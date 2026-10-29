@@ -1,0 +1,33 @@
+name: Set up toolchain
+description: >-
+  Installs pnpm (the exact version pinned by "packageManager" in package.json) and Node.js (version from
+  .node-version) with the pnpm store cached, then optionally runs a frozen-lockfile install.
+  Run actions/checkout first.
+
+inputs:
+  install:
+    description: Run `pnpm install --frozen-lockfile` after setting up the toolchain.
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    # pnpm must exist before setup-node so that its `cache: pnpm` can locate the store.
+    - name: Install pnpm
+      uses: pnpm/action-setup@v6
+
+    - name: Install Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version-file: .node-version
+        cache: pnpm
+        cache-dependency-path: pnpm-lock.yaml
+
+    - name: Install dependencies
+      if: inputs.install == 'true'
+      shell: bash
+      env:
+        # The root "prepare" script would otherwise try to install git hooks on the runner.
+        HUSKY: '0'
+      run: pnpm install --frozen-lockfile

@@ -1,0 +1,37 @@
+LICENSE PENDING - OWNER DECISION REQUIRED
+=========================================
+
+This repository does NOT have an open-source license yet. This file is a placeholder and is
+not itself a license.
+
+Current legal position
+----------------------
+Until the repository owner chooses and adds a license, the default copyright rules apply:
+the authors keep all rights, and nobody may copy, modify, distribute or build on this code,
+except for what GitHub's Terms of Service allow (viewing and forking the repository on
+GitHub). The root package.json declares "license": "UNLICENSED" for the same reason.
+
+Recommendation (a suggestion, not legal advice)
+-----------------------------------------------
+Pick one of these two permissive licenses:
+
+  * Apache-2.0 - preferred for this project. It is permissive, and it adds an explicit patent
+    grant from every contributor plus a patent-retaliation clause. That matters for a project
+    that others (including companies) may build on or contribute to, and it keeps the
+    contributor terms unambiguous.
+
+  * MIT - choose it if maximum simplicity and the shortest possible text matter more than an
+    explicit patent grant. It is permissive and widely understood, but silent on patents.
+
+Whichever you choose, do it deliberately: this file intentionally does not pick one for you.
+
+To finish
+---------
+1. Replace this file with the full, unmodified text of the chosen license (for example from
+   https://choosealicense.com/), with the copyright year and holder filled in.
+2. Change "license" in package.json from "UNLICENSED" to the SPDX identifier (for example
+   "Apache-2.0" or "MIT") and remove the "private" flag only if you intend to publish packages.
+3. Update the "License" section of CONTRIBUTING.md and, if you want pull requests checked
+   against a license allow-list, set allow-licenses in .github/workflows/dependency-review.yml.
+4. Check that every dependency's license is compatible with your choice (third-party
+   licenses are unaffected by this decision).

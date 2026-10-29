@@ -1,0 +1,10 @@
+# Git hook (husky v9): runs before every commit. Keep it fast; CI re-runs the same checks.
+#   1. lint-staged formats the staged files with Prettier (configuration: package.json).
+#   2. the secret scanner inspects the STAGED content and never prints a matched value.
+if command -v pnpm >/dev/null 2>&1; then
+  pnpm exec lint-staged
+else
+  # pnpm is not on PATH inside some Git GUIs on Windows; husky already put node_modules/.bin on PATH.
+  lint-staged
+fi
+node scripts/scan-secrets.mjs --staged

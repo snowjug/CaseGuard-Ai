@@ -1,0 +1,137 @@
+# Dependabot version updates. Renovate is intentionally not used (see docs/CI_CD.md).
+# Majors arrive as separate pull requests; minor and patch updates are grouped by ecosystem area so that a
+# week of upstream releases becomes a handful of reviewable PRs. Updates wait a few days after a release
+# (cooldown) so that freshly published, possibly compromised versions are not proposed immediately.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '05:00'
+      timezone: Etc/UTC
+    open-pull-requests-limit: 10
+    labels: [dependencies]
+    commit-message:
+      prefix: 'chore(deps)'
+      prefix-development: 'chore(deps-dev)'
+    cooldown:
+      default-days: 3
+      semver-major-days: 14
+    groups:
+      fluent-ui:
+        patterns: ['@fluentui/*']
+        update-types: [minor, patch]
+      next-react:
+        patterns: ['next', '@next/*', 'react', 'react-dom', '@types/react', '@types/react-dom']
+        update-types: [minor, patch]
+      web-data:
+        patterns: ['@tanstack/*', 'react-hook-form', '@hookform/*', '@azure/msal-*']
+        update-types: [minor, patch]
+      fastify:
+        patterns: ['fastify', 'fastify-*', '@fastify/*']
+        update-types: [minor, patch]
+      observability:
+        patterns: ['pino', 'pino-*', '@opentelemetry/*', '@azure/monitor-*']
+        update-types: [minor, patch]
+      azure-sdk:
+        patterns: ['@azure/*']
+        update-types: [minor, patch]
+      testing:
+        patterns:
+          [
+            'vitest',
+            '@vitest/*',
+            '@playwright/*',
+            'playwright*',
+            '@testing-library/*',
+            'jsdom',
+            'fast-check',
+            'axe-core',
+            '@axe-core/*',
+          ]
+        update-types: [minor, patch]
+      lint-and-format:
+        patterns:
+          [
+            'eslint',
+            'eslint-*',
+            '@eslint/*',
+            'typescript-eslint',
+            '@next/eslint-plugin-next',
+            'prettier',
+            'globals',
+            'husky',
+            'lint-staged',
+          ]
+        update-types: [minor, patch]
+      build-tooling:
+        patterns: ['typescript', 'tsx', 'tsup', 'concurrently', '@types/*']
+        update-types: [minor, patch]
+    ignore:
+      # Toolchain majors are held back for compatibility (docs/adr/0001-monorepo-strategy.md). Lift an
+      # entry deliberately, together with an ADR update, when the surrounding tools support the next major.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+      - dependency-name: eslint
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@eslint/js'
+        update-types: ['version-update:semver-major']
+      - dependency-name: vitest
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@vitest/coverage-v8'
+        update-types: ['version-update:semver-major']
+      # The runtime is Node 24, so the type definitions must stay on 24.x.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: github-actions
+    directories: ['/', '/.github/actions/*']
+    schedule:
+      interval: weekly
+      day: monday
+      time: '05:30'
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    labels: [dependencies, github-actions]
+    commit-message:
+      prefix: 'ci(deps)'
+    cooldown:
+      default-days: 3
+    groups:
+      actions:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directories: ['/apps/api', '/apps/web']
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    labels: [dependencies, docker]
+    commit-message:
+      prefix: 'build(deps)'
+    cooldown:
+      default-days: 3
+    groups:
+      node-base-image:
+        patterns: ['node']
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:30'
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    labels: [dependencies, docker]
+    commit-message:
+      prefix: 'build(deps)'
+    cooldown:
+      default-days: 3

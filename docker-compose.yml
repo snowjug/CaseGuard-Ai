@@ -1,0 +1,145 @@
+# CaseGuard AI: local development stack. DEV ONLY.
+#
+# Never use this file, its default credentials or the dev persona authentication outside a developer
+# machine. All data in the stack is synthetic demo data. Published ports are bound to 127.0.0.1
+# because the dev persona login (AUTH_MODE=dev) has no real authentication.
+#
+#   docker compose up --build              postgres + api + web, then open http://localhost:3000
+#   docker compose --profile azurite up    additionally start the Azurite blob emulator
+#   docker compose down -v                 stop everything and delete the data volumes
+#
+# Status: `docker compose config` validates this file without a daemon. The stack itself has NOT been
+# started in the environment where this file was written (no Docker daemon was available); CI builds
+# the images and runs a compose smoke test (see docs/CI_CD.md).
+name: caseguard
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: caseguard
+      # DEV ONLY default. Override with POSTGRES_PASSWORD in your shell or a local .env file
+      # (use a URL-safe value: it is embedded in DATABASE_URL below).
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-caseguard_dev_only}
+      POSTGRES_DB: caseguard
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      # Unusual host port on purpose, so it does not collide with a PostgreSQL already on 5432.
+      - '127.0.0.1:${POSTGRES_HOST_PORT:-55432}:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U caseguard -d caseguard']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+    image: caseguard-api:local
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_ENV: local
+      SERVICE_NAME: caseguard-api
+      API_HOST: 0.0.0.0
+      API_PORT: '4000'
+      LOG_LEVEL: info
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      # Dev persona authentication: acceptable only because APP_ENV=local and the port is loopback.
+      AUTH_MODE: dev
+      DEV_AUTH_ENABLED: 'true'
+      DATABASE_URL: postgres://caseguard:${POSTGRES_PASSWORD:-caseguard_dev_only}@postgres:5432/caseguard
+      DATABASE_AUTH: password
+      DB_AUTO_MIGRATE: 'true'
+      STORAGE_PROVIDER: local
+      STORAGE_LOCAL_DIR: /app/.data/objects
+      SEARCH_PROVIDER: lexical
+      AI_PROVIDER: deterministic
+      DEMO_MODE: 'true'
+      DEMO_AUTO_SEED: 'true'
+    volumes:
+      - api-data:/app/.data
+    ports:
+      - '127.0.0.1:4000:4000'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 20s
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:4000/livez').then((r)=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+        # Build-time values: Next.js bakes the rewrite target and NEXT_PUBLIC_* into the image.
+        API_INTERNAL_URL: http://api:4000
+        NEXT_PUBLIC_AUTH_MODE: dev
+        NEXT_PUBLIC_APP_ENV: local
+    image: caseguard-web:local
+    init: true
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      HOSTNAME: 0.0.0.0
+      PORT: '3000'
+      API_INTERNAL_URL: http://api:4000
+      NEXT_PUBLIC_AUTH_MODE: dev
+      NEXT_PUBLIC_APP_ENV: local
+    ports:
+      - '127.0.0.1:3000:3000'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/').then((r)=>process.exit(r.status<500?0:1),()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  # Optional blob emulator, for experiments only. The API's azure-blob storage provider authenticates
+  # with Microsoft Entra ID / managed identity (DefaultAzureCredential), which Azurite does not offer,
+  # so the API cannot use this emulator. It is useful for other tools (for example Azure Storage
+  # Explorer with the well-known Azurite development account from the Azurite documentation).
+  azurite:
+    profiles: ['azurite']
+    image: mcr.microsoft.com/azure-storage/azurite:3.37.0
+    command: azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --location /data --skipApiVersionCheck
+    volumes:
+      - azurite-data:/data
+    ports:
+      - '127.0.0.1:10000:10000'
+
+volumes:
+  postgres-data:
+  api-data:
+  azurite-data:

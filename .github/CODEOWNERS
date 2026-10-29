@@ -1,0 +1,23 @@
+# Code owners: every pull request touching these paths asks the owner for a review.
+#
+# NOTE: the owner below (@snowjug, the repository owner) must CONFIRM this file before relying on it.
+# Add more owners or a team (for example @snowjug/maintainers) as the project grows. Combine this file with
+# the branch protection rule "Require review from Code Owners" (see docs/CI_CD.md).
+
+* @snowjug
+
+# Security-sensitive code and anything that changes the supply chain or what is deployed.
+/.github/ @snowjug
+/infra/ @snowjug
+/packages/security/ @snowjug
+/packages/config/ @snowjug
+/apps/api/src/db/migrations/ @snowjug
+/apps/api/Dockerfile @snowjug
+/apps/web/Dockerfile @snowjug
+/docker-compose.yml @snowjug
+/scripts/ @snowjug
+/pnpm-lock.yaml @snowjug
+/pnpm-workspace.yaml @snowjug
+/SECURITY.md @snowjug
+/docs/THREAT_MODEL.md @snowjug
+/docs/adr/ @snowjug

@@ -1,0 +1,328 @@
+name: Deploy environment (reusable)
+
+# Deploys CaseGuard AI to ONE Azure environment with GitHub OIDC (no stored credentials). It is called by
+# deploy.yml and is inert on its own: nothing runs unless a caller invokes it, and every Azure value comes
+# from GitHub variables that a human must configure (see docs/CI_CD.md).
+#
+#   mode what-if : preview only (az deployment sub what-if); nothing is created or changed
+#   mode deploy  : what-if, infra (stage 1), images (az acr build), apps (stage 2), migration job, smoke
+#                  test, and an automatic rollback to the previously deployed image tag when a step after
+#                  the apps deployment fails
+#
+# Database migrations are forward-only: a rollback restores the previous application images but does NOT
+# undo schema changes, so migrations must stay backward compatible (expand, then contract in a later release).
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub environment and target environment (dev or production).
+        type: string
+        required: true
+      mode:
+        description: what-if or deploy.
+        type: string
+        required: true
+      image_tag:
+        description: Immutable tag for the API and web images.
+        type: string
+        required: true
+    secrets:
+      CASEGUARD_POSTGRES_ADMIN_PASSWORD:
+        description: >-
+          Optional. Only for a parameter file that sets postgresAuthMode to 'password' (dev). Leave unset
+          when the database uses Microsoft Entra authentication.
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: ${{ inputs.mode }} ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    # The environment scopes the OIDC subject (repo:<owner>/<repo>:environment:<name>), its variables and,
+    # for production, the required-reviewer approval gate.
+    environment: ${{ inputs.environment }}
+    timeout-minutes: 120
+    concurrency:
+      group: azure-deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+    defaults:
+      run:
+        shell: bash
+    env:
+      ENVIRONMENT: ${{ inputs.environment }}
+      MODE: ${{ inputs.mode }}
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Check configuration
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_BICEP_PARAMETERS: ${{ vars.AZURE_BICEP_PARAMETERS }}
+        run: |
+          missing=""
+          for name in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID AZURE_LOCATION AZURE_BICEP_PARAMETERS; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing GitHub variables for environment '$ENVIRONMENT':$missing. Complete the setup in docs/CI_CD.md first."
+            exit 1
+          fi
+          for name in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
+            value="${!name}"
+            if ! printf '%s' "$value" | grep -Eq '^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$' \
+              || [ "$value" = "00000000-0000-0000-0000-000000000000" ]; then
+              echo "::error::$name is not a valid, non-placeholder GUID."
+              exit 1
+            fi
+          done
+          case "$MODE" in what-if | deploy) ;; *) echo "::error::mode must be what-if or deploy"; exit 1 ;; esac
+          printf '%s' "$IMAGE_TAG" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$' \
+            || { echo "::error::image_tag must be 1-64 characters of letters, digits, '.', '_' or '-'"; exit 1; }
+
+      - uses: ./.github/actions/setup
+        with:
+          install: 'false'
+
+      - name: Choose deployment names
+        id: names
+        run: |
+          suffix="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          {
+            echo "whatif=caseguard-${ENVIRONMENT}-whatif-${suffix}"
+            echo "infra=caseguard-${ENVIRONMENT}-infra-${suffix}"
+            echo "apps=caseguard-${ENVIRONMENT}-apps-${suffix}"
+            echo "rollback=caseguard-${ENVIRONMENT}-rollback-${suffix}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Write the parameter file
+        id: params
+        env:
+          BICEP_PARAMETERS: ${{ vars.AZURE_BICEP_PARAMETERS }}
+        run: |
+          file="infra/bicep/main.${ENVIRONMENT}.local.bicepparam"
+          printf '%s\n' "$BICEP_PARAMETERS" > "$file"
+          if grep -Eq 'CHANGE-ME|example\.com|00000000-0000-0000-0000-000000000000|<[A-Za-z]' "$file"; then
+            echo "::error::AZURE_BICEP_PARAMETERS still contains placeholders (CHANGE-ME, example.com, all-zero GUIDs or <...>)."
+            exit 1
+          fi
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Azure (OIDC, no stored credentials)
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Prepare the Azure CLI
+        run: |
+          az config set extension.use_dynamic_install=yes_without_prompt extension.dynamic_install_allow_preview=false --only-show-errors
+          az bicep install --only-show-errors
+          az extension add --name containerapp --upgrade --only-show-errors
+
+      - name: What-if (preview of the full change set)
+        id: whatif
+        uses: ./.github/actions/bicep-deploy
+        env:
+          CASEGUARD_POSTGRES_ADMIN_PASSWORD: ${{ secrets.CASEGUARD_POSTGRES_ADMIN_PASSWORD }}
+        with:
+          mode: what-if
+          deployment-name: ${{ steps.names.outputs.whatif }}
+          deploy-apps: 'true'
+          image-tag: ${{ inputs.image_tag }}
+          location: ${{ vars.AZURE_LOCATION }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          parameter-file: ${{ steps.params.outputs.file }}
+
+      # ---- everything below creates or changes billable Azure resources: deploy mode only ----------
+
+      - name: Stage 1, infrastructure without the apps
+        id: infra
+        if: ${{ inputs.mode == 'deploy' }}
+        uses: ./.github/actions/bicep-deploy
+        env:
+          CASEGUARD_POSTGRES_ADMIN_PASSWORD: ${{ secrets.CASEGUARD_POSTGRES_ADMIN_PASSWORD }}
+        with:
+          mode: create
+          deployment-name: ${{ steps.names.outputs.infra }}
+          deploy-apps: 'false'
+          image-tag: ${{ inputs.image_tag }}
+          location: ${{ vars.AZURE_LOCATION }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          parameter-file: ${{ steps.params.outputs.file }}
+
+      - name: Read stage 1 outputs
+        id: infra_outputs
+        if: ${{ inputs.mode == 'deploy' }}
+        env:
+          INFRA_DEPLOYMENT: ${{ steps.names.outputs.infra }}
+        run: |
+          show() {
+            az deployment sub show --subscription "$AZURE_SUBSCRIPTION_ID" --name "$INFRA_DEPLOYMENT" "$@"
+          }
+          {
+            echo "registry=$(show --query properties.outputs.containerRegistryName.value --output tsv)"
+            echo "resource_group=$(show --query properties.outputs.resourceGroupName.value --output tsv)"
+            delimiter="ARGS_$(openssl rand -hex 8)"
+            echo "web_build_args<<$delimiter"
+            show --query 'properties.outputs.webBuildArguments.value[]' --output tsv
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Record the currently deployed API image tag (rollback target)
+        id: previous
+        if: ${{ inputs.mode == 'deploy' }}
+        env:
+          RESOURCE_GROUP: ${{ steps.infra_outputs.outputs.resource_group }}
+        run: |
+          previous=""
+          images="$(az containerapp list --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "$RESOURCE_GROUP" \
+            --query '[].properties.template.containers[0].image' --output tsv 2>/dev/null || true)"
+          while IFS= read -r image; do
+            case "$image" in
+              */caseguard-api:*) previous="${image##*:}" ;;
+            esac
+          done <<< "$images"
+          echo "tag=$previous" >> "$GITHUB_OUTPUT"
+          if [ -n "$previous" ]; then
+            echo "Currently deployed API image tag: $previous"
+          else
+            echo "No API container app is deployed yet, so automatic rollback is unavailable for this run."
+          fi
+
+      - name: Build and push the images (az acr build)
+        id: images
+        if: ${{ inputs.mode == 'deploy' }}
+        env:
+          REGISTRY: ${{ steps.infra_outputs.outputs.registry }}
+          WEB_BUILD_ARGS: ${{ steps.infra_outputs.outputs.web_build_args }}
+        run: |
+          api_args=(--build-arg "GIT_COMMIT=$GITHUB_SHA")
+          web_args=(--build-arg "GIT_COMMIT=$GITHUB_SHA")
+          # Next.js bakes API_INTERNAL_URL and NEXT_PUBLIC_* into the web image, so its build arguments
+          # come from this environment's stage 1 outputs. None of them is a secret.
+          while IFS= read -r arg; do
+            if [ -n "$arg" ]; then web_args+=(--build-arg "$arg"); fi
+          done <<< "$WEB_BUILD_ARGS"
+          az acr build --subscription "$AZURE_SUBSCRIPTION_ID" --registry "$REGISTRY" \
+            --image "caseguard-api:$IMAGE_TAG" --file apps/api/Dockerfile "${api_args[@]}" .
+          az acr build --subscription "$AZURE_SUBSCRIPTION_ID" --registry "$REGISTRY" \
+            --image "caseguard-web:$IMAGE_TAG" --file apps/web/Dockerfile "${web_args[@]}" .
+
+      - name: Stage 2, apps and migration job with the new image tag
+        id: apps
+        if: ${{ inputs.mode == 'deploy' }}
+        uses: ./.github/actions/bicep-deploy
+        env:
+          CASEGUARD_POSTGRES_ADMIN_PASSWORD: ${{ secrets.CASEGUARD_POSTGRES_ADMIN_PASSWORD }}
+        with:
+          mode: create
+          deployment-name: ${{ steps.names.outputs.apps }}
+          deploy-apps: 'true'
+          image-tag: ${{ inputs.image_tag }}
+          location: ${{ vars.AZURE_LOCATION }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          parameter-file: ${{ steps.params.outputs.file }}
+
+      - name: Read stage 2 outputs
+        id: apps_outputs
+        if: ${{ inputs.mode == 'deploy' }}
+        env:
+          APPS_DEPLOYMENT: ${{ steps.names.outputs.apps }}
+        run: |
+          show() {
+            az deployment sub show --subscription "$AZURE_SUBSCRIPTION_ID" --name "$APPS_DEPLOYMENT" "$@"
+          }
+          {
+            echo "web_url=$(show --query properties.outputs.webUrl.value --output tsv)"
+            echo "migrate_job=$(show --query properties.outputs.migrateJobName.value --output tsv)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run the database migration job
+        id: migrate
+        if: ${{ inputs.mode == 'deploy' }}
+        env:
+          RESOURCE_GROUP: ${{ steps.infra_outputs.outputs.resource_group }}
+          JOB_NAME: ${{ steps.apps_outputs.outputs.migrate_job }}
+        run: |
+          [ -n "$JOB_NAME" ] || { echo "::error::The deployment did not report a migration job."; exit 1; }
+          execution="$(az containerapp job start --subscription "$AZURE_SUBSCRIPTION_ID" \
+            --resource-group "$RESOURCE_GROUP" --name "$JOB_NAME" --query name --output tsv)"
+          deadline=$((SECONDS + 1200))
+          status=""
+          while ((SECONDS < deadline)); do
+            sleep 15
+            status="$(az containerapp job execution show --subscription "$AZURE_SUBSCRIPTION_ID" \
+              --resource-group "$RESOURCE_GROUP" --name "$JOB_NAME" --job-execution-name "$execution" \
+              --query properties.status --output tsv)"
+            echo "migration execution $execution: $status"
+            case "$status" in Succeeded | Failed | Stopped | Degraded) break ;; esac
+          done
+          if [ "$status" != "Succeeded" ]; then
+            echo "::error::The migration job ended with status '${status:-unknown}'. See docs/runbooks (broken migration) before retrying."
+            exit 1
+          fi
+
+      - name: Smoke test through the public web URL
+        id: smoke
+        if: ${{ inputs.mode == 'deploy' }}
+        env:
+          WEB_URL: ${{ steps.apps_outputs.outputs.web_url }}
+        run: |
+          [ -n "$WEB_URL" ] || { echo "::error::The deployment did not report a web URL."; exit 1; }
+          # The API has internal ingress only. Its health endpoints are reachable through the web app's
+          # proxy (next.config.ts rewrites /livez, /healthz and /readyz), so --api points at the web URL too.
+          node scripts/smoke-test.mjs --web "$WEB_URL" --api "$WEB_URL" --auth enforced --wait 300 --timeout 20000
+
+      - name: Roll back to the previous image tag
+        id: rollback
+        if: ${{ failure() && (steps.apps.outcome == 'success' || steps.apps.outcome == 'failure') && steps.previous.outputs.tag != '' }}
+        uses: ./.github/actions/bicep-deploy
+        env:
+          CASEGUARD_POSTGRES_ADMIN_PASSWORD: ${{ secrets.CASEGUARD_POSTGRES_ADMIN_PASSWORD }}
+        with:
+          mode: create
+          deployment-name: ${{ steps.names.outputs.rollback }}
+          deploy-apps: 'true'
+          image-tag: ${{ steps.previous.outputs.tag }}
+          location: ${{ vars.AZURE_LOCATION }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          parameter-file: ${{ steps.params.outputs.file }}
+
+      - name: Explain the rollback outcome
+        if: ${{ failure() && (steps.apps.outcome == 'success' || steps.apps.outcome == 'failure') }}
+        env:
+          PREVIOUS_TAG: ${{ steps.previous.outputs.tag }}
+          ROLLBACK_OUTCOME: ${{ steps.rollback.outcome }}
+        run: |
+          if [ "$ROLLBACK_OUTCOME" = "success" ]; then
+            echo "::error::Release $IMAGE_TAG failed its checks; the previous image tag $PREVIOUS_TAG was restored. Database migrations were NOT rolled back."
+          elif [ -z "$PREVIOUS_TAG" ]; then
+            echo "::error::Release $IMAGE_TAG failed its checks and there is no previous release to roll back to (first deployment)."
+          else
+            echo "::error::Release $IMAGE_TAG failed its checks AND the automatic rollback to $PREVIOUS_TAG did not complete. Intervene manually."
+          fi
+
+      - name: Summary
+        if: ${{ always() }}
+        env:
+          WEB_URL: ${{ steps.apps_outputs.outputs.web_url }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          {
+            echo "### Deploy $ENVIRONMENT ($MODE)"
+            echo "- Result: $JOB_STATUS"
+            echo "- Image tag: \`$IMAGE_TAG\` (commit \`$GITHUB_SHA\`)"
+            if [ -n "$WEB_URL" ]; then echo "- Web URL: $WEB_URL"; fi
+            echo "- A green run means every step above exited 0, including the smoke test; it says nothing about checks that were not part of it."
+          } >> "$GITHUB_STEP_SUMMARY"
+          rm -f "infra/bicep/main.${ENVIRONMENT}.local.bicepparam"

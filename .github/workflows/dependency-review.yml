@@ -1,0 +1,27 @@
+name: Dependency review
+
+# Blocks pull requests that add or bump a dependency with a known HIGH/CRITICAL vulnerability.
+# Needs the dependency graph (enabled by default for public repositories; private repositories also need
+# GitHub Code Security). It complements `pnpm audit:deps`, which checks the whole lockfile.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    name: Review dependency changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Dependency review
+        uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+          fail-on-scopes: runtime
+          # No pull-request write permission is granted, so the summary stays in the job summary.
+          comment-summary-in-pr: never

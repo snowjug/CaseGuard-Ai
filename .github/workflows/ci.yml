@@ -1,0 +1,311 @@
+name: CI
+
+# Runs on pull requests, on pushes to every branch except the default branch (a PR merging into it was
+# already validated), on manual dispatch, and as a reusable workflow (deploy.yml calls it before deploying).
+# Every pnpm quality gate runs through scripts/verify.mjs, which records an honest PASSED / FAILED /
+# NOT RUN result per step; the final job merges those results into the `verification-report` artifact.
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+  workflow_call:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+
+permissions:
+  contents: read
+
+env:
+  CI: 'true'
+  HUSKY: '0'
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  quality:
+    name: Format, lint, typecheck, unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Format check
+        run: node scripts/verify.mjs --only format:check --json-out "$RUNNER_TEMP/reports/quality-format-check.json" --no-md
+      - name: Lint
+        if: ${{ !cancelled() }}
+        run: node scripts/verify.mjs --only lint --json-out "$RUNNER_TEMP/reports/quality-lint.json" --no-md
+      - name: Typecheck
+        if: ${{ !cancelled() }}
+        run: node scripts/verify.mjs --only typecheck --json-out "$RUNNER_TEMP/reports/quality-typecheck.json" --no-md
+      - name: Unit tests
+        if: ${{ !cancelled() }}
+        run: node scripts/verify.mjs --only test:unit --json-out "$RUNNER_TEMP/reports/quality-test-unit.json" --no-md
+      - name: Upload verification reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: verify-quality
+          path: ${{ runner.temp }}/reports
+          if-no-files-found: ignore
+          retention-days: 14
+
+  integration:
+    name: Integration tests (PostgreSQL 16) and demo replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: caseguard
+          # Throwaway credentials for an ephemeral CI service container; not a secret.
+          POSTGRES_PASSWORD: ci_only_password
+          POSTGRES_DB: caseguard_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U caseguard -d caseguard_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgres://caseguard:ci_only_password@127.0.0.1:5432/caseguard_test
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Integration tests
+        run: node scripts/verify.mjs --only test:int --json-out "$RUNNER_TEMP/reports/integration-test-int.json" --no-md
+      - name: Demo reset and seed replay
+        if: ${{ !cancelled() }}
+        run: node scripts/verify.mjs --only demo:replay --json-out "$RUNNER_TEMP/reports/integration-demo-replay.json" --no-md
+      - name: Upload verification reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: verify-integration
+          path: ${{ runner.temp }}/reports
+          if-no-files-found: ignore
+          retention-days: 14
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Build
+        run: node scripts/verify.mjs --only build --json-out "$RUNNER_TEMP/reports/build-build.json" --no-md
+      - name: Upload verification reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: verify-build
+          path: ${{ runner.temp }}/reports
+          if-no-files-found: ignore
+          retention-days: 14
+
+  e2e:
+    name: End-to-end and accessibility (Playwright, axe)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Build
+        run: node scripts/verify.mjs --only build --json-out "$RUNNER_TEMP/reports/e2e-build.json" --no-md
+      - name: Install Playwright Chromium with system dependencies
+        run: pnpm exec playwright install --with-deps chromium
+      - name: End-to-end tests (includes axe accessibility checks)
+        run: node scripts/verify.mjs --only test:e2e --json-out "$RUNNER_TEMP/reports/e2e-test-e2e.json" --no-md
+      - name: Upload Playwright report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload verification reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: verify-e2e
+          path: ${{ runner.temp }}/reports
+          if-no-files-found: ignore
+          retention-days: 14
+
+  security:
+    name: Secret scan and dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # gitleaks lists the commits of a pull request through the API.
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history, so gitleaks can scan every commit of the push or pull request.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Secret scan (repository scanner, working tree)
+        run: node scripts/verify.mjs --only secrets:scan --json-out "$RUNNER_TEMP/reports/security-secrets-scan.json" --no-md
+      - name: Secret scan (gitleaks, commit history)
+        if: ${{ !cancelled() }}
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Only needed when the repository belongs to an organisation; empty (and ignored) otherwise.
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_VERSION: '8.30.1'
+          GITLEAKS_ENABLE_COMMENTS: 'false'
+      - name: Dependency audit (lockfile hygiene and vulnerabilities)
+        if: ${{ !cancelled() }}
+        run: node scripts/verify.mjs --only audit:deps --json-out "$RUNNER_TEMP/reports/security-audit-deps.json" --no-md
+      - name: Upload verification reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: verify-security
+          path: ${{ runner.temp }}/reports
+          if-no-files-found: ignore
+          retention-days: 14
+
+  infra:
+    name: Bicep validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # scripts/infra-validate.mjs only needs Node and pnpm (to run it through verify), not the dependencies.
+      - uses: ./.github/actions/setup
+        with:
+          install: 'false'
+      - name: Install Bicep CLI
+        run: |
+          az bicep install
+          az bicep version
+      - name: Bicep build, lint and parameter scan
+        run: node scripts/verify.mjs --only infra:validate --json-out "$RUNNER_TEMP/reports/infra-infra-validate.json" --no-md
+      - name: Upload verification reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: verify-infra
+          path: ${{ runner.temp }}/reports
+          if-no-files-found: ignore
+          retention-days: 14
+
+  containers:
+    name: Container images and compose smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          install: 'false'
+      - uses: docker/setup-buildx-action@v4
+      # push: false everywhere: images are only built (and loaded for the smoke test), never published by CI.
+      - name: Build API image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: false
+          load: true
+          tags: caseguard-api:local
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+      - name: Build web image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: false
+          load: true
+          tags: caseguard-web:local
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            API_INTERNAL_URL=http://api:4000
+            NEXT_PUBLIC_AUTH_MODE=dev
+            NEXT_PUBLIC_APP_ENV=local
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+      - name: Start the compose stack
+        run: docker compose up --no-build --detach --wait --wait-timeout 240
+      - name: Smoke test
+        run: node scripts/smoke-test.mjs --api http://localhost:4000 --web http://localhost:3000 --auth dev --wait 120
+      - name: Compose logs (on failure)
+        if: ${{ failure() }}
+        run: docker compose logs --no-color --tail 200
+      - name: Stop the compose stack
+        if: ${{ always() }}
+        run: docker compose down --volumes
+
+  report:
+    name: CI gate
+    if: ${{ always() }}
+    needs: [quality, integration, build, e2e, security, infra, containers]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          install: 'false'
+      - name: Prepare report directory
+        run: mkdir -p "$RUNNER_TEMP/reports"
+      - name: Download per-job reports
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          pattern: verify-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/reports
+      - name: Merge into the verification report
+        continue-on-error: true
+        run: |
+          node scripts/verify.mjs --merge "$RUNNER_TEMP/reports" \
+            --external "docker:build=${{ needs.containers.result }}" \
+            --json-out verification-report.json --md-out verification-report.md --allow-not-run \
+            || echo "::warning::at least one step did not pass; the gate step below decides the outcome"
+          cat verification-report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload verification report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: verification-report
+          path: |
+            verification-report.json
+            verification-report.md
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Fail unless every job succeeded
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          node -e "const jobs = Object.entries(JSON.parse(process.env.NEEDS)); const bad = jobs.filter(([, job]) => job.result !== 'success'); for (const [name, job] of bad) console.error('::error::job ' + name + ' finished with result ' + job.result); process.exit(bad.length > 0 ? 1 : 0)"

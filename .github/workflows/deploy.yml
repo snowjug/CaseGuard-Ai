@@ -1,0 +1,187 @@
+name: Deploy
+
+# INERT BY DEFAULT. Nothing in this workflow touches Azure until a human completes the one-time setup in
+# docs/CI_CD.md (Entra app registration with federated credentials, GitHub environments and variables) and
+# then sets the repository variable AZURE_DEPLOY_ENABLED=true. Until then every run stops after the
+# preflight job with a notice.
+#
+# - Manual (workflow_dispatch): choose the environment and the mode. `what-if` (the default) previews the
+#   change; `deploy` creates or updates resources.
+# - Tag push (v*.*.*): deploys to DEV only, and only when the variable AZURE_DEPLOY_ON_TAG=true is also set.
+# - PRODUCTION is never automatic: it needs a manual dispatch AND approval from the required reviewers
+#   configured on the `production` GitHub environment, and it follows a successful dev run of the same ref.
+#
+# No secret is stored for Azure access: azure/login uses OIDC with the client, tenant and subscription ids
+# held in (non-secret) GitHub variables. See deploy-environment.yml for the per-environment steps.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment. production needs approval from the reviewers set on the production environment.
+        type: choice
+        options: [dev, production]
+        default: dev
+      mode:
+        description: what-if previews only; deploy creates or changes billable Azure resources.
+        type: choice
+        options: [what-if, deploy]
+        default: what-if
+      image_tag:
+        description: Immutable image tag (letters, digits, dot, underscore, dash). Empty means the first 12 characters of the commit SHA.
+        type: string
+        default: ''
+      run_ci:
+        description: Run the full CI workflow for this ref first.
+        type: boolean
+        default: true
+      skip_dev:
+        description: With environment=production, skip the dev run that normally comes first (for example when no dev environment exists).
+        type: boolean
+        default: false
+  push:
+    tags: ['v*.*.*']
+
+concurrency:
+  group: azure-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    name: Preflight (is deployment enabled?)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      enabled: ${{ steps.plan.outputs.enabled }}
+      mode: ${{ steps.plan.outputs.mode }}
+      image_tag: ${{ steps.plan.outputs.image_tag }}
+      production: ${{ steps.plan.outputs.production }}
+      run_ci: ${{ steps.plan.outputs.run_ci }}
+      skip_dev: ${{ steps.plan.outputs.skip_dev }}
+    steps:
+      - name: Decide what this run does
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_ENVIRONMENT: ${{ inputs.environment }}
+          INPUT_MODE: ${{ inputs.mode }}
+          INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
+          INPUT_RUN_CI: ${{ inputs.run_ci }}
+          INPUT_SKIP_DEV: ${{ inputs.skip_dev }}
+          AZURE_DEPLOY_ENABLED: ${{ vars.AZURE_DEPLOY_ENABLED }}
+          AZURE_DEPLOY_ON_TAG: ${{ vars.AZURE_DEPLOY_ON_TAG }}
+        run: |
+          enabled=false
+          environment=dev
+          mode=what-if
+          run_ci=true
+          skip_dev=false
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            environment="$INPUT_ENVIRONMENT"
+            mode="$INPUT_MODE"
+            run_ci="$INPUT_RUN_CI"
+            skip_dev="$INPUT_SKIP_DEV"
+            if [ "$AZURE_DEPLOY_ENABLED" = "true" ]; then enabled=true; fi
+          elif [ "$EVENT" = "push" ]; then
+            # A version tag deploys to dev only, and only when the owner opted in explicitly.
+            mode=deploy
+            if [ "$AZURE_DEPLOY_ENABLED" = "true" ] && [ "$AZURE_DEPLOY_ON_TAG" = "true" ]; then enabled=true; fi
+          fi
+          production=false
+          if [ "$environment" = "production" ]; then production=true; else skip_dev=false; fi
+          image_tag="$INPUT_IMAGE_TAG"
+          if [ -z "$image_tag" ]; then image_tag="${GITHUB_SHA::12}"; fi
+          if ! printf '%s' "$image_tag" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$'; then
+            echo "::error::image_tag must be 1-64 characters of letters, digits, '.', '_' or '-'."
+            exit 1
+          fi
+          {
+            echo "enabled=$enabled"
+            echo "mode=$mode"
+            echo "image_tag=$image_tag"
+            echo "production=$production"
+            echo "run_ci=$run_ci"
+            echo "skip_dev=$skip_dev"
+          } >> "$GITHUB_OUTPUT"
+          if [ "$enabled" = "true" ]; then
+            echo "Plan: mode=$mode, production=$production, image tag=$image_tag, ci first=$run_ci"
+          else
+            echo "::notice::Azure deployment is disabled: set the repository variable AZURE_DEPLOY_ENABLED=true after completing docs/CI_CD.md (tag pushes also need AZURE_DEPLOY_ON_TAG=true). Nothing was deployed."
+            {
+              echo "### Azure deployment is disabled"
+              echo "This workflow is inert until the one-time setup in \`docs/CI_CD.md\` is done and the repository variable \`AZURE_DEPLOY_ENABLED\` is \`true\`. Nothing was deployed."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  validate:
+    name: Validate Bicep
+    needs: preflight
+    if: ${{ needs.preflight.outputs.enabled == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          install: 'false'
+      - name: Install Bicep CLI
+        run: |
+          az bicep install
+          az bicep version
+      - name: Bicep build, lint and parameter scan
+        run: node scripts/infra-validate.mjs
+
+  ci:
+    name: CI
+    needs: preflight
+    if: ${{ needs.preflight.outputs.enabled == 'true' && needs.preflight.outputs.run_ci == 'true' }}
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  dev:
+    name: Dev
+    needs: [preflight, validate, ci]
+    if: >-
+      ${{ !cancelled()
+      && needs.preflight.outputs.enabled == 'true'
+      && needs.preflight.outputs.skip_dev != 'true'
+      && needs.validate.result == 'success'
+      && (needs.ci.result == 'success' || needs.ci.result == 'skipped') }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: dev
+      mode: ${{ needs.preflight.outputs.mode }}
+      image_tag: ${{ needs.preflight.outputs.image_tag }}
+    secrets: inherit
+
+  production:
+    name: Production
+    needs: [preflight, validate, ci, dev]
+    # Never automatic: only a manual dispatch with environment=production reaches this job, and the
+    # production GitHub environment then waits for its required reviewers.
+    if: >-
+      ${{ !cancelled()
+      && needs.preflight.outputs.enabled == 'true'
+      && needs.preflight.outputs.production == 'true'
+      && needs.validate.result == 'success'
+      && (needs.ci.result == 'success' || needs.ci.result == 'skipped')
+      && (needs.dev.result == 'success' || needs.dev.result == 'skipped') }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: production
+      mode: ${{ needs.preflight.outputs.mode }}
+      image_tag: ${{ needs.preflight.outputs.image_tag }}
+    secrets: inherit

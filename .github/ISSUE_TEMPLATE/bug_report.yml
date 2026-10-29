@@ -1,0 +1,79 @@
+name: Bug report
+description: Something does not work as documented.
+title: '[Bug]: '
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping to improve CaseGuard AI.
+
+        **Do not paste real customer data, credentials, tokens or tenant/subscription ids.** All demo data in
+        this project is synthetic; please keep reproductions synthetic too. **Security vulnerabilities must
+        not be reported here**: use a private security advisory (see SECURITY.md).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you see instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps, ideally starting from `pnpm demo:reset && pnpm demo:seed` or `docker compose up --build`.
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Web UI
+        - API
+        - Analysis engine (domain)
+        - AI provider / prompts
+        - SkillDNA
+        - Security / auth
+        - Infrastructure (Bicep)
+        - CI/CD or tooling
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: how-run
+    attributes:
+      label: How are you running it?
+      options:
+        - pnpm dev (local)
+        - docker compose
+        - Azure deployment
+        - Tests / CI
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node version, pnpm version, browser, and the commit SHA if you know it.
+      render: text
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove secrets and personal data first. Screenshots of the synthetic demo are fine.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues.
+          required: true
+        - label: This report contains no real customer data, secrets, tenant ids or subscription ids.
+          required: true

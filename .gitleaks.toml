@@ -1,0 +1,33 @@
+# gitleaks configuration used by CI (gitleaks/gitleaks-action) and for local runs:
+#   gitleaks detect --source . --config .gitleaks.toml --redact
+#
+# This file only SUPPRESSES known-safe content on top of the built-in rules. The repository also has
+# its own scanner (scripts/scan-secrets.mjs, run by the pre-commit hook and `pnpm secrets:scan`);
+# the two are independent layers and neither relaxes the other.
+title = "CaseGuard AI gitleaks configuration"
+
+[extend]
+# Keep every built-in rule.
+useDefault = true
+
+[[allowlists]]
+description = "Synthetic demo data intentionally contains generated, secret-shaped canary strings used to test redaction (FR-ING-04). None of them is a real credential."
+paths = ['''(^|/)synthetic-data/''']
+
+[[allowlists]]
+description = "pnpm lockfile integrity hashes are public content digests, not credentials."
+paths = ['''(^|/)pnpm-lock\.yaml$''']
+
+[[allowlists]]
+description = "Azure built-in role definition ids (and other GUID constants) in Bicep templates are public identifiers, not credentials; only a value that is exactly a GUID is allowed."
+condition = "AND"
+paths = ['''(^|/)infra/.*\.bicep$''']
+regexTarget = "secret"
+regexes = ['''^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$''']
+
+[[allowlists]]
+description = "Documentation, issue/PR templates and env templates: lines that are clearly placeholders (angle-bracket values, example/changeme/placeholder markers, repeated x, all-zero GUIDs)."
+condition = "AND"
+paths = ['''(^|/)(docs/.*|[^/]*)\.md$''', '''(^|/)\.env\.example$''', '''(^|/)\.github/.*\.(md|ya?ml)$''']
+regexTarget = "line"
+regexes = ['''(?i)(<[a-z0-9_ .-]+>|changeme|placeholder|example|your[-_ ]|x{6,}|0{8}-0{4}-0{4}-0{4}-0{12})''']

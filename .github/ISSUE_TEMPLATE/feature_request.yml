@@ -1,0 +1,63 @@
+name: Feature request
+description: Suggest an improvement or a new capability.
+title: '[Feature]: '
+labels: [enhancement, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        CaseGuard AI is an evidence-grounded, counterfactual quality platform for technical support cases.
+        Requests that fit that scope (and the principles in the README: synthetic data only, honest
+        labelling, temporal integrity, "LLM proposes, code disposes") are the easiest to act on.
+
+        **Do not include real customer data or credentials.**
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or opportunity
+      description: What are you trying to do that is hard or impossible today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like to see? Sketches, API shapes or UI ideas are welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Web UI
+        - API
+        - Analysis engine (domain)
+        - AI provider / prompts
+        - SkillDNA / knowledge packs
+        - Security / privacy
+        - Infrastructure (Bicep)
+        - CI/CD or tooling
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: responsible-ai
+    attributes:
+      label: Responsible AI and security considerations
+      description: >-
+        Could this affect how model output is trusted, what data reaches a model, tenant isolation, or
+        who may approve or publish something? Say how it stays honest, auditable and reviewable.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and the implementation plan for similar requests.
+          required: true
+        - label: This request contains no real customer data or secrets.
+          required: true

@@ -56,3 +56,10 @@ infra/**/*.parameters.local.json
 *.pfx
 *.key
 *.p12
+
+# Scratch and verification artefacts (never commit)
+.scratch/
+.scratch*
+*.scratch*
+scratch/
+verification-report.json

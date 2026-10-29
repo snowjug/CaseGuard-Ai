@@ -1,0 +1,48 @@
+# Build context filter shared by apps/api/Dockerfile and apps/web/Dockerfile (context = repo root).
+# Anything not needed to build the images stays out of the context: it is faster, keeps caches stable
+# and avoids sending secrets or local state to the Docker daemon (or to ACR Tasks).
+
+# Version control and editor/tooling state
+.git
+.github
+.husky
+.vscode
+.idea
+
+# Dependencies and build output are produced inside the image
+**/node_modules
+**/.next
+**/dist
+**/build
+**/coverage
+**/.turbo
+**/*.tsbuildinfo
+**/.vitest
+
+# Local state, test output and anything that could hold secrets
+**/.data
+**/pgdata
+**/*.sqlite
+**/*.db
+**/playwright-report
+**/test-results
+**/blob-report
+**/.scratch
+.env
+.env.*
+!.env.example
+**/*.pem
+**/*.key
+**/*.pfx
+**/*.p12
+verification-report.json
+
+# Not needed to build the images (e2e, infrastructure, documentation). Excluding the Dockerfiles and
+# compose files keeps `COPY . .` cache layers stable; Docker still reads the Dockerfile given to -f.
+e2e
+infra
+docs
+*.md
+**/Dockerfile
+docker-compose*.yml
+.dockerignore

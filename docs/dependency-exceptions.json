@@ -1,0 +1,11 @@
+{
+  "$comment": "Time-boxed risk acceptances for scripts/audit-deps.mjs. Each entry needs id (GHSA/CVE/OSV id), package, justification (why the advisory is not exploitable here or what mitigates it) and expires (YYYY-MM-DD, at most a few months out). Expired entries are ignored and the advisory fails the audit again. Add an entry only with reviewer approval; prefer upgrading or a pnpm override.",
+  "exceptions": [
+    {
+      "id": "GHSA-xcx6-jx8p-x3h5",
+      "package": "@azure/msal-node",
+      "justification": "The advisory (CVE-2026-109461) affects the MSAL Node authorization-code flow (acquireTokenByCode). CaseGuard never calls it: the API reaches Azure with managed identity (DefaultAzureCredential) and validates incoming Entra tokens with jose, and the repository has no direct import of @azure/msal-node. It is present only as a dependency of @azure/identity 4.14.0, the latest stable release, which pins ^6.0.0; the fix is in 7.1.0. A pnpm override to 7.x was not applied because it cannot be tested against a live Azure identity here. Revisit when @azure/identity supports msal-node 7.1 or later.",
+      "expires": "2027-01-15"
+    }
+  ]
+}

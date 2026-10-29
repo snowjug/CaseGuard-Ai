@@ -1,0 +1,2 @@
+# Git hook (husky v9): enforces Conventional Commits on the message about to be committed.
+node scripts/check-commit-msg.mjs "$1"

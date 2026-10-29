@@ -1,0 +1,72 @@
+name: Bicep deployment (subscription scope)
+description: >-
+  Runs `az deployment sub what-if` or `az deployment sub create` for infra/bicep/main.bicep with an explicit
+  subscription. Requires a prior azure/login step and a rendered parameter file. Nothing is deployed unless
+  mode is `create`.
+
+inputs:
+  mode:
+    description: '`what-if` (preview only) or `create` (apply).'
+    required: true
+  deployment-name:
+    description: Unique deployment name (also the lookup key for its outputs).
+    required: true
+  deploy-apps:
+    description: >-
+      `true` deploys the Container Apps and the migration job; `false` deploys only the infrastructure
+      (the registry is still empty on a first deployment). Read by the parameter file through
+      CASEGUARD_DEPLOY_APPS.
+    required: true
+  image-tag:
+    description: Immutable image tag for the apps. Read by the parameter file through CASEGUARD_IMAGE_TAG.
+    required: true
+  location:
+    description: Azure region for the deployment record, for example westeurope.
+    required: true
+  subscription-id:
+    description: Target subscription id. Every az call is pinned to it; the CLI default is never used.
+    required: true
+  parameter-file:
+    description: Path of the rendered *.local.bicepparam file.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: ${{ inputs.mode }} ${{ inputs.deployment-name }}
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+        DEPLOYMENT_NAME: ${{ inputs.deployment-name }}
+        CASEGUARD_DEPLOY_APPS: ${{ inputs.deploy-apps }}
+        CASEGUARD_IMAGE_TAG: ${{ inputs.image-tag }}
+        LOCATION: ${{ inputs.location }}
+        SUBSCRIPTION_ID: ${{ inputs.subscription-id }}
+        PARAMETER_FILE: ${{ inputs.parameter-file }}
+      run: |
+        set -euo pipefail
+        common=(
+          --subscription "$SUBSCRIPTION_ID"
+          --location "$LOCATION"
+          --name "$DEPLOYMENT_NAME"
+          --parameters "$PARAMETER_FILE"
+          --only-show-errors
+        )
+        case "$MODE" in
+          what-if)
+            az deployment sub what-if "${common[@]}" | tee "$RUNNER_TEMP/what-if.txt"
+            {
+              echo "### What-if: $DEPLOYMENT_NAME"
+              echo '```'
+              cat "$RUNNER_TEMP/what-if.txt"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            ;;
+          create)
+            az deployment sub create "${common[@]}" --output none
+            ;;
+          *)
+            echo "::error::unknown mode '$MODE' (expected what-if or create)"
+            exit 1
+            ;;
+        esac
