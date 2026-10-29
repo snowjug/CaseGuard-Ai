@@ -476,19 +476,21 @@ export const ROUTES = {
   'forks.list': {
     method: 'GET',
     path: `${API_PREFIX}/cases/:caseId/forks`,
-    summary: 'Decision forks',
+    summary: 'Decision forks (decision-time view when asOf is given)',
     tags: ['Case analysis'],
     permission: 'case:read',
     params: CaseParams,
+    query: AsOfQuerySchema,
     response: ForkListResponseSchema,
   },
   'forks.get': {
     method: 'GET',
     path: `${API_PREFIX}/cases/:caseId/forks/:forkId`,
-    summary: 'One decision fork',
+    summary: 'One decision fork (decision-time view when asOf is given)',
     tags: ['Case analysis'],
     permission: 'case:read',
     params: CaseForkParams,
+    query: AsOfQuerySchema,
     response: DecisionForkSchema,
   },
   'counterfactuals.run': {
