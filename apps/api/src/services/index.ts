@@ -1,4 +1,5 @@
 import type { BaseInfrastructure } from '../infrastructure';
+import { createAiService } from './ai';
 import { createAnalysisService } from './analysis';
 import { createCounterfactualService } from './counterfactuals';
 import { createIngestionService } from './ingestion';
@@ -26,6 +27,7 @@ export function createServices(
   const deps: ServiceDeps = { infra, services: () => services };
   services = {
     jobs: new JobService(infra),
+    ai: createAiService(infra),
     analysis: createAnalysisService(deps),
     counterfactuals: createCounterfactualService(deps),
     skills: createSkillsService(deps),

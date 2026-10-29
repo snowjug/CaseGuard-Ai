@@ -1,5 +1,6 @@
 import type {
   AnalysisRun,
+  AgentName,
   CounterfactualScenario,
   CounterfactualStrategy,
   IngestRequest,
@@ -7,10 +8,12 @@ import type {
   Job,
   JobKind,
   JobStage,
+  ProviderStatus,
   SkillDna,
   SkillMatch,
   StartAnalysisResponse,
 } from '@caseguard/schemas';
+import type { AgentRunRequest, AgentRunResult, AiHealth } from '@caseguard/ai';
 import type { ObjectStore } from '../storage';
 import type { RequestContext } from '../http/request-context';
 
@@ -139,11 +142,39 @@ export interface IngestionPort {
   ingest(ctx: RequestContext, input: IngestInput): Promise<IngestResult>;
 }
 
+// ---------------------------------------------------------------- AI
+
+export interface AiRunOptions {
+  /**
+   * Persist the execution record immediately (default). The analysis pipeline passes `false` and stores
+   * the record together with its snapshot, because the record references the run that does not exist yet.
+   */
+  readonly persist?: boolean;
+}
+
+export interface AiPort {
+  /**
+   * Runs one agent task for the caller's tenant under that tenant's model settings (tightened by the
+   * operator's limits). "LLM proposes, code disposes": the result is always validated, and falls back
+   * to deterministic code when the provider is unavailable, over budget or proposes something invalid.
+   */
+  run<A extends AgentName>(
+    ctx: RequestContext,
+    request: AgentRunRequest<A>,
+    options?: AiRunOptions,
+  ): Promise<AgentRunResult<A>>;
+  /** Honest provider status for `system.provider` (simulated, validation note, limits). */
+  status(ctx: RequestContext): Promise<ProviderStatus>;
+  /** Provider, circuit breaker, bulkhead and cache state for `system.health`. */
+  health(ctx: RequestContext): Promise<AiHealth>;
+}
+
 // ---------------------------------------------------------------- the container
 
 /** Services resolvable from any request context. Implementations are wired in `container.ts`. */
 export interface Services {
   readonly jobs: JobPort;
+  readonly ai: AiPort;
   readonly analysis: AnalysisPort;
   readonly counterfactuals: CounterfactualPort;
   readonly skills: SkillsPort;
