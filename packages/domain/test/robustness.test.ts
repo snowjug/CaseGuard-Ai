@@ -6,7 +6,7 @@ import { CASE_ONE, CASE_TWO, loadBundle, prepareBundle } from './helpers';
 type Mutable = CaseBundle & { resolution?: unknown };
 type BundleEvent = CaseBundle['events'][number];
 
-const clone = (file: string): Mutable => structuredClone(loadBundle(file)) as Mutable;
+const clone = (file: string): Mutable => structuredClone(loadBundle(file));
 const parse = (bundle: Mutable): CaseBundle => CaseBundleSchema.parse(bundle);
 
 describe('[NFR-SEC-05] detectors cannot be used for denial of service (ReDoS)', () => {
