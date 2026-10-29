@@ -20,6 +20,7 @@ import {
 } from './db';
 import type { BaseInfrastructure, Infrastructure } from './infrastructure';
 import { createServices } from './services';
+import type { Services } from './services/ports';
 import { createObjectStore, type ObjectStore } from './storage';
 
 export interface InfrastructureOptions {
@@ -30,6 +31,8 @@ export interface InfrastructureOptions {
   /** A ready (migrated, seeded) database. When given, the container does not open or close one. */
   readonly database?: Database;
   readonly objects?: ObjectStore;
+  /** Replaces individual services (tests inject fakes for the ports they do not exercise). */
+  readonly services?: Partial<Services>;
 }
 
 export interface Container extends Infrastructure {
@@ -180,7 +183,7 @@ export async function createInfrastructure(
       now,
       newId,
     };
-    const services = createServices(base);
+    const services = createServices(base, options.services);
 
     const personaTenants = new Map(DEV_PERSONAS.map((persona) => [persona.id, persona.tenantId]));
     const authenticator = createAuthenticator(

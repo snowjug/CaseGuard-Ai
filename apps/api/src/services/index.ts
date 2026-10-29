@@ -13,8 +13,14 @@ export interface ServiceDeps {
   readonly services: () => Services;
 }
 
-/** Builds every service. This is the one place where ports are bound to implementations. */
-export function createServices(infra: BaseInfrastructure): Services {
+/**
+ * Builds every service. This is the one place where ports are bound to implementations. `overrides`
+ * replaces individual services (tests inject fakes); peers resolve the final set, overrides included.
+ */
+export function createServices(
+  infra: BaseInfrastructure,
+  overrides: Partial<Services> = {},
+): Services {
   // eslint-disable-next-line prefer-const -- assigned after the deps closure that reads it exists
   let services: Services;
   const deps: ServiceDeps = { infra, services: () => services };
@@ -25,6 +31,7 @@ export function createServices(infra: BaseInfrastructure): Services {
     skills: createSkillsService(deps),
     ingestion: createIngestionService(deps),
     objects: infra.objects,
+    ...overrides,
   };
   return services;
 }

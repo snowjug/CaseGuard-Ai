@@ -270,7 +270,10 @@ export function registerRoutes(app: FastifyInstance, options: BindOptions): void
       } catch (error) {
         if (error instanceof AuthenticationError) {
           infra.metrics.recordAuthFailure(error.reason);
-          request.log.warn({ reason: error.reason, routeId: id }, 'authentication failed');
+          request.log.warn(
+            { event: 'auth.failure', reason: error.reason, routeId: id },
+            'authentication failed',
+          );
         }
         throw error;
       }

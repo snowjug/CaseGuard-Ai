@@ -24,6 +24,7 @@ export function registerErrorHandling(
     const requestId = request.cg?.requestId ?? request.id;
     const result = toProblem(error, { requestId });
     const fields = {
+      event: result.denied ? 'access.denied' : 'http.error',
       routeId: request.cg?.routeId ?? undefined,
       code: result.problem.code,
       status: result.status,

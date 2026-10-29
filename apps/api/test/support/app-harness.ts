@@ -10,6 +10,7 @@ import { createTestDatabase, TestClock, createSequentialIdGenerator } from '../.
 import type { Database, TenantRepositories } from '../../src/db';
 import type { HandlerMap } from '../../src/http/route-binder';
 import { createHandlers } from '../../src/routes';
+import type { Services } from '../../src/services/ports';
 
 export const PERSONAS = {
   engineer: 'user_ava_engineer',
@@ -32,6 +33,8 @@ export interface HarnessOptions {
   readonly requireComplete?: boolean;
   /** Reuse a database across harnesses of one test file (starting PGlite is slow). */
   readonly database?: Database;
+  /** Replaces individual services (for example a fake `analysis` port in ingestion tests). */
+  readonly services?: Partial<Services>;
 }
 
 /** Parsed response bodies are asserted on freely in tests, so they are deliberately loosely typed. */
@@ -88,6 +91,7 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Harne
     database,
     now: clock.now,
     newId: sharedIds,
+    ...(options.services ? { services: options.services } : {}),
     logDestination: { write: (chunk: string) => void lines.push(chunk) },
   });
   const app = await buildApp({

@@ -147,7 +147,7 @@ Goal: the deployment pipeline authenticates to Azure with a short-lived token mi
    - the **deploy** identity: Contributor on the subscription (the template creates the resource group) plus **Role Based Access Control Administrator** with a condition that allows assigning only AcrPull, Key Vault Secrets User, Storage Blob Data Contributor, Search Index Data Contributor and Cognitive Services OpenAI User (or User Access Administrator if your policy allows);
    - a separate **what-if** identity for pull-request/preview jobs: Reader plus a custom role that allows `Microsoft.Resources/deployments/whatIf/action`.
 4. **Configure GitHub**: create the Environments (`dev`, `staging`, `production`) with required reviewers for production; store `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` as environment variables (they are identifiers, not secrets); never create an `AZURE_CLIENT_SECRET`.
-5. **Workflow shape** (reference only; the real workflows are owned by the CI/CD worker):
+5. **Workflow shape** (reference only; the real workflows live in `.github/workflows/` and use `azure/login@v3`):
 
    ```yaml
    permissions:
@@ -157,7 +157,7 @@ Goal: the deployment pipeline authenticates to Azure with a short-lived token mi
      deploy:
        environment: production
        steps:
-         - uses: azure/login@v2
+         - uses: azure/login@v3
            with:
              client-id: ${{ vars.AZURE_CLIENT_ID }}
              tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -170,14 +170,14 @@ The application itself uses **managed identity** at runtime; the only secrets in
 
 ## 8. Troubleshooting sign-in
 
-| Symptom                                  | Likely cause                                                                            | Check                                                                            |
-| ---------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `AADSTS50011` (reply URL mismatch)       | The web URL is not registered as a **SPA** redirect URI                                 | App registration > Authentication                                                |
-| `AADSTS65001` (consent required)         | The SPA lacks admin consent or the pre-authorization                                    | API permissions, "Authorized client applications"                                |
-| `AADSTS50105` (user not assigned)        | Assignment required and the user/group has no app role                                  | Enterprise application > Users and groups                                        |
-| API answers 401 to a valid-looking token | `iss` or `aud` mismatch (v1 vs v2 token), expired token, clock skew, JWKS not reachable | decode the token locally; compare with `ENTRA_ISSUER`/`ENTRA_AUDIENCE`           |
-| 401 only for one tenant                  | `tid` missing from `ENTRA_TENANT_MAP`                                                   | the API log event `auth.failure` (see [docs/OBSERVABILITY.md](OBSERVABILITY.md)) |
-| 403 after sign-in                        | No app role in the token, or the role is not in `ENTRA_ROLE_MAP`                        | the `roles` claim                                                                |
-| Works locally, fails in Azure            | Local runs use persona login; Azure never does                                          | `AUTH_MODE` of the running revision                                              |
+| Symptom                                  | Likely cause                                                                            | Check                                                                                                                       |
+| ---------------------------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `AADSTS50011` (reply URL mismatch)       | The web URL is not registered as a **SPA** redirect URI                                 | App registration > Authentication                                                                                           |
+| `AADSTS65001` (consent required)         | The SPA lacks admin consent or the pre-authorization                                    | API permissions, "Authorized client applications"                                                                           |
+| `AADSTS50105` (user not assigned)        | Assignment required and the user/group has no app role                                  | Enterprise application > Users and groups                                                                                   |
+| API answers 401 to a valid-looking token | `iss` or `aud` mismatch (v1 vs v2 token), expired token, clock skew, JWKS not reachable | decode the token locally; compare with `ENTRA_ISSUER`/`ENTRA_AUDIENCE`                                                      |
+| 401 only for one tenant                  | `tid` missing from `ENTRA_TENANT_MAP`                                                   | API log lines with `event` = `auth.failure` and `reason` = `unknown_tenant` (see [docs/OBSERVABILITY.md](OBSERVABILITY.md)) |
+| 403 after sign-in                        | No app role in the token, or the role is not in `ENTRA_ROLE_MAP`                        | the `roles` claim                                                                                                           |
+| Works locally, fails in Azure            | Local runs use persona login; Azure never does                                          | `AUTH_MODE` of the running revision                                                                                         |
 
 See also: [docs/DEPLOYMENT.md](DEPLOYMENT.md), [docs/THREAT_MODEL.md](THREAT_MODEL.md), [docs/runbooks/secret-exposure-response.md](runbooks/secret-exposure-response.md).

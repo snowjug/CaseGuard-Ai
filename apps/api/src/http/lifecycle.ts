@@ -67,6 +67,7 @@ export function registerLifecycle(
     });
     // Never log the raw URL or query string: they can carry search terms and identifiers.
     const fields = {
+      event: 'http.request',
       method: request.method,
       route: route ?? 'unmatched',
       statusCode: reply.statusCode,
