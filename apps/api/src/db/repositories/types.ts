@@ -546,8 +546,18 @@ export interface JobRepository {
     cursor?: string | undefined;
   }): Promise<Page<Job>>;
   findByIdempotencyKey(kind: JobKind, key: string): Promise<Job | null>;
-  /** Marks jobs left `running` by a previous process as failed (called at startup). */
-  failOrphaned(reason: string): Promise<number>;
+  /**
+   * Fails jobs a process left queued or running. Without `staleBefore` every non-terminal job of the
+   * tenant fails (right for a lone process that has just started). With it, only jobs whose last sign of
+   * life (heartbeat, else start, else creation) is at or before that ISO instant fail, so a job another
+   * replica is still running is left alone. Returns how many were failed.
+   */
+  failOrphaned(reason: string, options?: { staleBefore?: string }): Promise<number>;
+  /**
+   * Records that the process running `jobId` is alive and returns the job's status as stored (null when
+   * the job does not exist). A status other than queued/running tells the owner to stop.
+   */
+  heartbeat(jobId: string): Promise<JobStatus | null>;
 }
 
 export type IdempotencyBegin =

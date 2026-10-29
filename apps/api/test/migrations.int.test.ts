@@ -25,6 +25,7 @@ const MIGRATION_NAMES = [
   '0006_telemetry_audit_and_ops',
   '0007_search_and_identity_sync',
   '0008_dashboard_read_models',
+  '0009_job_heartbeat',
 ];
 const LATEST_MIGRATION = MIGRATION_NAMES[MIGRATION_NAMES.length - 1];
 /** What a database that predates search (migration 0007) has applied. */
@@ -47,6 +48,7 @@ const RELEASED_CHECKSUMS: Record<string, string> = {
   '0007_search_and_identity_sync':
     '96b1488647ff5dbe14eb0d16b0482286ce20aa51a65d26495fd38aefa74fc973',
   '0008_dashboard_read_models': '636b604258169cbac0ada5bd7cda550929f46b27085166938587f9223d3051e0',
+  '0009_job_heartbeat': 'bbab84d91f639e0abdf764af8c538f35ba000dbb4c5cae52cc8b610cd1dd1795',
 };
 
 async function scratchDir(prefix: string): Promise<string> {

@@ -41,6 +41,8 @@ export interface JobSpec {
   readonly idempotencyKey?: string | null;
   /** Default true: the user may cancel while it is queued or running. */
   readonly cancellable?: boolean;
+  /** Longest the work may run before it is stopped and recorded as failed (default 10 minutes). */
+  readonly timeoutMs?: number;
 }
 
 /** Handed to the work function so it can report progress and observe cancellation. */
@@ -69,8 +71,15 @@ export interface JobPort {
   cancel(ctx: RequestContext, jobId: string): Promise<Job>;
   /** Resolves when no job is queued or running (graceful shutdown and tests). */
   idle(): Promise<void>;
-  /** Marks jobs left running by a previous process as failed. Returns how many. */
-  recoverOrphans(tenantIds: readonly string[]): Promise<number>;
+  /**
+   * Fails jobs that no live process is running and returns how many. Without `staleAfterMs` every
+   * non-terminal job of the given tenants fails (a lone process that has just started). With it, only
+   * jobs whose owner has been silent that long fail, so another replica's jobs are left alone.
+   */
+  recoverOrphans(
+    tenantIds: readonly string[],
+    options?: { readonly staleAfterMs?: number },
+  ): Promise<number>;
 }
 
 // ---------------------------------------------------------------- analysis

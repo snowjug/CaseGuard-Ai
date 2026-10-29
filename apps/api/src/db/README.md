@@ -145,6 +145,21 @@ with row-level security bypassed.
   7.6 ms to 4.1 ms and the missing-evidence list 8.7 ms to 6.6 ms with the indexes. These are not benchmarks of
   PostgreSQL 16.
 
+## Job liveness (heartbeat)
+
+Jobs run inside the API process that accepted them (see `services/job-service.ts`). With more than one replica,
+or an old and a new revision side by side during a rollout, a job's status alone cannot say whether anyone is
+still running it, so migration 0009 adds `jobs.heartbeat_at`:
+
+- `jobs.heartbeat(jobId)` refreshes `heartbeat_at` of a queued or running job and returns the status the
+  database now has (`null` when the job does not exist). The owner calls it every few seconds, and a status
+  other than queued/running (cancelled on another replica, failed as orphaned while the owner stalled) tells it
+  to stop the work. A finished job keeps its last heartbeat.
+- `jobs.failOrphaned(reason, { staleBefore? })` fails queued/running jobs of the tenant. Without `staleBefore`
+  every one of them fails (a lone process that has just started). With it only jobs whose last sign of life,
+  `coalesce(heartbeat_at, started_at, created_at)`, is at or before that ISO instant fail, so a job another
+  replica is still heartbeating is left alone.
+
 ## Migrations
 
 `migrations/NNNN_name.sql`, applied in order, each in its own transaction, with a checksum recorded in
@@ -153,7 +168,7 @@ database that applied the old text, and `test/migrations.int.test.ts` pins the c
 file, so a schema change is always a new file. Add it to `MIGRATION_NAMES` in that test. `0007` adds search
 and the identity-sync changes above; its upgrade path (data written under 0006) is tested. `0008` adds the
 two partial indexes of the dashboard read models; the same test upgrades a database that stopped at 0006
-through both.
+through both. `0009` adds the job heartbeat column.
 
 ## Conventions
 

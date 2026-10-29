@@ -2,10 +2,13 @@ import { ConfigError, describeConfig, loadConfig, type AppConfig } from '@casegu
 import { buildApp } from './app';
 import { createInfrastructure, knownTenantIds } from './container';
 import { createHandlers } from './routes';
+import { JOB_STALE_AFTER_MS } from './services/job-service';
 import packageJson from '../package.json';
 
 /** How long shutdown waits for running jobs before giving up (Container Apps allows 30 s by default). */
 const SHUTDOWN_GRACE_MS = 20_000;
+/** How often a replica looks for jobs whose owner stopped responding. */
+const ORPHAN_SWEEP_INTERVAL_MS = 30_000;
 
 function loadConfigOrExit(): AppConfig {
   try {
@@ -25,9 +28,26 @@ async function main(): Promise<void> {
   const { logger } = infra;
 
   for (const warning of config.warnings) logger.warn({ warning }, 'configuration warning');
-  const recovered = await infra.services.jobs.recoverOrphans(knownTenantIds(config));
-  if (recovered > 0)
-    logger.warn({ recovered }, 'marked jobs interrupted by the last shutdown as failed');
+
+  // A lone local process knows that nothing else runs its jobs, so whatever the last run left
+  // unfinished is lost. Elsewhere other replicas (or the previous revision during a rollout) may be
+  // running jobs right now: only jobs whose owner stopped sending heartbeats are orphaned, and a
+  // periodic sweep catches the ones that were still fresh at start-up.
+  const tenantIds = knownTenantIds(config);
+  const recovery = config.runtime.localLike ? {} : { staleAfterMs: JOB_STALE_AFTER_MS };
+  const sweepOrphans = async (): Promise<void> => {
+    const recovered = await infra.services.jobs.recoverOrphans(tenantIds, recovery);
+    if (recovered > 0) logger.warn({ recovered }, 'marked jobs that lost their server as failed');
+  };
+  await sweepOrphans();
+  const sweeper = config.runtime.localLike
+    ? null
+    : setInterval(() => {
+        sweepOrphans().catch((error: unknown) =>
+          logger.error({ err: error }, 'could not sweep orphaned jobs'),
+        );
+      }, ORPHAN_SWEEP_INTERVAL_MS);
+  sweeper?.unref();
 
   const app = await buildApp({ infra, handlers: createHandlers(infra) });
 
@@ -52,6 +72,7 @@ async function main(): Promise<void> {
       process.exit(1);
     }, SHUTDOWN_GRACE_MS);
     deadline.unref();
+    if (sweeper !== null) clearInterval(sweeper);
     try {
       await app.close();
       await infra.close();

@@ -367,7 +367,8 @@ export const ROUTES = {
     path: `${API_PREFIX}/jobs/:jobId/cancel`,
     summary: 'Cancel a queued or running job',
     tags: ['Jobs'],
-    permission: 'case:analyze',
+    // Any signed-in user may ask; the job service then requires the permission that starts that kind of job.
+    permission: null,
     params: z.object({ jobId: IdSchema }),
     response: JobSchema,
   },

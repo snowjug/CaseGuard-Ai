@@ -14,6 +14,7 @@ import {
   QueryBuilder,
   assertTenant,
   insertRows,
+  normalizeInstant,
   nowIso,
   parseStored,
   updateRow,
@@ -141,12 +142,18 @@ export class JobRepositoryImpl implements JobRepository {
   }
 
   /**
-   * Fails every job a previous process left queued or running. The in-memory runner does not resume
-   * work after a restart, so a non-terminal job found at startup can never finish on its own.
+   * Fails jobs a process left queued or running. Without `staleBefore` that is every non-terminal job
+   * (a single process that has just started knows nothing else is running them). With it, only jobs whose
+   * last sign of life (`heartbeat`, else start, else creation) is at or before that instant: a job that
+   * another replica is still heartbeating is left alone.
    */
-  async failOrphaned(reason: string): Promise<number> {
+  async failOrphaned(reason: string, options: { staleBefore?: string } = {}): Promise<number> {
     const message = reason.trim().slice(0, 400) || 'The job was interrupted by a restart';
     const at = nowIso(this.ctx);
+    const staleBefore =
+      options.staleBefore === undefined
+        ? null
+        : normalizeInstant(options.staleBefore, 'staleBefore');
     return this.ctx.run(async (tx) => {
       const result = await tx.query(
         `UPDATE jobs
@@ -156,10 +163,38 @@ export class JobRepositoryImpl implements JobRepository {
                   'completedAt', $3::text,
                   'cancellable', false,
                   'error', jsonb_build_object('code', 'orphaned', 'message', $4::text))
-          WHERE tenant_id = $1 AND status IN ('queued', 'running')`,
-        [this.ctx.scope.tenantId, at, at, message],
+          WHERE tenant_id = $1 AND status IN ('queued', 'running')
+            AND ($5::timestamptz IS NULL
+                 OR coalesce(heartbeat_at, started_at, created_at) <= $5::timestamptz)`,
+        [this.ctx.scope.tenantId, at, at, message, staleBefore],
       );
       return result.rowCount;
+    });
+  }
+
+  /**
+   * Records that the owner of a job is alive. Returns the job's status as the database now has it, so
+   * the owner learns that the job was cancelled (or otherwise finished) elsewhere; null when the job
+   * does not exist. A job that is already finished keeps its old heartbeat.
+   */
+  async heartbeat(jobId: string): Promise<JobStatus | null> {
+    const at = nowIso(this.ctx);
+    return this.ctx.run(async (tx) => {
+      const alive = await tx.query<{ status: string }>(
+        `UPDATE jobs SET heartbeat_at = $3::timestamptz
+          WHERE tenant_id = $1 AND id = $2 AND status IN ('queued', 'running')
+      RETURNING status`,
+        [this.ctx.scope.tenantId, jobId, at],
+      );
+      const found =
+        alive.rows[0] ??
+        (
+          await tx.query<{ status: string }>(
+            'SELECT status FROM jobs WHERE tenant_id = $1 AND id = $2',
+            [this.ctx.scope.tenantId, jobId],
+          )
+        ).rows[0];
+      return found ? parseStored(JobStatusSchema, found.status, 'job status') : null;
     });
   }
 }
