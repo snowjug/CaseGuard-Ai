@@ -29,7 +29,13 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['*.mjs', 'scripts/*.mjs', 'scripts/*.ts', 'e2e/*.ts', '*.config.ts'],
+          allowDefaultProject: [
+            '*.mjs',
+            'scripts/*.mjs',
+            'scripts/*.ts',
+            'e2e/*.ts',
+            '*.config.ts',
+          ],
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -43,7 +49,10 @@ export default tseslint.config(
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
       ],
       '@typescript-eslint/no-floating-promises': 'error',
-      '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: { attributes: false } }],
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        { checksVoidReturn: { attributes: false } },
+      ],
       '@typescript-eslint/require-await': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'warn',
       '@typescript-eslint/restrict-template-expressions': [
@@ -63,7 +72,13 @@ export default tseslint.config(
   },
   {
     // CLI scripts and build tooling are allowed to print to the console.
-    files: ['scripts/**', 'e2e/**', 'apps/api/src/**/*-cli.ts', 'apps/api/src/openapi-export.ts', '**/*.config.{ts,mjs}'],
+    files: [
+      'scripts/**',
+      'e2e/**',
+      'apps/api/src/**/*-cli.ts',
+      'apps/api/src/openapi-export.ts',
+      '**/*.config.{ts,mjs}',
+    ],
     rules: { 'no-console': 'off' },
   },
   {
