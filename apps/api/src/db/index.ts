@@ -23,6 +23,11 @@ export { createIdGenerator, isGeneratedId, type IdGenerator } from './ids';
 export { canonicalJson, sha256Hex } from './hash';
 export { AUDIT_GENESIS_HASH, computeAuditHash } from './repositories/audit-repository';
 export { MAX_EVENTS_PER_CASE } from './repositories/case-repository';
+export {
+  MAX_SEARCH_RESULTS,
+  MAX_SNIPPET_CHARS,
+  SEARCH_TYPE_WEIGHTS,
+} from './repositories/search-repository';
 export { SNAPSHOT_LIMITS } from './repositories/analysis-snapshot';
 export {
   DataIntegrityError,

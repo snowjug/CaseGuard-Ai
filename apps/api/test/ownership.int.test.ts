@@ -47,7 +47,7 @@ describe('production-like ownership: a non-superuser owns the schema', () => {
       await db.query('GRANT CREATE, USAGE ON SCHEMA public TO cg_owner');
       const owner = asRole(db, 'cg_owner');
 
-      expect((await migrate(owner)).appliedNow).toHaveLength(6);
+      expect((await migrate(owner)).appliedNow).toHaveLength(7);
       await seedFoundation(owner);
 
       const tableOwner = await db.query<{ owner: string }>(
@@ -76,6 +76,20 @@ describe('production-like ownership: a non-superuser owns the schema', () => {
       await repos.cases.ingest(input);
       await repos.analysis.saveSnapshot(buildSnapshot(input));
       expect((await repos.cases.list({ limit: 10 })).items).toHaveLength(1);
+
+      // Migration 0007 as a non-superuser owner: the generated search vectors are computed while the
+      // application role inserts, full-text search runs as that role, and a just-in-time sign-in can
+      // insert the user (the grant added by the migration).
+      expect((await repos.search.query({ text: 'sign-in', limit: 5 })).length).toBeGreaterThan(0);
+      const signedIn = await repos.governance.upsertIdentityUser({
+        userId: 'entra-object-1',
+        displayName: 'Entra User (synthetic)',
+        email: null,
+        roles: ['engineer'],
+        synthetic: true,
+      });
+      expect(signedIn).toMatchObject({ status: 'active', version: 1, email: '' });
+
       expect(await repos.cases.delete('case_alpha')).toBe(true);
       expect((await repos.cases.list({ limit: 10 })).items).toHaveLength(0);
       const events = await owner.transaction(async (tx) => {

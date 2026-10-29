@@ -126,7 +126,6 @@ const CONSTRAINT_MESSAGES: Record<string, string> = {
   skills_tenant_key_uq: 'A skill with this key already exists',
   skill_versions_semver_uq: 'This skill already has a version with the same version number',
   jobs_idempotency_uq: 'A job with this idempotency key already exists',
-  users_tenant_email_uq: 'A user with this e-mail address already exists',
   skill_approvals_distinct_approver_chk:
     'An approval requires an approver other than the requester',
 };

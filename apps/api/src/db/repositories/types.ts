@@ -385,6 +385,18 @@ export interface TelemetryRepository {
 
 // ---------------------------------------------------------------- governance, users, audit, reviews
 
+/** Profile an identity provider (Entra) asserts for the signed-in user; the token is the source of truth. */
+export interface IdentityUserInput {
+  /** The identity provider's stable user id (Entra object id). */
+  userId: string;
+  displayName: string;
+  /** Null when the token carries none: a new user gets an empty string, an existing user keeps the stored address. */
+  email: string | null;
+  /** At least one role; duplicates are ignored and the order does not matter. */
+  roles: Role[];
+  synthetic: boolean;
+}
+
 export interface GovernanceRepository {
   getTenant(): Promise<Tenant>;
   /** Returns stored sections, seeding defaults for any that are missing. */
@@ -397,6 +409,16 @@ export interface GovernanceRepository {
   listUsers(): Promise<User[]>;
   getUser(userId: string): Promise<User | null>;
   updateUserRoles(userId: string, roles: Role[], expectedVersion: number): Promise<User>;
+  /**
+   * Just-in-time user sync for the scoped tenant. Inserts the user when absent (status `active`,
+   * version 1). When present, takes displayName, email and roles from `input` but never changes
+   * `status` (an administrator may have disabled the user), `createdAt` or `synthetic`; `updatedAt`
+   * and `version` move only when something actually changed, so repeated sign-ins are no-ops. A null
+   * `email` never erases a stored address. Safe to call concurrently. Writes no audit rows: the
+   * caller audits role changes. Throws ValidationFailedError for an empty role list, an unknown
+   * role, a malformed id or an e-mail longer than 200 characters.
+   */
+  upsertIdentityUser(input: IdentityUserInput): Promise<User>;
 }
 
 export interface AuditAppendInput {
@@ -528,6 +550,34 @@ export interface AnalyticsRepository {
   collect(limit: number): Promise<AnalyticsSource>;
 }
 
+// ---------------------------------------------------------------- search
+
+export type SearchHitType = 'case' | 'claim' | 'hypothesis' | 'skill' | 'warning' | 'event';
+
+/** One search result; the service layer adds the `href` that `SearchResultSchema` carries. */
+export interface SearchHit {
+  type: SearchHitType;
+  id: string;
+  /** The case the hit belongs to (the case itself for `case` hits); null for skills. */
+  caseId: string | null;
+  title: string;
+  /** Plain text of at most 300 characters (no highlight markup). Render it as text. */
+  snippet: string;
+  /** Relevance in [0, 1) used only for ordering; comparable across types, not across queries. */
+  score: number;
+}
+
+export interface SearchRepository {
+  /**
+   * Full-text search over the tenant's cases (title, reference, tags), case events (title, body),
+   * claims, hypotheses, skills and open warnings. `text` uses web-search syntax (words are ANDed,
+   * "quoted phrases", `or`, `-exclusion`); any input is accepted and never reaches SQL as text.
+   * Blank text, or text with nothing searchable in it, returns []. `limit` is 1..100. Best match
+   * first; ties break by type, case id and id, so the order is deterministic.
+   */
+  query(input: { text: string; limit: number }): Promise<SearchHit[]>;
+}
+
 // ---------------------------------------------------------------- composition
 
 export interface TenantRepositories {
@@ -544,6 +594,7 @@ export interface TenantRepositories {
   readonly idempotency: IdempotencyRepository;
   readonly demo: DemoRepository;
   readonly analytics: AnalyticsRepository;
+  readonly search: SearchRepository;
   /** Runs `fn` with repositories bound to ONE transaction (all-or-nothing). */
   transaction<T>(fn: (repos: TenantRepositories) => Promise<T>): Promise<T>;
 }

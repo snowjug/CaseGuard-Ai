@@ -245,6 +245,24 @@ export interface DataRow {
 
 export const unique = <T>(values: readonly T[]): T[] => [...new Set(values)];
 
+/** Text that comes from outside the system: control characters and whitespace runs become one space. */
+export function cleanText(value: string): string {
+  return value
+    .replace(/\p{Cc}+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Cuts `value` to at most `max` characters, ending in an ellipsis when something was removed. */
+export function clipText(value: string, max: number): string {
+  const characters = Array.from(value);
+  if (characters.length <= max) return value;
+  return `${characters
+    .slice(0, max - 1)
+    .join('')
+    .trimEnd()}…`;
+}
+
 /** Reads a single integer produced by `count(*)::int` style queries. */
 export async function readCount(
   tx: SqlExecutor,

@@ -12,6 +12,7 @@ import { GovernanceRepositoryImpl } from './governance-repository';
 import { IdempotencyRepositoryImpl } from './idempotency-repository';
 import { JobRepositoryImpl } from './job-repository';
 import { ReviewRepositoryImpl } from './review-repository';
+import { SearchRepositoryImpl } from './search-repository';
 import { SkillRepositoryImpl } from './skill-repository';
 import type { RepoContext, Run } from './support';
 import { TelemetryRepositoryImpl } from './telemetry-repository';
@@ -54,6 +55,7 @@ function build(
     idempotency: new IdempotencyRepositoryImpl(ctx),
     demo: new DemoRepositoryImpl(ctx),
     analytics: new AnalyticsRepositoryImpl(ctx),
+    search: new SearchRepositoryImpl(ctx),
     transaction: (fn) =>
       bound
         ? fn(repositories)

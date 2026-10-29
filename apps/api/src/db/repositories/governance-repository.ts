@@ -6,10 +6,12 @@ import {
   GOVERNANCE_SECTIONS,
   GovernanceSectionSchema,
   GovernanceSettingsSchema,
+  IdSchema,
   ModelConfigSchema,
   QualityConfigSchema,
   RedactionConfigSchema,
   RetentionConfigSchema,
+  ROLES,
   RoleSchema,
   TenantSchema,
   UserSchema,
@@ -23,6 +25,7 @@ import { z } from 'zod';
 import { GOVERNANCE_SETTINGS, USERS } from './table-specs';
 import {
   assertVersion,
+  cleanText,
   insertRows,
   loadVersioned,
   nowIso,
@@ -33,7 +36,7 @@ import {
   type DataRow,
   type RepoContext,
 } from './support';
-import type { GovernanceRepository, SqlExecutor } from './types';
+import type { GovernanceRepository, IdentityUserInput, SqlExecutor } from './types';
 import { ConflictError } from '../../errors';
 
 /** One validator per governance section; the section value is what operators edit. */
@@ -63,6 +66,36 @@ interface StoredSetting {
 }
 
 const MAX_USERS = 500;
+const MAX_DISPLAY_NAME_CHARS = 120;
+
+const IdentityUserInputSchema = z.object({
+  userId: IdSchema,
+  displayName: z.string(),
+  email: z.string().nullish(),
+  roles: z.array(RoleSchema).min(1).max(20),
+  synthetic: z.boolean(),
+});
+
+/** The roles in the order of the `ROLES` list, without duplicates: one stored form per role set. */
+function canonicalRoles(roles: readonly Role[]): Role[] {
+  const wanted = new Set(roles);
+  return ROLES.filter((role) => wanted.has(role));
+}
+
+function sameRoles(left: readonly Role[], right: readonly Role[]): boolean {
+  const a = new Set(left);
+  const b = new Set(right);
+  return a.size === b.size && [...a].every((role) => b.has(role));
+}
+
+/**
+ * Display names come from outside, so they are cleaned and cut to the schema limit instead of
+ * failing a sign-in; a blank name falls back to the e-mail address and then to the user id.
+ */
+function displayNameFor(displayName: string, email: string, userId: string): string {
+  const name = cleanText(displayName) || email || userId;
+  return Array.from(name).slice(0, MAX_DISPLAY_NAME_CHARS).join('');
+}
 
 export class GovernanceRepositoryImpl implements GovernanceRepository {
   constructor(private readonly ctx: RepoContext) {}
@@ -222,6 +255,78 @@ export class GovernanceRepositoryImpl implements GovernanceRepository {
         USERS,
         { user: next, createdBy: this.ctx.scope.actorId },
         { columns: ['roles', 'updated_at', 'version', 'data'], expectedVersion: version },
+      );
+      if (changed !== 1)
+        throw new ConflictError('The user was modified concurrently; reload and retry');
+      return next;
+    });
+  }
+
+  async upsertIdentityUser(input: IdentityUserInput): Promise<User> {
+    const profile = validateInput(IdentityUserInputSchema, input, 'identity user');
+    // A token that carries no e-mail says nothing about it: a stored address is kept, not erased.
+    const suppliedEmail = typeof profile.email === 'string' ? cleanText(profile.email) : null;
+    const roles = canonicalRoles(profile.roles);
+    const tenantId = this.ctx.scope.tenantId;
+    return this.ctx.run(async (tx) => {
+      const stamp = nowIso(this.ctx);
+      const newEmail = suppliedEmail ?? '';
+      const fresh = validateInput(
+        UserSchema,
+        {
+          id: profile.userId,
+          tenantId,
+          displayName: displayNameFor(profile.displayName, newEmail, profile.userId),
+          email: newEmail,
+          roles,
+          status: 'active',
+          synthetic: profile.synthetic,
+          createdAt: stamp,
+          updatedAt: stamp,
+          version: 1,
+        },
+        'user',
+      );
+      // Insert first and fall back to the update path on conflict: two simultaneous first sign-ins
+      // of the same user cannot both insert, and neither can fail.
+      const inserted = await insertRows(
+        tx,
+        USERS,
+        [{ user: fresh, createdBy: this.ctx.scope.actorId }],
+        'ignore',
+      );
+      if (inserted === 1) return fresh;
+
+      const { entity, version } = await loadVersioned(tx, {
+        table: 'users',
+        key: { tenant_id: tenantId, id: profile.userId },
+        schema: UserSchema,
+        what: 'User',
+        id: profile.userId,
+      });
+      const email = suppliedEmail ?? entity.email;
+      const displayName = displayNameFor(profile.displayName, email, profile.userId);
+      if (
+        entity.displayName === displayName &&
+        entity.email === email &&
+        sameRoles(entity.roles, roles)
+      ) {
+        return entity;
+      }
+      // Status, createdAt and the synthetic flag are deliberately carried over from the stored user.
+      const next = validateInput(
+        UserSchema,
+        { ...entity, displayName, email, roles, updatedAt: stamp, version: version + 1 },
+        'user',
+      );
+      const changed = await updateRow(
+        tx,
+        USERS,
+        { user: next, createdBy: this.ctx.scope.actorId },
+        {
+          columns: ['display_name', 'email', 'roles', 'updated_at', 'version', 'data'],
+          expectedVersion: version,
+        },
       );
       if (changed !== 1)
         throw new ConflictError('The user was modified concurrently; reload and retry');
