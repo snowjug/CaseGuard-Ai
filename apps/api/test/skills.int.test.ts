@@ -1,0 +1,1026 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return -- response bodies are parsed JSON, typed `Json` by the harness */
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { Database } from '../src/db';
+import { TEST_DATABASE_STARTUP_TIMEOUT_MS } from '../src/db/testing';
+import {
+  CONTOSO,
+  FABRIKAM,
+  PERSONAS,
+  createHarness,
+  openSharedDatabase,
+  type Harness,
+  type Json,
+} from './support/app-harness';
+import { contextFor } from './support/context';
+import { buildIngestInput } from './builders';
+import {
+  acceptScenario,
+  allAuditEvents,
+  apiOf,
+  earliestForkScenarios,
+  ingestAndAnalyse,
+  ingestIrrelevantCase,
+  moveSkill,
+  runValidation,
+  settledJob,
+  type TestApi,
+} from './skills-support';
+
+const ONE = 'case_sk_one';
+const TWO = 'case_sk_two';
+const IRR = 'case_sk_irrelevant';
+const RAW = 'case_sk_raw';
+const REASON = 'MARKER-SKILL-8e21 reviewed against the recorded steps';
+
+let database: Database;
+let h: Harness;
+let api: TestApi;
+let forkId = '';
+let skillA = ''; // extracted by the engineer (Ava) from the balanced scenario; published below
+let skillB = ''; // extracted by the curator (Casey) from the lowest-customer-effort scenario
+let rejectedScenario: Json;
+
+beforeAll(async () => {
+  database = await openSharedDatabase();
+  h = await createHarness({ database });
+  api = apiOf(h);
+  // Case data is dated April 2026, so "now" is after it, as it is for historical cases in real use.
+  h.clock.set('2026-06-01T09:00:00.000Z');
+  await ingestAndAnalyse(h, { one: ONE, two: TWO });
+  await ingestIrrelevantCase(h, IRR);
+  await h
+    .repos(CONTOSO)
+    .cases.ingest(buildIngestInput({ tenantId: CONTOSO, caseId: RAW, receivedSeed: 'raw' }));
+
+  const found = await earliestForkScenarios(h, api, ONE);
+  forkId = found.forkId;
+  const pick = (strategy: string): Json => found.scenarios.find((s) => s.strategy === strategy);
+  expect((await acceptScenario(api, ONE, pick('balanced'))).statusCode).toBe(200);
+  expect((await acceptScenario(api, ONE, pick('lowest_customer_effort'))).statusCode).toBe(200);
+  const rejected = await api.post(
+    PERSONAS.reviewer,
+    `/cases/${ONE}/counterfactuals/${pick('fastest_diagnosis').id}/review`,
+    {
+      decision: 'reject',
+      reason: 'Unrealistic for this customer: the second request would not be answered in time.',
+      expectedVersion: pick('fastest_diagnosis').version,
+    },
+  );
+  rejectedScenario = rejected.data;
+
+  const extractAs = async (persona: string, scenarioId: string): Promise<string> => {
+    const res = await api.post(persona, `/cases/${ONE}/skills/extract`, { scenarioId });
+    expect(res.statusCode).toBe(202);
+    const job = await settledJob(h, api, res.data.job.id);
+    expect(job.status, JSON.stringify(job.error)).toBe('succeeded');
+    return job.resultRef.id as string;
+  };
+  skillA = await extractAs(PERSONAS.engineer, pick('balanced').id);
+  skillB = await extractAs(PERSONAS.curator, pick('lowest_customer_effort').id);
+}, TEST_DATABASE_STARTUP_TIMEOUT_MS);
+
+afterAll(async () => {
+  await h.close();
+  await database.close();
+});
+
+const audits = (tenantId = CONTOSO) => allAuditEvents(h, tenantId);
+const detailOf = async (skillId: string, persona: string = PERSONAS.engineer): Promise<Json> =>
+  (await api.get(persona, `/skills/${skillId}`)).data;
+
+describe('skills.list, skills.get, skills.versions and skills.diff', () => {
+  it('lists the library for every reader, filters it and pages through it', async () => {
+    expect((await api.get(null, '/skills')).statusCode).toBe(401);
+    for (const persona of [
+      PERSONAS.engineer,
+      PERSONAS.reviewer,
+      PERSONAS.manager,
+      PERSONAS.curator,
+      PERSONAS.admin,
+    ]) {
+      const res = await api.get(persona, '/skills');
+      expect(res.statusCode, persona).toBe(200);
+      expect(res.data.items.map((s: Json) => s.id).sort()).toEqual([skillA, skillB].sort());
+    }
+    expect(
+      (await api.get(PERSONAS.engineer, '/skills?lifecycle=discovered')).data.items,
+    ).toHaveLength(2);
+    expect((await api.get(PERSONAS.engineer, '/skills?lifecycle=published')).data.items).toEqual(
+      [],
+    );
+    expect(
+      (await api.get(PERSONAS.engineer, '/skills?q=no-such-skill-anywhere')).data.items,
+    ).toEqual([]);
+    expect((await api.get(PERSONAS.engineer, '/skills?lifecycle=bogus')).statusCode).toBe(422);
+
+    const first = await api.get(PERSONAS.engineer, '/skills?limit=1');
+    expect(first.data.items).toHaveLength(1);
+    expect(first.data.nextCursor).toEqual(expect.any(String));
+    const second = await api.get(
+      PERSONAS.engineer,
+      `/skills?limit=1&cursor=${encodeURIComponent(first.data.nextCursor)}`,
+    );
+    expect(second.data.items).toHaveLength(1);
+    expect(second.data.items[0].id).not.toBe(first.data.items[0].id);
+  });
+
+  it('shows one skill with its versions, history and the steps this caller may take', async () => {
+    const asCreator = await detailOf(skillA);
+    expect(asCreator.skill).toMatchObject({
+      id: skillA,
+      lifecycle: 'discovered',
+      currentVersion: '1.0.0',
+      createdBy: PERSONAS.engineer,
+      owner: PERSONAS.engineer,
+      hasProposedMutation: false,
+      synthetic: true,
+    });
+    expect(asCreator.currentVersion.content.decisionSequence.length).toBeGreaterThan(0);
+    expect(asCreator).toMatchObject({
+      proposedVersion: null,
+      validations: [],
+      approvals: [],
+      matches: [],
+    });
+    expect(asCreator.versions).toHaveLength(1);
+    expect(asCreator.versions[0]).not.toHaveProperty('content');
+    expect(asCreator.notices.join(' ')).toMatch(/never published automatically/);
+
+    // The person who created a skill cannot record an approval for it: the option says so.
+    const draftOption = asCreator.transitions.find((t: Json) => t.toState === 'draft');
+    expect(draftOption).toMatchObject({ allowed: false, requiredPermission: 'skill:extract' });
+    expect(draftOption.reason).toMatch(/created the skill cannot record an approval/);
+    const retire = asCreator.transitions.find((t: Json) => t.toState === 'retired');
+    expect(retire).toMatchObject({ allowed: false });
+    expect(retire.reason).toMatch(/skill:retire/);
+
+    const asCurator = await detailOf(skillA, PERSONAS.curator);
+    expect(asCurator.transitions.find((t: Json) => t.toState === 'draft')).toMatchObject({
+      allowed: true,
+      reason: null,
+    });
+    expect(asCurator.transitions.find((t: Json) => t.toState === 'retired')).toMatchObject({
+      allowed: true,
+    });
+  });
+
+  it('404s on unknown skills and across tenants, and lists versions and diffs', async () => {
+    const eve = PERSONAS.otherTenantEngineer;
+    expect((await api.get(PERSONAS.engineer, '/skills/skl_missing')).statusCode).toBe(404);
+    expect((await api.get(eve, `/skills/${skillA}`)).statusCode).toBe(404);
+    expect((await api.get(eve, `/skills/${skillA}/versions`)).statusCode).toBe(404);
+
+    const versions = await api.get(PERSONAS.manager, `/skills/${skillA}/versions`);
+    expect(versions.statusCode).toBe(200);
+    expect(versions.data.items).toHaveLength(1);
+    const v1 = versions.data.items[0];
+    expect(v1).toMatchObject({
+      version: '1.0.0',
+      state: 'active',
+      changeType: 'initial',
+      sequence: 1,
+    });
+    expect(v1.content.name).toEqual(expect.any(String));
+
+    const same = await api.get(
+      PERSONAS.engineer,
+      `/skills/${skillA}/diff?fromVersionId=${v1.id}&toVersionId=${v1.id}`,
+    );
+    expect(same.statusCode).toBe(200);
+    expect(same.data).toMatchObject({
+      skillId: skillA,
+      fromVersion: '1.0.0',
+      toVersion: '1.0.0',
+      changes: [],
+    });
+    expect(
+      (
+        await api.get(
+          PERSONAS.engineer,
+          `/skills/${skillA}/diff?fromVersionId=${v1.id}&toVersionId=nope`,
+        )
+      ).statusCode,
+    ).toBe(404);
+    expect(
+      (await api.get(PERSONAS.engineer, `/skills/${skillA}/diff?fromVersionId=${v1.id}`))
+        .statusCode,
+    ).toBe(422);
+    expect(
+      (await api.get(eve, `/skills/${skillA}/diff?fromVersionId=${v1.id}&toVersionId=${v1.id}`))
+        .statusCode,
+    ).toBe(404);
+  });
+});
+
+describe('skills.extract', () => {
+  it('is for people who may extract, and refuses what is not accepted with every reason the engine gave', async () => {
+    const url = `/cases/${ONE}/skills/extract`;
+    expect((await api.post(null, url, { scenarioId: rejectedScenario.id })).statusCode).toBe(401);
+    for (const persona of [PERSONAS.reviewer, PERSONAS.manager]) {
+      expect(
+        (await api.post(persona, url, { scenarioId: rejectedScenario.id })).statusCode,
+        persona,
+      ).toBe(403);
+    }
+    expect((await api.post(PERSONAS.engineer, url, {})).statusCode).toBe(422);
+    expect((await api.post(PERSONAS.engineer, url, { scenarioId: 'scn_missing' })).statusCode).toBe(
+      404,
+    );
+    expect(
+      (await api.post(PERSONAS.engineer, `/cases/case_missing/skills/extract`, { scenarioId: 'x' }))
+        .statusCode,
+    ).toBe(404);
+    expect(
+      (await api.post(PERSONAS.otherTenantEngineer, url, { scenarioId: rejectedScenario.id }))
+        .statusCode,
+    ).toBe(404);
+
+    const refused = await api.post(PERSONAS.engineer, url, { scenarioId: rejectedScenario.id });
+    expect(refused.statusCode).toBe(422);
+    const reasons = refused.data.errors.map((e: Json) => e.message);
+    expect(reasons).toContain('A reviewer rejected this scenario.');
+    expect(reasons).toContain('The scenario has not been accepted by a reviewer yet.');
+    expect(
+      refused.data.errors.every((e: Json) => e.path === `scenario.${rejectedScenario.id}`),
+    ).toBe(true);
+    expect((await api.get(PERSONAS.engineer, '/skills')).data.items).toHaveLength(2);
+  });
+
+  it('is idempotent with and without an Idempotency-Key, and extractForCase uses every accepted scenario', async () => {
+    const scenarios = (
+      await api.get(PERSONAS.engineer, `/cases/${ONE}/counterfactuals?forkId=${forkId}`)
+    ).data.items as Json[];
+    const accepted = scenarios.find((s) => s.reviewState === 'confirmed');
+    const url = `/cases/${ONE}/skills/extract`;
+    const key = 'idem-skill-extract-0001';
+    const first = await api.post(
+      PERSONAS.engineer,
+      url,
+      { scenarioId: accepted.id },
+      { 'idempotency-key': key },
+    );
+    expect(first.statusCode).toBe(202);
+    const replay = await api.post(
+      PERSONAS.engineer,
+      url,
+      { scenarioId: accepted.id },
+      { 'idempotency-key': key },
+    );
+    expect(replay.headers['idempotent-replayed']).toBe('true');
+    expect(replay.data).toEqual(first.data);
+    const clash = await api.post(
+      PERSONAS.engineer,
+      url,
+      { scenarioId: scenarios.find((s) => s.id !== accepted.id)?.id },
+      { 'idempotency-key': key },
+    );
+    expect(clash.statusCode).toBe(422);
+    expect(clash.data.code).toBe('idempotency_conflict');
+    await h.infra.services.jobs.idle();
+    expect((await api.get(PERSONAS.engineer, '/skills')).data.items).toHaveLength(2);
+
+    const ctx = contextFor(h, PERSONAS.engineer);
+    const skills = await ctx.services.skills.extractForCase(ctx, ONE);
+    expect(skills.map((s) => s.id).sort()).toEqual([skillA, skillB].sort());
+    const twoCtx = contextFor(h, PERSONAS.engineer);
+    await expect(twoCtx.services.skills.extractForCase(twoCtx, TWO)).rejects.toMatchObject({
+      status: 422,
+      message: expect.stringMatching(/No scenario of this case has been accepted/),
+    });
+  });
+
+  it('audits the extraction with ids only', async () => {
+    const extracted = (await audits()).filter((e) => e.action === 'skill.extracted');
+    expect(extracted.map((e) => e.targetId).sort()).toEqual([skillA, skillB].sort());
+    expect(extracted[0]).toMatchObject({ outcome: 'success', caseId: ONE });
+    expect(Object.keys(extracted[0]?.details ?? {}).sort()).toEqual([
+      'forkId',
+      'lifecycle',
+      'scenarioIds',
+      'skillId',
+      'version',
+      'versionId',
+    ]);
+    expect(
+      (await audits()).filter((e) => e.action === 'skill.extraction_requested').length,
+    ).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('skills.transition', () => {
+  it('checks the body, the skill and the caller before anything changes', async () => {
+    const url = `/skills/${skillB}/transition`;
+    const ok = { toState: 'draft', reason: REASON, expectedVersion: 1 };
+    expect((await api.post(null, url, ok)).statusCode).toBe(401);
+    for (const persona of [PERSONAS.engineer, PERSONAS.manager]) {
+      expect((await api.post(persona, url, ok)).statusCode, persona).toBe(403);
+    }
+    expect((await api.post(PERSONAS.curator, url, { ...ok, toState: 'frozen' })).statusCode).toBe(
+      422,
+    );
+    expect((await api.post(PERSONAS.curator, url, { ...ok, reason: 'no' })).statusCode).toBe(422);
+    expect((await api.post(PERSONAS.curator, url, { ...ok, expectedVersion: 0 })).statusCode).toBe(
+      422,
+    );
+    expect(
+      (await api.post(PERSONAS.curator, '/skills/skl_missing/transition', ok)).statusCode,
+    ).toBe(404);
+    expect((await api.post(PERSONAS.otherTenantEngineer, url, ok)).statusCode).toBe(403);
+    expect((await detailOf(skillB)).skill).toMatchObject({ lifecycle: 'discovered', version: 1 });
+  });
+
+  it('refuses the creator’s own approval as a separation-of-duties denial, audited', async () => {
+    const res = await moveSkill(api, PERSONAS.curator, skillB, 'draft', REASON);
+    expect(res.statusCode).toBe(403);
+    expect(res.data.code).toBe('forbidden');
+    expect(res.data.detail).toMatch(/created the skill cannot record an approval/);
+    const denied = (await audits()).filter(
+      (e) => e.action === 'skill.transition_denied' && e.targetId === skillB,
+    );
+    expect(denied).toHaveLength(1);
+    expect(denied[0]).toMatchObject({
+      outcome: 'denied',
+      actorId: PERSONAS.curator,
+      details: { code: 'separation_of_duties', fromState: 'discovered', toState: 'draft' },
+    });
+    expect((await detailOf(skillB, PERSONAS.curator)).skill.lifecycle).toBe('discovered');
+  });
+
+  it('a stale version or an unknown move changes nothing; withdrawing a skill is recorded as a rejection', async () => {
+    const stale = await api.post(PERSONAS.curator, `/skills/${skillB}/transition`, {
+      toState: 'retired',
+      reason: REASON,
+      expectedVersion: 9,
+    });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.data.code).toBe('version_conflict');
+    expect((await detailOf(skillB)).skill.lifecycle).toBe('discovered');
+    // The version the caller saw is the lock: two people acting on the same view cannot both succeed.
+    const seen = (await detailOf(skillA)).skill.version as number;
+    const results = await Promise.all([
+      api.post(PERSONAS.curator, `/skills/${skillA}/transition`, {
+        toState: 'draft',
+        reason: REASON,
+        expectedVersion: seen,
+      }),
+      api.post(PERSONAS.admin, `/skills/${skillA}/transition`, {
+        toState: 'draft',
+        reason: REASON,
+        expectedVersion: seen,
+      }),
+    ]);
+    expect(results.map((r) => r.statusCode).sort()).toEqual([200, 409]);
+    expect(['conflict', 'version_conflict']).toContain(
+      results.find((r) => r.statusCode === 409)?.data.code,
+    );
+    expect((await detailOf(skillA)).skill).toMatchObject({ lifecycle: 'draft', version: seen + 1 });
+    // A legal step taken on a stale view is a version conflict, audited as a failure.
+    const late = await api.post(PERSONAS.reviewer, `/skills/${skillA}/transition`, {
+      toState: 'simulation_tested',
+      reason: REASON,
+      expectedVersion: seen,
+    });
+    expect(late.statusCode).toBe(409);
+    expect(late.data.code).toBe('version_conflict');
+    expect((await detailOf(skillA)).skill.lifecycle).toBe('draft');
+  });
+});
+
+describe('a published skill: matching, applying and effectiveness', () => {
+  it('walks skill A to published through the real gates', { timeout: 120_000 }, async () => {
+    // Skill A is already a draft (above); the helper continues from there with the required people.
+    await publishAfterDraft();
+    expect((await detailOf(skillA)).skill).toMatchObject({
+      lifecycle: 'published',
+      validationStatus: 'validated',
+    });
+  });
+
+  async function publishAfterDraft(): Promise<void> {
+    const drive = async (persona: string, toState: string): Promise<void> => {
+      h.clock.advance(60_000);
+      const res = await moveSkill(api, persona, skillA, toState);
+      expect(res.statusCode, `${toState}: ${JSON.stringify(res.data)}`).toBe(200);
+    };
+    const check = async (persona: string, kind: string): Promise<void> => {
+      h.clock.advance(60_000);
+      expect((await runValidation(api, persona, skillA, { kind })).statusCode).toBe(200);
+    };
+    await check(PERSONAS.reviewer, 'simulation_test');
+    await drive(PERSONAS.reviewer, 'simulation_tested');
+    await drive(PERSONAS.reviewer, 'expert_reviewed');
+    await drive(PERSONAS.curator, 'pilot');
+    await check(PERSONAS.reviewer, 'regression');
+    await drive(PERSONAS.reviewer, 'validated');
+    await drive(PERSONAS.admin, 'published');
+  }
+
+  it('lists matches for the whole case (stored) and as of a moment (never stored)', async () => {
+    const url = `/cases/${TWO}/skill-matches`;
+    expect((await api.get(null, url)).statusCode).toBe(401);
+    expect((await api.get(PERSONAS.engineer, `/cases/case_missing/skill-matches`)).statusCode).toBe(
+      404,
+    );
+    expect((await api.get(PERSONAS.otherTenantEngineer, url)).statusCode).toBe(404);
+    expect((await api.get(PERSONAS.engineer, `${url}?asOf=yesterday`)).statusCode).toBe(422);
+    expect((await api.get(PERSONAS.engineer, `/cases/${RAW}/skill-matches`)).data.items).toEqual(
+      [],
+    );
+
+    const events = await h.repos(CONTOSO).cases.getAllEvents(TWO);
+    const first = events[0]?.timestamp ?? '';
+    const last = events[events.length - 1]?.timestamp ?? '';
+    const whole = await api.get(PERSONAS.manager, url);
+    expect(whole.statusCode).toBe(200);
+    expect(whole.data.items).toHaveLength(1);
+    expect(whole.data.items[0]).toMatchObject({
+      skillId: skillA,
+      lifecycle: 'published',
+      applicability: 'applies',
+      asOf: last,
+      applied: false,
+    });
+    const stored = await h.repos(CONTOSO).skills.listMatchesForCase(TWO);
+    expect(stored.map((m) => [m.skillId, m.asOf])).toEqual([[skillA, last]]);
+
+    const early = await api.get(PERSONAS.engineer, `${url}?asOf=${first}`);
+    expect(early.data.items[0]).toMatchObject({ applicability: 'applies', asOf: first });
+    // Before the first event nothing is known, so a skill with required triggers cannot apply.
+    const before = await api.get(PERSONAS.engineer, `${url}?asOf=2000-01-01T00:00:00Z`);
+    expect(before.data.items[0]).toMatchObject({ applicability: 'not_applicable', score: 0 });
+    // Beyond the last event is the whole case again (and keeps the last event as its evidence cut).
+    const beyond = await api.get(PERSONAS.engineer, `${url}?asOf=2099-01-01T00:00:00Z`);
+    expect(beyond.data.items[0].asOf).toBe(last);
+    // None of the ad-hoc matches was stored.
+    expect((await h.repos(CONTOSO).skills.listMatchesForCase(TWO)).map((m) => m.asOf)).toEqual([
+      last,
+    ]);
+  });
+
+  it('does not match what the skill has nothing to do with', async () => {
+    const res = await api.get(PERSONAS.engineer, `/cases/${IRR}/skill-matches`);
+    expect(res.data.items).toHaveLength(1);
+    expect(res.data.items[0]).toMatchObject({ applicability: 'not_applicable' });
+  });
+
+  it('refuses to apply what cannot be applied: not analysed, not applicable, not yet piloted, no permission', async () => {
+    const apply = (persona: string | null, caseId: string, skillId: string) =>
+      api.post(persona, `/cases/${caseId}/skills/apply`, { skillId });
+    expect((await apply(null, TWO, skillA)).statusCode).toBe(401);
+    for (const persona of [PERSONAS.reviewer, PERSONAS.manager]) {
+      expect((await apply(persona, TWO, skillA)).statusCode, persona).toBe(403);
+    }
+    expect((await api.post(PERSONAS.engineer, `/cases/${TWO}/skills/apply`, {})).statusCode).toBe(
+      422,
+    );
+    expect((await apply(PERSONAS.engineer, TWO, 'skl_missing')).statusCode).toBe(404);
+    expect((await apply(PERSONAS.engineer, 'case_missing', skillA)).statusCode).toBe(404);
+    expect((await apply(PERSONAS.otherTenantEngineer, TWO, skillA)).statusCode).toBe(404);
+
+    const draft = await apply(PERSONAS.engineer, TWO, skillB);
+    expect(draft.statusCode).toBe(409);
+    expect(draft.data.detail).toMatch(/Only pilot, validated or published skills/);
+    const raw = await apply(PERSONAS.engineer, RAW, skillA);
+    expect(raw.statusCode).toBe(409);
+    expect(raw.data.detail).toMatch(/not been analysed/);
+    const irrelevant = await apply(PERSONAS.engineer, IRR, skillA);
+    expect(irrelevant.statusCode).toBe(409);
+    expect(irrelevant.data.detail).toMatch(/does not apply/);
+    expect((await audits()).filter((e) => e.action === 'skill.applied')).toEqual([]);
+  });
+
+  it('applies a skill to a case once, with conformance and effectiveness, and records who and when', async () => {
+    h.clock.advance(60_000);
+    const res = await api.post(PERSONAS.engineer, `/cases/${TWO}/skills/apply`, {
+      skillId: skillA,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.data).toMatchObject({
+      caseId: TWO,
+      skillId: skillA,
+      applicability: 'applies',
+      applied: true,
+      appliedBy: PERSONAS.engineer,
+    });
+    expect(res.data.conformance).toMatchObject({
+      stepsTotal: expect.any(Number),
+      score: expect.any(Number),
+    });
+    expect(res.data.conformance.stepsFollowed).toBeLessThanOrEqual(res.data.conformance.stepsTotal);
+
+    h.clock.advance(60_000);
+    const again = await api.post(PERSONAS.curator, `/cases/${TWO}/skills/apply`, {
+      skillId: skillA,
+    });
+    expect(again.statusCode).toBe(200);
+    expect(again.data).toEqual(res.data);
+    const viaMatch = await api.post(
+      PERSONAS.admin,
+      `/cases/${TWO}/skill-matches/${res.data.id}/apply`,
+    );
+    expect(viaMatch.statusCode).toBe(200);
+    expect(viaMatch.data.appliedAt).toBe(res.data.appliedAt);
+    const applications = (await audits()).filter(
+      (e) => e.action === 'skill.applied' && e.caseId === TWO,
+    );
+    expect(applications).toHaveLength(1);
+    expect(applications[0]).toMatchObject({ actorId: PERSONAS.engineer, outcome: 'success' });
+  });
+
+  it('shows an application only from the moment it happened, and as applied for the whole case', async () => {
+    const events = await h.repos(CONTOSO).cases.getAllEvents(TWO);
+    const first = events[0]?.timestamp ?? '';
+    const whole = (await api.get(PERSONAS.engineer, `/cases/${TWO}/skill-matches`)).data.items[0];
+    expect(whole).toMatchObject({ applied: true, appliedBy: PERSONAS.engineer });
+    expect(whole.conformance.score).toBeGreaterThanOrEqual(0.75);
+    // On the case timeline the first email came before anyone applied the skill.
+    const early = (await api.get(PERSONAS.engineer, `/cases/${TWO}/skill-matches?asOf=${first}`))
+      .data.items[0];
+    expect(early).toMatchObject({ applied: false, appliedBy: null, conformance: null });
+    // An instant after the application sees it, with conformance through that instant.
+    const later = (
+      await api.get(PERSONAS.engineer, `/cases/${TWO}/skill-matches?asOf=2099-01-01T00:00:00Z`)
+    ).data.items[0];
+    expect(later).toMatchObject({ applied: true });
+  });
+
+  it('applies by match id: unknown matches are 404, other tenants see nothing, and it needs skill:apply', async () => {
+    const matchId = (await api.get(PERSONAS.engineer, `/cases/${TWO}/skill-matches`)).data.items[0]
+      .id as string;
+    expect((await api.post(null, `/cases/${TWO}/skill-matches/${matchId}/apply`)).statusCode).toBe(
+      401,
+    );
+    for (const persona of [PERSONAS.reviewer, PERSONAS.manager]) {
+      expect(
+        (await api.post(persona, `/cases/${TWO}/skill-matches/${matchId}/apply`)).statusCode,
+        persona,
+      ).toBe(403);
+    }
+    expect(
+      (await api.post(PERSONAS.engineer, `/cases/${TWO}/skill-matches/smt_missing/apply`))
+        .statusCode,
+    ).toBe(404);
+    expect(
+      (await api.post(PERSONAS.otherTenantEngineer, `/cases/${TWO}/skill-matches/${matchId}/apply`))
+        .statusCode,
+    ).toBe(404);
+  });
+
+  it('estimates effectiveness from the applications, labelled as an estimate and as synthetic', async () => {
+    h.clock.advance(60_000);
+    const second = await api.post(PERSONAS.curator, `/cases/${ONE}/skills/apply`, {
+      skillId: skillA,
+    });
+    expect(second.statusCode, JSON.stringify(second.data)).toBe(200);
+    const first = (await api.get(PERSONAS.engineer, `/cases/${TWO}/skill-matches`)).data.items[0];
+    const detail = await detailOf(skillA);
+    const mean =
+      Math.round(((first.conformance.score + second.data.conformance.score) / 2) * 1000) / 1000;
+    expect(detail.skill.effectiveness).toMatchObject({
+      applications: 2,
+      estimated: true,
+      synthetic: true,
+      conformanceAvg: mean,
+    });
+    expect(detail.skill.effectiveness.matchedCases).toBeGreaterThanOrEqual(2);
+    expect(detail.skill.effectiveness.notes.join(' ')).toMatch(/estimate/i);
+    const applied = (detail.matches as Json[]).filter((m) => m.applied).map((m) => m.caseId);
+    expect(applied.sort()).toEqual([ONE, TWO].sort());
+    // The case the skill does not apply to is listed as a match that was never applied.
+    expect(detail.matches.find((m: Json) => m.caseId === IRR)).toMatchObject({
+      applicability: 'not_applicable',
+      applied: false,
+    });
+  });
+});
+
+describe('simulation tests and regression suites', () => {
+  it('are for validators: engineers and managers are refused', async () => {
+    const url = `/skills/${skillA}/simulation-test`;
+    expect((await api.post(null, url, {})).statusCode).toBe(401);
+    for (const persona of [PERSONAS.engineer, PERSONAS.manager]) {
+      expect((await api.post(persona, url, {})).statusCode, persona).toBe(403);
+    }
+    expect((await api.post(PERSONAS.reviewer, url, { kind: 'chaos' })).statusCode).toBe(422);
+    expect(
+      (await api.post(PERSONAS.reviewer, '/skills/skl_missing/simulation-test', {})).statusCode,
+    ).toBe(404);
+    expect((await api.post(PERSONAS.reviewer, url, { versionId: 'skv_missing' })).statusCode).toBe(
+      404,
+    );
+    expect((await api.post(PERSONAS.otherTenantEngineer, url, {})).statusCode).toBe(403);
+  });
+
+  it('replays on the source cases by default, or on the one case named, and records who ran it', async () => {
+    h.clock.advance(60_000);
+    const res = await runValidation(api, PERSONAS.curator, skillA, {});
+    expect(res.statusCode).toBe(200);
+    expect(res.data).toMatchObject({
+      skillId: skillA,
+      kind: 'simulation_test',
+      outcome: 'passed',
+      caseId: ONE,
+      executedBy: PERSONAS.curator,
+      synthetic: true,
+    });
+    const ids = (res.data.checks as Json[]).map((c) => c.id as string);
+    expect(ids.every((id) => id.startsWith('CG-SYN-1001:'))).toBe(true);
+    expect(ids).toEqual(
+      expect.arrayContaining(['CG-SYN-1001:temporal-integrity', 'CG-SYN-1001:matches-at-decision']),
+    );
+
+    h.clock.advance(60_000);
+    const single = await runValidation(api, PERSONAS.reviewer, skillA, {
+      kind: 'regression',
+      caseId: TWO,
+    });
+    expect(single.data).toMatchObject({ kind: 'regression', caseId: TWO });
+    expect(
+      (await runValidation(api, PERSONAS.reviewer, skillA, { caseId: 'case_missing' })).statusCode,
+    ).toBe(404);
+    const raw = await runValidation(api, PERSONAS.reviewer, skillA, { caseId: RAW });
+    expect(raw.statusCode).toBe(409);
+    expect(raw.data.detail).toMatch(/not been analysed/);
+  });
+
+  it('runs the regression suite over the tenant’s resolved cases, including ones the skill must stay out of', async () => {
+    h.clock.advance(60_000);
+    const res = await runValidation(api, PERSONAS.reviewer, skillA, { kind: 'regression' });
+    expect(res.statusCode).toBe(200);
+    expect(res.data.outcome).toBe('passed');
+    const ids = (res.data.checks as Json[]).map((c) => c.id as string);
+    expect(ids).toEqual(
+      expect.arrayContaining([
+        'CG-SYN-1001:non-breaking',
+        'CG-SYN-1002:matches-at-decision',
+        'CG-SYN-9001:does-not-match',
+      ]),
+    );
+    expect((res.data.checks as Json[]).every((c) => c.passed === true)).toBe(true);
+    expect(res.data.caseId).toBeNull();
+    const event = (await audits()).find(
+      (e) => e.action === 'skill.validation_recorded' && e.details.validationId === res.data.id,
+    );
+    expect(event).toMatchObject({
+      outcome: 'success',
+      actorId: PERSONAS.reviewer,
+      targetType: 'skill_version',
+    });
+    expect(Object.keys(event?.details ?? {}).sort()).toEqual([
+      'cases',
+      'casesPassed',
+      'kind',
+      'outcome',
+      'skillId',
+      'skillVersion',
+      'validationId',
+      'versionId',
+    ]);
+  });
+});
+
+describe('mutations, version decisions and rollback', () => {
+  let proposed: Json;
+  let originalVersion: Json;
+
+  it(
+    'queues a proposal for a distinct case as a job, idempotently, and never applies it',
+    { timeout: 120_000 },
+    async () => {
+      const url = `/skills/${skillA}/mutations`;
+      expect((await api.post(null, url, { sourceCaseId: TWO })).statusCode).toBe(401);
+      for (const persona of [PERSONAS.engineer, PERSONAS.reviewer, PERSONAS.manager]) {
+        expect((await api.post(persona, url, { sourceCaseId: TWO })).statusCode, persona).toBe(403);
+      }
+      expect((await api.post(PERSONAS.curator, url, {})).statusCode).toBe(422);
+      expect(
+        (await api.post(PERSONAS.curator, url, { sourceCaseId: 'case_missing' })).statusCode,
+      ).toBe(404);
+      expect(
+        (await api.post(PERSONAS.curator, '/skills/skl_missing/mutations', { sourceCaseId: TWO }))
+          .statusCode,
+      ).toBe(404);
+      expect(
+        (await api.post(PERSONAS.otherTenantEngineer, url, { sourceCaseId: TWO })).statusCode,
+      ).toBe(403);
+
+      originalVersion = (await detailOf(skillA)).currentVersion;
+      h.clock.advance(60_000);
+      const key = 'idem-skill-mutation-0001';
+      const res = await api.post(
+        PERSONAS.curator,
+        url,
+        { sourceCaseId: TWO },
+        { 'idempotency-key': key },
+      );
+      expect(res.statusCode).toBe(202);
+      const replay = await api.post(
+        PERSONAS.curator,
+        url,
+        { sourceCaseId: TWO },
+        { 'idempotency-key': key },
+      );
+      expect(replay.headers['idempotent-replayed']).toBe('true');
+      expect(replay.data).toEqual(res.data);
+      const job = await settledJob(h, api, res.data.job.id);
+      expect(job.status, JSON.stringify(job.error)).toBe('succeeded');
+      expect(job.progress.stages.map((s: Json) => s.id)).toEqual(['load', 'propose', 'save']);
+      expect((await api.post(PERSONAS.curator, url, { sourceCaseId: TWO })).data.job.id).toBe(
+        res.data.job.id,
+      );
+
+      const detail = await detailOf(skillA);
+      proposed = detail.proposedVersion;
+      expect(proposed).toMatchObject({
+        version: '1.1.0',
+        state: 'proposed',
+        changeType: 'mutation',
+        createdBy: PERSONAS.curator,
+      });
+      expect(detail.skill).toMatchObject({
+        currentVersion: '1.0.0',
+        hasProposedMutation: true,
+        lifecycle: 'published',
+      });
+      expect(detail.currentVersion.id).toBe(originalVersion.id);
+      const event = (await audits()).find((e) => e.action === 'skill.mutation_proposed');
+      expect(event).toMatchObject({ outcome: 'success', actorId: PERSONAS.curator, caseId: TWO });
+      expect(event?.details).not.toHaveProperty('sourceCaseReference');
+    },
+  );
+
+  it('says so when a case teaches the skill nothing new, and refuses what it cannot learn from', async () => {
+    const same = await api.post(PERSONAS.curator, `/skills/${skillA}/mutations`, {
+      sourceCaseId: ONE,
+    });
+    expect(same.statusCode).toBe(202);
+    const job = await settledJob(h, api, same.data.job.id);
+    expect(job.status).toBe('succeeded');
+    expect(job.resultRef).toBeNull();
+    expect(job.progress.stages.find((s: Json) => s.id === 'save')).toMatchObject({
+      status: 'skipped',
+    });
+    expect(job.progress.stages.find((s: Json) => s.id === 'save').detail).toMatch(
+      /already a source case/,
+    );
+
+    const raw = await api.post(PERSONAS.curator, `/skills/${skillA}/mutations`, {
+      sourceCaseId: RAW,
+    });
+    const failed = await settledJob(h, api, raw.data.job.id);
+    expect(failed.status).toBe('failed');
+    expect(failed.error).toMatchObject({ code: 'conflict' });
+    expect(failed.error.message).toMatch(/not been analysed/);
+  });
+
+  it('decides a proposed version only with a distinct approver and validated content', async () => {
+    const decide = (persona: string | null, body: object) =>
+      api.post(persona, `/skills/${skillA}/versions/${proposed.id}/decision`, body);
+    const current = (await detailOf(skillA)).skill.version as number;
+    const ok = { decision: 'approve', reason: REASON, expectedVersion: current };
+    expect((await decide(PERSONAS.curator, ok)).statusCode).toBe(403); // the proposer
+    expect((await decide(null, ok)).statusCode).toBe(401);
+    for (const persona of [PERSONAS.engineer, PERSONAS.reviewer, PERSONAS.manager]) {
+      expect((await decide(persona, ok)).statusCode, persona).toBe(403);
+    }
+    expect((await decide(PERSONAS.admin, { ...ok, decision: 'maybe' })).statusCode).toBe(422);
+    expect((await decide(PERSONAS.admin, { ...ok, reason: 'no' })).statusCode).toBe(422);
+    expect(
+      (await api.post(PERSONAS.admin, `/skills/${skillA}/versions/skv_missing/decision`, ok))
+        .statusCode,
+    ).toBe(404);
+    const stale = await decide(PERSONAS.admin, { ...ok, expectedVersion: current + 4 });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.data.code).toBe('version_conflict');
+    const unvalidated = await decide(PERSONAS.admin, ok);
+    expect(unvalidated.statusCode).toBe(412);
+    expect(unvalidated.data.detail).toMatch(/simulation test/i);
+    expect((await detailOf(skillA)).skill.currentVersion).toBe('1.0.0');
+  });
+
+  it(
+    'approves it once simulation and regression passed on the proposed content; history is kept',
+    { timeout: 120_000 },
+    async () => {
+      h.clock.advance(60_000);
+      const sim = await runValidation(api, PERSONAS.reviewer, skillA, {
+        kind: 'simulation_test',
+        versionId: proposed.id,
+      });
+      expect(sim.data).toMatchObject({ outcome: 'passed', versionId: proposed.id });
+      h.clock.advance(60_000);
+      const reg = await runValidation(api, PERSONAS.reviewer, skillA, {
+        kind: 'regression',
+        versionId: proposed.id,
+      });
+      expect(reg.data).toMatchObject({ outcome: 'passed', versionId: proposed.id });
+
+      h.clock.advance(60_000);
+      const res = await api.post(
+        PERSONAS.admin,
+        `/skills/${skillA}/versions/${proposed.id}/decision`,
+        {
+          decision: 'approve',
+          reason: REASON,
+          expectedVersion: (await detailOf(skillA)).skill.version,
+        },
+      );
+      expect(res.statusCode, JSON.stringify(res.data)).toBe(200);
+      expect(res.data.skill).toMatchObject({
+        currentVersion: '1.1.0',
+        lifecycle: 'published',
+        hasProposedMutation: false,
+      });
+      expect(res.data.proposedVersion).toBeNull();
+      expect(res.data.versions.map((v: Json) => [v.version, v.state])).toEqual([
+        ['1.0.0', 'superseded'],
+        ['1.1.0', 'active'],
+      ]);
+      const approval = (res.data.approvals as Json[]).find((a) => a.versionId === proposed.id);
+      expect(approval).toMatchObject({
+        decision: 'approved',
+        approver: PERSONAS.admin,
+        requestedBy: PERSONAS.curator,
+      });
+      const event = (await audits()).find((e) => e.action === 'skill.version_approved');
+      expect(event).toMatchObject({ outcome: 'success', actorId: PERSONAS.admin });
+      expect(JSON.stringify(event?.details)).not.toContain('MARKER-');
+    },
+  );
+
+  it('follows the new version in matches, keeping the application of the case', async () => {
+    const match = (await api.get(PERSONAS.engineer, `/cases/${TWO}/skill-matches`)).data.items[0];
+    expect(match).toMatchObject({
+      skillVersion: '1.1.0',
+      applied: true,
+      appliedBy: PERSONAS.engineer,
+    });
+    expect(match.conformance).not.toBeNull();
+  });
+
+  it('rolls back by creating a new version with an earlier version’s content, never by rewriting history', async () => {
+    const url = `/skills/${skillA}/rollback`;
+    const detail = await detailOf(skillA);
+    const body = {
+      toVersionId: originalVersion.id,
+      reason: REASON,
+      expectedVersion: detail.skill.version,
+    };
+    expect((await api.post(null, url, body)).statusCode).toBe(401);
+    for (const persona of [PERSONAS.engineer, PERSONAS.reviewer, PERSONAS.manager]) {
+      expect((await api.post(persona, url, body)).statusCode, persona).toBe(403);
+    }
+    expect((await api.post(PERSONAS.curator, url, { ...body, reason: 'no' })).statusCode).toBe(422);
+    expect(
+      (await api.post(PERSONAS.curator, url, { ...body, toVersionId: 'skv_missing' })).statusCode,
+    ).toBe(404);
+    expect(
+      (await api.post(PERSONAS.curator, url, { ...body, toVersionId: detail.currentVersion.id }))
+        .statusCode,
+    ).toBe(409);
+    const stale = await api.post(PERSONAS.curator, url, {
+      ...body,
+      expectedVersion: body.expectedVersion + 3,
+    });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.data.code).toBe('version_conflict');
+
+    h.clock.advance(60_000);
+    const res = await api.post(PERSONAS.curator, url, body);
+    expect(res.statusCode, JSON.stringify(res.data)).toBe(200);
+    expect(res.data.skill).toMatchObject({ currentVersion: '1.1.1', lifecycle: 'published' });
+    expect(res.data.versions.map((v: Json) => [v.version, v.state, v.changeType])).toEqual([
+      ['1.0.0', 'superseded', 'initial'],
+      ['1.1.0', 'superseded', 'mutation'],
+      ['1.1.1', 'active', 'rollback'],
+    ]);
+    expect(res.data.currentVersion).toMatchObject({
+      parentVersionId: originalVersion.id,
+      contentHash: originalVersion.contentHash,
+    });
+    expect(res.data.currentVersion.content).toEqual(originalVersion.content);
+    const event = (await audits()).find((e) => e.action === 'skill.rolled_back');
+    expect(event).toMatchObject({ outcome: 'success', actorId: PERSONAS.curator });
+    expect(event?.details).toMatchObject({ restoredFromVersion: '1.0.0', newVersion: '1.1.1' });
+    expect(JSON.stringify(event?.details)).not.toContain('MARKER-');
+
+    const diff = await api.get(
+      PERSONAS.engineer,
+      `/skills/${skillA}/diff?fromVersionId=${originalVersion.id}&toVersionId=${res.data.currentVersion.id}`,
+    );
+    expect(diff.data.changes).toEqual([]);
+  });
+
+  it(
+    'rejecting a proposal needs no validation and leaves the skill as it was',
+    { timeout: 120_000 },
+    async () => {
+      const res = await api.post(PERSONAS.curator, `/skills/${skillB}/mutations`, {
+        sourceCaseId: TWO,
+      });
+      expect(res.statusCode).toBe(202);
+      const job = await settledJob(h, api, res.data.job.id);
+      expect(job.status, JSON.stringify(job.error)).toBe('succeeded');
+      const detail = await detailOf(skillB);
+      expect(detail.proposedVersion).toMatchObject({ state: 'proposed', version: '1.1.0' });
+
+      const rejected = await api.post(
+        PERSONAS.admin,
+        `/skills/${skillB}/versions/${detail.proposedVersion.id}/decision`,
+        {
+          decision: 'reject',
+          reason: 'Not convinced yet; collect one more case first.',
+          expectedVersion: detail.skill.version,
+        },
+      );
+      expect(rejected.statusCode).toBe(200);
+      expect(rejected.data.skill).toMatchObject({
+        currentVersion: '1.0.0',
+        hasProposedMutation: false,
+        lifecycle: 'discovered',
+      });
+      expect(rejected.data.versions.map((v: Json) => [v.version, v.state])).toEqual([
+        ['1.0.0', 'active'],
+        ['1.1.0', 'rejected'],
+      ]);
+      const again = await api.post(
+        PERSONAS.admin,
+        `/skills/${skillB}/versions/${detail.proposedVersion.id}/decision`,
+        {
+          decision: 'approve',
+          reason: REASON,
+          expectedVersion: rejected.data.skill.version,
+        },
+      );
+      expect(again.statusCode).toBe(409); // only proposed versions can be decided
+
+      // A rejected version was never approved, so it can never be restored by a rollback.
+      h.clock.advance(60_000);
+      const restore = await api.post(PERSONAS.curator, `/skills/${skillB}/rollback`, {
+        toVersionId: detail.proposedVersion.id,
+        reason: REASON,
+        expectedVersion: rejected.data.skill.version,
+      });
+      expect(restore.statusCode).toBe(412);
+    },
+  );
+
+  it('retires a skill that was never published (a rejection by the curator), and nothing moves it afterwards', async () => {
+    h.clock.advance(60_000);
+    const res = await moveSkill(api, PERSONAS.curator, skillB, 'retired', REASON);
+    expect(res.statusCode, JSON.stringify(res.data)).toBe(200);
+    expect(res.data.skill.lifecycle).toBe('retired');
+    const approval = (res.data.approvals as Json[]).at(-1);
+    expect(approval).toMatchObject({
+      decision: 'rejected',
+      toState: 'retired',
+      approver: PERSONAS.curator,
+    });
+    expect(res.data.transitions).toEqual([]);
+    expect((await moveSkill(api, PERSONAS.curator, skillB, 'draft', REASON)).statusCode).toBe(409);
+    expect(
+      (await audits()).find((e) => e.action === 'skill.retired' && e.targetId === skillB),
+    ).toMatchObject({
+      outcome: 'success',
+    });
+    // A retired skill never matches and cannot be applied.
+    const apply = await api.post(PERSONAS.engineer, `/cases/${TWO}/skills/apply`, {
+      skillId: skillB,
+    });
+    expect(apply.statusCode).toBe(409);
+  });
+});
+
+describe('what stays on the record', () => {
+  it('audits every refusal and change inside the tenant, with no free text, and never logs it', async () => {
+    const events = await audits();
+    const denied = events.filter((e) => e.outcome === 'denied');
+    expect(denied.some((e) => e.action === 'access.denied')).toBe(true);
+    expect(denied.some((e) => e.action === 'skill.transition_denied')).toBe(true);
+    expect(denied.some((e) => e.action === 'skill.version_decision_denied')).toBe(true);
+    const text = JSON.stringify(events.map((e) => e.details));
+    expect(text).not.toContain('MARKER-');
+    expect(text).not.toMatch(/sign-in|resolver|proxy node/i);
+    expect(JSON.stringify(h.logs())).not.toContain('MARKER-SKILL');
+    expect((await h.repos(CONTOSO).audit.verify()).valid).toBe(true);
+    expect((await audits(FABRIKAM)).filter((e) => /^skill\./.test(e.action))).toEqual([]);
+  });
+
+  it('keeps the other tenant out of the whole library', async () => {
+    const eve = PERSONAS.otherTenantEngineer;
+    expect((await api.get(eve, '/skills')).data.items).toEqual([]);
+    for (const url of [
+      `/skills/${skillA}`,
+      `/skills/${skillA}/versions`,
+      `/cases/${TWO}/skill-matches`,
+      `/cases/${ONE}/counterfactuals`,
+    ]) {
+      expect((await api.get(eve, url)).statusCode, url).toBe(404);
+    }
+    const other = contextFor(h, eve);
+    await expect(other.services.skills.get(other, skillA)).rejects.toMatchObject({ status: 404 });
+    await expect(other.services.skills.applyToCase(other, TWO, skillA)).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+});

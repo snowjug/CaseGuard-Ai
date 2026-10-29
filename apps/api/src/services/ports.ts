@@ -3,19 +3,31 @@ import type {
   AgentName,
   CounterfactualScenario,
   CounterfactualStrategy,
+  HindsightCheck,
   IngestRequest,
   IngestResult,
   IngestionPreview,
   Job,
   JobKind,
   JobStage,
+  Page,
   ProviderStatus,
+  ReviewCounterfactualBody,
+  SimulateSkillBody,
+  SkillDetail,
+  SkillDiff,
   SkillDna,
   SkillMatch,
+  SkillRollbackBody,
+  SkillTransitionBody,
+  SkillValidation,
+  SkillVersion,
+  SkillVersionDecisionBody,
   StartAnalysisResponse,
 } from '@caseguard/schemas';
 import type { AgentRunRequest, AgentRunResult, AiHealth } from '@caseguard/ai';
 import type { ObjectStore } from '../storage';
+import type { SkillListQuery } from '../db';
 import type { RequestContext } from '../http/request-context';
 
 /*
@@ -113,30 +125,154 @@ export interface AnalysisPort {
 
 // ---------------------------------------------------------------- counterfactuals and skills
 
+/**
+ * Counterfactual paths. Every method takes the `RequestContext` of the acting persona (the demo
+ * seeder builds one per persona), so permissions, tenancy, audit actor and four-eyes rules apply
+ * exactly as they do over HTTP. Route-level permission checks happen in the binder; the service
+ * enforces the data-dependent rules (eligibility, review state, optimistic locks).
+ */
 export interface CounterfactualPort {
-  /** Generates, validates and persists scenarios (and hindsight checks) for one fork. */
+  /**
+   * Generates, validates and persists scenarios for one eligible fork, waiting for the result (the
+   * job-based route runs the same work in the background). Generation sees only the pre-decision
+   * view; the engine's leak and validity checks decide each scenario's status and are stored as they
+   * are. Rejected scenarios are kept and shown as rejected.
+   */
   runForFork(
     ctx: RequestContext,
     caseId: string,
     forkId: string,
     strategies?: readonly CounterfactualStrategy[],
   ): Promise<CounterfactualScenario[]>;
+  /** `counterfactuals.run`: validates the fork, then queues the generation as a `counterfactual` job. */
+  startRun(
+    ctx: RequestContext,
+    caseId: string,
+    forkId: string,
+    strategies?: readonly CounterfactualStrategy[],
+  ): Promise<Job>;
   /**
-   * Ensures every fork flagged as meaningful has scenarios (generating missing ones). The analysis
-   * pipeline uses the valid scenarios to estimate avoidable support effort.
+   * Ensures every eligible fork has its default scenarios (generating the missing ones) and returns
+   * all stored scenarios of the case: the earliest meaningful fork with every strategy, the other
+   * eligible forks with the balanced strategy.
    */
   ensureScenarios(ctx: RequestContext, caseId: string): Promise<CounterfactualScenario[]>;
+  list(
+    ctx: RequestContext,
+    caseId: string,
+    filter?: { readonly forkId?: string | undefined },
+  ): Promise<CounterfactualScenario[]>;
+  get(ctx: RequestContext, caseId: string, scenarioId: string): Promise<CounterfactualScenario>;
+  /**
+   * Accepts (`confirmed`) or rejects a scenario with a reason, in one transaction with the
+   * `ReviewDecision` record and the audit event. `expectedVersion` is the scenario `version` the
+   * reviewer last saw. Only accepted scenarios may seed a skill.
+   */
+  review(
+    ctx: RequestContext,
+    caseId: string,
+    scenarioId: string,
+    input: ReviewCounterfactualBody,
+  ): Promise<CounterfactualScenario>;
+  /** Post-hoc comparison with the recorded resolution; separate from, and never feeding, generation. */
+  hindsight(ctx: RequestContext, caseId: string, scenarioId: string): Promise<HindsightCheck>;
 }
 
+export interface SkillExtractionOptions {
+  /** Restrict extraction to one accepted scenario; by default every accepted scenario of the case is used. */
+  readonly scenarioId?: string | undefined;
+}
+
+export type SkillMutationResult =
+  | {
+      readonly status: 'proposed';
+      /** The proposed version (`state: 'proposed'`): never applied until a distinct approver decides. */
+      readonly version: SkillVersion;
+      /** Human-readable diff from the version it builds on. */
+      readonly diff: SkillDiff;
+    }
+  | { readonly status: 'no_change'; readonly reasons: readonly string[] };
+
+/**
+ * SkillDNA library, governance and matching. Every method takes the acting persona's
+ * `RequestContext`; the domain gates (four-eyes, validations, optimistic locks) decide, and a refused
+ * step is audited as `denied` and thrown as the documented problem (`SKILL_ERROR_HTTP`).
+ */
 export interface SkillsPort {
-  /** Scores matchable skills against the evidence known as of `asOf` (default: the whole case). */
+  // ------------------------------------------------------------ matching and application
+  /**
+   * Scores the matchable skills (pilot, validated, published) against the evidence known as of `asOf`
+   * (default: the whole case, which is also persisted; ad-hoc `asOf` matches never are).
+   */
   matchForCase(
     ctx: RequestContext,
     caseId: string,
-    options?: { asOf?: string },
+    options?: { readonly asOf?: string | undefined },
   ): Promise<SkillMatch[]>;
-  /** Extracts draft skills from the case's eligible forks and valid scenarios. */
-  extractForCase(ctx: RequestContext, caseId: string): Promise<SkillDna[]>;
+  /** `skillMatches.apply`: records that the engineer adopted the guided plan of a stored match (idempotent). */
+  applyMatch(ctx: RequestContext, caseId: string, matchId: string): Promise<SkillMatch>;
+  /** `skills.apply`: applies a skill to a case (creates or updates the match; idempotent). */
+  applyToCase(ctx: RequestContext, caseId: string, skillId: string): Promise<SkillMatch>;
+
+  // ------------------------------------------------------------ library
+  list(ctx: RequestContext, query: SkillListQuery): Promise<Page<SkillDna>>;
+  get(ctx: RequestContext, skillId: string): Promise<SkillDetail>;
+  versions(ctx: RequestContext, skillId: string): Promise<SkillVersion[]>;
+  diff(
+    ctx: RequestContext,
+    skillId: string,
+    fromVersionId: string,
+    toVersionId: string,
+  ): Promise<SkillDiff>;
+
+  // ------------------------------------------------------------ extraction
+  /**
+   * Extracts draft skills (lifecycle `discovered`) from the reviewer-ACCEPTED scenarios of a case,
+   * waiting for the result. Refusals are thrown as a 422 problem listing the engine's reasons.
+   * Idempotent: an existing skill from the same scenario is returned as it is.
+   */
+  extractForCase(
+    ctx: RequestContext,
+    caseId: string,
+    options?: SkillExtractionOptions,
+  ): Promise<SkillDna[]>;
+  /** `skills.extract`: validates the scenario, then queues a `skill_extraction` job. */
+  startExtraction(ctx: RequestContext, caseId: string, scenarioId: string): Promise<Job>;
+
+  // ------------------------------------------------------------ governance
+  /** Moves a skill through its lifecycle (permission, four-eyes, validations, optimistic lock, audit). */
+  transition(
+    ctx: RequestContext,
+    skillId: string,
+    input: SkillTransitionBody,
+  ): Promise<SkillDetail>;
+  /**
+   * Replays the skill (default: its current version) on the cases it was derived from
+   * (`simulation_test`), or runs the regression suite over the tenant's analysed, resolved cases of
+   * its workload (`regression`), and records the validation.
+   */
+  runValidation(
+    ctx: RequestContext,
+    skillId: string,
+    input?: Partial<SimulateSkillBody>,
+  ): Promise<SkillValidation>;
+  /** Proposes a new version learned from another resolved case, waiting for the result. */
+  proposeMutation(
+    ctx: RequestContext,
+    skillId: string,
+    sourceCaseId: string,
+  ): Promise<SkillMutationResult>;
+  /** `skills.proposeMutation`: validates the request, then queues a `skill_mutation` job. */
+  startMutation(ctx: RequestContext, skillId: string, sourceCaseId: string): Promise<Job>;
+  /** Approves or rejects a proposed version (distinct approver; validated content only). */
+  decideVersion(
+    ctx: RequestContext,
+    skillId: string,
+    versionId: string,
+    input: SkillVersionDecisionBody,
+  ): Promise<SkillDetail>;
+  /** Rolls back by creating a NEW version with an earlier version's content. */
+  rollback(ctx: RequestContext, skillId: string, input: SkillRollbackBody): Promise<SkillDetail>;
 }
 
 // ---------------------------------------------------------------- ingestion
