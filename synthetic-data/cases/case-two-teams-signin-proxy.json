@@ -1,0 +1,226 @@
+{
+  "schemaVersion": "caseguard.case-bundle/1",
+  "synthetic": true,
+  "syntheticNotice": "SYNTHETIC DEMONSTRATION DATA. All organisations, people, users, addresses and incidents are fictional. Authored for the CaseGuard AI hackathon demo; the efficient handling shown here illustrates the measurement pipeline and is not evidence of real-world effectiveness.",
+  "case": {
+    "reference": "CG-SYN-1002",
+    "title": "Intermittent Teams sign-in failures for about 60 users at the Rotterdam site",
+    "product": "Microsoft Teams",
+    "workload": "teams-authentication",
+    "severity": "B",
+    "status": "resolved",
+    "openedAt": "2026-04-14T07:35:00Z",
+    "closedAt": "2026-04-14T16:10:00Z",
+    "customerAlias": "Fabrikam Synthetic BV",
+    "tags": ["synthetic", "authentication", "intermittent", "single-site"]
+  },
+  "participants": [
+    { "id": "p-cust-admin", "role": "customer_admin", "alias": "Customer IT Admin 1" },
+    { "id": "p-cust-net", "role": "customer_network_admin", "alias": "Customer Network Admin 1" },
+    { "id": "p-eng", "role": "support_engineer", "alias": "Support Engineer 2" },
+    { "id": "p-system", "role": "system", "alias": "Case System" }
+  ],
+  "events": [
+    {
+      "id": "g01",
+      "timestamp": "2026-04-14T07:35:00Z",
+      "participantId": "p-cust-admin",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams sign-in failing intermittently at Rotterdam",
+      "body": "Hello,\n\nSince about 07:10 UTC roughly 60 users at our Rotterdam site cannot sign in to Teams reliably. The window says \"We couldn't sign you in\" and shows error code caa82ee2. A retry sometimes works. Users at our other sites are fine.\n\nAbout 25 of them are warehouse supervisors who dispatch trucks by Teams calls, so shipments are being delayed. Our network team deployed a TLS inspection policy update on the web proxies yesterday evening, but we do not think it is related. We have not changed Conditional Access."
+    },
+    {
+      "id": "g02",
+      "timestamp": "2026-04-14T07:52:00Z",
+      "participantId": "p-eng",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Teams sign-in - three quick items",
+      "body": "Hello,\n\nThank you, that is very clear. To speed things up please send three sample affected users with the UTC time of one failed attempt each, and the names of the proxy nodes and DNS servers used by the Rotterdam clients. Meanwhile I will check Microsoft 365 service health and correlate the failures with the sign-in logs as soon as I have the sample users. I will update you by 10:00 UTC.\n\nRegards",
+      "action": {
+        "actionKey": "act.request-minimal-scoping",
+        "label": "Ask for three sample users with UTC failure times and the proxy and DNS servers used at Rotterdam",
+        "customerEffort": "low",
+        "durationMinutes": 8
+      },
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 700, "completionTokens": 220 }
+    },
+    {
+      "id": "g03",
+      "timestamp": "2026-04-14T07:55:00Z",
+      "participantId": "p-eng",
+      "type": "engineer_action",
+      "channel": "tool",
+      "title": "Service health check",
+      "body": "Checked Service health and the Message center: no active incidents or advisories for Teams or Microsoft Entra ID.",
+      "action": {
+        "actionKey": "act.check-service-health",
+        "label": "Check Microsoft 365 service health",
+        "customerEffort": "none",
+        "durationMinutes": 5
+      }
+    },
+    {
+      "id": "g04",
+      "timestamp": "2026-04-14T08:50:00Z",
+      "participantId": "p-cust-admin",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in - three quick items",
+      "inResponseTo": "g02",
+      "body": "Hello,\n\nSample users: h.vos@fabrikam-synthetic.invalid failed at 07:12:30 UTC, j.dekker@fabrikam-synthetic.invalid at 07:15:02 UTC and p.bakker@fabrikam-synthetic.invalid at 07:21:44 UTC. Rotterdam clients get their proxy settings from a PAC file that rotates across three proxy nodes (proxy-rtm-1, proxy-rtm-2 and proxy-rtm-3) and use DNS servers 10.30.5.10 and 10.30.5.11."
+    },
+    {
+      "id": "g05",
+      "timestamp": "2026-04-14T09:05:00Z",
+      "participantId": "p-eng",
+      "type": "engineer_action",
+      "channel": "tool",
+      "title": "Sign-in log correlation for the sample users",
+      "body": "Ran the sign-in log correlation for the three sample users and failure times (plus or minus 2 minutes).",
+      "action": {
+        "actionKey": "act.signin-log-correlation",
+        "label": "Correlate the three failing attempts with Entra sign-in logs",
+        "customerEffort": "none",
+        "durationMinutes": 20
+      },
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 1600, "completionTokens": 300 }
+    },
+    {
+      "id": "g06",
+      "timestamp": "2026-04-14T09:12:00Z",
+      "participantId": "p-eng",
+      "type": "query_output",
+      "channel": "tool",
+      "title": "Correlation result",
+      "inResponseTo": "g05",
+      "body": "failing = (h.vos 07:12:30Z, j.dekker 07:15:02Z, p.bakker 07:21:44Z)\n| join kind=leftouter (union SigninLogs, AADNonInteractiveUserSignInLogs) on UserPrincipalName\n| where abs(datetime_diff('second', TimeGenerated, FailureTimeUtc)) <= 120\n\n0 of 3 failing attempts have a matching record in SigninLogs or AADNonInteractiveUserSignInLogs.",
+      "structured": { "correlationMatchedFailures": 0, "failingAttemptsChecked": 3 },
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 3200, "completionTokens": 400 }
+    },
+    {
+      "id": "g07",
+      "timestamp": "2026-04-14T09:20:00Z",
+      "participantId": "p-eng",
+      "type": "case_note",
+      "channel": "internal",
+      "title": "Assessment after correlation",
+      "body": "Server-side correlation found no failure records, so the failures happen before authentication. The client error caa82ee2 is a timeout and the customer deployed a TLS inspection policy update on the proxies yesterday, so the proxy path is the leading hypothesis. DNS is less likely given the timeout code. Plan: test the three proxy nodes individually from Rotterdam and compare them.",
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 1100, "completionTokens": 300 }
+    },
+    {
+      "id": "g08",
+      "timestamp": "2026-04-14T09:35:00Z",
+      "participantId": "p-eng",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Proxy node test from Rotterdam",
+      "body": "Hello,\n\nCould the network team please test https://login.microsoftonline.com and https://aadcdn.msftauth.net through each proxy node (proxy-rtm-1, proxy-rtm-2 and proxy-rtm-3) from a Rotterdam client, 20 requests each, and send the timings? A script is attached. Please also tell me the exact time the TLS inspection policy changed.\n\nI will review the results as soon as they arrive and will update you by 11:30 UTC.\n\nRegards",
+      "action": {
+        "actionKey": "act.proxy-node-comparison",
+        "label": "Ask the network team to test sign-in endpoints through each proxy node from Rotterdam",
+        "customerEffort": "medium",
+        "durationMinutes": 10
+      },
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 1300, "completionTokens": 350 }
+    },
+    {
+      "id": "g09",
+      "timestamp": "2026-04-14T10:55:00Z",
+      "participantId": "p-cust-net",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Proxy node test from Rotterdam",
+      "inResponseTo": "g08",
+      "body": "Hello,\n\nResults from Rotterdam: proxy-rtm-1 and proxy-rtm-3 respond in about 0.4 seconds. proxy-rtm-2 times out for roughly one in three requests to aadcdn.msftauth.net and login.microsoftonline.com with a 10 second limit. The CPU on proxy-rtm-2 has been at 97 percent since the TLS inspection policy update, while the other two nodes are at about 40 percent. The policy changed at 21:40 UTC yesterday.",
+      "structured": { "proxyNodesTested": 3, "proxyNodesFailing": 1 }
+    },
+    {
+      "id": "g10",
+      "timestamp": "2026-04-14T11:10:00Z",
+      "participantId": "p-eng",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Workaround and permanent fix",
+      "body": "Hello,\n\nThank you, that explains the intermittent pattern: proxy-rtm-2 is overloaded since TLS inspection was enabled for all categories. Workaround: take proxy-rtm-2 out of the PAC file rotation until it has capacity. Permanent fix: bypass TLS inspection for the Microsoft 365 endpoints published by Microsoft and review proxy capacity under change control before re-enabling broader inspection.\n\nPlease confirm when the PAC file is updated. I will validate with a before and after comparison and will update you by 15:00 UTC.\n\nRegards",
+      "action": {
+        "actionKey": "act.remove-proxy-node-from-rotation",
+        "label": "Recommend taking proxy-rtm-2 out of the PAC rotation (workaround) and bypassing TLS inspection for Microsoft 365 endpoints (permanent fix)",
+        "customerEffort": "low",
+        "durationMinutes": 15
+      },
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 1700, "completionTokens": 450 }
+    },
+    {
+      "id": "g11",
+      "timestamp": "2026-04-14T11:50:00Z",
+      "participantId": "p-cust-net",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Workaround and permanent fix",
+      "inResponseTo": "g10",
+      "body": "Hello,\n\nThe PAC file was updated at 11:35 UTC and proxy-rtm-2 is out of rotation. Users are signing in again. The inspection bypass will go through change control this afternoon."
+    },
+    {
+      "id": "g12",
+      "timestamp": "2026-04-14T15:30:00Z",
+      "participantId": "p-cust-admin",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Afternoon update from the customer",
+      "body": "Hello,\n\nOur helpdesk has had no sign-in tickets since 11:45 UTC. The inspection bypass for the Microsoft 365 endpoints was deployed at 15:00 UTC and proxy-rtm-2 went back into rotation at 15:20 UTC. We confirm users can sign in.",
+      "structured": { "fixTarget": "proxy-node", "failuresAfterChange": 0, "monitoringHours": 4 }
+    },
+    {
+      "id": "g13",
+      "timestamp": "2026-04-14T15:45:00Z",
+      "participantId": "p-eng",
+      "type": "validation_result",
+      "channel": "internal",
+      "title": "Validation of workaround and permanent fix",
+      "body": "Validation: 100 requests through each of the three proxy nodes completed without a timeout after the change, and client sign-in telemetry shows 0 failures over the last 4 hours. The customer confirmed that users can sign in. Workaround and permanent fix are both validated.",
+      "structured": {
+        "proxyNodesTested": 3,
+        "proxyNodesFailing": 0,
+        "requestsPerNode": 100,
+        "failuresAfterChange": 0,
+        "monitoringHours": 4,
+        "fixTarget": "proxy-node"
+      },
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 1400, "completionTokens": 350 }
+    },
+    {
+      "id": "g14",
+      "timestamp": "2026-04-14T16:00:00Z",
+      "participantId": "p-eng",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Resolution summary",
+      "body": "Resolution summary. Root cause: after a TLS inspection policy update at 21:40 UTC on 2026-04-13 proxy-rtm-2 was saturated (97 percent CPU) and timed out for about one in three requests to Microsoft sign-in hosts. PAC rotation across three nodes made sign-in intermittent for Rotterdam. Workaround: proxy-rtm-2 removed from PAC rotation at 11:35 UTC. Permanent fix: TLS inspection bypass for Microsoft 365 endpoints at 15:00 UTC and a capacity review under change control. Validation: 4 hours with 0 failures and 100 requests per node without timeouts."
+    },
+    {
+      "id": "g15",
+      "timestamp": "2026-04-14T16:10:00Z",
+      "participantId": "p-system",
+      "type": "status_change",
+      "channel": "tool",
+      "title": "Status changed to Resolved",
+      "body": "Status changed to Resolved. Customer confirmed resolution."
+    }
+  ],
+  "resolution": {
+    "resolvedAt": "2026-04-14T16:00:00Z",
+    "summary": "After a TLS inspection policy update, one of three web proxy nodes became overloaded and timed out for a share of requests to Microsoft sign-in hosts, causing intermittent Teams sign-in failures for Rotterdam users routed through that node.",
+    "rootCause": "After a TLS inspection policy update at 21:40 UTC on 2026-04-13 proxy-rtm-2 was saturated (97 percent CPU) and timed out for about one in three requests to Microsoft sign-in hosts. PAC rotation across three nodes made sign-in intermittent.",
+    "workaround": "proxy-rtm-2 removed from PAC rotation at 11:35 UTC on 2026-04-14.",
+    "permanentFix": "TLS inspection bypass for Microsoft 365 endpoints deployed at 15:00 UTC on 2026-04-14 and a proxy capacity review under change control.",
+    "rootCauseHypothesisKey": "hyp.proxy-egress",
+    "validation": {
+      "validatedAt": "2026-04-14T15:45:00Z",
+      "method": "100 requests per proxy node after the change plus 4 hours of client sign-in telemetry (0 failures) and customer confirmation.",
+      "outcome": "confirmed",
+      "evidenceEventIds": ["g12", "g13"]
+    }
+  }
+}

@@ -1,0 +1,440 @@
+{
+  "schemaVersion": "caseguard.case-bundle/1",
+  "synthetic": true,
+  "syntheticNotice": "SYNTHETIC DEMONSTRATION DATA. All organisations, people, users, addresses and incidents are fictional. Authored for the CaseGuard AI hackathon demo; not a real support case.",
+  "case": {
+    "reference": "CG-SYN-1001",
+    "title": "Intermittent Teams sign-in failures for about 140 branch users (Pune and Leeds)",
+    "product": "Microsoft Teams",
+    "workload": "teams-authentication",
+    "severity": "A",
+    "status": "resolved",
+    "openedAt": "2026-03-09T09:12:00Z",
+    "closedAt": "2026-03-12T10:20:00Z",
+    "customerAlias": "Contoso Synthetic Ltd",
+    "tags": ["synthetic", "authentication", "intermittent", "multi-site"]
+  },
+  "participants": [
+    { "id": "p-cust-admin", "role": "customer_admin", "alias": "Customer IT Admin 1" },
+    { "id": "p-cust-net", "role": "customer_network_admin", "alias": "Customer Network Admin 1" },
+    { "id": "p-eng", "role": "support_engineer", "alias": "Support Engineer 1" },
+    { "id": "p-esc", "role": "escalation_engineer", "alias": "Identity Escalation Engineer 1" },
+    { "id": "p-mgr", "role": "support_manager", "alias": "Support Manager 1" },
+    { "id": "p-system", "role": "system", "alias": "Case System" }
+  ],
+  "events": [
+    {
+      "id": "e01",
+      "timestamp": "2026-03-09T09:12:00Z",
+      "participantId": "p-cust-admin",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams sign-in failing intermittently for branch users",
+      "body": "Hello,\n\nSince about 08:50 UTC this morning roughly 140 users across our Pune and Leeds branch offices cannot sign in to the Microsoft Teams desktop app reliably. The sign-in window shows \"We couldn't sign you in\". A retry sometimes works and sometimes does not.\n\nAbout 40 of the affected people are customer service agents who cannot join customer calls, so this is directly affecting our support queue. Users at our head office are not reporting the problem. We have not changed anything on purpose.\n\nPlease advise urgently."
+    },
+    {
+      "id": "e02",
+      "timestamp": "2026-03-09T09:30:00Z",
+      "participantId": "p-eng",
+      "type": "case_note",
+      "channel": "internal",
+      "title": "Initial triage",
+      "body": "Initial triage. Multi-user intermittent sign-in failure on Teams desktop at two branch sites. Sounds like a Conditional Access or MFA policy change forcing re-authentication. Likely a CA policy issue. Plan: pull the Entra sign-in logs for affected users and review recent Conditional Access policy changes. I will also ask the customer for HAR captures and the full list of affected users."
+    },
+    {
+      "id": "e03",
+      "timestamp": "2026-03-09T09:41:00Z",
+      "participantId": "p-eng",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Teams sign-in - information needed",
+      "body": "Hello,\n\nThank you for the details. To investigate, please send:\n1. A HAR capture and a Fiddler trace from at least three affected users, captured while a sign-in fails.\n2. The complete list of all affected users.\n3. An export of every Conditional Access policy and all changes made in the last 30 days.\n4. The Teams client version for each affected device.\n\nI will review the Conditional Access angle in the meantime.\n\nRegards",
+      "action": {
+        "actionKey": "act.request-har-capture",
+        "label": "Request HAR and Fiddler traces, full user list and Conditional Access export",
+        "customerEffort": "very_high",
+        "durationMinutes": 10
+      },
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 2100, "completionTokens": 450 }
+    },
+    {
+      "id": "e04",
+      "timestamp": "2026-03-09T11:05:00Z",
+      "participantId": "p-cust-admin",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in - information needed",
+      "inResponseTo": "e03",
+      "body": "Hello,\n\nFull HAR and Fiddler captures will take a while because users are in calls, so here is what we can send quickly.\n\nThree sample affected users: u.patel@contoso-synthetic.invalid, c.ellis@contoso-synthetic.invalid and m.rao@contoso-synthetic.invalid. A failed attempt for u.patel was at 09:03:41 UTC and one for c.ellis at 09:07:12 UTC.\n\nFailures are much worse at the Pune office than at Leeds. The screenshot shows the message \"We couldn't sign you in\" with error code caa82ee7. Teams in a browser also fails for some of them.\n\nThe Conditional Access export is attached. The last Conditional Access policy edit was three weeks ago."
+    },
+    {
+      "id": "e05",
+      "timestamp": "2026-03-09T11:40:00Z",
+      "participantId": "p-eng",
+      "type": "engineer_action",
+      "channel": "tool",
+      "title": "Sign-in log lookup for the sample users",
+      "body": "Ran a sign-in log query for the three sample users, failures only, last 24 hours.",
+      "action": {
+        "actionKey": "act.signin-log-correlation",
+        "label": "Query Entra sign-in failures for the three sample users (last 24 hours)",
+        "customerEffort": "none",
+        "durationMinutes": 25
+      },
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 1800, "completionTokens": 300 }
+    },
+    {
+      "id": "e06",
+      "timestamp": "2026-03-09T11:41:00Z",
+      "participantId": "p-eng",
+      "type": "query_output",
+      "channel": "tool",
+      "title": "Sign-in log query result",
+      "inResponseTo": "e05",
+      "body": "SigninLogs\n| where UserPrincipalName in (\"u.patel@contoso-synthetic.invalid\", \"c.ellis@contoso-synthetic.invalid\", \"m.rao@contoso-synthetic.invalid\")\n| where TimeGenerated > ago(24h) and ResultType != 0\n| project TimeGenerated, UserPrincipalName, ResultType, ResultDescription, ConditionalAccessStatus, CorrelationId\n\n2026-03-08T16:21:07Z | m.rao | 50076 | AADSTS50076: Due to a configuration change made by your administrator, or because you moved to a new location, you must use multi-factor authentication to access | failure | 8c1d2f64-3a1e-4f0b-9d55-0a7d1e6b2c01\n2026-03-08T16:21:55Z | m.rao | 50074 | AADSTS50074: Strong Authentication is required | failure | 8c1d2f64-3a1e-4f0b-9d55-0a7d1e6b2c02\n\n(2 rows)",
+      "structured": {
+        "rowCount": 2,
+        "rowsInFailureWindow": 0,
+        "timeRangeStartUtc": "2026-03-08T11:40:00Z",
+        "timeRangeEndUtc": "2026-03-09T11:40:00Z"
+      },
+      "correlationIds": [
+        "8c1d2f64-3a1e-4f0b-9d55-0a7d1e6b2c01",
+        "8c1d2f64-3a1e-4f0b-9d55-0a7d1e6b2c02"
+      ],
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 6200, "completionTokens": 700 }
+    },
+    {
+      "id": "e07",
+      "timestamp": "2026-03-09T12:10:00Z",
+      "participantId": "p-eng",
+      "type": "case_note",
+      "channel": "internal",
+      "title": "Findings from sign-in logs",
+      "body": "Findings: the sign-in logs show AADSTS50076 (MFA required by Conditional Access) for the affected users. Root cause is the Conditional Access policy 'Require MFA for Teams', which forces interactive MFA that Teams desktop cannot complete reliably. Confirmed. Next: ask the customer to exclude the affected users from that policy and revoke their sessions.",
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 1800, "completionTokens": 600 }
+    },
+    {
+      "id": "e08",
+      "timestamp": "2026-03-09T12:25:00Z",
+      "participantId": "p-eng",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Proposed change: exclude affected users from the MFA policy",
+      "body": "Hello,\n\nBased on the sign-in logs the Conditional Access policy 'Require MFA for Teams' is the cause. Please temporarily exclude the affected users (all 140) from that policy and confirm once done. I will revoke their sessions at the same time so everyone signs in again.\n\nRegards",
+      "action": {
+        "actionKey": "act.exclude-users-from-mfa-ca",
+        "label": "Ask the customer to exclude all affected users from the MFA policy",
+        "customerEffort": "medium",
+        "durationMinutes": 10
+      },
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 1500, "completionTokens": 400 }
+    },
+    {
+      "id": "e09",
+      "timestamp": "2026-03-09T12:31:00Z",
+      "participantId": "p-eng",
+      "type": "engineer_action",
+      "channel": "tool",
+      "title": "Revoke sign-in sessions",
+      "body": "Revoked refresh tokens and sessions for the 140 affected users so that they must authenticate again.",
+      "action": {
+        "actionKey": "act.revoke-user-sessions",
+        "label": "Revoke sign-in sessions for the affected users",
+        "customerEffort": "low",
+        "destructive": true,
+        "durationMinutes": 10
+      }
+    },
+    {
+      "id": "e10",
+      "timestamp": "2026-03-09T13:30:00Z",
+      "participantId": "p-cust-admin",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Proposed change: exclude affected users from the MFA policy",
+      "inResponseTo": "e08",
+      "body": "Hello,\n\nWe excluded the 140 users from the MFA policy and everyone signed in again after the sessions were revoked, but the failures continue with the same pattern. We also cleared the Teams cache on five PCs and they still fail intermittently.\n\nMore people are affected now, about 55 agents cannot join calls. We have not heard what is happening or what the plan is. Please update us."
+    },
+    {
+      "id": "e11",
+      "timestamp": "2026-03-09T14:00:00Z",
+      "participantId": "p-eng",
+      "type": "engineer_action",
+      "channel": "tool",
+      "title": "Repeat sign-in log query with wider window",
+      "body": "Re-ran the same sign-in failure query with a wider 7-day window for the three sample users.",
+      "action": {
+        "actionKey": "act.signin-log-correlation",
+        "label": "Re-run the sign-in failure query with a 7-day window",
+        "customerEffort": "none",
+        "durationMinutes": 20,
+        "repeatOf": "e05"
+      },
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 2000, "completionTokens": 300 }
+    },
+    {
+      "id": "e12",
+      "timestamp": "2026-03-09T14:05:00Z",
+      "participantId": "p-eng",
+      "type": "query_output",
+      "channel": "tool",
+      "title": "Sign-in log query result (7 days)",
+      "inResponseTo": "e11",
+      "body": "SigninLogs\n| where UserPrincipalName in (\"u.patel@contoso-synthetic.invalid\", \"c.ellis@contoso-synthetic.invalid\", \"m.rao@contoso-synthetic.invalid\")\n| where TimeGenerated > ago(7d) and ResultType != 0\n| summarize Count = count() by ResultType, ResultDescription\n\n50076 | AADSTS50076: Due to a configuration change made by your administrator, or because you moved to a new location, you must use multi-factor authentication to access | 9\n50074 | AADSTS50074: Strong Authentication is required | 5\n\n(14 rows, all MFA-related, spread over the last 7 days)",
+      "structured": {
+        "rowCount": 14,
+        "rowsInFailureWindow": 0,
+        "timeRangeStartUtc": "2026-03-02T14:00:00Z",
+        "timeRangeEndUtc": "2026-03-09T14:00:00Z"
+      },
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 7800, "completionTokens": 900 }
+    },
+    {
+      "id": "e13",
+      "timestamp": "2026-03-09T14:20:00Z",
+      "participantId": "p-eng",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Teams sign-in - still need diagnostics",
+      "body": "Hello,\n\nI still need the following to continue:\n1. HAR and Fiddler captures from three users during a failure.\n2. Teams client logs from the same devices.\n3. The output of dsregcmd /status from three affected devices.\n4. The exact time of each failure.\n\nRegards",
+      "action": {
+        "actionKey": "act.request-har-capture",
+        "label": "Repeat request for HAR/Fiddler traces, client logs, dsregcmd output and exact failure times",
+        "customerEffort": "very_high",
+        "durationMinutes": 10,
+        "repeatOf": "e03"
+      },
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 2300, "completionTokens": 500 }
+    },
+    {
+      "id": "e14",
+      "timestamp": "2026-03-09T17:45:00Z",
+      "participantId": "p-cust-admin",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in - still need diagnostics",
+      "inResponseTo": "e13",
+      "body": "Hello,\n\nA HAR was captured for u.patel while a sign-in failed. The network log summary shows several requests to aadcdn.msftauth.net failing with ERR_NAME_NOT_RESOLVED and the sign-in page never finishes loading. The dsregcmd output for the three devices shows AzureAdPrt : YES on all of them.\n\nWe are still waiting for an update on the plan."
+    },
+    {
+      "id": "e15",
+      "timestamp": "2026-03-10T08:55:00Z",
+      "participantId": "p-eng",
+      "type": "case_note",
+      "channel": "internal",
+      "title": "Review of HAR summary",
+      "body": "Reviewed the HAR summary. The name resolution errors are probably noise from the corporate proxy. The PRT is present on all three devices, so the device is fine. I still believe this is Conditional Access or token lifetime. Next I will check sign-in frequency settings and ask the Identity team to look at backend tokens.",
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 4000, "completionTokens": 700 }
+    },
+    {
+      "id": "e16",
+      "timestamp": "2026-03-10T09:30:00Z",
+      "participantId": "p-eng",
+      "type": "engineer_action",
+      "channel": "tool",
+      "title": "Conditional Access configuration review",
+      "body": "Reviewed the Conditional Access sign-in frequency settings and found no changes in the audit log.",
+      "action": {
+        "actionKey": "act.review-ca-policy-config",
+        "label": "Review Conditional Access sign-in frequency settings",
+        "customerEffort": "none",
+        "durationMinutes": 25
+      }
+    },
+    {
+      "id": "e17",
+      "timestamp": "2026-03-10T14:00:00Z",
+      "participantId": "p-cust-admin",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Day 2 - request for update",
+      "body": "Hello,\n\nIt is now the second day and about 55 agents are still affected. Our director is asking for an update and an ETA. Nobody has told us what you are doing or when this will be fixed."
+    },
+    {
+      "id": "e18",
+      "timestamp": "2026-03-10T14:40:00Z",
+      "participantId": "p-mgr",
+      "type": "case_note",
+      "channel": "internal",
+      "title": "Customer escalation noted",
+      "body": "Customer escalation noted. Director-level visibility at the customer. Asked the engineer to engage the Identity backend team today."
+    },
+    {
+      "id": "e19",
+      "timestamp": "2026-03-10T15:05:00Z",
+      "participantId": "p-eng",
+      "type": "escalation",
+      "channel": "internal",
+      "title": "Escalation: intermittent Teams sign-in failures for about 140 users",
+      "body": "Escalating to the Identity backend team. Summary: intermittent Teams desktop sign-in failures for about 140 users at two branch sites. Suspected Conditional Access sign-in frequency issue. Requesting backend token and session traces for u.patel and c.ellis. Evidence so far: sign-in logs show MFA events, the HAR shows some name resolution errors (probably proxy noise), dsregcmd shows a healthy PRT.",
+      "action": {
+        "actionKey": "act.escalate-to-identity-team",
+        "label": "Escalate to the Identity backend team",
+        "customerEffort": "none",
+        "durationMinutes": 30
+      },
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 5200, "completionTokens": 1100 }
+    },
+    {
+      "id": "e20",
+      "timestamp": "2026-03-10T18:30:00Z",
+      "participantId": "p-system",
+      "type": "system_event",
+      "channel": "tool",
+      "title": "Escalation accepted",
+      "body": "Escalation accepted by the Identity backend team. Priority P2. Next update expected within one business day."
+    },
+    {
+      "id": "e21",
+      "timestamp": "2026-03-11T08:20:00Z",
+      "participantId": "p-esc",
+      "type": "escalation_response",
+      "channel": "internal",
+      "title": "Backend review result",
+      "inResponseTo": "e19",
+      "body": "Reviewed. We searched backend sign-in telemetry for u.patel, c.ellis and m.rao at the failure times you listed. There are no failed sign-in requests for those times: 0 of 6 failing attempts have a matching record in SigninLogs or AADNonInteractiveUserSignInLogs, so the requests never reached Microsoft Entra ID. The failure is happening before authentication. Please check the client network path. The HAR summary you attached shows ERR_NAME_NOT_RESOLVED for aadcdn.msftauth.net.",
+      "structured": { "correlationMatchedFailures": 0, "failingAttemptsChecked": 6 },
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 3000, "completionTokens": 500 }
+    },
+    {
+      "id": "e22",
+      "timestamp": "2026-03-11T08:50:00Z",
+      "participantId": "p-eng",
+      "type": "case_note",
+      "channel": "internal",
+      "title": "Re-plan after backend result",
+      "body": "Understood. The failures are pre-authentication, so the Conditional Access theory does not hold. Likely a DNS or proxy problem at the branch sites. I will ask the customer network team to test name resolution on each resolver used by the Pune site.",
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 900, "completionTokens": 250 }
+    },
+    {
+      "id": "e23",
+      "timestamp": "2026-03-11T09:05:00Z",
+      "participantId": "p-eng",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Name resolution test per DNS server",
+      "body": "Hello,\n\nCould the network team please run Resolve-DnsName login.microsoftonline.com and aadcdn.msftauth.net against each DNS server used by the Pune site (10.20.1.10 and 10.20.1.11) and send the output? Please also tell us about any DNS, proxy or web filter policy changes made around 08:40 UTC on Monday.\n\nI will review the results as soon as they arrive and will update you by end of day.\n\nRegards",
+      "action": {
+        "actionKey": "act.dns-resolver-comparison",
+        "label": "Ask the network team to test name resolution against each DNS resolver at the Pune site",
+        "customerEffort": "low",
+        "durationMinutes": 10
+      },
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 1200, "completionTokens": 300 }
+    },
+    {
+      "id": "e24",
+      "timestamp": "2026-03-11T11:35:00Z",
+      "participantId": "p-cust-net",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Name resolution test per DNS server",
+      "inResponseTo": "e23",
+      "body": "Hello,\n\nResults for the Pune site: resolver 10.20.1.10 answers both names normally. Resolver 10.20.1.11 returns SERVFAIL for aadcdn.msftauth.net for roughly one in three queries. Pune clients use 10.20.1.11 as their primary resolver and Leeds clients use it as secondary, which fits the pattern you described.\n\nA DNS security policy update was deployed to resolver 10.20.1.11 at 08:42 UTC on Monday. The new URL category 'CDN and content delivery' was set to block.",
+      "structured": { "resolversTested": 2, "resolversFailing": 1 }
+    },
+    {
+      "id": "e25",
+      "timestamp": "2026-03-11T11:50:00Z",
+      "participantId": "p-eng",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Workaround and permanent fix",
+      "body": "Hello,\n\nThank you, that explains the pattern. Workaround: remove resolver 10.20.1.11 from the Pune and Leeds DHCP scopes until the policy is corrected. Permanent fix: remove the block on the 'CDN and content delivery' category for Microsoft sign-in hosts and add an exception for the Microsoft 365 endpoints published by Microsoft, then put DNS policy changes through change control.\n\nPlease confirm when each change is done. I will validate with a 24 hour before and after comparison and will update you by end of day tomorrow.\n\nRegards",
+      "action": {
+        "actionKey": "act.remove-resolver-from-service",
+        "label": "Recommend removing the failing resolver from DHCP scopes (workaround) and correcting the DNS policy (permanent fix)",
+        "customerEffort": "low",
+        "durationMinutes": 15
+      },
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 1800, "completionTokens": 500 }
+    },
+    {
+      "id": "e26",
+      "timestamp": "2026-03-11T13:05:00Z",
+      "participantId": "p-cust-net",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Workaround and permanent fix",
+      "inResponseTo": "e25",
+      "body": "Hello,\n\nResolver 10.20.1.11 was removed from the Pune and Leeds DHCP scopes at 12:40 UTC and clients are renewing leases. Sign-ins are improving. The DNS policy exception will go through our change control process tomorrow."
+    },
+    {
+      "id": "e27",
+      "timestamp": "2026-03-11T15:10:00Z",
+      "participantId": "p-eng",
+      "type": "engineer_action",
+      "channel": "tool",
+      "title": "Start before and after monitoring",
+      "body": "Started a before and after comparison of client sign-in failure counts for Pune and Leeds. Next check tomorrow morning.",
+      "action": {
+        "actionKey": "act.validate-fix",
+        "label": "Start before/after monitoring of sign-in failures for Pune and Leeds",
+        "customerEffort": "low",
+        "durationMinutes": 30
+      },
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 1500, "completionTokens": 300 }
+    },
+    {
+      "id": "e28",
+      "timestamp": "2026-03-12T09:15:00Z",
+      "participantId": "p-cust-admin",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Overnight update from the customer",
+      "body": "Hello,\n\nOvernight our helpdesk reports no sign-in tickets since 13:00 UTC yesterday. The network team deployed the DNS exception for the Microsoft 365 endpoints at 08:50 UTC and added resolver 10.20.1.11 back to DHCP at 09:05 UTC. We confirm users can sign in.",
+      "structured": { "fixTarget": "dns-resolver", "failuresAfterChange": 0, "monitoringHours": 20 }
+    },
+    {
+      "id": "e29",
+      "timestamp": "2026-03-12T09:40:00Z",
+      "participantId": "p-eng",
+      "type": "validation_result",
+      "channel": "internal",
+      "title": "Validation of workaround and permanent fix",
+      "body": "Validation: Resolve-DnsName succeeded on both resolvers for 200 consecutive queries each, from Pune and from Leeds. Client sign-in telemetry shows 0 failures over the last 20 hours compared with a failure rate of roughly one in three attempts on Monday. The customer confirmed that users can sign in. Workaround and permanent fix are both validated.",
+      "structured": {
+        "resolversTested": 2,
+        "resolversFailing": 0,
+        "queriesPerResolver": 200,
+        "failuresAfterChange": 0,
+        "monitoringHours": 20,
+        "fixTarget": "dns-resolver"
+      },
+      "ai": { "model": "gpt-synthetic-4", "promptTokens": 2200, "completionTokens": 600 }
+    },
+    {
+      "id": "e30",
+      "timestamp": "2026-03-12T10:05:00Z",
+      "participantId": "p-eng",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Resolution summary",
+      "body": "Resolution summary. Root cause: a DNS security policy update deployed to resolver 10.20.1.11 at 08:42 UTC on 2026-03-09 set the URL category 'CDN and content delivery' to block, so aadcdn.msftauth.net failed to resolve on that resolver. Clients alternate between two resolvers, which made sign-in intermittent; Pune uses 10.20.1.11 as primary, which is why it was worse. Workaround: resolver removed from DHCP scopes on 2026-03-11 at 12:40 UTC. Permanent fix: DNS exception for Microsoft 365 endpoints deployed on 2026-03-12 at 08:50 UTC and DNS policy changes placed under change control. Validation: 20 hours with 0 failures and 200 consecutive successful queries per resolver."
+    },
+    {
+      "id": "e31",
+      "timestamp": "2026-03-12T10:20:00Z",
+      "participantId": "p-system",
+      "type": "status_change",
+      "channel": "tool",
+      "title": "Status changed to Resolved",
+      "body": "Status changed to Resolved. Customer confirmed resolution."
+    }
+  ],
+  "resolution": {
+    "resolvedAt": "2026-03-12T10:05:00Z",
+    "summary": "A DNS security policy update on one of two branch DNS resolvers blocked a CDN host used by the Teams sign-in page, causing intermittent sign-in failures for users who were served by that resolver.",
+    "rootCause": "A DNS security policy update deployed to resolver 10.20.1.11 at 08:42 UTC on 2026-03-09 set the URL category 'CDN and content delivery' to block, so aadcdn.msftauth.net failed to resolve on that resolver. Clients alternate between two resolvers, which made sign-in intermittent.",
+    "workaround": "Resolver 10.20.1.11 removed from the Pune and Leeds DHCP scopes on 2026-03-11 at 12:40 UTC.",
+    "permanentFix": "DNS exception for Microsoft 365 endpoints deployed on 2026-03-12 at 08:50 UTC and DNS policy changes placed under change control.",
+    "rootCauseHypothesisKey": "hyp.dns-resolution",
+    "validation": {
+      "validatedAt": "2026-03-12T09:40:00Z",
+      "method": "200 consecutive Resolve-DnsName queries per resolver from both sites plus 20 hours of client sign-in telemetry (0 failures) and customer confirmation.",
+      "outcome": "confirmed",
+      "evidenceEventIds": ["e28", "e29"]
+    }
+  }
+}

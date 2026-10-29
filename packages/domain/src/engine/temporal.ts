@@ -1,0 +1,128 @@
+import type { CaseEvent, CaseResolution } from '@caseguard/schemas';
+import { hashJson } from '../util/ids';
+import { compareIso } from '../util/time';
+
+/**
+ * Temporal integrity gatekeeper (ADR-0007).
+ *
+ * Every analysis that must respect "information available at time T" accepts ONLY a TemporalView.
+ * The brand makes it impossible to hand such a function a raw event array, and the single factory
+ * below is the only place where the boundary is applied. The final resolution is carried only when
+ * the boundary has reached it.
+ */
+declare const temporalBrand: unique symbol;
+
+export interface TemporalView {
+  readonly [temporalBrand]: true;
+  /** Inclusive upper bound (or exclusive when `mode` is 'before'). */
+  readonly asOf: string;
+  readonly mode: 'at' | 'before';
+  /** Events visible inside the boundary, ordered by (timestamp, sequence). */
+  readonly events: readonly CaseEvent[];
+  /** Always null unless the boundary has passed the resolution time. */
+  readonly resolution: CaseResolution | null;
+  /** Count of events withheld because they lie beyond the boundary (never their content). */
+  readonly withheldFutureEventCount: number;
+  /** Stable digest of the visible event ids; recorded on scenarios as the boundary fingerprint. */
+  readonly fingerprint: string;
+}
+
+/** A view that can never contain the final resolution (used by counterfactual generation). */
+export type PreResolutionView = TemporalView & { readonly resolution: null };
+
+export interface TemporalViewOptions {
+  /** 'at' keeps events with timestamp <= asOf; 'before' keeps timestamp < asOf (decision moment). */
+  mode?: 'at' | 'before';
+  resolution?: CaseResolution | null;
+}
+
+export function createTemporalView(
+  events: readonly CaseEvent[],
+  asOf: string,
+  options: TemporalViewOptions = {},
+): TemporalView {
+  const mode = options.mode ?? 'at';
+  const sorted = [...events].sort(
+    (a, b) => compareIso(a.timestamp, b.timestamp) || a.sequence - b.sequence,
+  );
+  const visible = sorted.filter((e) =>
+    mode === 'at' ? compareIso(e.timestamp, asOf) <= 0 : compareIso(e.timestamp, asOf) < 0,
+  );
+  const resolution =
+    options.resolution && compareIso(options.resolution.resolvedAt, asOf) <= 0 && mode === 'at'
+      ? options.resolution
+      : null;
+  return {
+    asOf,
+    mode,
+    events: visible,
+    resolution,
+    withheldFutureEventCount: sorted.length - visible.length,
+    fingerprint: hashJson(visible.map((e) => e.id)),
+  } as unknown as TemporalView;
+}
+
+/**
+ * View of everything strictly before one event (the decision moment of that event): events ordered
+ * before it by (timestamp, sequence). Never contains the event itself, later events or the resolution.
+ */
+export function createTemporalViewBeforeEvent(
+  events: readonly CaseEvent[],
+  eventId: string,
+): PreResolutionView {
+  const target = events.find((e) => e.id === eventId);
+  if (!target) throw new Error(`Unknown event "${eventId}" for temporal view`);
+  const sorted = [...events].sort(
+    (a, b) => compareIso(a.timestamp, b.timestamp) || a.sequence - b.sequence,
+  );
+  const visible = sorted.filter(
+    (e) =>
+      compareIso(e.timestamp, target.timestamp) < 0 ||
+      (e.timestamp === target.timestamp && e.sequence < target.sequence),
+  );
+  return {
+    asOf: target.timestamp,
+    mode: 'before',
+    events: visible,
+    resolution: null,
+    withheldFutureEventCount: sorted.length - visible.length,
+    fingerprint: hashJson(visible.map((e) => e.id)),
+  } as unknown as PreResolutionView;
+}
+
+/** The post-hoc, whole-case view used for retrospective quality assessment. */
+export function createFullView(
+  events: readonly CaseEvent[],
+  resolution: CaseResolution | null,
+): TemporalView {
+  const last = events.reduce(
+    (max, e) => (compareIso(e.timestamp, max) > 0 ? e.timestamp : max),
+    events[0]?.timestamp ?? '1970-01-01T00:00:00.000Z',
+  );
+  const asOf =
+    resolution && compareIso(resolution.resolvedAt, last) > 0 ? resolution.resolvedAt : last;
+  return createTemporalView(events, asOf, { resolution });
+}
+
+/** Narrows a view to one that provably excludes the resolution, or throws. */
+export function assertPreResolution(view: TemporalView): asserts view is PreResolutionView {
+  if (view.resolution !== null) {
+    throw new Error(
+      'Temporal integrity violation: the final resolution is present in a pre-resolution analysis view.',
+    );
+  }
+}
+
+/**
+ * Counts references that point outside the view (events, evidence ids). Used for the leak check
+ * recorded on every counterfactual scenario.
+ */
+export function findFutureReferences(
+  view: TemporalView,
+  referencedEventIds: Iterable<string>,
+): string[] {
+  const visible = new Set(view.events.map((e) => e.id));
+  const leaks: string[] = [];
+  for (const id of referencedEventIds) if (!visible.has(id)) leaks.push(id);
+  return leaks;
+}

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TwinSectionSchema } from './case';
 import { ProbabilitySchema } from './common';
 import {
   ActionKindSchema,
@@ -36,6 +37,21 @@ export const SignalDetectorSchema = z.discriminatedUnion('kind', [
     value: z.union([z.string(), z.number(), z.boolean()]).optional(),
     eventTypes: z.array(EventTypeSchema).optional(),
   }),
+  /** Several structured conditions on the same event that must ALL hold. */
+  z.object({
+    kind: z.literal('structured_all'),
+    conditions: z
+      .array(
+        z.object({
+          key: z.string().min(1).max(64),
+          op: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'includes', 'exists']),
+          value: z.union([z.string(), z.number(), z.boolean()]).optional(),
+        }),
+      )
+      .min(2)
+      .max(6),
+    eventTypes: z.array(EventTypeSchema).optional(),
+  }),
 ]);
 export type SignalDetector = z.infer<typeof SignalDetectorSchema>;
 
@@ -71,6 +87,8 @@ export const KnowledgeSignalSchema = z.object({
   explanation: z.string().max(500),
   /** Requirement ids satisfied by observing this signal. */
   satisfies: z.array(z.string()).default([]),
+  /** Digital-twin section this observation belongs in (defaults to `observations`). */
+  twinSection: TwinSectionSchema.optional(),
 });
 export type KnowledgeSignal = z.infer<typeof KnowledgeSignalSchema>;
 
