@@ -1,8 +1,5 @@
-import type { ServiceDeps } from '..';
-import type { AnalysisPort } from '../ports';
-import { unavailable } from '../unavailable';
-
-/** Analysis pipeline service (owner: API analysis workstream). Replace this stub with the implementation. */
-export function createAnalysisService(_deps: ServiceDeps): AnalysisPort {
-  return unavailable<AnalysisPort>('AnalysisPort');
-}
+export { AnalysisService, createAnalysisService } from './service';
+export { ENGINE_VERSION, computeInputHash, loadAnalysisInputs } from './inputs';
+export type { AnalysisInputs } from './inputs';
+export { computeAnalysis } from './compute';
+export type { AnalysisComputation } from './compute';
