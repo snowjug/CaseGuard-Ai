@@ -3,28 +3,20 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import type { z } from 'zod';
 import type { ProductMetrics } from '@caseguard/observability';
 import type { AppConfig } from '@caseguard/config';
-import { ROUTES, type RouteId, type RouteSpec } from '@caseguard/schemas';
-import {
-  AuthenticationError,
-  AuthorizationError,
-  canonicalJson,
-  sha256Hex,
-  type AuthContext,
-} from '@caseguard/security';
+import { IdSchema, ROUTES, type RouteId, type RouteSpec } from '@caseguard/schemas';
+import { AuthenticationError, AuthorizationError, type AuthContext } from '@caseguard/security';
 import { setContextValue } from '@caseguard/observability';
-import {
-  ConflictError,
-  IdempotencyConflictError,
-  NotImplementedError,
-  RateLimitedError,
-  UnsupportedMediaTypeError,
-  ValidationFailedError,
-} from '../errors';
+import { NotImplementedError, RateLimitedError } from '../errors';
 import type { Infrastructure } from '../infrastructure';
 import { buildRequestContext } from './context-factory';
+import { DenialAuditThrottle } from './denial-throttle';
 import './fastify-types';
+import { hashRequest, idempotencyScope, readIdempotencyKey, runIdempotent } from './idempotency';
 import type { RequestContext } from './request-context';
 import { toProblem } from './problem';
+import { readUpload, type UploadedFile } from './upload';
+
+export type { UploadedFile } from './upload';
 
 // ---------------------------------------------------------------- handler typing
 
@@ -41,14 +33,6 @@ export type ParamsOf<K extends RouteId> = ParsedPart<Spec<K>, 'params'>;
 export type QueryOf<K extends RouteId> = ParsedPart<Spec<K>, 'query'>;
 export type BodyOf<K extends RouteId> = ParsedPart<Spec<K>, 'body'>;
 export type ResponseOf<K extends RouteId> = z.output<Spec<K>['response']>;
-
-export interface UploadedFile {
-  /** Name sent by the client. Hostile: run it through the security package before storing or echoing. */
-  readonly fileName: string;
-  readonly mediaType: string | null;
-  readonly bytes: Buffer;
-  readonly sha256: string;
-}
 
 type FileOf<K extends RouteId> =
   Spec<K> extends { readonly multipart: true } ? UploadedFile : undefined;
@@ -141,10 +125,6 @@ const AUDITED_READS: ReadonlySet<RouteId> = new Set<RouteId>([
   'governance.users',
 ]);
 
-const IDEMPOTENCY_KEY = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;
-const IDEMPOTENCY_HEADER = 'idempotency-key';
-const REPLAY_HEADER = 'idempotent-replayed';
-
 // ---------------------------------------------------------------- binder
 
 export interface BindOptions {
@@ -160,58 +140,26 @@ export interface BindOptions {
 type AnyCall = RouteCall<RouteId>;
 type AnyHandler = (call: AnyCall) => Promise<unknown>;
 
+/**
+ * An identifier from the request that may go into an audit event. Path parameters are raw at the
+ * point of authorization (they are validated later), so anything that is not a well-formed id is
+ * dropped rather than allowed to make the audit write fail.
+ */
+function auditableId(value: unknown): string | null {
+  const parsed = IdSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
 function firstParam(params: unknown): string | null {
   if (typeof params !== 'object' || params === null) return null;
-  for (const value of Object.values(params)) if (typeof value === 'string') return value;
+  for (const value of Object.values(params))
+    if (typeof value === 'string') return auditableId(value);
   return null;
 }
 
 function caseIdOf(params: unknown): string | null {
   if (typeof params !== 'object' || params === null) return null;
-  const value = (params as { caseId?: unknown }).caseId;
-  return typeof value === 'string' ? value : null;
-}
-
-function readIdempotencyKey(request: FastifyRequest): string | null {
-  const raw = request.headers[IDEMPOTENCY_HEADER];
-  if (raw === undefined) return null;
-  const value = Array.isArray(raw) ? (raw.length === 1 ? raw[0] : undefined) : raw;
-  if (value === undefined || !IDEMPOTENCY_KEY.test(value)) {
-    throw new ValidationFailedError('The Idempotency-Key header is not valid', [
-      {
-        path: 'header.idempotency-key',
-        message: 'Use 8 to 128 URL-safe characters (letters, digits, . _ : -)',
-      },
-    ]);
-  }
-  return value;
-}
-
-async function readUpload(request: FastifyRequest, maxBytes: number): Promise<UploadedFile> {
-  if (!request.isMultipart()) {
-    throw new UnsupportedMediaTypeError(
-      'Send multipart/form-data with one file in the "file" field',
-    );
-  }
-  const part = await request.file({ limits: { fileSize: maxBytes, files: 1 } });
-  if (part === undefined) {
-    throw new ValidationFailedError('No file was uploaded', [
-      { path: 'file', message: 'Attach one file in the "file" field' },
-    ]);
-  }
-  if (part.fieldname !== 'file') {
-    throw new ValidationFailedError('The file must be sent in the "file" field', [
-      { path: part.fieldname.slice(0, 40), message: 'Unexpected field name' },
-    ]);
-  }
-  // `toBuffer` throws a 413 when the part exceeds `fileSize`; the error handler turns it into a problem.
-  const bytes = await part.toBuffer();
-  return {
-    fileName: part.filename,
-    mediaType: part.mimetype === '' ? null : part.mimetype,
-    bytes,
-    sha256: sha256Hex(bytes),
-  };
+  return auditableId((params as { caseId?: unknown }).caseId);
 }
 
 function publicContext(infra: Infrastructure, request: FastifyRequest): PublicContext {
@@ -244,6 +192,9 @@ export function registerRoutes(app: FastifyInstance, options: BindOptions): void
   const typed = app.withTypeProvider<ZodTypeProvider>();
   const config = infra.config;
   const windowMs = config.limits.rateLimitWindowMs;
+  // Runs first on every route: unauthenticated and forbidden requests are throttled like any other,
+  // so credential guessing and permission probing cost the caller their quota.
+  const generalLimit = app.rateLimit();
   const heavyLimit = app.createRateLimit({
     max: config.limits.rateLimitAiMax,
     timeWindow: windowMs,
@@ -252,6 +203,73 @@ export function registerRoutes(app: FastifyInstance, options: BindOptions): void
       return auth === null ? `ip:${request.ip}` : `user:${auth.tenantId}:${auth.userId}`;
     },
   });
+  const denialThrottle = new DenialAuditThrottle(windowMs, () => infra.now().getTime());
+
+  /**
+   * Audits a refusal, at most once per caller and route per window (see `DenialAuditThrottle`). A
+   * failure to write the event is logged and never replaces the refusal itself.
+   */
+  const auditDenial = async (
+    request: FastifyRequest,
+    routeId: RouteId,
+    targetId: string | null,
+    details: Record<string, unknown>,
+  ): Promise<void> => {
+    const { ctx, auth } = request.cg;
+    if (ctx === null || auth === null) return;
+    const verdict = denialThrottle.admit(`${auth.tenantId}:${auth.userId}:${routeId}`);
+    if (!verdict.write) return;
+    try {
+      await ctx.audit({
+        action: 'access.denied',
+        targetType: 'route',
+        targetId,
+        caseId: caseIdOf(request.params),
+        outcome: 'denied',
+        details: {
+          ...details,
+          ...(verdict.suppressed > 0 ? { suppressedSincePrevious: verdict.suppressed } : {}),
+        },
+      });
+    } catch (error) {
+      request.log.error(
+        { err: error, event: 'audit.write_failed', routeId },
+        'could not write the access-denied audit event',
+      );
+    }
+  };
+
+  /**
+   * Audits server faults of state-changing requests and refusals raised inside a handler. Never masks
+   * the original error: a failure to write the audit event is logged and the caller rethrows.
+   */
+  const auditFailure = async (
+    request: FastifyRequest,
+    error: unknown,
+    route: { id: RouteId; method: string; audited: boolean },
+  ): Promise<void> => {
+    const ctx = request.cg.ctx;
+    if (ctx === null) return;
+    const verdict = toProblem(error, { requestId: request.cg.requestId });
+    const details = { routeId: route.id, code: verdict.problem.code, status: verdict.status };
+    if (verdict.denied) {
+      await auditDenial(request, route.id, firstParam(request.params), details);
+      return;
+    }
+    if (!route.audited || verdict.status < 500) return;
+    try {
+      await ctx.audit({
+        action: `api.${route.id}`,
+        targetType: 'route',
+        targetId: firstParam(request.params),
+        caseId: caseIdOf(request.params),
+        outcome: 'failure',
+        details,
+      });
+    } catch (auditError) {
+      request.log.error({ err: auditError }, 'could not write audit event for a failed request');
+    }
+  };
 
   for (const [id, spec] of Object.entries(ROUTES) as [RouteId, RouteSpec][]) {
     const handler = handlers[id] as AnyHandler | undefined;
@@ -260,8 +278,11 @@ export function registerRoutes(app: FastifyInstance, options: BindOptions): void
     const audited = mutating || AUDITED_READS.has(id);
     const status = spec.status ?? 200;
 
-    const authenticate = async (request: FastifyRequest): Promise<void> => {
+    const markRoute = async (request: FastifyRequest): Promise<void> => {
       request.cg.routeId = id;
+    };
+
+    const authenticate = async (request: FastifyRequest): Promise<void> => {
       if (isPublic) return;
 
       let auth: AuthContext;
@@ -295,13 +316,10 @@ export function registerRoutes(app: FastifyInstance, options: BindOptions): void
 
       if (spec.permission !== null && !auth.permissions.includes(spec.permission)) {
         infra.metrics.recordForbidden(spec.permission);
-        await state.ctx.audit({
-          action: 'access.denied',
-          targetType: 'route',
-          targetId: id,
-          caseId: caseIdOf(request.params),
-          outcome: 'denied',
-          details: { routeId: id, method: spec.method, requiredPermission: spec.permission },
+        await auditDenial(request, id, id, {
+          routeId: id,
+          method: spec.method,
+          requiredPermission: spec.permission,
         });
         throw new AuthorizationError(undefined, spec.permission);
       }
@@ -322,7 +340,9 @@ export function registerRoutes(app: FastifyInstance, options: BindOptions): void
         ? publicContext(infra, request)
         : (request.cg.ctx as RequestContext);
       const file =
-        spec.multipart === true ? await readUpload(request, config.http.uploadMaxBytes) : undefined;
+        spec.multipart === true
+          ? await readUpload(request, response, config.http.uploadMaxBytes)
+          : undefined;
       const idempotencyKey = spec.idempotent === true ? readIdempotencyKey(request) : null;
 
       const call = {
@@ -344,35 +364,46 @@ export function registerRoutes(app: FastifyInstance, options: BindOptions): void
 
       const tenantCtx = isPublic ? null : (ctx as RequestContext);
       let body: unknown;
+      let replayed = false;
       if (idempotencyKey !== null && tenantCtx !== null) {
-        body = await runIdempotent(tenantCtx, response, {
+        const outcome = await runIdempotent(tenantCtx, response, {
           key: idempotencyKey,
-          scope: id,
+          scope: idempotencyScope(id, tenantCtx.auth.userId),
           status,
-          requestHash: sha256Hex(
-            canonicalJson({
-              routeId: id,
-              params: request.params,
-              query: request.query,
-              body: request.body,
-              file: file === undefined ? null : { sha256: file.sha256, name: file.fileName },
-            }),
-          ),
+          requestHash: hashRequest({
+            routeId: id,
+            params: request.params,
+            query: request.query,
+            body: request.body,
+            file: file === undefined ? undefined : { sha256: file.sha256, name: file.fileName },
+          }),
           execute,
         });
+        body = outcome.body;
+        replayed = outcome.replayed;
       } else {
         body = await execute();
       }
 
       if (tenantCtx !== null && audited && !request.cg.audited) {
-        await tenantCtx.audit({
-          action: `api.${id}`,
-          targetType: 'route',
-          targetId: firstParam(request.params),
-          caseId: caseIdOf(request.params),
-          outcome: 'success',
-          details: { routeId: id, method: spec.method },
-        });
+        // The work is already committed: a failure to record it must not turn the success into an
+        // error (a retry would repeat the mutation). It is logged and counted instead.
+        try {
+          await tenantCtx.audit({
+            action: `api.${id}`,
+            targetType: 'route',
+            targetId: firstParam(request.params),
+            caseId: caseIdOf(request.params),
+            outcome: 'success',
+            details: { routeId: id, method: spec.method, ...(replayed ? { replayed: true } : {}) },
+          });
+        } catch (error) {
+          request.log.error(
+            { err: error, event: 'audit.write_failed', routeId: id },
+            'could not write the audit event of a request that succeeded',
+          );
+          infra.metrics.recordError('audit', 'write_failed');
+        }
       }
       return body;
     };
@@ -391,7 +422,7 @@ export function registerRoutes(app: FastifyInstance, options: BindOptions): void
         ...(spec.multipart ? { consumes: ['multipart/form-data'] } : {}),
         security: isPublic ? [] : [{ bearerAuth: [] }, { devPersona: [] }],
       },
-      onRequest: async (request) => authenticate(request),
+      onRequest: [markRoute, generalLimit, authenticate],
       // A body-less POST to a route whose body has defaults is valid; for required fields the 422 then
       // names them instead of complaining that the body "is not an object".
       ...(spec.body
@@ -409,76 +440,10 @@ export function registerRoutes(app: FastifyInstance, options: BindOptions): void
         try {
           return await run(request, response);
         } catch (error) {
-          await auditFailure(request, error, { id, audited });
+          await auditFailure(request, error, { id, method: spec.method, audited });
           throw error;
         }
       },
     });
-  }
-}
-
-interface IdempotentRun {
-  readonly key: string;
-  readonly scope: string;
-  readonly status: number;
-  readonly requestHash: string;
-  readonly execute: () => Promise<unknown>;
-}
-
-async function runIdempotent(
-  ctx: RequestContext,
-  response: FastifyReply,
-  run: IdempotentRun,
-): Promise<unknown> {
-  const begin = await ctx.repos.idempotency.begin(run.key, run.scope, run.requestHash);
-  switch (begin.state) {
-    case 'replay':
-      void response.header(REPLAY_HEADER, 'true');
-      return begin.response;
-    case 'conflict':
-      throw new IdempotencyConflictError();
-    case 'in_progress':
-      throw new ConflictError('A request with this Idempotency-Key is still being processed');
-    case 'new':
-      break;
-  }
-  try {
-    const body = await run.execute();
-    await ctx.repos.idempotency.complete(run.key, run.scope, run.status, body);
-    return body;
-  } catch (error) {
-    // Free the key so the client can retry; the failed attempt left no stored response.
-    await ctx.repos.idempotency.release(run.key, run.scope).catch((releaseError: unknown) => {
-      ctx.logger.warn({ err: releaseError }, 'could not release idempotency key');
-    });
-    throw error;
-  }
-}
-
-/**
- * Audits refusals (always) and server faults of state-changing requests. Never masks the original
- * error: a failure to write the audit event is logged and the original error is rethrown by the caller.
- */
-async function auditFailure(
-  request: FastifyRequest,
-  error: unknown,
-  route: { id: RouteId; audited: boolean },
-): Promise<void> {
-  const ctx = request.cg.ctx;
-  if (ctx === null) return;
-  const verdict = toProblem(error, { requestId: request.cg.requestId });
-  const worthRecording = verdict.denied || (route.audited && verdict.status >= 500);
-  if (!worthRecording) return;
-  try {
-    await ctx.audit({
-      action: verdict.denied ? 'access.denied' : `api.${route.id}`,
-      targetType: 'route',
-      targetId: firstParam(request.params),
-      caseId: caseIdOf(request.params),
-      outcome: verdict.denied ? 'denied' : 'failure',
-      details: { routeId: route.id, code: verdict.problem.code, status: verdict.status },
-    });
-  } catch (auditError) {
-    request.log.error({ err: auditError }, 'could not write audit event for a failed request');
   }
 }

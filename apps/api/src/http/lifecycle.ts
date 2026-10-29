@@ -6,7 +6,7 @@ import {
 } from '@caseguard/observability';
 import { API_CONTENT_SECURITY_POLICY, buildSecurityHeaders } from '@caseguard/security';
 import type { Infrastructure } from '../infrastructure';
-import './fastify-types';
+import type { RequestState } from './fastify-types';
 
 /** Orchestrator probes hit these every few seconds; they are logged at debug level only. */
 export const PROBE_PATHS: ReadonlySet<string> = new Set(['/livez', '/healthz', '/readyz']);
@@ -57,7 +57,9 @@ export function registerLifecycle(
   });
 
   app.addHook('onResponse', (request, reply, done) => {
-    const durationMs = performance.now() - request.cg.startedAt;
+    // Failures Fastify answers before routing (a malformed URL) never ran the hook above.
+    const startedAt = (request.cg as RequestState | null)?.startedAt ?? performance.now();
+    const durationMs = performance.now() - startedAt;
     const route = request.routeOptions.url;
     infra.metrics.recordHttpRequest({
       method: request.method,

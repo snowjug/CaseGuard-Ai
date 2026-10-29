@@ -96,11 +96,81 @@ describe('toProblem', () => {
   });
 
   it('turns Fastify client errors into problems with their own safe message', () => {
-    const error = Object.assign(new Error('Request body is too large'), { statusCode: 413 });
+    const error = Object.assign(new Error('Request body is too large'), {
+      statusCode: 413,
+      code: 'FST_ERR_CTP_BODY_TOO_LARGE',
+    });
     const result = convert(error);
     expect(result.status).toBe(413);
     expect(result.problem.code).toBe('payload_too_large');
     expect(result.problem.detail).toBe('Request body is too large');
+  });
+
+  it('keeps the status of a multipart client error but not of other framework faults', () => {
+    const tooMany = Object.assign(new Error('reach parts limit'), {
+      statusCode: 413,
+      code: 'FST_PARTS_LIMIT',
+    });
+    expect(convert(tooMany).status).toBe(413);
+    const framework = Object.assign(new Error('the file buffer was not found'), {
+      statusCode: 500,
+      code: 'FST_FILE_BUFFER_NOT_FOUND',
+    });
+    const result = convert(framework);
+    expect(result.status).toBe(500);
+    expect(JSON.stringify(result.problem)).not.toContain('buffer');
+  });
+
+  it.each([401, 403, 404, 409, 429])(
+    'does not let a non-Fastify error with status %i choose the response',
+    (statusCode) => {
+      const upstream = Object.assign(
+        new Error('AADSTS700016: Application with identifier was not found in tenant'),
+        { statusCode, name: 'SomeSdkError' },
+      );
+      const result = convert(upstream);
+      expect(result.status).toBe(500);
+      expect(result.denied).toBe(false);
+      expect(result.unexpected).toBe(true);
+      expect(JSON.stringify(result.problem)).not.toContain('AADSTS');
+    },
+  );
+
+  it('reports an Azure SDK failure as an unavailable dependency, not as the caller being refused', () => {
+    const sdk = Object.assign(new Error('AuthorizationFailure: this request is not authorized'), {
+      name: 'RestError',
+      statusCode: 403,
+      code: 'AuthorizationFailure',
+    });
+    const result = convert(sdk);
+    expect(result.status).toBe(503);
+    expect(result.problem.code).toBe('provider_unavailable');
+    expect(result.denied).toBe(false);
+    expect(result.unexpected).toBe(true);
+    expect(JSON.stringify(result.problem)).not.toContain('AuthorizationFailure');
+  });
+
+  it.each([
+    ['a refused connection', 'ECONNREFUSED'],
+    ['a timed-out connection', 'ETIMEDOUT'],
+    ['an unknown host', 'ENOTFOUND'],
+    ['a PostgreSQL connection failure', '08006'],
+    ['a PostgreSQL server shutdown', '57P01'],
+    ['too many PostgreSQL connections', '53300'],
+  ])('reports %s as a dependency outage', (_label, code) => {
+    const result = convert(
+      Object.assign(new Error('connect failed to db.internal:5432'), { code }),
+    );
+    expect(result.status).toBe(503);
+    expect(result.unexpected).toBe(true);
+    expect(JSON.stringify(result.problem)).not.toContain('db.internal');
+  });
+
+  it('does not mistake an ordinary database error for an outage', () => {
+    const unique = Object.assign(new Error('duplicate key value violates unique constraint'), {
+      code: '23505',
+    });
+    expect(convert(unique).status).toBe(500);
   });
 
   it('never echoes the message of an unexpected error', () => {

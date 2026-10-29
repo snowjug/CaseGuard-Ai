@@ -116,10 +116,58 @@ interface FastifyLikeError {
   message?: unknown;
   validation?: unknown;
   validationContext?: unknown;
+  code?: unknown;
+  name?: unknown;
 }
 
 function asFastifyLike(error: unknown): FastifyLikeError | null {
   return typeof error === 'object' && error !== null ? error : null;
+}
+
+/**
+ * Only Fastify's own client errors (`FST_*` codes: body too large, invalid JSON, wrong media type...)
+ * may choose the response status and message. Any other error that happens to carry a 4xx
+ * `statusCode` (an Azure SDK `RestError` relaying a storage or identity answer, for example) is a
+ * server-side fault: its status and text describe a dependency, not this caller's request.
+ */
+function isFastifyClientError(error: FastifyLikeError | null): error is FastifyLikeError {
+  return (
+    error !== null &&
+    typeof error.statusCode === 'number' &&
+    error.statusCode >= 400 &&
+    error.statusCode < 500 &&
+    typeof error.code === 'string' &&
+    error.code.startsWith('FST_')
+  );
+}
+
+const DEPENDENCY_ERROR_NAMES: ReadonlySet<string> = new Set([
+  'RestError',
+  'CredentialUnavailableError',
+  'AuthenticationRequiredError',
+  'AggregateAuthenticationError',
+]);
+
+const NETWORK_ERROR_CODES: ReadonlySet<string> = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'EPIPE',
+]);
+
+/** PostgreSQL connection exceptions (class 08), server shutdown (57P01-03) and too many connections. */
+const POSTGRES_UNAVAILABLE = /^(08[A-Z0-9]{3}|57P0[123]|53300)$/;
+
+/** A dependency (database, storage, identity service) is unreachable or refused the service itself. */
+function isDependencyFault(error: FastifyLikeError | null): boolean {
+  if (error === null) return false;
+  if (typeof error.name === 'string' && DEPENDENCY_ERROR_NAMES.has(error.name)) return true;
+  return (
+    typeof error.code === 'string' &&
+    (NETWORK_ERROR_CODES.has(error.code) || POSTGRES_UNAVAILABLE.test(error.code))
+  );
 }
 
 function validationIssues(error: FastifyLikeError): { path: string; message: string }[] {
@@ -174,19 +222,29 @@ export function toProblem(error: unknown, options: ProblemOptions): ProblemResul
   }
 
   const like = asFastifyLike(error);
-  const status = like !== null && typeof like.statusCode === 'number' ? like.statusCode : null;
-  if (status !== null && status >= 400 && status < 500) {
+  if (isFastifyClientError(like)) {
     // Fastify's own 4xx messages (body too large, invalid JSON, wrong media type) contain no request data.
-    const hasValidation = like !== null && Array.isArray(like.validation);
+    const status = like.statusCode as number;
+    const hasValidation = Array.isArray(like.validation);
     const detail = hasValidation
       ? 'One or more fields are not valid.'
-      : like !== null && typeof like.message === 'string'
+      : typeof like.message === 'string'
         ? like.message
         : undefined;
     return build(codeFromStatus(status), status, options, {
       ...(detail !== undefined ? { detail } : {}),
-      ...(hasValidation && like !== null ? { errors: validationIssues(like) } : {}),
+      ...(hasValidation ? { errors: validationIssues(like) } : {}),
     });
+  }
+
+  if (isDependencyFault(like)) {
+    // Retryable for the client, and a fault for the operator: logged with the underlying error.
+    return {
+      ...build('provider_unavailable', 503, options, {
+        detail: 'A required service is temporarily unavailable. Try again shortly.',
+      }),
+      unexpected: true,
+    };
   }
 
   return build('internal', 500, options);

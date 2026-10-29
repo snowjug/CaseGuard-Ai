@@ -1,7 +1,13 @@
-import Fastify, { LogController, type FastifyBaseLogger, type FastifyInstance } from 'fastify';
+import Fastify, {
+  LogController,
+  type FastifyBaseLogger,
+  type FastifyInstance,
+  type FastifyServerOptions,
+} from 'fastify';
 import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
+import type { TrustProxySetting } from '@caseguard/config';
 import { acceptRequestId, newRequestId } from '@caseguard/observability';
-import { registerErrorHandling } from './http/error-handling';
+import { frameworkErrorHandler, registerErrorHandling } from './http/error-handling';
 import { registerHealthRoutes } from './http/health-routes';
 import { registerLifecycle } from './http/lifecycle';
 import { registerOpenApi } from './http/openapi';
@@ -30,6 +36,16 @@ const MAX_PARAM_LENGTH = 200;
 const KEEP_ALIVE_TIMEOUT_MS = 65_000;
 
 /**
+ * Fastify wants a mutable list, and a hop count as a function (`hop` is 0 for the socket peer, which
+ * is the nearest proxy): `1` believes the nearest proxy only, so the address it appended to
+ * `X-Forwarded-For` wins over whatever a client sent before it.
+ */
+function proxyTrust(setting: TrustProxySetting): NonNullable<FastifyServerOptions['trustProxy']> {
+  if (typeof setting === 'number') return (_address, hop) => hop < setting;
+  return typeof setting === 'object' ? [...setting] : setting;
+}
+
+/**
  * Assembles the HTTP server: correlation and metrics, security headers, CORS, rate limits, uploads,
  * the OpenAPI document, health probes and every route of the contract. Nothing is started here;
  * the caller decides whether to `listen` (main) or `inject` (tests).
@@ -48,10 +64,11 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       requestIdLogLabel: 'requestId',
     }),
     genReqId: (request) => acceptRequestId(request.headers['x-request-id']) ?? newRequestId(),
-    trustProxy: config.http.trustProxy,
+    trustProxy: proxyTrust(config.http.trustProxy),
     bodyLimit: config.http.bodyLimitBytes,
     requestTimeout: REQUEST_TIMEOUT_MS,
     keepAliveTimeout: KEEP_ALIVE_TIMEOUT_MS,
+    frameworkErrors: frameworkErrorHandler(infra),
     // GET handlers are never run a second time for HEAD: the contract documents GET only.
     exposeHeadRoutes: false,
     return503OnClosing: true,

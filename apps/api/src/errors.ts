@@ -70,6 +70,13 @@ export class ValidationFailedError extends AppError {
   }
 }
 
+/** The request could not be read at all (a broken multipart envelope, an upload cut short). */
+export class MalformedRequestError extends AppError {
+  constructor(message = 'The request is malformed') {
+    super('validation_failed', 400, message);
+  }
+}
+
 export class ForbiddenError extends AppError {
   constructor(message = 'You do not have permission to perform this action') {
     super('forbidden', 403, message);

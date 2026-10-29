@@ -1,5 +1,6 @@
-import type { FastifyInstance, FastifyReply } from 'fastify';
-import { NotFoundError } from '../errors';
+import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { API_CONTENT_SECURITY_POLICY, buildSecurityHeaders } from '@caseguard/security';
+import { MalformedRequestError, NotFoundError } from '../errors';
 import type { Infrastructure } from '../infrastructure';
 import './fastify-types';
 import { toProblem, type ProblemResult } from './problem';
@@ -10,6 +11,35 @@ function sendProblem(reply: FastifyReply, result: ProblemResult): FastifyReply {
     .code(result.status)
     .type('application/problem+json; charset=utf-8')
     .send(JSON.stringify(result.problem));
+}
+
+/**
+ * Fastify answers a few failures itself, before routing and before any hook ran (a malformed URL, for
+ * example), in its own JSON shape that repeats the offending path. This keeps them in the one problem
+ * format, with the same headers and a correlation id, and without echoing the request.
+ */
+export function frameworkErrorHandler(
+  infra: Pick<Infrastructure, 'metrics'>,
+): (error: FastifyError, request: FastifyRequest, reply: FastifyReply) => void {
+  return (error, request, reply) => {
+    const cause =
+      error.code === 'FST_ERR_BAD_URL'
+        ? new MalformedRequestError('The request URL is not valid')
+        : error;
+    const result = toProblem(cause, { requestId: request.id });
+    request.log.debug(
+      { event: 'http.error', code: result.problem.code, status: result.status },
+      'request rejected before routing',
+    );
+    infra.metrics.recordError('http', result.problem.code);
+    void reply.headers({
+      ...buildSecurityHeaders({ secureTransport: request.protocol === 'https' }),
+      'content-security-policy': API_CONTENT_SECURITY_POLICY,
+      'cache-control': 'no-store',
+      'x-request-id': request.id,
+    });
+    sendProblem(reply, result);
+  };
 }
 
 /**
