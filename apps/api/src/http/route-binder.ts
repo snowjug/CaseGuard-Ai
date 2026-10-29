@@ -392,6 +392,15 @@ export function registerRoutes(app: FastifyInstance, options: BindOptions): void
         security: isPublic ? [] : [{ bearerAuth: [] }, { devPersona: [] }],
       },
       onRequest: async (request) => authenticate(request),
+      // A body-less POST to a route whose body has defaults is valid; for required fields the 422 then
+      // names them instead of complaining that the body "is not an object".
+      ...(spec.body
+        ? {
+            preValidation: async (request: FastifyRequest) => {
+              if (request.body === undefined) request.body = {};
+            },
+          }
+        : {}),
       ...(HEAVY_ROUTES.has(id)
         ? { preHandler: async (request: FastifyRequest) => limitHeavy(request) }
         : {}),

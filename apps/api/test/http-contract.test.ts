@@ -96,6 +96,24 @@ describe('request validation', () => {
     expect(seen.body).toEqual({ force: true });
   });
 
+  it('accepts a body-less POST when every body field has a default', async () => {
+    const seen: { body?: unknown } = {};
+    const h = await harness({
+      handlers: {
+        'analysis.start': async ({ body, params }) => {
+          seen.body = body;
+          return { job: fakeJob(params.caseId), runId: null, reused: false };
+        },
+      },
+    });
+    const res = await h.call(PERSONAS.engineer, {
+      method: 'POST',
+      url: '/api/v1/cases/case_1/analysis',
+    });
+    expect(res.statusCode).toBe(202);
+    expect(seen.body).toEqual({ force: false });
+  });
+
   it('answers malformed JSON with a 400 that does not echo the payload', async () => {
     const h = await harness({ handlers: { 'analysis.start': async () => ({}) as never } });
     const res = await h.call(PERSONAS.engineer, {

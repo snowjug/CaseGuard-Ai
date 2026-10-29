@@ -72,6 +72,7 @@ import {
   ApplySkillBodySchema,
   ExtractSkillBodySchema,
   ProposeMutationBodySchema,
+  SimulateSkillBodySchema,
   SkillDiffSchema,
   SkillDnaSchema,
   SkillMatchSchema,
@@ -694,6 +695,7 @@ export const ROUTES = {
     tags: ['SkillDNA'],
     permission: 'skill:validate',
     params: SkillParams,
+    body: SimulateSkillBodySchema,
     response: SkillValidationSchema,
   },
   'skills.proposeMutation': {
