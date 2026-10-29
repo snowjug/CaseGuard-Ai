@@ -116,6 +116,9 @@ export const HEAVY_ROUTES: ReadonlySet<RouteId> = new Set<RouteId>([
   'skills.proposeMutation',
   'cases.create',
   'cases.createFromFile',
+  // A preview runs the whole ingestion pipeline (parse, redact, screen) without storing anything.
+  'ingestion.preview',
+  'ingestion.previewFile',
   'demo.seed',
   // Both read or walk very large amounts of data (a case export, the whole audit hash chain).
   'governance.export',
