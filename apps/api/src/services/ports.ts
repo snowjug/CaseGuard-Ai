@@ -5,6 +5,7 @@ import type {
   CounterfactualStrategy,
   IngestRequest,
   IngestResult,
+  IngestionPreview,
   Job,
   JobKind,
   JobStage,
@@ -140,15 +141,32 @@ export interface SkillsPort {
 
 // ---------------------------------------------------------------- ingestion
 
+/** An uploaded file as the HTTP layer hands it over. Hostile until the ingestion service validated it. */
+export interface IngestUpload {
+  readonly fileName: string;
+  readonly mediaType: string | null;
+  readonly bytes: Uint8Array;
+  readonly sha256: string;
+}
+
+/** What can be ingested: a request payload (built-in sample, pasted text, JSON bundle) or an uploaded file. */
+export type IngestSource = IngestRequest | { readonly type: 'file'; readonly file: IngestUpload };
+
 export interface IngestInput {
-  readonly source: IngestRequest;
+  readonly source: IngestSource;
   /** Start the analysis job after ingestion (default true). */
   readonly analyze?: boolean;
   readonly idempotencyKey?: string | null;
 }
 
 export interface IngestionPort {
+  /**
+   * Validates, redacts and screens a payload, then stores it as an immutable case (idempotent on the
+   * content hash: an identical payload returns the existing case with `created: false`).
+   */
   ingest(ctx: RequestContext, input: IngestInput): Promise<IngestResult>;
+  /** Runs the same pipeline without persisting anything and reports what would be stored. */
+  preview(ctx: RequestContext, source: IngestSource): Promise<IngestionPreview>;
 }
 
 // ---------------------------------------------------------------- AI

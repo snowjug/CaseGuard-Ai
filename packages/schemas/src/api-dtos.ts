@@ -59,7 +59,7 @@ export const ExampleInfoSchema = z.object({
   title: z.string(),
   description: z.string(),
   fileName: z.string(),
-  kind: z.enum(['case_bundle', 'transcript']),
+  kind: z.enum(['case_bundle', 'transcript', 'csv']),
   sizeBytes: z.number().int().min(0),
   synthetic: z.literal(true),
   /** Present for transcript examples so the Paste tab can offer "insert example". */

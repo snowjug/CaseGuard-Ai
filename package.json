@@ -34,6 +34,7 @@
     "infra:validate": "node scripts/infra-validate.mjs",
     "docker:build": "node scripts/docker-build.mjs",
     "schemas:export": "tsx scripts/export-json-schemas.ts",
+    "samples:export": "tsx scripts/export-samples.ts",
     "screenshots": "playwright test --project=screenshots",
     "verify": "node scripts/verify.mjs",
     "prepare": "husky"

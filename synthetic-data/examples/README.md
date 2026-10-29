@@ -33,3 +33,7 @@ Transcripts: 200,000 characters, 20,000 lines, 2,000 messages. CSV and JSON: 2 M
 ## JSON Schemas
 
 The downloadable JSON Schemas live in `synthetic-data/knowledge/` and `docs/schemas/` (case bundle, knowledge pack, SkillDNA content). Regenerate them with `pnpm schemas:export`; `pnpm schemas:export -- --check` fails when the committed files are out of date.
+
+## Embedded copies in the API
+
+The API container ships only the bundle, so it cannot read these files at run time. `apps/api/src/samples/generated.ts` embeds the two sample cases (`synthetic-data/cases/`) and the three example files of this folder; they are served by `GET /api/v1/samples` (loaded through the normal ingestion pipeline), `GET /api/v1/examples` and `GET /api/v1/examples/:exampleId`. After changing any of those files run `pnpm samples:export`; `pnpm samples:export -- --check` (and a test in `apps/api`) fails when the embedded copy is out of date.
