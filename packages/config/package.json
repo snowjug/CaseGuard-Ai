@@ -1,0 +1,23 @@
+{
+  "name": "@caseguard/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Environment parsing and fail-fast validation, feature flags, production safety guards.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@caseguard/schemas": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

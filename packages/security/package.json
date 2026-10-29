@@ -1,0 +1,25 @@
+{
+  "name": "@caseguard/security",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "RBAC policy, identity strategies (dev persona, Entra JWT), tenant context, redaction, prompt-injection detection, file validation, URL safety, rate limiting.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@caseguard/schemas": "workspace:*",
+    "jose": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "fast-check": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

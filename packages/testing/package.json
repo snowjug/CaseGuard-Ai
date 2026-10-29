@@ -1,0 +1,23 @@
+{
+  "name": "@caseguard/testing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared test helpers: fixture loaders, builders, fake clock, in-memory database harness.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@caseguard/domain": "workspace:*",
+    "@caseguard/schemas": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

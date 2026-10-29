@@ -1,0 +1,29 @@
+{
+  "name": "@caseguard/ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Model provider abstraction (deterministic + Azure OpenAI), versioned prompts, orchestration with schema/citation/policy validation, token governor, semantic cache, circuit breaker.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.14.0",
+    "@caseguard/config": "workspace:*",
+    "@caseguard/domain": "workspace:*",
+    "@caseguard/observability": "workspace:*",
+    "@caseguard/schemas": "workspace:*",
+    "@caseguard/security": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "fast-check": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

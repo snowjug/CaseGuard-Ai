@@ -1,0 +1,37 @@
+{
+  "name": "@caseguard/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Design tokens (Evidence Constellation), Fluent theme, accessible charts, investigation graph and shared components.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@caseguard/schemas": "workspace:*",
+    "@fluentui/react-components": "^9.75.0",
+    "@fluentui/react-icons": "^2.0.344"
+  },
+  "peerDependencies": {
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "^29.1.1",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

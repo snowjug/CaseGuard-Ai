@@ -1,0 +1,41 @@
+{
+  "name": "@caseguard/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CaseGuard web application: Next.js App Router + Fluent UI.",
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@azure/msal-browser": "^5.27.0",
+    "@azure/msal-react": "^5.7.4",
+    "@caseguard/schemas": "workspace:*",
+    "@caseguard/ui": "workspace:*",
+    "@fluentui/react-components": "^9.75.0",
+    "@fluentui/react-icons": "^2.0.344",
+    "@hookform/resolvers": "^5.9.2",
+    "@tanstack/react-query": "^5.104.5",
+    "next": "^16.4.2",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-hook-form": "^7.90.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "^29.1.1",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

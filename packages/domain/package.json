@@ -1,0 +1,25 @@
+{
+  "name": "@caseguard/domain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure, deterministic analysis engine: temporal view, knowledge packs, evidence classification, Bayesian hypotheses, action value, forks, counterfactuals, quality, ASE, SkillDNA.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@caseguard/schemas": "workspace:*",
+    "@caseguard/security": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "fast-check": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

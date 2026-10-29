@@ -1,0 +1,22 @@
+{
+  "name": "@caseguard/schemas",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Zod contracts shared by every CaseGuard package: entities, case bundle, knowledge pack, API route registry.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

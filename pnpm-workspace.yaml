@@ -1,0 +1,35 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# pnpm 10 blocks dependency lifecycle scripts unless explicitly allow-listed.
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - unrs-resolver
+
+# Lifecycle scripts we have reviewed and intentionally do not run.
+ignoredBuiltDependencies:
+  - protobufjs
+
+# @azure/monitor-opentelemetry pins OpenTelemetry SDK packages whose peer range stops below
+# @opentelemetry/api 1.10, so the whole workspace is held on the 1.9 line.
+overrides:
+  '@opentelemetry/api': '~1.9.1'
+
+# Shared third-party versions. Reference them from a package.json with "catalog:".
+# Majors were chosen for toolchain compatibility, not novelty (see docs/adr/0001-monorepo-strategy.md).
+catalog:
+  typescript: 5.9.3
+  zod: ^4.6.7
+  vitest: ^4.1.12
+  '@vitest/coverage-v8': ^4.1.12
+  '@types/node': ^24.19.2
+  tsx: ^4.23.15
+  fast-check: ^4.10.2
+  react: ^19.3.1
+  react-dom: ^19.3.1
+  '@types/react': ^19.3.0
+  '@types/react-dom': ^19.3.0
+  pino: ^10.4.0
+  jose: ^6.2.13

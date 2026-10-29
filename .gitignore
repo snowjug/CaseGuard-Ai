@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output (never commit generated artifacts)
+dist/
+build/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+coverage/
+.vitest/
+
+# Test output
+playwright-report/
+test-results/
+blob-report/
+e2e/.auth/
+e2e/screenshots-tmp/
+
+# Local data (databases, uploaded objects) — never commit
+.data/
+*.sqlite
+*.db
+pgdata/
+
+# Environment files (only *.example files are tracked)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+
+# Infra
+infra/**/*.parameters.local.json
+*.bicep.json
+.azure/
+
+# Secrets safety net
+*.pem
+*.pfx
+*.key
+*.p12

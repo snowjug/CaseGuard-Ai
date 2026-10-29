@@ -1,0 +1,26 @@
+{
+  "name": "@caseguard/observability",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Structured logging with redaction, correlation IDs, in-process metrics, health aggregation, OpenTelemetry hooks.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@caseguard/schemas": "workspace:*",
+    "@caseguard/security": "workspace:*",
+    "@opentelemetry/api": "~1.9.1",
+    "pino": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

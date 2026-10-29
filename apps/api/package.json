@@ -1,0 +1,49 @@
+{
+  "name": "@caseguard/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CaseGuard API: Fastify modular monolith with Zod-typed routes, OpenAPI, RBAC, tenant isolation, audit.",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/main.ts",
+    "start": "node dist/main.js",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "db:migrate": "tsx --env-file-if-exists=.env src/db/migrate-cli.ts",
+    "openapi:export": "tsx src/openapi-export.ts"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.14.0",
+    "@azure/monitor-opentelemetry": "^1.20.1",
+    "@azure/storage-blob": "^12.34.0",
+    "@caseguard/ai": "workspace:*",
+    "@caseguard/config": "workspace:*",
+    "@caseguard/domain": "workspace:*",
+    "@caseguard/observability": "workspace:*",
+    "@caseguard/schemas": "workspace:*",
+    "@caseguard/security": "workspace:*",
+    "@electric-sql/pglite": "^0.5.11",
+    "@fastify/cors": "^11.3.1",
+    "@fastify/helmet": "^13.2.0",
+    "@fastify/multipart": "^10.1.4",
+    "@fastify/rate-limit": "^11.2.1",
+    "@fastify/swagger": "^9.9.2",
+    "@fastify/swagger-ui": "^6.1.2",
+    "fastify": "^5.12.7",
+    "fastify-type-provider-zod": "^7.0.0",
+    "jose": "catalog:",
+    "pg": "^8.23.1",
+    "pino": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@caseguard/testing": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/pg": "^8.23.1",
+    "tsup": "^8.5.1",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
