@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { RangeSchema } from './analysis';
 import { IdSchema, IsoTimestampSchema, ProbabilitySchema, RecordMetaSchema } from './common';
 import { EffortLevelSchema, LevelSchema, SkillLifecycleSchema } from './enums';
 
@@ -35,6 +36,10 @@ export const DecisionStepSchema = z.object({
       outcomeId: z.string().optional(),
       next: z.string().max(60),
       rationale: z.string().max(400),
+      /** Additive: decision-time model estimate that this outcome occurs (never a measurement). */
+      probability: ProbabilitySchema.optional(),
+      /** Additive: estimate given the recorded root cause of the source case (uses hindsight). */
+      hindsightProbability: ProbabilitySchema.optional(),
     }),
   ),
 });
@@ -51,6 +56,65 @@ export const QueryTemplateSchema = z.object({
   safetyNote: z.string().max(300),
 });
 export type QueryTemplate = z.infer<typeof QueryTemplateSchema>;
+
+/** Additive: a cheaper way to learn the same thing than the step the source case actually took. */
+export const SkillCheaperAlternativeSchema = z.object({
+  insteadOfActionKey: z.string().nullable(),
+  insteadOfLabel: z.string().max(200),
+  useActionKey: z.string(),
+  useLabel: z.string().max(200),
+  rationale: z.string().max(400),
+  /** Estimated customer-side minutes avoided; null when the pack has no effort figure. */
+  estimatedCustomerMinutesSaved: z.number().nullable(),
+  estimated: z.literal(true),
+});
+export type SkillCheaperAlternative = z.infer<typeof SkillCheaperAlternativeSchema>;
+
+/** Additive: where a skill applies and, just as important, where it has not been validated. */
+export const SkillApplicabilitySchema = z.object({
+  scope: z.string().max(600),
+  validatedOnCases: z.number().int().min(0),
+  limitations: z.array(z.string().max(300)),
+});
+export type SkillApplicability = z.infer<typeof SkillApplicabilitySchema>;
+
+/** Additive: estimated benefit of following the skill. Always an estimate, never a measurement. */
+export const SkillExpectedBenefitSchema = z.object({
+  estimated: z.literal(true),
+  simulated: z.literal(true),
+  basis: z.string().max(400),
+  timeSavedMinutes: RangeSchema,
+  customerEffortSavedMinutes: RangeSchema,
+  tokensSaved: RangeSchema,
+  caveats: z.array(z.string().max(300)),
+});
+export type SkillExpectedBenefit = z.infer<typeof SkillExpectedBenefitSchema>;
+
+/** Additive: where a skill came from and which parts relied on hindsight. */
+export const SkillProvenanceSchema = z.object({
+  caseId: IdSchema,
+  caseReference: z.string().max(80),
+  forkId: IdSchema.nullable(),
+  scenarioId: IdSchema.nullable(),
+  analysisRunId: IdSchema,
+  strategy: z.string().max(60).nullable(),
+  extractedAt: IsoTimestampSchema,
+  hindsight: z.object({
+    used: z.boolean(),
+    resolutionHypothesisKey: z.string().nullable(),
+    /** Content paths whose value was derived with knowledge of the recorded resolution. */
+    parts: z.array(z.string().max(200)),
+    notice: z.string().max(400),
+  }),
+  /** Content paths derived only from information available at the decision time. */
+  decisionTimeParts: z.array(z.string().max(200)),
+  labels: z.object({
+    simulated: z.literal(true),
+    estimated: z.literal(true),
+    synthetic: z.boolean(),
+  }),
+});
+export type SkillProvenance = z.infer<typeof SkillProvenanceSchema>;
 
 export const SkillContentSchema = z.object({
   name: z.string().min(5).max(160),
@@ -99,6 +163,12 @@ export const SkillContentSchema = z.object({
     }),
   ),
   confidence: z.object({ score: ProbabilitySchema, rationale: z.string().max(500) }),
+  /** Additive, optional so content stored before these fields existed still parses. */
+  cheaperAlternatives: z.array(SkillCheaperAlternativeSchema).optional(),
+  validationCriteria: z.array(z.string().max(300)).optional(),
+  applicability: SkillApplicabilitySchema.optional(),
+  expectedBenefit: SkillExpectedBenefitSchema.optional(),
+  provenance: SkillProvenanceSchema.optional(),
 });
 export type SkillContent = z.infer<typeof SkillContentSchema>;
 
@@ -302,3 +372,13 @@ export const ApplySkillBodySchema = z.object({
   skillId: IdSchema,
 });
 export type ApplySkillBody = z.infer<typeof ApplySkillBodySchema>;
+
+/** Additive: body for `skills.simulationTest` (the route currently declares no body). */
+export const SimulateSkillBodySchema = z.object({
+  kind: z.enum(['simulation_test', 'regression']).default('simulation_test'),
+  /** Restricts the run to one case; omitted means every case the skill was derived from or validated on. */
+  caseId: IdSchema.optional(),
+  /** Defaults to the current version; set it to test a proposed mutation before it is approved. */
+  versionId: IdSchema.optional(),
+});
+export type SimulateSkillBody = z.infer<typeof SimulateSkillBodySchema>;
