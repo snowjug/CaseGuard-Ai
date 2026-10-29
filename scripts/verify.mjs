@@ -36,6 +36,11 @@ const STEPS = [
     title: 'TypeScript typecheck (all workspaces)',
     commands: [pnpm('typecheck')],
   },
+  {
+    id: 'generated:check',
+    title: 'Generated files are current (JSON schemas, built-in samples)',
+    commands: [pnpm('schemas:export', '--', '--check'), pnpm('samples:export', '--', '--check')],
+  },
   { id: 'test:unit', title: 'Unit tests (Vitest)', commands: [pnpm('test:unit')] },
   { id: 'test:int', title: 'Integration tests (Vitest)', commands: [pnpm('test:int')] },
   { id: 'build', title: 'Production build (all workspaces)', commands: [pnpm('build')] },

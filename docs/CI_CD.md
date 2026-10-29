@@ -22,16 +22,16 @@ Renovate is not used because Dependabot is built into GitHub, needs no extra app
 
 Jobs run in parallel; each uses `scripts/verify.mjs --only <step>` so the local loop and CI share one runner and one honest status model (PASSED only for exit code 0, NOT RUN for exit code 3, otherwise FAILED).
 
-| Job (check name)                                  | Steps (verify ids)                                                                                                  |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Format, lint, typecheck, unit tests               | `format:check`, `lint`, `typecheck`, `test:unit` (later steps still run after an earlier failure)                   |
-| Integration tests (PostgreSQL 16) and demo replay | `test:int` against a `postgres:16` service container (`TEST_DATABASE_URL`), then `demo:replay`                      |
-| Production build                                  | `build`                                                                                                             |
-| End-to-end and accessibility (Playwright, axe)    | `build`, `pnpm exec playwright install --with-deps chromium`, `test:e2e`; uploads the report on failure             |
-| Secret scan and dependency audit                  | `secrets:scan`, gitleaks (full history, `.gitleaks.toml`), `audit:deps`                                             |
-| Bicep validate                                    | installs the Bicep CLI (`az bicep install`), then `infra:validate`                                                  |
-| Container images and compose smoke test           | `docker/build-push-action` with `push: false` for both images, `docker compose up --wait`, `scripts/smoke-test.mjs` |
-| CI gate                                           | merges every job's report into the `verification-report` artifact and fails unless all jobs succeeded               |
+| Job (check name)                                  | Steps (verify ids)                                                                                                                                                                        |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Format, lint, typecheck, unit tests               | `format:check`, `lint`, `typecheck`, `generated:check` (the exported JSON schemas and the embedded sample data are current), `test:unit` (later steps still run after an earlier failure) |
+| Integration tests (PostgreSQL 16) and demo replay | `test:int` against a `postgres:16` service container (`TEST_DATABASE_URL`), then `demo:replay`                                                                                            |
+| Production build                                  | `build`                                                                                                                                                                                   |
+| End-to-end and accessibility (Playwright, axe)    | `build`, `pnpm exec playwright install --with-deps chromium`, `test:e2e`; uploads the report on failure                                                                                   |
+| Secret scan and dependency audit                  | `secrets:scan`, gitleaks (full history, `.gitleaks.toml`), `audit:deps`                                                                                                                   |
+| Bicep validate                                    | installs the Bicep CLI (`az bicep install`), then `infra:validate`                                                                                                                        |
+| Container images and compose smoke test           | `docker/build-push-action` with `push: false` for both images, `docker compose up --wait`, `scripts/smoke-test.mjs`                                                                       |
+| CI gate                                           | merges every job's report into the `verification-report` artifact and fails unless all jobs succeeded                                                                                     |
 
 - **Artifacts:** `verify-<job>` (per-step JSON), `playwright-report` (on failure), and `verification-report` (`.json` and `.md`, also appended to the run summary). In the merged report a step with no report is `NOT RUN`, never passed; the container job is mapped from its job conclusion.
 - **Nothing is pushed.** CI builds images and loads them locally for the smoke test; it never publishes an image or a package.

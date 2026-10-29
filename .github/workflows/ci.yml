@@ -41,6 +41,9 @@ jobs:
       - name: Typecheck
         if: ${{ !cancelled() }}
         run: node scripts/verify.mjs --only typecheck --json-out "$RUNNER_TEMP/reports/quality-typecheck.json" --no-md
+      - name: Generated files are current
+        if: ${{ !cancelled() }}
+        run: node scripts/verify.mjs --only generated:check --json-out "$RUNNER_TEMP/reports/quality-generated-check.json" --no-md
       - name: Unit tests
         if: ${{ !cancelled() }}
         run: node scripts/verify.mjs --only test:unit --json-out "$RUNNER_TEMP/reports/quality-test-unit.json" --no-md
