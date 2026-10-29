@@ -1,11 +1,10 @@
 import type { StartAnalysisResponse } from '@caseguard/schemas';
-import type { EngineContext } from '@caseguard/domain';
 import { sha256Hex } from '@caseguard/security';
 import type { RequestContext } from '../../http/request-context';
 import type { ServiceDeps } from '..';
 import { runAnalysisAgents } from './agents';
 import { computeAnalysis, type StageReporter } from './compute';
-import { ENGINE_VERSION, computeInputHash, loadAnalysisInputs } from './inputs';
+import { ENGINE_VERSION, computeInputHash, engineContextFor, loadAnalysisInputs } from './inputs';
 import { buildSnapshot } from './snapshot';
 import type { AnalysisOutcome, AnalysisPort, AnalyzeOptions, JobHandle, JobSpec } from '../ports';
 
@@ -136,14 +135,13 @@ export class AnalysisService implements AnalysisPort {
     await ctx.repos.cases.setAnalysisState(caseId, 'running');
     try {
       const runId = ctx.newId('run');
-      const engineCtx: EngineContext = {
+      const engineCtx = engineContextFor({
         tenantId: ctx.scope.tenantId,
         caseId,
         runId,
-        now: startedAt,
-        createdBy: 'system:analysis',
-        seed: hash,
-      };
+        startedAt,
+        inputHash: hash,
+      });
 
       const computation = await computeAnalysis(inputs, engineCtx, async (stageId, detail) => {
         handle?.throwIfCancelled();

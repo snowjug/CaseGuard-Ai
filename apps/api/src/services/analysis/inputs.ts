@@ -2,10 +2,12 @@ import {
   getCompiledPack,
   listKnowledgePacks,
   type CompiledPack,
+  type EngineContext,
   type MatchableSkill,
 } from '@caseguard/domain';
 import type {
   ActionValueConfig,
+  AnalysisRun,
   Case,
   CaseEvent,
   CaseResolution,
@@ -88,6 +90,40 @@ export async function loadAnalysisInputs(
 export interface ProviderIdentity {
   readonly kind: string;
   readonly model: string;
+}
+
+export interface EngineContextInput {
+  readonly tenantId: string;
+  readonly caseId: string;
+  readonly runId: string;
+  readonly startedAt: string;
+  readonly inputHash: string;
+}
+
+/**
+ * The identity the engine runs under. Artefact ids, timestamps and the simulation seed derive from it,
+ * so a view that recomputes an analysis from the stored record (for an as-of request) must build its
+ * context with `engineContextForRun` to get exactly the ids that were stored.
+ */
+export function engineContextFor(input: EngineContextInput): EngineContext {
+  return {
+    tenantId: input.tenantId,
+    caseId: input.caseId,
+    runId: input.runId,
+    now: input.startedAt,
+    createdBy: 'system:analysis',
+    seed: input.inputHash,
+  };
+}
+
+export function engineContextForRun(run: AnalysisRun): EngineContext {
+  return engineContextFor({
+    tenantId: run.tenantId,
+    caseId: run.caseId,
+    runId: run.id,
+    startedAt: run.startedAt,
+    inputHash: run.inputHash,
+  });
 }
 
 /**
