@@ -90,6 +90,23 @@ export function createTemporalViewBeforeEvent(
   } as unknown as PreResolutionView;
 }
 
+/**
+ * The decision-moment view of the event at `length` in an already ordered view: its first `length`
+ * events. Equivalent to createTemporalViewBeforeEvent for that event, without re-sorting.
+ */
+export function createTemporalPrefixView(view: TemporalView, length: number): PreResolutionView {
+  const visible = view.events.slice(0, Math.max(0, length));
+  const boundary = view.events[length]?.timestamp ?? view.asOf;
+  return {
+    asOf: boundary,
+    mode: 'before',
+    events: visible,
+    resolution: null,
+    withheldFutureEventCount: view.events.length - visible.length,
+    fingerprint: hashJson(visible.map((e) => e.id)),
+  } as unknown as PreResolutionView;
+}
+
 /** The post-hoc, whole-case view used for retrospective quality assessment. */
 export function createFullView(
   events: readonly CaseEvent[],

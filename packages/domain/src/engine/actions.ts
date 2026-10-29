@@ -16,7 +16,7 @@ import type { BeliefTimeline } from './belief';
 import { statedHypothesis } from './claims';
 import { type EngineContext, metaOf } from './context';
 import { eventText, firstDetectorMatch } from './signals';
-import { analyzeView, type ViewAnalysis } from './state';
+import { analyzeView, PrefixAnalyzer, type ViewAnalysis } from './state';
 import { createTemporalViewBeforeEvent, type TemporalView } from './temporal';
 
 export interface DecisionRanking {
@@ -40,6 +40,8 @@ export interface ActionsInput {
   ctx: EngineContext;
   config: ActionValueConfig;
   timeline: BeliefTimeline;
+  /** Shared prefix analyzer; created on demand when omitted. */
+  analyzer?: PrefixAnalyzer;
 }
 
 export interface ActionsOutput {
@@ -132,7 +134,36 @@ export function rankAtEvent(
   actionKey: string | null,
 ): DecisionRanking {
   const before = createTemporalViewBeforeEvent(events, event.id);
-  const analysis = analyzeView(before, pack, ctx.caseId);
+  return rankFromAnalysis(
+    analyzeView(before, pack, ctx.caseId),
+    event,
+    eventIndex,
+    pack,
+    config,
+    actionKey,
+  );
+}
+
+/** Same as rankAtEvent but reuses an analyzer so long cases do not rescan their text per decision. */
+export function rankAtIndex(
+  analyzer: PrefixAnalyzer,
+  event: CaseEvent,
+  eventIndex: number,
+  pack: CompiledPack,
+  config: ActionValueConfig,
+  actionKey: string | null,
+): DecisionRanking {
+  return rankFromAnalysis(analyzer.at(eventIndex), event, eventIndex, pack, config, actionKey);
+}
+
+function rankFromAnalysis(
+  analysis: ViewAnalysis,
+  event: CaseEvent,
+  eventIndex: number,
+  pack: CompiledPack,
+  config: ActionValueConfig,
+  actionKey: string | null,
+): DecisionRanking {
   const { candidates, blocked } = toBreakdowns(pack, config, analysis.rankingState);
   const packAction = actionKey ? pack.actions.get(actionKey) : undefined;
   const actual = actionKey
@@ -162,6 +193,7 @@ export function rankAtEvent(
 export function buildDiagnosticActions(input: ActionsInput): ActionsOutput {
   const { view, pack, ctx, config, timeline } = input;
   const events = view.events;
+  const analyzer = input.analyzer ?? new PrefixAnalyzer(view, pack, ctx.caseId);
   const stepIndexByEvent = new Map(events.map((e, i) => [e.id, i]));
   const decisions = new Map<string, DecisionRanking>();
   const actions: DiagnosticAction[] = [];
@@ -175,7 +207,7 @@ export function buildDiagnosticActions(input: ActionsInput): ActionsOutput {
     const id = stableId('act', ctx.caseId, event.id);
     const text = eventText(event);
 
-    const decision = rankAtEvent(events, event, eventIndex, pack, ctx, config, actionKey);
+    const decision = rankAtIndex(analyzer, event, eventIndex, pack, config, actionKey);
     decisions.set(event.id, decision);
     const { relative, best, actual } = decision;
     const diagnosticClass = packAction

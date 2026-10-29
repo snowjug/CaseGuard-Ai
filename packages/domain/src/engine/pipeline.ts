@@ -29,6 +29,7 @@ import {
 import { buildHypotheses } from './hypotheses';
 import { computeRequirementStates, type RequirementState } from './requirements';
 import { detectObservations, type Observation } from './signals';
+import { PrefixAnalyzer } from './state';
 import {
   assertPreResolution,
   createFullView,
@@ -77,7 +78,15 @@ export function runDeterministicAnalysis(input: AnalysisInput): DeterministicAna
     timeline,
     requirementStates,
   });
-  const { actions, decisions } = buildDiagnosticActions({ view, pack, ctx, config, timeline });
+  const analyzer = new PrefixAnalyzer(view, pack, ctx.caseId, { observations, requirementStates });
+  const { actions, decisions } = buildDiagnosticActions({
+    view,
+    pack,
+    ctx,
+    config,
+    timeline,
+    analyzer,
+  });
   const { hypotheses, links, missing } = buildHypotheses({
     pack,
     ctx,
@@ -102,6 +111,7 @@ export function runDeterministicAnalysis(input: AnalysisInput): DeterministicAna
     requirementStates,
     actions,
     decisions,
+    analyzer,
   });
   return {
     view,

@@ -21,7 +21,7 @@ import {
   actionCostOf,
   isHygieneAction,
   MIN_MEANINGFUL_COST,
-  rankAtEvent,
+  rankAtIndex,
   resolveActionKey,
   responderClosure,
 } from './actions';
@@ -30,7 +30,8 @@ import { type AnchorInfo, evidenceEffectFor, leaderOf } from './claims';
 import { type EngineContext, metaOf } from './context';
 import { missingRequirementsAt, type RequirementState } from './requirements';
 import type { Observation } from './signals';
-import { createTemporalViewBeforeEvent, type TemporalView } from './temporal';
+import { PrefixAnalyzer } from './state';
+import type { TemporalView } from './temporal';
 
 /** Impact at or above which a fork counts as "meaningful" for the earliest-meaningful marker. */
 export const EARLIEST_MEANINGFUL_IMPACT = 0.45;
@@ -96,6 +97,8 @@ export interface ForksInput {
   requirementStates: readonly RequirementState[];
   actions: readonly DiagnosticAction[];
   decisions: ReadonlyMap<string, DecisionRanking>;
+  /** Shared prefix analyzer; created on demand when omitted. */
+  analyzer?: PrefixAnalyzer;
 }
 
 export interface ForksOutput {
@@ -201,6 +204,7 @@ function alternativeFrom(
 export function detectForks(input: ForksInput): ForksOutput {
   const { view, pack, ctx, config, timeline, claims, anchors, actions, decisions } = input;
   const events = view.events;
+  const analyzer = input.analyzer ?? new PrefixAnalyzer(view, pack, ctx.caseId);
   const policies = pack.pack.policies;
   const hypName = (id: string): string => pack.hypotheses.get(id)?.name ?? id;
   const actionByEvent = new Map(actions.map((a) => [a.eventId, a]));
@@ -229,8 +233,7 @@ export function detectForks(input: ForksInput): ForksOutput {
     const actionKey = action?.actionKey ?? resolveActionKey(event, pack);
     const packAction = actionKey ? pack.actions.get(actionKey) : undefined;
     const decision =
-      decisions.get(event.id) ??
-      rankAtEvent(events, event, eventIndex, pack, ctx, config, actionKey);
+      decisions.get(event.id) ?? rankAtIndex(analyzer, event, eventIndex, pack, config, actionKey);
     const analysis = decision.analysis;
     const belief = analysis.belief;
     const leader = leaderOf(belief);
@@ -392,7 +395,7 @@ export function detectForks(input: ForksInput): ForksOutput {
     if (impact < policies.forkMinimumImpact) return;
 
     // ---- information boundary ----------------------------------------------------------------
-    const before = createTemporalViewBeforeEvent(events, event.id);
+    const before = decision.analysis.view;
     const visibleIds = new Set(before.events.map((e) => e.id));
     const evidenceBefore = input.evidence.filter((e) => visibleIds.has(e.eventId));
     const claimsBefore = claims.filter(

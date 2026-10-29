@@ -1810,7 +1810,7 @@ export const TEAMS_AUTH_PACK: KnowledgePack = {
     {
       id: 'clm.affected-user-count',
       subject: 'affected_user_count',
-      pattern: String.raw`(?:roughly|about|around|approximately|over)?\s*(\d{2,4})\s+(?:of our\s+)?(?:users|people|employees)`,
+      pattern: String.raw`\b(\d{2,4})\s{1,3}(?:of our\s{1,3})?(?:users|people|employees)\b`,
       flags: 'i',
       valueGroup: 1,
       roles: [...CUSTOMER_ROLES],
