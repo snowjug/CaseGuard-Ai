@@ -1,0 +1,699 @@
+{
+  "$id": "https://caseguard.example/schemas/skill.schema.json",
+  "title": "CaseGuard SkillDNA content",
+  "description": "Reusable investigation skill: trigger conditions, decision sequence, candidate actions, safety constraints and source cases. Skills are governed: they are proposed, validated, reviewed by a distinct approver and only then published.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 160
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1200
+    },
+    "product": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "workload": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "triggerConditions": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["signal", "attribute", "text"]
+          },
+          "signalId": {
+            "type": "string"
+          },
+          "attribute": {
+            "type": "string"
+          },
+          "pattern": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "required": {
+            "type": "boolean"
+          }
+        },
+        "required": ["id", "description", "kind", "weight", "required"]
+      }
+    },
+    "exclusions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["signal", "attribute", "text"]
+          },
+          "signalId": {
+            "type": "string"
+          },
+          "attribute": {
+            "type": "string"
+          },
+          "pattern": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "required": {
+            "type": "boolean"
+          }
+        },
+        "required": ["id", "description", "kind", "weight", "required"]
+      }
+    },
+    "requiredInputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "required": {
+            "type": "boolean"
+          }
+        },
+        "required": ["key", "label", "description", "required"]
+      }
+    },
+    "minimumEvidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "requirementId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": ["requirementId", "label", "description"]
+      }
+    },
+    "decisionSequence": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "instruction": {
+            "type": "string",
+            "maxLength": 1200
+          },
+          "actionKey": {
+            "type": ["string", "null"]
+          },
+          "expectedInformationGainBits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requiresInputs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "branches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "condition": {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                "outcomeId": {
+                  "type": "string"
+                },
+                "next": {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                "rationale": {
+                  "type": "string",
+                  "maxLength": 400
+                },
+                "probability": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "hindsightProbability": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["condition", "next", "rationale"]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "order",
+          "title",
+          "instruction",
+          "actionKey",
+          "expectedInformationGainBits",
+          "requiresInputs",
+          "branches"
+        ]
+      }
+    },
+    "candidateActions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "actionKey": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "whenToUse": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "risk": {
+            "type": "string",
+            "enum": ["low", "medium", "high"]
+          },
+          "customerEffort": {
+            "type": "string",
+            "enum": ["none", "low", "medium", "high", "very_high"]
+          },
+          "requiresApproval": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "actionKey",
+          "label",
+          "whenToUse",
+          "risk",
+          "customerEffort",
+          "requiresApproval"
+        ]
+      }
+    },
+    "stopConditions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    },
+    "successConditions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    },
+    "escalationConditions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    },
+    "safetyConstraints": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    },
+    "queryTemplates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "language": {
+            "type": "string",
+            "enum": ["kql", "powershell"]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "template": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 200
+                }
+              },
+              "required": ["name", "description"]
+            }
+          },
+          "safetyNote": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "id",
+          "language",
+          "title",
+          "description",
+          "template",
+          "parameters",
+          "safetyNote"
+        ]
+      }
+    },
+    "knownFailureModes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    },
+    "sourceCases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["origin", "validation", "mutation_source"]
+          }
+        },
+        "required": ["caseId", "reference", "role"]
+      }
+    },
+    "confidence": {
+      "type": "object",
+      "properties": {
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "rationale": {
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "required": ["score", "rationale"]
+    },
+    "cheaperAlternatives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "insteadOfActionKey": {
+            "type": ["string", "null"]
+          },
+          "insteadOfLabel": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "useActionKey": {
+            "type": "string"
+          },
+          "useLabel": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "rationale": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "estimatedCustomerMinutesSaved": {
+            "type": ["number", "null"]
+          },
+          "estimated": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "insteadOfActionKey",
+          "insteadOfLabel",
+          "useActionKey",
+          "useLabel",
+          "rationale",
+          "estimatedCustomerMinutesSaved",
+          "estimated"
+        ]
+      }
+    },
+    "validationCriteria": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    },
+    "applicability": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "maxLength": 600
+        },
+        "validatedOnCases": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 300
+          }
+        }
+      },
+      "required": ["scope", "validatedOnCases", "limitations"]
+    },
+    "expectedBenefit": {
+      "type": "object",
+      "properties": {
+        "estimated": {
+          "type": "boolean",
+          "const": true
+        },
+        "simulated": {
+          "type": "boolean",
+          "const": true
+        },
+        "basis": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "timeSavedMinutes": {
+          "type": "object",
+          "properties": {
+            "low": {
+              "type": "number"
+            },
+            "mid": {
+              "type": "number"
+            },
+            "high": {
+              "type": "number"
+            }
+          },
+          "required": ["low", "mid", "high"]
+        },
+        "customerEffortSavedMinutes": {
+          "type": "object",
+          "properties": {
+            "low": {
+              "type": "number"
+            },
+            "mid": {
+              "type": "number"
+            },
+            "high": {
+              "type": "number"
+            }
+          },
+          "required": ["low", "mid", "high"]
+        },
+        "tokensSaved": {
+          "type": "object",
+          "properties": {
+            "low": {
+              "type": "number"
+            },
+            "mid": {
+              "type": "number"
+            },
+            "high": {
+              "type": "number"
+            }
+          },
+          "required": ["low", "mid", "high"]
+        },
+        "caveats": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 300
+          }
+        }
+      },
+      "required": [
+        "estimated",
+        "simulated",
+        "basis",
+        "timeSavedMinutes",
+        "customerEffortSavedMinutes",
+        "tokensSaved",
+        "caveats"
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "caseId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+        },
+        "caseReference": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "forkId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scenarioId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "analysisRunId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+        },
+        "strategy": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 60
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "extractedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "hindsight": {
+          "type": "object",
+          "properties": {
+            "used": {
+              "type": "boolean"
+            },
+            "resolutionHypothesisKey": {
+              "type": ["string", "null"]
+            },
+            "parts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 200
+              }
+            },
+            "notice": {
+              "type": "string",
+              "maxLength": 400
+            }
+          },
+          "required": ["used", "resolutionHypothesisKey", "parts", "notice"]
+        },
+        "decisionTimeParts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "labels": {
+          "type": "object",
+          "properties": {
+            "simulated": {
+              "type": "boolean",
+              "const": true
+            },
+            "estimated": {
+              "type": "boolean",
+              "const": true
+            },
+            "synthetic": {
+              "type": "boolean"
+            }
+          },
+          "required": ["simulated", "estimated", "synthetic"]
+        }
+      },
+      "required": [
+        "caseId",
+        "caseReference",
+        "forkId",
+        "scenarioId",
+        "analysisRunId",
+        "strategy",
+        "extractedAt",
+        "hindsight",
+        "decisionTimeParts",
+        "labels"
+      ]
+    }
+  },
+  "required": [
+    "name",
+    "description",
+    "product",
+    "workload",
+    "triggerConditions",
+    "exclusions",
+    "requiredInputs",
+    "minimumEvidence",
+    "decisionSequence",
+    "candidateActions",
+    "stopConditions",
+    "successConditions",
+    "escalationConditions",
+    "safetyConstraints",
+    "queryTemplates",
+    "knownFailureModes",
+    "sourceCases",
+    "confidence"
+  ]
+}

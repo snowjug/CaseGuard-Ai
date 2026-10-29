@@ -1,0 +1,116 @@
+Notice: SYNTHETIC DEMONSTRATION TRANSCRIPT. Every organisation, person, address and incident below is fictional.
+Title: Intermittent Teams sign-in failures for about 60 users at the Rotterdam site
+Reference: CG-SYN-2001
+Customer alias: Fabrikam Synthetic BV
+Product: Microsoft Teams
+Workload: teams-authentication
+Severity: B
+
+From: Fabrikam IT admin <it.admin@fabrikam-synthetic.invalid>
+Sent: Tuesday, 14 April 2026 07:35 UTC
+To: Support
+Subject: Teams sign-in failing intermittently at Rotterdam
+
+Hello,
+
+Since about 07:10 UTC roughly 60 users at our Rotterdam site cannot sign in to Teams reliably. The window says "We couldn't sign you in" and shows error code caa82ee2. A retry sometimes works. Users at our other sites are fine.
+
+About 25 of them are warehouse supervisors who dispatch trucks by Teams calls, so shipments are being delayed. Our network team deployed a TLS inspection policy update on the web proxies yesterday evening, but we do not think it is related. We have not changed Conditional Access.
+
+From: Support Engineer <engineer@support-synthetic.invalid>
+Sent: Tuesday, 14 April 2026 07:52 UTC
+To: Fabrikam IT admin
+Subject: Teams sign-in - three quick items
+
+Hello,
+
+Thank you, that is very clear. To speed things up please send three sample affected users with the UTC time of one failed attempt each, and the names of the proxy nodes and DNS servers used by the Rotterdam clients. Meanwhile I will check Microsoft 365 service health and correlate the failures with the sign-in logs as soon as I have the sample users. I will update you by 10:00 UTC.
+
+Regards
+
+[2026-04-14 07:55 UTC] Support Engineer: Checked Service health and the Message center: no active incidents or advisories for Teams or Microsoft Entra ID.
+
+From: Fabrikam IT admin <it.admin@fabrikam-synthetic.invalid>
+Sent: Tuesday, 14 April 2026 08:50 UTC
+To: Support Engineer
+Subject: Re: Teams sign-in - three quick items
+
+Hello,
+
+Sample users: h.vos@fabrikam-synthetic.invalid failed at 07:12:30 UTC, j.dekker@fabrikam-synthetic.invalid at 07:15:02 UTC and p.bakker@fabrikam-synthetic.invalid at 07:21:44 UTC. Rotterdam clients get their proxy settings from a PAC file that rotates across three proxy nodes (proxy-rtm-1, proxy-rtm-2 and proxy-rtm-3) and use DNS servers 10.30.5.10 and 10.30.5.11.
+
+On Tue, 14 Apr 2026 at 07:52, Support Engineer <engineer@support-synthetic.invalid> wrote:
+> Hello,
+>
+> Thank you, that is very clear. To speed things up please send three sample affected users
+> with the UTC time of one failed attempt each.
+
+[2026-04-14 09:05 UTC] Support Engineer: Ran the sign-in log correlation for the three sample users and failure times (plus or minus 2 minutes).
+
+[2026-04-14 09:12 UTC] Support Engineer:
+failing = (h.vos 07:12:30Z, j.dekker 07:15:02Z, p.bakker 07:21:44Z)
+| join kind=leftouter (union SigninLogs, AADNonInteractiveUserSignInLogs) on UserPrincipalName
+| where abs(datetime_diff('second', TimeGenerated, FailureTimeUtc)) <= 120
+
+0 of 3 failing attempts have a matching record in SigninLogs or AADNonInteractiveUserSignInLogs.
+
+[2026-04-14 09:20 UTC] Support Engineer (case note): Server-side correlation found no failure records, so the failures happen before authentication. The client error caa82ee2 is a timeout and the customer deployed a TLS inspection policy update on the proxies yesterday, so the proxy path is the leading hypothesis. DNS is less likely given the timeout code. Plan: test the three proxy nodes individually from Rotterdam and compare them.
+
+From: Support Engineer <engineer@support-synthetic.invalid>
+Sent: Tuesday, 14 April 2026 09:35 UTC
+To: Fabrikam network admin
+Subject: Proxy node test from Rotterdam
+
+Hello,
+
+Could the network team please test https://login.microsoftonline.com and https://aadcdn.msftauth.net through each proxy node (proxy-rtm-1, proxy-rtm-2 and proxy-rtm-3) from a Rotterdam client, 20 requests each, and send the timings? A script is attached. Please also tell me the exact time the TLS inspection policy changed.
+
+I will review the results as soon as they arrive and will update you by 11:30 UTC.
+
+Regards
+
+From: Fabrikam network admin <net.admin@fabrikam-synthetic.invalid>
+Sent: Tuesday, 14 April 2026 10:55 UTC
+To: Support Engineer
+Subject: Re: Proxy node test from Rotterdam
+
+Hello,
+
+Results from Rotterdam: proxy-rtm-1 and proxy-rtm-3 respond in about 0.4 seconds. proxy-rtm-2 times out for roughly one in three requests to aadcdn.msftauth.net and login.microsoftonline.com with a 10 second limit. The CPU on proxy-rtm-2 has been at 97 percent since the TLS inspection policy update, while the other two nodes are at about 40 percent. The policy changed at 21:40 UTC yesterday.
+
+From: Support Engineer <engineer@support-synthetic.invalid>
+Sent: Tuesday, 14 April 2026 11:10 UTC
+To: Fabrikam network admin
+Subject: Workaround and permanent fix
+
+Hello,
+
+Thank you, that explains the intermittent pattern: proxy-rtm-2 is overloaded since TLS inspection was enabled for all categories. Workaround: take proxy-rtm-2 out of the PAC file rotation until it has capacity. Permanent fix: bypass TLS inspection for the Microsoft 365 endpoints published by Microsoft and review proxy capacity under change control before re-enabling broader inspection.
+
+Please confirm when the PAC file is updated. I will validate with a before and after comparison and will update you by 15:00 UTC.
+
+Regards
+
+From: Fabrikam network admin <net.admin@fabrikam-synthetic.invalid>
+Sent: Tuesday, 14 April 2026 11:50 UTC
+To: Support Engineer
+Subject: Re: Workaround and permanent fix
+
+Hello,
+
+The PAC file was updated at 11:35 UTC and proxy-rtm-2 is out of rotation. Users are signing in again. The inspection bypass will go through change control this afternoon.
+
+From: Fabrikam IT admin <it.admin@fabrikam-synthetic.invalid>
+Sent: Tuesday, 14 April 2026 15:30 UTC
+To: Support Engineer
+Subject: Afternoon update from the customer
+
+Hello,
+
+Our helpdesk has had no sign-in tickets since 11:45 UTC. The inspection bypass for the Microsoft 365 endpoints was deployed at 15:00 UTC and proxy-rtm-2 went back into rotation at 15:20 UTC. We confirm users can sign in.
+
+[2026-04-14 15:45 UTC] Support Engineer: Validation: 100 requests through each of the three proxy nodes completed without a timeout after the change, and client sign-in telemetry shows 0 failures over the last 4 hours. The customer confirmed that users can sign in. Workaround and permanent fix are both validated.
+
+[2026-04-14 16:00 UTC] Support Engineer: Resolution summary. Root cause: after a TLS inspection policy update at 21:40 UTC on 2026-04-13 proxy-rtm-2 was saturated (97 percent CPU) and timed out for about one in three requests to Microsoft sign-in hosts. PAC rotation across three nodes made sign-in intermittent for Rotterdam. Workaround: proxy-rtm-2 removed from PAC rotation at 11:35 UTC. Permanent fix: TLS inspection bypass for Microsoft 365 endpoints at 15:00 UTC and a capacity review under change control. Validation: 4 hours with 0 failures and 100 requests per node without timeouts.
+
+[2026-04-14 16:10 UTC] Case System: Status changed to Resolved. Customer confirmed resolution.

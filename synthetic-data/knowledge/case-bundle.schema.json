@@ -1,0 +1,369 @@
+{
+  "$id": "https://caseguard.example/schemas/case-bundle.schema.json",
+  "title": "CaseGuard case bundle",
+  "description": "Structured support-case export accepted by CaseGuard ingestion. Demo bundles must set \"synthetic\": true.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "caseguard.case-bundle/1"
+    },
+    "synthetic": {
+      "type": "boolean"
+    },
+    "syntheticNotice": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "case": {
+      "type": "object",
+      "properties": {
+        "reference": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9-]{3,39}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 200
+        },
+        "product": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "workload": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["A", "B", "C"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["open", "resolved", "closed"]
+        },
+        "openedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "closedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "customerAlias": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "tags": {
+          "default": [],
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          }
+        }
+      },
+      "required": [
+        "reference",
+        "title",
+        "product",
+        "workload",
+        "severity",
+        "status",
+        "openedAt",
+        "customerAlias"
+      ]
+    },
+    "participants": {
+      "minItems": 1,
+      "maxItems": 30,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "customer_admin",
+              "customer_end_user",
+              "customer_network_admin",
+              "support_engineer",
+              "escalation_engineer",
+              "support_manager",
+              "system"
+            ]
+          },
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "required": ["id", "role", "alias"]
+      }
+    },
+    "events": {
+      "minItems": 1,
+      "maxItems": 2000,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "participantId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "customer_email",
+              "customer_call",
+              "engineer_email",
+              "case_note",
+              "engineer_action",
+              "diagnostic_result",
+              "log_sample",
+              "query_output",
+              "escalation",
+              "escalation_response",
+              "status_change",
+              "resolution_note",
+              "validation_result",
+              "system_event"
+            ]
+          },
+          "channel": {
+            "type": "string",
+            "enum": ["email", "phone", "portal", "internal", "tool"]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "action": {
+            "type": "object",
+            "properties": {
+              "actionKey": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "customerEffort": {
+                "default": "none",
+                "type": "string",
+                "enum": ["none", "low", "medium", "high", "very_high"]
+              },
+              "destructive": {
+                "default": false,
+                "type": "boolean"
+              },
+              "durationMinutes": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 20160
+              },
+              "repeatOf": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+              }
+            },
+            "required": ["label"]
+          },
+          "inResponseTo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+          },
+          "correlationIds": {
+            "default": [],
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          "structured": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                },
+                {
+                  "maxItems": 50,
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          "ai": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "promptTokens": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5000000
+              },
+              "completionTokens": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5000000
+              },
+              "cachedTokens": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5000000
+              },
+              "computeSeconds": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100000
+              }
+            },
+            "required": ["model", "promptTokens", "completionTokens"]
+          }
+        },
+        "required": ["id", "timestamp", "participantId", "type", "body"]
+      }
+    },
+    "resolution": {
+      "type": "object",
+      "properties": {
+        "resolvedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "rootCause": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "workaround": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "permanentFix": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "rootCauseHypothesisKey": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "validation": {
+          "type": "object",
+          "properties": {
+            "validatedAt": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "method": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "outcome": {
+              "type": "string",
+              "enum": ["confirmed", "partial", "failed"]
+            },
+            "evidenceEventIds": {
+              "default": [],
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+              }
+            }
+          },
+          "required": ["validatedAt", "method", "outcome"]
+        }
+      },
+      "required": ["resolvedAt", "summary", "rootCause"]
+    }
+  },
+  "required": ["schemaVersion", "synthetic", "case", "participants", "events"]
+}

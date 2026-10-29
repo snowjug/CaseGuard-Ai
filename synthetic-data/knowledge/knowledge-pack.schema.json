@@ -1,0 +1,1265 @@
+{
+  "$id": "https://caseguard.example/schemas/knowledge-pack.schema.json",
+  "title": "CaseGuard workload knowledge pack",
+  "description": "Authored domain model used by the deterministic provider and as grounding for model prompts.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^kp\\.[a-z0-9-]+$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "workload": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "title": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 160
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 600
+    },
+    "disclaimer": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 500
+    },
+    "hypotheses": {
+      "minItems": 2,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^hyp\\.[a-z0-9-]+$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "category": {
+            "type": "string",
+            "enum": ["identity", "network", "client", "service", "configuration", "unknown"]
+          },
+          "prior": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "assumptions": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 300
+            }
+          },
+          "keywords": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 60
+            }
+          },
+          "validatingActionIds": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "confirmationRequirementIds": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["id", "name", "description", "category", "prior"]
+      }
+    },
+    "signals": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^sig\\.[a-z0-9-]+$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "detectors": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "regex"
+                    },
+                    "pattern": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "flags": {
+                      "default": "i",
+                      "type": "string",
+                      "maxLength": 8
+                    },
+                    "eventTypes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "customer_email",
+                          "customer_call",
+                          "engineer_email",
+                          "case_note",
+                          "engineer_action",
+                          "diagnostic_result",
+                          "log_sample",
+                          "query_output",
+                          "escalation",
+                          "escalation_response",
+                          "status_change",
+                          "resolution_note",
+                          "validation_result",
+                          "system_event"
+                        ]
+                      }
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "customer_admin",
+                          "customer_end_user",
+                          "customer_network_admin",
+                          "support_engineer",
+                          "escalation_engineer",
+                          "support_manager",
+                          "system"
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["kind", "pattern"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "structured"
+                    },
+                    "key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "op": {
+                      "type": "string",
+                      "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "includes", "exists"]
+                    },
+                    "value": {
+                      "type": ["string", "number", "boolean"]
+                    },
+                    "eventTypes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "customer_email",
+                          "customer_call",
+                          "engineer_email",
+                          "case_note",
+                          "engineer_action",
+                          "diagnostic_result",
+                          "log_sample",
+                          "query_output",
+                          "escalation",
+                          "escalation_response",
+                          "status_change",
+                          "resolution_note",
+                          "validation_result",
+                          "system_event"
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["kind", "key", "op"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "structured_all"
+                    },
+                    "conditions": {
+                      "minItems": 2,
+                      "maxItems": 6,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "op": {
+                            "type": "string",
+                            "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "includes", "exists"]
+                          },
+                          "value": {
+                            "type": ["string", "number", "boolean"]
+                          }
+                        },
+                        "required": ["key", "op"]
+                      }
+                    },
+                    "eventTypes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "customer_email",
+                          "customer_call",
+                          "engineer_email",
+                          "case_note",
+                          "engineer_action",
+                          "diagnostic_result",
+                          "log_sample",
+                          "query_output",
+                          "escalation",
+                          "escalation_response",
+                          "status_change",
+                          "resolution_note",
+                          "validation_result",
+                          "system_event"
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["kind", "conditions"]
+                }
+              ]
+            }
+          },
+          "strength": {
+            "type": "string",
+            "enum": ["strong", "moderate", "weak"]
+          },
+          "evidenceKind": {
+            "default": "presence",
+            "type": "string",
+            "enum": ["presence", "absence"]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "confirmed_fact",
+              "customer_reported",
+              "engineer_assumption",
+              "diagnostic_evidence",
+              "ai_inference",
+              "conflicting_evidence",
+              "missing_evidence",
+              "simulated_outcome"
+            ]
+          },
+          "likelihoods": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0.01,
+              "maximum": 0.99
+            }
+          },
+          "neutral": {
+            "default": 0.5,
+            "type": "number",
+            "minimum": 0.01,
+            "maximum": 0.99
+          },
+          "explanation": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "satisfies": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "twinSection": {
+            "type": "string",
+            "enum": [
+              "problem_statement",
+              "customer_impact",
+              "environment",
+              "scope",
+              "participants",
+              "observations",
+              "actions",
+              "decisions",
+              "communications",
+              "escalations",
+              "resolution",
+              "validation",
+              "remaining_risks",
+              "unknowns"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "description",
+          "detectors",
+          "strength",
+          "category",
+          "likelihoods",
+          "explanation"
+        ]
+      }
+    },
+    "actions": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^act\\.[a-z0-9-]+$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "log_query",
+              "customer_request",
+              "client_diagnostic",
+              "network_diagnostic",
+              "configuration_change",
+              "remediation",
+              "escalation",
+              "communication",
+              "validation",
+              "analysis"
+            ]
+          },
+          "executor": {
+            "type": "string",
+            "enum": [
+              "engineer",
+              "customer_admin",
+              "customer_network_admin",
+              "customer_end_user",
+              "system"
+            ]
+          },
+          "valueClass": {
+            "type": "string",
+            "enum": ["diagnostic", "enabling", "remediation", "communication", "validation"]
+          },
+          "timeMinutes": {
+            "type": "object",
+            "properties": {
+              "min": {
+                "type": "number",
+                "minimum": 0
+              },
+              "typical": {
+                "type": "number",
+                "minimum": 0
+              },
+              "max": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": ["min", "typical", "max"]
+          },
+          "tokenEstimate": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200000
+          },
+          "computeUnits": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "customerEffort": {
+            "type": "string",
+            "enum": ["none", "low", "medium", "high", "very_high"]
+          },
+          "operationalRisk": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "destructive": {
+            "type": "boolean"
+          },
+          "requiresApproval": {
+            "type": "boolean"
+          },
+          "reliability": {
+            "type": "number",
+            "minimum": 0.05,
+            "maximum": 1
+          },
+          "requires": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "produces": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "targets": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "outcomes": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9-]+$"
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 3,
+                  "maxLength": 160
+                },
+                "emitsSignals": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "simulatedResult": {
+                  "type": "string",
+                  "maxLength": 500
+                }
+              },
+              "required": ["id", "label", "emitsSignals", "simulatedResult"]
+            }
+          },
+          "detectors": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "regex"
+                    },
+                    "pattern": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "flags": {
+                      "default": "i",
+                      "type": "string",
+                      "maxLength": 8
+                    },
+                    "eventTypes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "customer_email",
+                          "customer_call",
+                          "engineer_email",
+                          "case_note",
+                          "engineer_action",
+                          "diagnostic_result",
+                          "log_sample",
+                          "query_output",
+                          "escalation",
+                          "escalation_response",
+                          "status_change",
+                          "resolution_note",
+                          "validation_result",
+                          "system_event"
+                        ]
+                      }
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "customer_admin",
+                          "customer_end_user",
+                          "customer_network_admin",
+                          "support_engineer",
+                          "escalation_engineer",
+                          "support_manager",
+                          "system"
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["kind", "pattern"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "structured"
+                    },
+                    "key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "op": {
+                      "type": "string",
+                      "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "includes", "exists"]
+                    },
+                    "value": {
+                      "type": ["string", "number", "boolean"]
+                    },
+                    "eventTypes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "customer_email",
+                          "customer_call",
+                          "engineer_email",
+                          "case_note",
+                          "engineer_action",
+                          "diagnostic_result",
+                          "log_sample",
+                          "query_output",
+                          "escalation",
+                          "escalation_response",
+                          "status_change",
+                          "resolution_note",
+                          "validation_result",
+                          "system_event"
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["kind", "key", "op"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "structured_all"
+                    },
+                    "conditions": {
+                      "minItems": 2,
+                      "maxItems": 6,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "op": {
+                            "type": "string",
+                            "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "includes", "exists"]
+                          },
+                          "value": {
+                            "type": ["string", "number", "boolean"]
+                          }
+                        },
+                        "required": ["key", "op"]
+                      }
+                    },
+                    "eventTypes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "customer_email",
+                          "customer_call",
+                          "engineer_email",
+                          "case_note",
+                          "engineer_action",
+                          "diagnostic_result",
+                          "log_sample",
+                          "query_output",
+                          "escalation",
+                          "escalation_response",
+                          "status_change",
+                          "resolution_note",
+                          "validation_result",
+                          "system_event"
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["kind", "conditions"]
+                }
+              ]
+            }
+          },
+          "templates": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "kql": {
+                "type": "string",
+                "maxLength": 4000
+              },
+              "powershell": {
+                "type": "string",
+                "maxLength": 4000
+              }
+            }
+          },
+          "safetyNotes": {
+            "type": "string",
+            "maxLength": 400
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "description",
+          "kind",
+          "executor",
+          "valueClass",
+          "timeMinutes",
+          "tokenEstimate",
+          "computeUnits",
+          "customerEffort",
+          "operationalRisk",
+          "destructive",
+          "requiresApproval",
+          "reliability"
+        ]
+      }
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^req\\.[a-z0-9-]+$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "category": {
+            "type": "string",
+            "enum": ["scoping", "evidence", "troubleshooting", "communication", "closure"]
+          },
+          "criticality": {
+            "type": "string",
+            "enum": ["critical", "important", "helpful"]
+          },
+          "neededFrom": {
+            "type": "string",
+            "enum": ["case_open", "first_engineer_request", "before_escalation", "before_closure"]
+          },
+          "askText": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "satisfiedBySignals": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "satisfiedByDetectors": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "regex"
+                    },
+                    "pattern": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "flags": {
+                      "default": "i",
+                      "type": "string",
+                      "maxLength": 8
+                    },
+                    "eventTypes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "customer_email",
+                          "customer_call",
+                          "engineer_email",
+                          "case_note",
+                          "engineer_action",
+                          "diagnostic_result",
+                          "log_sample",
+                          "query_output",
+                          "escalation",
+                          "escalation_response",
+                          "status_change",
+                          "resolution_note",
+                          "validation_result",
+                          "system_event"
+                        ]
+                      }
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "customer_admin",
+                          "customer_end_user",
+                          "customer_network_admin",
+                          "support_engineer",
+                          "escalation_engineer",
+                          "support_manager",
+                          "system"
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["kind", "pattern"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "structured"
+                    },
+                    "key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "op": {
+                      "type": "string",
+                      "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "includes", "exists"]
+                    },
+                    "value": {
+                      "type": ["string", "number", "boolean"]
+                    },
+                    "eventTypes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "customer_email",
+                          "customer_call",
+                          "engineer_email",
+                          "case_note",
+                          "engineer_action",
+                          "diagnostic_result",
+                          "log_sample",
+                          "query_output",
+                          "escalation",
+                          "escalation_response",
+                          "status_change",
+                          "resolution_note",
+                          "validation_result",
+                          "system_event"
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["kind", "key", "op"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "structured_all"
+                    },
+                    "conditions": {
+                      "minItems": 2,
+                      "maxItems": 6,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "op": {
+                            "type": "string",
+                            "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "includes", "exists"]
+                          },
+                          "value": {
+                            "type": ["string", "number", "boolean"]
+                          }
+                        },
+                        "required": ["key", "op"]
+                      }
+                    },
+                    "eventTypes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "customer_email",
+                          "customer_call",
+                          "engineer_email",
+                          "case_note",
+                          "engineer_action",
+                          "diagnostic_result",
+                          "log_sample",
+                          "query_output",
+                          "escalation",
+                          "escalation_response",
+                          "status_change",
+                          "resolution_note",
+                          "validation_result",
+                          "system_event"
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["kind", "conditions"]
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "description",
+          "category",
+          "criticality",
+          "neededFrom",
+          "askText"
+        ]
+      }
+    },
+    "claimPatterns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^clm\\.[a-z0-9-]+$"
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 60
+          },
+          "pattern": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          },
+          "flags": {
+            "default": "i",
+            "type": "string",
+            "maxLength": 8
+          },
+          "valueGroup": {
+            "default": 0,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "customer_admin",
+                "customer_end_user",
+                "customer_network_admin",
+                "support_engineer",
+                "escalation_engineer",
+                "support_manager",
+                "system"
+              ]
+            }
+          },
+          "eventTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "customer_email",
+                "customer_call",
+                "engineer_email",
+                "case_note",
+                "engineer_action",
+                "diagnostic_result",
+                "log_sample",
+                "query_output",
+                "escalation",
+                "escalation_response",
+                "status_change",
+                "resolution_note",
+                "validation_result",
+                "system_event"
+              ]
+            }
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": ["id", "subject", "pattern", "label"]
+      }
+    },
+    "inferences": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^inf\\.[a-z0-9-]+$"
+          },
+          "signalId": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "explanation": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "hypothesisCategories": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["identity", "network", "client", "service", "configuration", "unknown"]
+            }
+          }
+        },
+        "required": ["id", "signalId", "text", "explanation", "hypothesisCategories"]
+      }
+    },
+    "lexicon": {
+      "type": "object",
+      "properties": {
+        "hedges": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "definitive": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 160
+          }
+        },
+        "customerReport": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "template": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 160
+          }
+        },
+        "workaround": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "permanentFix": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "validation": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "nextSteps": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "expectation": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "closure": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "injection": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      },
+      "required": [
+        "hedges",
+        "definitive",
+        "customerReport",
+        "template",
+        "workaround",
+        "permanentFix",
+        "validation",
+        "nextSteps",
+        "expectation",
+        "closure"
+      ]
+    },
+    "policies": {
+      "type": "object",
+      "properties": {
+        "diagnosisThreshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "minimumEvidenceForEscalation": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "destructiveHypothesisThreshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "lowValueRelativeScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "lowValueInformationGainBits": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "repeatWindowMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "customerResponsePriorMinutes": {
+          "type": "object",
+          "properties": {
+            "min": {
+              "type": "number",
+              "minimum": 0
+            },
+            "typical": {
+              "type": "number",
+              "minimum": 0
+            },
+            "max": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": ["min", "typical", "max"]
+        },
+        "maxCounterfactualSteps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "rolloutCount": {
+          "type": "integer",
+          "minimum": 20,
+          "maximum": 2000
+        },
+        "posteriorFloor": {
+          "type": "number",
+          "minimum": 0.0001,
+          "maximum": 0.2
+        },
+        "strengthWeights": {
+          "type": "object",
+          "properties": {
+            "strong": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "moderate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "weak": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": ["strong", "moderate", "weak"]
+        },
+        "forkMinimumImpact": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "validationRequirementId": {
+          "type": "string"
+        },
+        "escalationActionIds": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "diagnosisThreshold",
+        "minimumEvidenceForEscalation",
+        "destructiveHypothesisThreshold",
+        "lowValueRelativeScore",
+        "lowValueInformationGainBits",
+        "repeatWindowMinutes",
+        "customerResponsePriorMinutes",
+        "maxCounterfactualSteps",
+        "rolloutCount",
+        "posteriorFloor",
+        "strengthWeights",
+        "forkMinimumImpact"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "version",
+    "workload",
+    "title",
+    "description",
+    "disclaimer",
+    "hypotheses",
+    "signals",
+    "actions",
+    "requirements",
+    "claimPatterns",
+    "lexicon",
+    "policies"
+  ]
+}

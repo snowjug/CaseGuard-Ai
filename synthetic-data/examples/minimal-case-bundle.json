@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "caseguard.case-bundle/1",
+  "synthetic": true,
+  "syntheticNotice": "SYNTHETIC DEMONSTRATION DATA. All organisations, people, users, addresses and incidents are fictional. This is the smallest valid case bundle and exists to show the required structure.",
+  "case": {
+    "reference": "CG-SYN-2003",
+    "title": "Minimal example: intermittent Teams sign-in failures at one site",
+    "product": "Microsoft Teams",
+    "workload": "teams-authentication",
+    "severity": "C",
+    "status": "open",
+    "openedAt": "2026-05-05T09:00:00Z",
+    "customerAlias": "Contoso Synthetic Ltd",
+    "tags": ["synthetic", "example", "minimal"]
+  },
+  "participants": [
+    { "id": "p-cust-admin", "role": "customer_admin", "alias": "Customer IT Admin 1" },
+    { "id": "p-eng", "role": "support_engineer", "alias": "Support Engineer 1" }
+  ],
+  "events": [
+    {
+      "id": "e01",
+      "timestamp": "2026-05-05T09:00:00Z",
+      "participantId": "p-cust-admin",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams sign-in fails for some users",
+      "body": "Hello,\n\nSince this morning about 20 users at our Leeds office see \"We couldn't sign you in\" when they start Teams. Users at other offices are not affected."
+    },
+    {
+      "id": "e02",
+      "timestamp": "2026-05-05T09:15:00Z",
+      "participantId": "p-eng",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Teams sign-in - details needed",
+      "body": "Hello,\n\nThank you. Please send the UTC time of one failed sign-in for two affected users and the DNS servers used by the Leeds clients (for example 192.0.2.10).\n\nRegards"
+    },
+    {
+      "id": "e03",
+      "timestamp": "2026-05-05T09:50:00Z",
+      "participantId": "p-cust-admin",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in - details needed",
+      "inResponseTo": "e02",
+      "body": "Hello,\n\nu1@contoso-synthetic.invalid failed at 08:41 UTC and u2@contoso-synthetic.invalid at 08:44 UTC. The Leeds clients use DNS servers 10.40.1.10 and 10.40.1.11."
+    }
+  ]
+}

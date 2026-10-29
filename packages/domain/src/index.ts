@@ -22,6 +22,7 @@ export * from './engine/timeline';
 export * from './engine/graph';
 
 export * from './ingest/normalize';
+export * from './ingest/parsers';
 export * from './knowledge';
 export * from './knowledge/compile';
 export * from './knowledge/teams-authentication';
