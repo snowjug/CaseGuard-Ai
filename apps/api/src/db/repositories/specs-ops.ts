@@ -1,0 +1,132 @@
+import type {
+  AuditEvent,
+  Job,
+  ModelExecutionWithUsage,
+  ReviewDecision,
+  TokenUsage,
+} from '@caseguard/schemas';
+import { col, ts, tsOrNull, type TableSpec } from './support';
+
+/** Table projections for telemetry, the audit trail, review decisions and jobs. */
+
+export const MODEL_EXECUTIONS: TableSpec<ModelExecutionWithUsage> = {
+  table: 'model_executions',
+  key: ['tenant_id', 'id'],
+  columns: [
+    col('tenant_id', 'text', (e: ModelExecutionWithUsage) => e.tenantId),
+    col('id', 'text', (e) => e.id),
+    col('case_id', 'text', (e) => e.caseId),
+    col('analysis_run_id', 'text', (e) => e.analysisRunId),
+    col('agent', 'text', (e) => e.agent),
+    col('prompt_version_id', 'text', (e) => e.promptVersionId),
+    col('provider', 'text', (e) => e.provider),
+    col('model', 'text', (e) => e.model),
+    col('status', 'text', (e) => e.status),
+    col('attempts', 'int', (e) => e.attempts),
+    col('latency_ms', 'int', (e) => e.latencyMs),
+    col('started_at', 'timestamptz', (e) => ts(e.startedAt)),
+    col('completed_at', 'timestamptz', (e) => ts(e.completedAt)),
+    col('simulated', 'bool', (e) => e.simulated),
+    col('token_usage_id', 'text', (e) => e.tokenUsageId),
+    col('created_at', 'timestamptz', (e) => ts(e.createdAt)),
+    col('updated_at', 'timestamptz', (e) => ts(e.updatedAt)),
+    col('created_by', 'text', (e) => e.createdBy),
+    col('version', 'int', (e) => e.version),
+    col('data', 'jsonb', (e) => e),
+  ],
+};
+
+export const TOKEN_USAGE: TableSpec<TokenUsage> = {
+  table: 'token_usage',
+  key: ['tenant_id', 'id'],
+  columns: [
+    col('tenant_id', 'text', (u: TokenUsage) => u.tenantId),
+    col('id', 'text', (u) => u.id),
+    col('model_execution_id', 'text', (u) => u.modelExecutionId),
+    col('case_id', 'text', (u) => u.caseId),
+    col('agent', 'text', (u) => u.agent),
+    col('provider', 'text', (u) => u.provider),
+    col('model', 'text', (u) => u.model),
+    col('prompt_tokens', 'int', (u) => u.promptTokens),
+    col('completion_tokens', 'int', (u) => u.completionTokens),
+    col('cached_tokens', 'int', (u) => u.cachedTokens),
+    col('total_tokens', 'int', (u) => u.totalTokens),
+    col('estimated_cost_usd', 'float8', (u) => u.estimatedCostUsd),
+    col('context_tokens_before', 'int', (u) => u.contextTokensBefore),
+    col('context_tokens_after', 'int', (u) => u.contextTokensAfter),
+    col('compression_ratio', 'float8', (u) => u.compressionRatio),
+    col('cache_hit', 'bool', (u) => u.cacheHit),
+    col('early_stopped', 'bool', (u) => u.earlyStopped),
+    col('estimated_savings_tokens', 'int', (u) => u.estimatedSavingsTokens),
+    col('latency_ms', 'int', (u) => u.latencyMs),
+    col('simulated', 'bool', (u) => u.simulated),
+    col('created_at', 'timestamptz', (u) => ts(u.createdAt)),
+    col('updated_at', 'timestamptz', (u) => ts(u.updatedAt)),
+    col('created_by', 'text', (u) => u.createdBy),
+    col('version', 'int', (u) => u.version),
+    col('data', 'jsonb', (u) => u),
+  ],
+};
+
+export const AUDIT_EVENTS: TableSpec<AuditEvent> = {
+  table: 'audit_events',
+  key: ['tenant_id', 'id'],
+  columns: [
+    col('tenant_id', 'text', (e: AuditEvent) => e.tenantId),
+    col('id', 'text', (e) => e.id),
+    col('sequence', 'int', (e) => e.sequence),
+    col('occurred_at', 'timestamptz', (e) => ts(e.occurredAt)),
+    col('actor_id', 'text', (e) => e.actorId),
+    col('actor_role', 'text', (e) => e.actorRole),
+    col('action', 'text', (e) => e.action),
+    col('target_type', 'text', (e) => e.targetType),
+    col('target_id', 'text', (e) => e.targetId),
+    col('case_id', 'text', (e) => e.caseId),
+    col('outcome', 'text', (e) => e.outcome),
+    col('details', 'jsonb', (e) => e.details),
+    col('correlation_id', 'text', (e) => e.correlationId),
+    col('prev_hash', 'text', (e) => e.prevHash),
+    col('hash', 'text', (e) => e.hash),
+  ],
+};
+
+export const REVIEW_DECISIONS: TableSpec<ReviewDecision> = {
+  table: 'review_decisions',
+  key: ['tenant_id', 'id'],
+  columns: [
+    col('tenant_id', 'text', (r: ReviewDecision) => r.tenantId),
+    col('id', 'text', (r) => r.id),
+    col('case_id', 'text', (r) => r.caseId),
+    col('target_type', 'text', (r) => r.targetType),
+    col('target_id', 'text', (r) => r.targetId),
+    col('decision', 'text', (r) => r.decision),
+    col('reviewer_id', 'text', (r) => r.reviewerId),
+    col('reviewer_role', 'text', (r) => r.reviewerRole),
+    col('decided_at', 'timestamptz', (r) => ts(r.decidedAt)),
+    col('created_at', 'timestamptz', (r) => ts(r.createdAt)),
+    col('updated_at', 'timestamptz', (r) => ts(r.updatedAt)),
+    col('created_by', 'text', (r) => r.createdBy),
+    col('version', 'int', (r) => r.version),
+    col('data', 'jsonb', (r) => r),
+  ],
+};
+
+export const JOBS: TableSpec<Job> = {
+  table: 'jobs',
+  key: ['tenant_id', 'id'],
+  columns: [
+    col('tenant_id', 'text', (j: Job) => j.tenantId),
+    col('id', 'text', (j) => j.id),
+    col('kind', 'text', (j) => j.kind),
+    col('status', 'text', (j) => j.status),
+    col('case_id', 'text', (j) => j.caseId),
+    col('target_id', 'text', (j) => j.targetId),
+    col('idempotency_key', 'text', (j) => j.idempotencyKey),
+    col('created_at', 'timestamptz', (j) => ts(j.createdAt)),
+    col('started_at', 'timestamptz', (j) => tsOrNull(j.startedAt)),
+    col('completed_at', 'timestamptz', (j) => tsOrNull(j.completedAt)),
+    col('created_by', 'text', (j) => j.createdBy),
+    col('cancellable', 'bool', (j) => j.cancellable),
+    col('data', 'jsonb', (j) => j),
+  ],
+};
