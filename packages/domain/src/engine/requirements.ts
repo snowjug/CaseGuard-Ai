@@ -32,8 +32,11 @@ function firstRelevantIndex(
       return idx >= 0 ? idx : null;
     }
     case 'before_escalation': {
+      const escalationActions = pack.pack.policies.escalationActionIds;
       const idx = events.findIndex(
-        (e) => e.type === 'escalation' || e.action?.actionKey === 'act.escalate-to-identity-team',
+        (e) =>
+          e.type === 'escalation' ||
+          (e.action?.actionKey !== undefined && escalationActions.includes(e.action.actionKey)),
       );
       return idx >= 0 ? idx : null;
     }

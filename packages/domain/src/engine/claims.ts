@@ -327,10 +327,13 @@ export function buildClaims(input: ClaimsInput): ClaimsOutput {
       let explanation: string;
       let confidence = 0.7;
 
-      const validationOk = isSatisfiedAt(
-        requirementStates.find((s) => s.requirementId === 'req.fix-validation'),
-        index,
-      );
+      const validationRequirementId = pack.pack.policies.validationRequirementId;
+      const validationOk = validationRequirementId
+        ? isSatisfiedAt(
+            requirementStates.find((s) => s.requirementId === validationRequirementId),
+            index,
+          )
+        : false;
       if (event.type === 'validation_result' || event.type === 'resolution_note') {
         if (validationOk) {
           category = 'confirmed_fact';
@@ -460,26 +463,27 @@ export function buildClaims(input: ClaimsInput): ClaimsOutput {
   }
 
   // 4) AI inferences ------------------------------------------------------------------------
-  const preAuthSet = pack.pack.hypotheses
-    .filter((h) => h.category === 'network' || h.category === 'client')
-    .map((h) => h.id);
-  const preAuthObs = input.observations.find(
-    (o) => o.signalId === 'sig.no-server-side-failure-records' && o.affectsBelief,
-  );
-  if (preAuthObs) {
-    const event = view.events[preAuthObs.eventIndex] ?? null;
-    const step = timeline.steps[preAuthObs.eventIndex];
-    const mass = preAuthSet.reduce((s, id) => s + (step?.posterior[id] ?? 0), 0);
+  for (const inference of pack.pack.inferences) {
+    const obs = input.observations.find(
+      (o) => o.signalId === inference.signalId && o.affectsBelief,
+    );
+    if (!obs) continue;
+    const categorySet = pack.pack.hypotheses
+      .filter((h) => inference.hypothesisCategories.includes(h.category))
+      .map((h) => h.id);
+    const event = view.events[obs.eventIndex] ?? null;
+    const step = timeline.steps[obs.eventIndex];
+    const mass = categorySet.reduce((s, id) => s + (step?.posterior[id] ?? 0), 0);
     claims.push(
-      base('inference.pre-authentication', preAuthObs.id, {
-        text: 'The failing attempts left no server-side sign-in record, so the failure occurs before authentication (client or network path), not inside the identity service.',
+      base(`inference.${inference.id.slice(4)}`, obs.id, {
+        text: inference.text,
         category: 'ai_inference',
         event,
-        timestamp: preAuthObs.timestamp,
-        explanation: `CaseGuard inference from the absence of matching sign-in log records. The combined model estimate for client/network-path hypotheses is ${pct(mass)}.`,
+        timestamp: obs.timestamp,
+        explanation: `${inference.explanation} The combined model estimate for the related hypotheses is ${pct(mass)}.`,
         confidence: Math.min(0.95, mass),
-        supporting: [preAuthObs.id],
-        related: preAuthSet,
+        supporting: [obs.id],
+        related: categorySet,
         method: 'derived',
       }),
     );

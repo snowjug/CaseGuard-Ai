@@ -28,7 +28,7 @@
     "demo:seed": "tsx scripts/demo-seed.ts",
     "demo:reset": "tsx scripts/demo-reset.ts",
     "db:migrate": "pnpm --filter @caseguard/api db:migrate",
-    "bench": "tsx scripts/bench.ts",
+    "bench": "pnpm --filter @caseguard/domain bench --",
     "secrets:scan": "node scripts/scan-secrets.mjs",
     "audit:deps": "node scripts/audit-deps.mjs",
     "infra:validate": "node scripts/infra-validate.mjs",

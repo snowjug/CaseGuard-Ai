@@ -1959,5 +1959,17 @@ export const TEAMS_AUTH_PACK: KnowledgePack = {
     posteriorFloor: 0.01,
     strengthWeights: { strong: 1, moderate: 0.75, weak: 0.5 },
     forkMinimumImpact: 0.25,
+    validationRequirementId: 'req.fix-validation',
+    escalationActionIds: ['act.escalate-to-identity-team'],
   },
+  inferences: [
+    {
+      id: 'inf.pre-authentication',
+      signalId: 'sig.no-server-side-failure-records',
+      text: 'The failing attempts left no server-side sign-in record, so the failure occurs before authentication (client or network path), not inside the identity service.',
+      explanation:
+        'CaseGuard inference from the absence of matching sign-in log records for the failing attempts.',
+      hypothesisCategories: ['network', 'client'],
+    },
+  ],
 };

@@ -226,8 +226,26 @@ export const KnowledgePoliciesSchema = z.object({
   }),
   /** Minimum normalized gap between best and actual action for a fork to be "meaningful". */
   forkMinimumImpact: ProbabilitySchema,
+  /** Requirement that a before/after validation satisfies; closure statements are only facts once it is. */
+  validationRequirementId: z.string().optional(),
+  /** Actions that count as an escalation when seen in the case record (besides `escalation` events). */
+  escalationActionIds: z.array(z.string()).default([]),
 });
 export type KnowledgePolicies = z.infer<typeof KnowledgePoliciesSchema>;
+
+/**
+ * A derived statement the platform may make when a signal is observed (for example "the failure occurs
+ * before authentication"). Rendered as an `ai_inference` claim with the combined model estimate of the
+ * listed hypothesis categories.
+ */
+export const KnowledgeInferenceSchema = z.object({
+  id: z.string().regex(/^inf\.[a-z0-9-]+$/),
+  signalId: z.string(),
+  text: z.string().max(400),
+  explanation: z.string().max(400),
+  hypothesisCategories: z.array(HypothesisCategorySchema).min(1),
+});
+export type KnowledgeInference = z.infer<typeof KnowledgeInferenceSchema>;
 
 export const KnowledgePackSchema = z.object({
   id: z.string().regex(/^kp\.[a-z0-9-]+$/),
@@ -242,6 +260,7 @@ export const KnowledgePackSchema = z.object({
   actions: z.array(KnowledgeActionSchema).min(1),
   requirements: z.array(KnowledgeRequirementSchema),
   claimPatterns: z.array(ClaimPatternSchema),
+  inferences: z.array(KnowledgeInferenceSchema).default([]),
   lexicon: KnowledgeLexiconSchema,
   policies: KnowledgePoliciesSchema,
 });
@@ -325,6 +344,18 @@ export function validateKnowledgePackReferences(pack: KnowledgePack): string[] {
   }
   for (const r of pack.policies.minimumEvidenceForEscalation) {
     if (!reqIds.has(r)) problems.push(`policies reference unknown requirement ${r}`);
+  }
+  if (pack.policies.validationRequirementId && !reqIds.has(pack.policies.validationRequirementId)) {
+    problems.push(
+      `policies reference unknown validation requirement ${pack.policies.validationRequirementId}`,
+    );
+  }
+  for (const a of pack.policies.escalationActionIds) {
+    if (!actIds.has(a)) problems.push(`policies reference unknown escalation action ${a}`);
+  }
+  for (const inf of pack.inferences) {
+    if (!sigIds.has(inf.signalId))
+      problems.push(`inference ${inf.id} references unknown signal ${inf.signalId}`);
   }
   return problems;
 }
