@@ -9,9 +9,11 @@ import type {
   InvestigationGraph,
 } from '@caseguard/schemas';
 import { round } from '../util/math';
-import { formatUtcStamp } from '../util/time';
-import { responderClosure } from './actions';
+import { compareIso, formatUtcStamp } from '../util/time';
+import { informationClass } from './actions';
+import { compareNullableIso, knownAt, lastStepAt } from './as-of';
 import type { DeterministicAnalysis } from './pipeline';
+import { ResponderIndex } from './responders';
 
 export const GRAPH_NODE_LIMIT = 160;
 const EVIDENCE_NODE_LIMIT = 18;
@@ -43,7 +45,7 @@ const clip = (text: string, max: number): string =>
 
 export function buildInvestigationGraph(input: GraphInput): InvestigationGraph {
   const { analysis, asOf, events, scenario } = input;
-  const known = (iso: string): boolean => asOf === null || iso <= asOf;
+  const known = knownAt(asOf);
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
   const ids = new Set<string>();
@@ -93,10 +95,18 @@ export function buildInvestigationGraph(input: GraphInput): InvestigationGraph {
   });
 
   // hypotheses (state at asOf) -------------------------------------------------------------
+  // Confidence comes from the last step known at asOf (where a replay of the prefix ends); a recorded
+  // point can lag it by a few skipped sub-1% moves, and its status never lags because every status
+  // change is recorded.
+  const lastVisibleStep = lastStepAt(analysis.timeline.steps, known);
   const hypothesisNodes = [...analysis.hypotheses]
     .map((h) => {
       const point = [...h.timeline].filter((p) => known(p.at)).pop();
-      return { h, confidence: point?.confidence ?? h.prior, status: point?.status ?? 'active' };
+      return {
+        h,
+        confidence: lastVisibleStep ? round(lastVisibleStep.posterior[h.key] ?? 0, 3) : h.prior,
+        status: point?.status ?? 'active',
+      };
     })
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, HYPOTHESIS_NODE_LIMIT);
@@ -148,7 +158,7 @@ export function buildInvestigationGraph(input: GraphInput): InvestigationGraph {
           ? Math.abs(strongLinkByEvidence.get(e.id)?.logLr ?? 0) >= 0.75
           : false),
     )
-    .sort((a, b) => (a.observedAt < b.observedAt ? -1 : 1))
+    .sort((a, b) => (compareIso(a.observedAt, b.observedAt) < 0 ? -1 : 1))
     .slice(0, EVIDENCE_NODE_LIMIT);
   keyEvidence.forEach((e, order) => {
     const link = strongLinkByEvidence.get(e.id);
@@ -184,16 +194,39 @@ export function buildInvestigationGraph(input: GraphInput): InvestigationGraph {
   const actions = analysis.actions.filter((a) => known(a.startedAt));
   let previousId: string = problemId;
   const forkByEvent = new Map(analysis.forks.map((f) => [f.eventId, f]));
+  const responderIndex = new ResponderIndex(events);
+  const gainByEvent = new Map(analysis.timeline.steps.map((s) => [s.eventId, s.gainBits]));
+  /**
+   * Information realised by an action and its answers. The stored value counts answers recorded
+   * after `asOf`, which an as-of view must not reveal, so it is recomputed from the answers known by
+   * then (exactly what a replay of the prefix would produce).
+   */
+  const realizedAsOf = (
+    a: DiagnosticAction,
+    responders: readonly CaseEvent[],
+  ): Pick<DiagnosticAction, 'realizedInformationGainBits' | 'informationGainClass'> => {
+    if (asOf === null) return a;
+    const gain = [
+      a.eventId,
+      ...responders.filter((e) => known(e.timestamp)).map((e) => e.id),
+    ].reduce((sum, eventId) => sum + (gainByEvent.get(eventId) ?? 0), 0);
+    return {
+      realizedInformationGainBits: round(gain, 3),
+      informationGainClass: informationClass(gain),
+    };
+  };
   actions.forEach((a, order) => {
     const id = `action:${a.id}`;
-    const status = actionStatus(a);
+    const responderEvents = responderIndex.closure(a.eventId);
+    const realized = realizedAsOf(a, responderEvents);
+    const status = actionStatus(a, asOf === null ? realized.informationGainClass : null);
     addNode({
       id,
       kind: 'action',
       lane: 'actual',
       label: clip(a.label, 120),
       detail: clip(
-        `${formatUtcStamp(a.startedAt)} · ${a.customerEffort.replace('_', ' ')} customer effort · ${round(a.realizedInformationGainBits, 2)} bits gained${a.isRepeat ? ' · repeat' : ''}`,
+        `${formatUtcStamp(a.startedAt)} · ${a.customerEffort.replace('_', ' ')} customer effort · ${round(realized.realizedInformationGainBits, 2)} bits gained${a.isRepeat ? ' · repeat' : ''}`,
         600,
       ),
       order,
@@ -212,7 +245,7 @@ export function buildInvestigationGraph(input: GraphInput): InvestigationGraph {
     const fork = forkByEvent.get(a.eventId);
     if (fork) addForkNode(fork, order);
     // Evidence produced by the responses to this action.
-    const responders = new Set(responderClosure(events, a.eventId).map((e) => e.id));
+    const responders = new Set(responderEvents.map((e) => e.id));
     for (const e of keyEvidence)
       if (responders.has(e.eventId)) addEdge(id, `evidence:${e.id}`, 'informs', null, false, null);
   });
@@ -350,7 +383,7 @@ export function buildInvestigationGraph(input: GraphInput): InvestigationGraph {
   for (const lane of GRAPH_LANE_LABELS) {
     nodes
       .filter((n) => n.lane === lane.id)
-      .sort((a, b) => a.order - b.order || (a.timestamp ?? '').localeCompare(b.timestamp ?? ''))
+      .sort((a, b) => a.order - b.order || compareNullableIso(a.timestamp, b.timestamp))
       .forEach((n, i) => {
         n.order = i;
       });
@@ -381,9 +414,22 @@ export function buildInvestigationGraph(input: GraphInput): InvestigationGraph {
   };
 }
 
-function actionStatus(a: DiagnosticAction): GraphNode['status'] {
+/** Relative value at which a step counts as well chosen when only decision-time facts may be used. */
+const WELL_CHOSEN_RELATIVE_VALUE = 0.6;
+
+/**
+ * Whole-record graphs may colour a step by the information it eventually produced (`realizedClass`,
+ * retrospective). As-of graphs pass null and use only what was knowable when the step was taken.
+ */
+function actionStatus(
+  a: DiagnosticAction,
+  realizedClass: DiagnosticAction['informationGainClass'] | null,
+): GraphNode['status'] {
   if (a.lowValue || a.isRepeat || a.destructive) return 'unsupported';
-  if (a.informationGainClass === 'high' || a.informationGainClass === 'moderate')
-    return 'productive';
-  return 'uncertain';
+  if (realizedClass !== null)
+    return realizedClass === 'high' || realizedClass === 'moderate' ? 'productive' : 'uncertain';
+  return a.relativeValueAtDecision !== null &&
+    a.relativeValueAtDecision >= WELL_CHOSEN_RELATIVE_VALUE
+    ? 'productive'
+    : 'uncertain';
 }

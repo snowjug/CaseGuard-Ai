@@ -7,12 +7,26 @@ import type {
 } from '@caseguard/schemas';
 import { round } from '../util/math';
 import { formatDuration, minutesBetween } from '../util/time';
+import { knownAt, lastStepAt } from './as-of';
 import { isCustomerSide } from './context';
 import type { DeterministicAnalysis } from './pipeline';
 
 /** Gaps at or above this many minutes are marked as delays on the timeline. */
 export const DELAY_MINUTES = 240;
 const EXCERPT_LIMIT = 500;
+
+/** Groups items by key, keeping their order, in one linear pass. */
+function groupBy<T>(items: readonly T[], keyOf: (item: T) => string | null): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const key = keyOf(item);
+    if (key === null) continue;
+    const list = groups.get(key);
+    if (list) list.push(item);
+    else groups.set(key, [item]);
+  }
+  return groups;
+}
 
 export interface TimelineInput {
   caseRecord: Pick<Case, 'id' | 'openedAt'>;
@@ -28,23 +42,15 @@ export interface TimelineInput {
 
 export function buildTimelineResponse(input: TimelineInput): TimelineResponse {
   const { caseRecord, events, analysis, asOf, scenario } = input;
-  const known = (iso: string): boolean => asOf === null || iso <= asOf;
+  const known = knownAt(asOf);
   const visible = events.filter((e) => known(e.timestamp));
   const offset = input.offset ?? 0;
   const limit = input.limit ?? 200;
 
   const actionByEvent = new Map(analysis.actions.map((a) => [a.eventId, a]));
-  const forksByEvent = new Map<string, string[]>();
-  for (const f of analysis.forks)
-    forksByEvent.set(f.eventId, [...(forksByEvent.get(f.eventId) ?? []), f.id]);
-  const claimsByEvent = new Map<string, typeof analysis.claims>();
-  for (const c of analysis.claims) {
-    if (!c.eventId) continue;
-    claimsByEvent.set(c.eventId, [...(claimsByEvent.get(c.eventId) ?? []), c]);
-  }
-  const evidenceByEvent = new Map<string, typeof analysis.evidence>();
-  for (const ev of analysis.evidence)
-    evidenceByEvent.set(ev.eventId, [...(evidenceByEvent.get(ev.eventId) ?? []), ev]);
+  const forksByEvent = groupBy(analysis.forks, (f) => f.eventId);
+  const claimsByEvent = groupBy(analysis.claims, (c) => c.eventId);
+  const evidenceByEvent = groupBy(analysis.evidence, (ev) => ev.eventId);
   const stepByEvent = new Map(analysis.timeline.steps.map((s) => [s.eventId, s]));
   const hypRecordByKey = new Map(analysis.hypotheses.map((h) => [h.key, h.id]));
 
@@ -101,7 +107,7 @@ export function buildTimelineResponse(input: TimelineInput): TimelineResponse {
       gapMinutes: gap === null ? null : round(gap, 0),
       isDelay,
       isRepeatedDiagnostic: action?.isRepeat ?? false,
-      forkIds: forksByEvent.get(event.id) ?? [],
+      forkIds: (forksByEvent.get(event.id) ?? []).map((f) => f.id),
       claimIds: claims.map((c) => c.id),
       evidenceIds: (evidenceByEvent.get(event.id) ?? []).map((e) => e.id),
       categories: [...new Set(claims.map((c) => c.category))],
@@ -129,10 +135,18 @@ export function buildTimelineResponse(input: TimelineInput): TimelineResponse {
       };
     });
 
-  const hypothesisSeries = [...analysis.hypotheses]
-    .sort((a, b) => b.currentConfidence - a.currentConfidence)
-    .slice(0, 5)
+  // Rank by what was believed at `asOf`, never by the final confidence: an as-of view that listed the
+  // eventual winner first would leak the outcome. The last visible step is exactly where a replay of
+  // the prefix ends, so the order matches a faithful as-of re-analysis.
+  const lastVisibleStep = lastStepAt(analysis.timeline.steps, known);
+  const hypothesisSeries = analysis.hypotheses
     .map((h) => ({
+      h,
+      confidenceAsOf: lastVisibleStep ? round(lastVisibleStep.posterior[h.key] ?? 0, 3) : h.prior,
+    }))
+    .sort((a, b) => b.confidenceAsOf - a.confidenceAsOf)
+    .slice(0, 5)
+    .map(({ h }) => ({
       hypothesisId: h.id,
       key: h.key,
       name: h.name,

@@ -169,6 +169,30 @@ export const CaseBundleSchema = z
         });
       }
     });
+    // A reply or declared repeat can only point at something recorded earlier, in the order the
+    // platform assigns on ingestion (timestamp, then position in the file). A forward reference would
+    // let a later event change how an earlier one is read.
+    const ingestionOrder = bundle.events
+      .map((e, i) => ({ id: e.id, ms: Date.parse(e.timestamp), i }))
+      .sort((a, b) => a.ms - b.ms || a.i - b.i);
+    const orderOf = new Map(ingestionOrder.map((o, position) => [o.id, position]));
+    bundle.events.forEach((e, i) => {
+      const own = orderOf.get(e.id);
+      const refs = [
+        { ref: e.inResponseTo, field: 'inResponseTo', path: ['events', i, 'inResponseTo'] },
+        { ref: e.action?.repeatOf, field: 'repeatOf', path: ['events', i, 'action', 'repeatOf'] },
+      ];
+      for (const { ref, field, path } of refs) {
+        const target = ref ? orderOf.get(ref) : undefined;
+        if (own !== undefined && target !== undefined && target >= own) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `${field} must point at an earlier event, but "${ref}" is not earlier than "${e.id}"`,
+            path,
+          });
+        }
+      }
+    });
     const first = bundle.events.reduce(
       (min, e) => (e.timestamp < min ? e.timestamp : min),
       bundle.events[0]?.timestamp ?? bundle.case.openedAt,

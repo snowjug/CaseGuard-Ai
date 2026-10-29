@@ -17,7 +17,7 @@ import type { CompiledPack } from '../knowledge/compile';
 import { hypothesisRecordId, stableId } from '../util/ids';
 import { clamp, entropyBits, mean, rangeOf, round } from '../util/math';
 import { createRng } from '../util/rng';
-import { addMinutes, formatDuration, formatUtcStamp } from '../util/time';
+import { addMinutes, compareIso, formatDuration, formatUtcStamp } from '../util/time';
 import {
   type ActionEvaluation,
   applyOutcome,
@@ -30,6 +30,7 @@ import {
 } from './action-value';
 import { type Belief, beliefToVector, informationGain, topHypotheses } from './belief';
 import { type EngineContext, metaOf } from './context';
+import { scanForLeaks } from './leak-check';
 import { signalRequirementLinks } from './requirements';
 import { analyzeView } from './state';
 import {
@@ -462,42 +463,9 @@ export function simulateAlternativePath(input: SimulateInput): SimulationResult 
 }
 
 // ---------------------------------------------------------------------------------------------
-// Leak check
+// Leak check (implemented in ./leak-check; re-exported here for the public API)
 
-const DISTINCTIVE_TOKEN =
-  /\b(?:\d{1,3}(?:\.\d{1,3}){3}|[a-z0-9-]+(?:\.[a-z0-9-]+){2,}|[a-z]{2,}\d{2,}[a-z0-9]*|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f-]{20,})\b/gi;
-
-function distinctiveTokens(text: string): Set<string> {
-  return new Set((text.match(DISTINCTIVE_TOKEN) ?? []).map((t) => t.toLowerCase()));
-}
-
-/** Distinctive identifiers (IPs, hostnames, codes) that occur only after the boundary or in the resolution. */
-export function futureOnlyTokens(
-  allEvents: readonly CaseEvent[],
-  preView: PreResolutionView,
-  resolutionText: string,
-): Set<string> {
-  const known = new Set<string>();
-  for (const e of preView.events)
-    for (const t of distinctiveTokens(`${e.title ?? ''} ${e.body}`)) known.add(t);
-  const visible = new Set(preView.events.map((e) => e.id));
-  const future = new Set<string>();
-  for (const e of allEvents) {
-    if (visible.has(e.id)) continue;
-    for (const t of distinctiveTokens(`${e.title ?? ''} ${e.body}`))
-      if (!known.has(t)) future.add(t);
-  }
-  for (const t of distinctiveTokens(resolutionText)) if (!known.has(t)) future.add(t);
-  return future;
-}
-
-export function scanForLeaks(
-  texts: readonly string[],
-  futureTokens: ReadonlySet<string>,
-): string[] {
-  const haystack = texts.join('\n').toLowerCase();
-  return [...futureTokens].filter((t) => haystack.includes(t));
-}
+export { futureOnlyTokens, packStaticTokens, scanForLeaks } from './leak-check';
 
 // ---------------------------------------------------------------------------------------------
 // Assembly
@@ -701,7 +669,7 @@ export function assembleScenario(input: AssembleInput): CounterfactualScenario {
       id: 'boundary-respected',
       passed:
         futureEvidenceRefs.length === 0 &&
-        preView.events.every((e) => e.timestamp <= fork.timestamp),
+        preView.events.every((e) => compareIso(e.timestamp, fork.timestamp) <= 0),
       detail: 'Generation used only events recorded before the decision instant.',
     },
     {

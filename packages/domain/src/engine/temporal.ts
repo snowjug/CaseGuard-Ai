@@ -78,7 +78,7 @@ export function createTemporalViewBeforeEvent(
   const visible = sorted.filter(
     (e) =>
       compareIso(e.timestamp, target.timestamp) < 0 ||
-      (e.timestamp === target.timestamp && e.sequence < target.sequence),
+      (compareIso(e.timestamp, target.timestamp) === 0 && e.sequence < target.sequence),
   );
   return {
     asOf: target.timestamp,
@@ -97,13 +97,18 @@ export function createTemporalViewBeforeEvent(
 export function createTemporalPrefixView(view: TemporalView, length: number): PreResolutionView {
   const visible = view.events.slice(0, Math.max(0, length));
   const boundary = view.events[length]?.timestamp ?? view.asOf;
+  let fingerprint: string | undefined;
   return {
     asOf: boundary,
     mode: 'before',
     events: visible,
     resolution: null,
     withheldFutureEventCount: view.events.length - visible.length,
-    fingerprint: hashJson(visible.map((e) => e.id)),
+    // Hashing every visible id is linear in the prefix; do it only for views that are asked for it.
+    get fingerprint(): string {
+      fingerprint ??= hashJson(visible.map((e) => e.id));
+      return fingerprint;
+    },
   } as unknown as PreResolutionView;
 }
 

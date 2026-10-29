@@ -10,6 +10,7 @@ import {
 import type { CompiledPack } from '../knowledge/compile';
 import { stableId } from '../util/ids';
 import { round } from '../util/math';
+import { compareIso } from '../util/time';
 import { type Belief, type BeliefTimeline, topHypotheses } from './belief';
 import { type EngineContext, isCustomerSide, metaOf } from './context';
 import type { RequirementState } from './requirements';
@@ -43,7 +44,18 @@ export interface ClaimsInput {
 export interface ClaimsOutput {
   claims: Claim[];
   anchors: AnchorInfo[];
+  /** Bounded, human-readable notes about limits that shortened the output (empty when none did). */
+  notes: string[];
 }
+
+/**
+ * Statement claims kept per event and per case. A body is one sentence per few characters, so without
+ * a limit a few megabytes of "Likely." would become hundreds of thousands of claims. Selection is
+ * deterministic: strongest signal first (definitive or root-cause statements, then checklist
+ * phrasing, then hedged ones), then earliest; whatever is left out is counted in `notes`.
+ */
+export const MAX_STATEMENT_CLAIMS_PER_EVENT = 12;
+export const MAX_STATEMENT_CLAIMS_PER_CASE = 1500;
 
 const ENGINEER_STATEMENT_EVENT_TYPES: ReadonlySet<string> = new Set([
   'case_note',
@@ -73,22 +85,19 @@ export function leaderOf(belief: Belief): { id: string; p: number } {
   return top ? { id: top.id, p: top.p } : { id: 'hyp.other', p: 0 };
 }
 
-const escapeRegex = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 /** Counts keyword hits at word starts; short keywords must also end at a word boundary. */
-function keywordHits(lowerText: string, keyword: string): number {
-  const needle = keyword.toLowerCase();
-  const tail = needle.length <= 4 ? '(?![\\w])' : '';
-  const matches = lowerText.match(new RegExp(`(?<![\\w])${escapeRegex(needle)}${tail}`, 'g'));
-  return matches ? matches.length : 0;
-}
+const keywordHits = (lowerText: string, pattern: RegExp): number =>
+  lowerText.match(pattern)?.length ?? 0;
 
 /** Hypothesis an engineer event is anchored on, from keyword hits in the text (null when none). */
 export function statedHypothesis(text: string, pack: CompiledPack): string | null {
   const lower = text.toLowerCase();
   let best: { id: string; hits: number; prior: number } | null = null;
   for (const h of pack.pack.hypotheses) {
-    const hits = h.keywords.reduce((sum, keyword) => sum + keywordHits(lower, keyword), 0);
+    const hits = (pack.keywordPatterns.get(h.id) ?? []).reduce(
+      (sum, pattern) => sum + keywordHits(lower, pattern),
+      0,
+    );
     if (
       hits > 0 &&
       (best === null || hits > best.hits || (hits === best.hits && h.prior > best.prior))
@@ -102,6 +111,28 @@ export function statedHypothesis(text: string, pack: CompiledPack): string | nul
 interface SentenceSpan {
   text: string;
   start: number;
+}
+
+const LABELLED_STATEMENT = /^(root cause|workaround|permanent fix|validation)\s*:/i;
+
+interface StatementCandidate {
+  span: SentenceSpan;
+  spanIndex: number;
+  hedged: boolean;
+  definitive: boolean;
+  template: boolean;
+  rooted: boolean;
+  /** 2 = definitive, root-cause or labelled statement; 1 = checklist phrasing; 0 = hedged only. */
+  signal: 0 | 1 | 2;
+}
+
+/** Keeps `limit` candidates, strongest signal first and then earliest, returned in sentence order. */
+function strongestFirst(items: readonly StatementCandidate[], limit: number): StatementCandidate[] {
+  if (items.length <= limit) return [...items];
+  return [...items]
+    .sort((a, b) => b.signal - a.signal || a.spanIndex - b.spanIndex)
+    .slice(0, Math.max(0, limit))
+    .sort((a, b) => a.spanIndex - b.spanIndex);
 }
 
 export function sentencesOf(text: string): SentenceSpan[] {
@@ -122,9 +153,6 @@ export function sentencesOf(text: string): SentenceSpan[] {
   }
   return out;
 }
-
-const anyMatch = (regexes: readonly RegExp[], text: string): boolean =>
-  regexes.some((re) => re.test(text));
 
 /** The first lexicon cue found in the text, or null. */
 function firstLexiconHit(regexes: readonly RegExp[], text: string): string | null {
@@ -161,6 +189,7 @@ export function buildClaims(input: ClaimsInput): ClaimsOutput {
   const anchors: AnchorInfo[] = [];
   const hypName = (id: string): string => pack.hypotheses.get(id)?.name ?? id;
   const evidenceByObservation = new Map(input.evidence.map((e) => [e.id, e]));
+  const eventById = new Map(view.events.map((e) => [e.id, e]));
 
   const base = (
     ruleId: string,
@@ -227,7 +256,7 @@ export function buildClaims(input: ClaimsInput): ClaimsOutput {
   for (const step of timeline.steps)
     for (const eff of step.effects) effectByObservation.set(eff.observation.id, eff.logLr);
   for (const ev of input.evidence) {
-    const event = view.events.find((e) => e.id === ev.eventId) ?? null;
+    const event = eventById.get(ev.eventId) ?? null;
     const logLr = effectByObservation.get(ev.id) ?? {};
     const related = Object.entries(logLr)
       .filter(([, v]) => Math.abs(v) >= 0.75)
@@ -255,21 +284,49 @@ export function buildClaims(input: ClaimsInput): ClaimsOutput {
 
   // 2) Engineer statements: assumptions, facts, unsupported conclusions ----------------------
   const rootCausePattern = pack.claimPatterns.find((c) => c.subject === 'root_cause');
+  const cue = {
+    hedge: (text: string): boolean => pack.lexiconAny.hedges?.test(text) ?? false,
+    definitive: (text: string): boolean => pack.lexiconAny.definitive?.test(text) ?? false,
+    template: (text: string): boolean => pack.lexiconAny.template?.test(text) ?? false,
+  };
+  const limits = { eventsOverLimit: 0, droppedByEvent: 0, droppedByCase: 0, kept: 0 };
   view.events.forEach((event, index) => {
     if (!ENGINEER_SIDE_ROLES.includes(event.participantRole)) return;
     if (!ENGINEER_STATEMENT_EVENT_TYPES.has(event.type)) return;
     const before = posteriorBefore(timeline, index);
     const leader = leaderOf(before);
     const spans = sentencesOf(event.body);
-    const isBeliefSentence = (sentence: string): boolean =>
-      anyMatch(pack.lexicon.hedges, sentence) ||
-      anyMatch(pack.lexicon.definitive, sentence) ||
-      (rootCausePattern?.regex.test(sentence) ?? false);
+
+    // One cheap pass classifies every sentence; only the strongest few become claims (see below).
+    const definitiveCues = spans.map((s) => cue.definitive(s.text));
+    const beliefSentences: string[] = [];
+    const candidates: StatementCandidate[] = [];
+    spans.forEach((span, spanIndex) => {
+      const text = span.text;
+      const definitiveCue = definitiveCues[spanIndex] ?? false;
+      const hedged = cue.hedge(text);
+      const rooted = rootCausePattern?.regex.test(text) ?? false;
+      if (hedged || definitiveCue || rooted) beliefSentences.push(text);
+      if (text.length < 25 && definitiveCue) return; // handled as a modifier of the previous sentence below
+      const next = spans[spanIndex + 1];
+      const followedByConfirmation =
+        next !== undefined && next.text.length < 25 && (definitiveCues[spanIndex + 1] ?? false);
+      const definitive = definitiveCue || followedByConfirmation;
+      const template = cue.template(text);
+      const labelled = LABELLED_STATEMENT.test(text);
+      if (!hedged && !definitive && !template && !rooted && !labelled) return;
+      candidates.push({
+        span,
+        spanIndex,
+        hedged,
+        definitive,
+        template,
+        rooted,
+        signal: definitive || rooted || labelled ? 2 : template ? 1 : 0,
+      });
+    });
     // The working hypothesis comes only from sentences that express a belief, never from a request for data.
-    const beliefText = spans
-      .filter((s) => isBeliefSentence(s.text))
-      .map((s) => s.text)
-      .join(' ');
+    const beliefText = beliefSentences.join(' ');
     const eventStated = beliefText ? statedHypothesis(beliefText, pack) : null;
 
     // Anchoring: the engineer's working hypothesis versus what the evidence already said.
@@ -291,27 +348,29 @@ export function buildClaims(input: ClaimsInput): ClaimsOutput {
       }
     }
 
-    spans.forEach((span, spanIndex) => {
-      const text = span.text;
-      const shortDefinitive = text.length < 25 && anyMatch(pack.lexicon.definitive, text);
-      if (shortDefinitive) return; // handled as a modifier of the previous sentence below
-      const previousShort = spans[spanIndex + 1];
-      const followedByConfirmation =
-        previousShort !== undefined &&
-        previousShort.text.length < 25 &&
-        anyMatch(pack.lexicon.definitive, previousShort.text);
-      const hedged = anyMatch(pack.lexicon.hedges, text);
-      const definitive = anyMatch(pack.lexicon.definitive, text) || followedByConfirmation;
-      const template = anyMatch(pack.lexicon.template, text);
-      const rootMatch = rootCausePattern?.regex.exec(text) ?? null;
-      const labelled = /^(root cause|workaround|permanent fix|validation)\s*:/i.test(text);
-      if (!hedged && !definitive && !template && !rootMatch && !labelled) return;
+    const withinEventLimit = strongestFirst(candidates, MAX_STATEMENT_CLAIMS_PER_EVENT);
+    if (withinEventLimit.length < candidates.length) limits.eventsOverLimit += 1;
+    limits.droppedByEvent += candidates.length - withinEventLimit.length;
+    const room = Math.max(0, MAX_STATEMENT_CLAIMS_PER_CASE - limits.kept);
+    const selected =
+      withinEventLimit.length <= room ? withinEventLimit : strongestFirst(withinEventLimit, room);
+    limits.droppedByCase += withinEventLimit.length - selected.length;
+    limits.kept += selected.length;
 
+    const effectCache = new Map<string, ReturnType<typeof evidenceEffectFor>>();
+    const effectsAt = (hypothesisId: string): ReturnType<typeof evidenceEffectFor> => {
+      const cached = effectCache.get(hypothesisId);
+      if (cached) return cached;
+      const fresh = evidenceEffectFor(timeline, index, hypothesisId);
+      effectCache.set(hypothesisId, fresh);
+      return fresh;
+    };
+
+    for (const { span, hedged, definitive, template, rooted } of selected) {
+      const text = span.text;
       const mentioned = statedHypothesis(text, pack) ?? eventStated;
       const pH = mentioned ? (before[mentioned] ?? 0) : null;
-      const effects = mentioned
-        ? evidenceEffectFor(timeline, index, mentioned)
-        : { supporting: [], contradicting: [] };
+      const effects = mentioned ? effectsAt(mentioned) : { supporting: [], contradicting: [] };
       const supportIds = effects.supporting
         .filter((s) => evidenceByObservation.get(s.id)?.category === 'diagnostic_evidence')
         .slice(0, 3)
@@ -362,7 +421,7 @@ export function buildClaims(input: ClaimsInput): ClaimsOutput {
         confidence = 0.85;
       } else {
         flags.push('assumption_as_fact');
-        if (rootMatch || /root cause|the cause is|is the cause|caused by/i.test(text))
+        if (rooted || /root cause|the cause is|is the cause|caused by/i.test(text))
           flags.push('unsupported_root_cause');
         explanation = mentioned
           ? `Stated as established, but the model estimate for “${hypName(mentioned)}” was only ${pct(pH ?? 0)} and no supporting diagnostic evidence is cited, so it is treated as an assumption.`
@@ -390,8 +449,19 @@ export function buildClaims(input: ClaimsInput): ClaimsOutput {
           excerpt: text,
         }),
       );
-    });
+    }
   });
+  const notes: string[] = [];
+  if (limits.droppedByEvent > 0) {
+    notes.push(
+      `Claim extraction keeps at most ${MAX_STATEMENT_CLAIMS_PER_EVENT} statement claims per event (strongest signals first, then earliest): ${limits.eventsOverLimit} event${limits.eventsOverLimit === 1 ? '' : 's'} had more qualifying sentences, and ${limits.droppedByEvent} sentence${limits.droppedByEvent === 1 ? ' was' : 's were'} not turned into claims.`,
+    );
+  }
+  if (limits.droppedByCase > 0) {
+    notes.push(
+      `The case-wide limit of ${MAX_STATEMENT_CLAIMS_PER_CASE} statement claims was reached; ${limits.droppedByCase} further sentence${limits.droppedByCase === 1 ? '' : 's'} in later events ${limits.droppedByCase === 1 ? 'was' : 'were'} not turned into claims.`,
+    );
+  }
 
   // 3) Conflicts: engineer position versus the evidence on record ---------------------------
   for (const anchor of anchors) {
@@ -536,8 +606,9 @@ export function buildClaims(input: ClaimsInput): ClaimsOutput {
     );
   }
 
-  claims.sort((a, b) =>
-    a.timestamp < b.timestamp ? -1 : a.timestamp > b.timestamp ? 1 : a.id < b.id ? -1 : 1,
-  );
-  return { claims, anchors };
+  claims.sort((a, b) => {
+    const byTime = compareIso(a.timestamp, b.timestamp);
+    return byTime < 0 ? -1 : byTime > 0 ? 1 : a.id < b.id ? -1 : 1;
+  });
+  return { claims, anchors, notes };
 }

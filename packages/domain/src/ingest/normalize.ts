@@ -9,7 +9,7 @@ import type {
   RedactionCategory,
   SourceKind,
 } from '@caseguard/schemas';
-import { compareIso } from '../util/time';
+import { compareIso, isoFromMs, toMs } from '../util/time';
 
 export interface NormalizeContext {
   tenantId: string;
@@ -38,17 +38,84 @@ export interface NormalizedCase {
   resolution: CaseResolution | null;
 }
 
+/** One problem found in a bundle, in the shape of the schema's own issues (`path` into the bundle). */
+export interface BundleIssue {
+  path: (string | number)[];
+  message: string;
+}
+
+/** Thrown by `normalizeBundle` when a bundle must be rejected rather than persisted. */
+export class BundleValidationError extends Error {
+  readonly issues: readonly BundleIssue[];
+
+  constructor(issues: readonly BundleIssue[]) {
+    super(
+      `Invalid case bundle: ${issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`,
+    );
+    this.name = 'BundleValidationError';
+    this.issues = issues;
+  }
+}
+
 export const sha256Hex = (text: string): string =>
   createHash('sha256').update(text, 'utf8').digest('hex');
 
 /**
+ * One spelling per instant: whole seconds stay "…Z" (the form the parsers and the synthetic cases
+ * use), anything finer is written as milliseconds ("….500Z"), so "…:00Z" and "…:00.000Z" become the
+ * same string. Ordering must still be decided by instant (`compareIso`), never by string order.
+ * Text that is not a timestamp is returned unchanged.
+ */
+export function canonicalTimestamp(iso: string): string {
+  const ms = toMs(iso);
+  return Number.isFinite(ms) ? isoFromMs(ms).replace('.000Z', 'Z') : iso;
+}
+
+/**
+ * A reply or declared repeat must point at an event that comes strictly earlier in the order the
+ * platform assigns (timestamp, then position in the file). Forward and self references would let a
+ * later event change how an earlier one is classified. References to unknown ids are the bundle
+ * schema's concern and are not reported here.
+ */
+function findNonCausalReferences(
+  ordered: readonly { event: CaseBundle['events'][number]; index: number }[],
+): BundleIssue[] {
+  const position = new Map(ordered.map(({ event }, p) => [event.id, p]));
+  const issues: BundleIssue[] = [];
+  ordered.forEach(({ event, index }, p) => {
+    const refs = [
+      { ref: event.inResponseTo, field: 'inResponseTo', path: ['events', index, 'inResponseTo'] },
+      {
+        ref: event.action?.repeatOf,
+        field: 'repeatOf',
+        path: ['events', index, 'action', 'repeatOf'],
+      },
+    ];
+    for (const { ref, field, path } of refs) {
+      const target = ref === undefined || ref === null ? undefined : position.get(ref);
+      if (target !== undefined && target >= p) {
+        issues.push({
+          path,
+          message: `${field} must point at an earlier event, but "${ref}" is not earlier than "${event.id}"`,
+        });
+      }
+    }
+  });
+  return issues;
+}
+
+/**
  * Turns a validated (and already redacted) bundle into the immutable records that are persisted.
- * Pure: ids, timestamps and hashes come from the context so tests are reproducible.
+ * Pure: ids, timestamps and hashes come from the context so tests are reproducible. Timestamps are
+ * canonicalised; a bundle whose replies point at later events is rejected with a
+ * `BundleValidationError`.
  */
 export function normalizeBundle(bundle: CaseBundle, ctx: NormalizeContext): NormalizedCase {
   const participantById = new Map(bundle.participants.map((p) => [p.id, p]));
   const indexed = bundle.events.map((event, index) => ({ event, index }));
   indexed.sort((a, b) => compareIso(a.event.timestamp, b.event.timestamp) || a.index - b.index);
+  const nonCausal = findNonCausalReferences(indexed);
+  if (nonCausal.length > 0) throw new BundleValidationError(nonCausal);
 
   const meta = {
     tenantId: ctx.tenantId,
@@ -66,7 +133,7 @@ export function normalizeBundle(bundle: CaseBundle, ctx: NormalizeContext): Norm
       caseId: ctx.caseId,
       sourceId: ctx.sourceId,
       sequence,
-      timestamp: event.timestamp,
+      timestamp: canonicalTimestamp(event.timestamp),
       participantId: event.participantId,
       participantRole: participant?.role ?? 'system',
       participantAlias: participant?.alias ?? 'Unknown participant',
@@ -122,7 +189,7 @@ export function normalizeBundle(bundle: CaseBundle, ctx: NormalizeContext): Norm
   const resolution: CaseResolution | null = bundle.resolution
     ? {
         caseId: ctx.caseId,
-        resolvedAt: bundle.resolution.resolvedAt,
+        resolvedAt: canonicalTimestamp(bundle.resolution.resolvedAt),
         summary: bundle.resolution.summary,
         rootCause: bundle.resolution.rootCause,
         workaround: bundle.resolution.workaround ?? null,
@@ -130,7 +197,7 @@ export function normalizeBundle(bundle: CaseBundle, ctx: NormalizeContext): Norm
         rootCauseHypothesisKey: bundle.resolution.rootCauseHypothesisKey ?? null,
         validation: bundle.resolution.validation
           ? {
-              validatedAt: bundle.resolution.validation.validatedAt,
+              validatedAt: canonicalTimestamp(bundle.resolution.validation.validatedAt),
               method: bundle.resolution.validation.method,
               outcome: bundle.resolution.validation.outcome,
               evidenceEventIds: bundle.resolution.validation.evidenceEventIds,
@@ -149,8 +216,8 @@ export function normalizeBundle(bundle: CaseBundle, ctx: NormalizeContext): Norm
     severity: bundle.case.severity,
     status: bundle.case.status,
     customerAlias: bundle.case.customerAlias,
-    openedAt: bundle.case.openedAt,
-    closedAt: bundle.case.closedAt ?? null,
+    openedAt: canonicalTimestamp(bundle.case.openedAt),
+    closedAt: bundle.case.closedAt ? canonicalTimestamp(bundle.case.closedAt) : null,
     synthetic: bundle.synthetic,
     tags: bundle.case.tags,
     eventCount: events.length,

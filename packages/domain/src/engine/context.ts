@@ -2,6 +2,7 @@ import type { Evidence, ParticipantRole } from '@caseguard/schemas';
 import { CUSTOMER_SIDE_ROLES } from '@caseguard/schemas';
 import type { CompiledPack } from '../knowledge/compile';
 import { clamp } from '../util/math';
+import { earlierPosition, positionsOf } from './responders';
 import type { Observation } from './signals';
 import type { TemporalView } from './temporal';
 
@@ -43,13 +44,16 @@ export function buildEvidence(
   ctx: EngineContext,
 ): Evidence[] {
   const evidence: Evidence[] = [];
-  const byId = new Map(view.events.map((e) => [e.id, e]));
+  const positions = positionsOf(view.events);
   for (const obs of observations) {
     const signal = pack.signals.get(obs.signalId);
     const event = view.events[obs.eventIndex];
     if (!signal || !event) continue;
     const customerSide = isCustomerSide(event.participantRole);
-    const parent = event.inResponseTo ? byId.get(event.inResponseTo) : undefined;
+    // Only an earlier event can have been answered: a forward reference must not let later events
+    // change how this one is classified (prefix and full analyses have to agree).
+    const parentPosition = earlierPosition(positions, event.inResponseTo, obs.eventIndex);
+    const parent = parentPosition === null ? undefined : view.events[parentPosition];
     const answersEngineer =
       parent !== undefined &&
       !isCustomerSide(parent.participantRole) &&

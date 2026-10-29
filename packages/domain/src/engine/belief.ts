@@ -36,29 +36,42 @@ function floorAndNormalize(values: number[], floor: number): number[] {
   return normalize(floored);
 }
 
-/** Posterior after applying a list of observations to the prior (log-space, dampened). */
-export function posteriorFrom(
-  pack: CompiledPack,
-  observations: readonly Observation[],
-  start?: Belief,
-): Belief {
-  const ids = pack.hypothesisIds;
+/** Log-weights of a starting belief (the prior unless `start` is given). */
+export function startingLogWeights(pack: CompiledPack, start?: Belief): number[] {
   const base = start ?? priorBelief(pack);
-  const logw = ids.map((id) => Math.log(Math.max(base[id] ?? 1e-6, 1e-6)));
-  for (const obs of observations) {
-    if (!obs.affectsBelief) continue;
-    const w = observationWeight(pack, obs.signalId, obs.repeatIndex);
-    ids.forEach((id, i) => {
-      logw[i] =
-        (logw[i] ?? 0) + w * Math.log(clamp(likelihoodOf(pack, obs.signalId, id), 0.01, 0.99));
-    });
-  }
+  return pack.hypothesisIds.map((id) => Math.log(Math.max(base[id] ?? 1e-6, 1e-6)));
+}
+
+/** Adds one observation's dampened log-likelihoods to `logw` in place (nothing when it cannot move beliefs). */
+export function accumulateObservation(pack: CompiledPack, logw: number[], obs: Observation): void {
+  if (!obs.affectsBelief) return;
+  const w = observationWeight(pack, obs.signalId, obs.repeatIndex);
+  pack.hypothesisIds.forEach((id, i) => {
+    logw[i] =
+      (logw[i] ?? 0) + w * Math.log(clamp(likelihoodOf(pack, obs.signalId, id), 0.01, 0.99));
+  });
+}
+
+/** Turns accumulated log-weights into a floored, normalised belief. */
+export function posteriorFromLogWeights(pack: CompiledPack, logw: readonly number[]): Belief {
+  const ids = pack.hypothesisIds;
   const max = Math.max(...logw);
   const probs = floorAndNormalize(
     logw.map((l) => Math.exp(l - max)),
     pack.pack.policies.posteriorFloor,
   );
   return Object.fromEntries(ids.map((id, i) => [id, probs[i] ?? 0]));
+}
+
+/** Posterior after applying a list of observations to the prior (log-space, dampened). */
+export function posteriorFrom(
+  pack: CompiledPack,
+  observations: readonly Observation[],
+  start?: Belief,
+): Belief {
+  const logw = startingLogWeights(pack, start);
+  for (const obs of observations) accumulateObservation(pack, logw, obs);
+  return posteriorFromLogWeights(pack, logw);
 }
 
 export const beliefToVector = (pack: CompiledPack, belief: Belief): number[] =>

@@ -15,7 +15,7 @@ import {
 import type { CompiledPack } from '../knowledge/compile';
 import { hypothesisRecordId, stableId } from '../util/ids';
 import { clamp, round } from '../util/math';
-import { formatUtcStamp } from '../util/time';
+import { compareIso, formatUtcStamp } from '../util/time';
 import {
   type DecisionRanking,
   actionCostOf,
@@ -23,12 +23,12 @@ import {
   MIN_MEANINGFUL_COST,
   rankAtIndex,
   resolveActionKey,
-  responderClosure,
 } from './actions';
 import { type Belief, type BeliefTimeline, topHypotheses } from './belief';
 import { type AnchorInfo, evidenceEffectFor, leaderOf } from './claims';
 import { type EngineContext, metaOf } from './context';
 import { missingRequirementsAt, type RequirementState } from './requirements';
+import { positionsOf, ResponderIndex } from './responders';
 import type { Observation } from './signals';
 import { PrefixAnalyzer } from './state';
 import type { TemporalView } from './temporal';
@@ -99,6 +99,8 @@ export interface ForksInput {
   decisions: ReadonlyMap<string, DecisionRanking>;
   /** Shared prefix analyzer; created on demand when omitted. */
   analyzer?: PrefixAnalyzer;
+  /** Shared reply index; created on demand when omitted. */
+  responders?: ResponderIndex;
 }
 
 export interface ForksOutput {
@@ -205,12 +207,17 @@ export function detectForks(input: ForksInput): ForksOutput {
   const { view, pack, ctx, config, timeline, claims, anchors, actions, decisions } = input;
   const events = view.events;
   const analyzer = input.analyzer ?? new PrefixAnalyzer(view, pack, ctx.caseId);
+  const responderIndex = input.responders ?? new ResponderIndex(events);
+  const positions = positionsOf(events);
   const policies = pack.pack.policies;
   const hypName = (id: string): string => pack.hypotheses.get(id)?.name ?? id;
   const actionByEvent = new Map(actions.map((a) => [a.eventId, a]));
   const evidenceByEvent = new Map<string, Evidence[]>();
-  for (const ev of input.evidence)
-    evidenceByEvent.set(ev.eventId, [...(evidenceByEvent.get(ev.eventId) ?? []), ev]);
+  for (const ev of input.evidence) {
+    const list = evidenceByEvent.get(ev.eventId);
+    if (list) list.push(ev);
+    else evidenceByEvent.set(ev.eventId, [ev]);
+  }
   const observationEvidence = new Map(input.evidence.map((e) => [e.id, e]));
 
   // Decision points: every action, plus engineer statements flagged by the evidence ledger.
@@ -219,7 +226,9 @@ export function detectForks(input: ForksInput): ForksOutput {
     if (!claim.eventId || claim.simulated) continue;
     if (!hasFlag(claim, 'assumption_as_fact', 'unsupported_root_cause', 'ignored_contradiction'))
       continue;
-    flaggedByEvent.set(claim.eventId, [...(flaggedByEvent.get(claim.eventId) ?? []), claim]);
+    const list = flaggedByEvent.get(claim.eventId);
+    if (list) list.push(claim);
+    else flaggedByEvent.set(claim.eventId, [claim]);
   }
   const anchorByEvent = new Map(anchors.map((a) => [a.eventId, a]));
 
@@ -301,12 +310,11 @@ export function detectForks(input: ForksInput): ForksOutput {
       (s) => s.logLr >= 1,
     );
     const testsLeader = packAction ? packAction.targets.includes(leader.id) : false;
-    const signalEventIndex = Math.min(
-      eventIndex,
-      ...strongSupport
-        .map((s) => events.findIndex((e) => e.id === observationEvidence.get(s.id)?.eventId))
-        .filter((i) => i >= 0),
-    );
+    let signalEventIndex = eventIndex;
+    for (const s of strongSupport) {
+      const position = positions.get(observationEvidence.get(s.id)?.eventId ?? '');
+      if (position !== undefined && position < signalEventIndex) signalEventIndex = position;
+    }
     const actedOnLeader = actions.some(
       (a) =>
         a.sequence >= signalEventIndex &&
@@ -401,7 +409,7 @@ export function detectForks(input: ForksInput): ForksOutput {
     const claimsBefore = claims.filter(
       (c) =>
         (c.eventId !== null && visibleIds.has(c.eventId)) ||
-        (c.eventId === null && c.timestamp < event.timestamp),
+        (c.eventId === null && compareIso(c.timestamp, event.timestamp) < 0),
     );
     const evidenceIdsBefore = new Set(evidenceBefore.map((e) => e.id));
 
@@ -510,7 +518,9 @@ export function detectForks(input: ForksInput): ForksOutput {
     const checks = [
       {
         id: 'boundary-excludes-future',
-        passed: before.events.every((e) => e.timestamp <= event.timestamp && e.id !== event.id),
+        passed: before.events.every(
+          (e) => compareIso(e.timestamp, event.timestamp) <= 0 && e.id !== event.id,
+        ),
         detail: `The analysis window contains ${before.events.length} events recorded before ${formatUtcStamp(event.timestamp)}; later events were withheld.`,
       },
       {
@@ -540,7 +550,7 @@ export function detectForks(input: ForksInput): ForksOutput {
     ];
     const eligibleReasons = checks.filter((c) => !c.passed).map((c) => c.detail);
 
-    const responders = responderClosure(events, event.id);
+    const responders = responderIndex.closure(event.id);
     const newEvidence = responders.flatMap((e) => evidenceByEvent.get(e.id) ?? []);
     const retrospective = action
       ? {
@@ -624,7 +634,7 @@ export function detectForks(input: ForksInput): ForksOutput {
     });
   });
 
-  forks.sort((a, b) => (a.timestamp < b.timestamp ? -1 : a.timestamp > b.timestamp ? 1 : 0));
+  forks.sort((a, b) => compareIso(a.timestamp, b.timestamp));
   forks.forEach((f, i) => {
     f.sequence = i;
   });

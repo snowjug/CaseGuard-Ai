@@ -49,6 +49,21 @@ export interface CompiledPack {
     roles: readonly string[] | undefined;
     eventTypes: readonly string[] | undefined;
   }[];
+  /**
+   * Word-start regex for every hypothesis keyword, in keyword order, built once instead of per
+   * sentence. They carry the `g` flag so hits can be counted with `String.prototype.match`, which
+   * resets `lastIndex` itself; never call `test` or `exec` on them.
+   */
+  keywordPatterns: ReadonlyMap<string, readonly RegExp[]>;
+  /**
+   * One alternation per cue group, equivalent to testing every entry of the same `lexicon` group
+   * (null when the group is empty). Lets a sentence be classified with one scan per group.
+   */
+  lexiconAny: {
+    hedges: RegExp | null;
+    definitive: RegExp | null;
+    template: RegExp | null;
+  };
 }
 
 const escapeRegex = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -58,17 +73,44 @@ function phrase(text: string): RegExp {
   return new RegExp(`(?<![\\w])${escapeRegex(text)}`, 'i');
 }
 
+/** The same cues as `phrase`, as one expression that matches when any of them does. */
+function anyPhrase(texts: readonly string[]): RegExp | null {
+  if (texts.length === 0) return null;
+  return new RegExp(`(?<![\\w])(?:${texts.map(escapeRegex).join('|')})`, 'i');
+}
+
+/** Counts a keyword at word starts; short keywords must also end at a word boundary. */
+function keywordPattern(keyword: string): RegExp {
+  const needle = keyword.toLowerCase();
+  const tail = needle.length <= 4 ? '(?![\\w])' : '';
+  return new RegExp(`(?<![\\w])${escapeRegex(needle)}${tail}`, 'g');
+}
+
+/**
+ * Compiles an authored pattern. The `g` and `y` flags are rejected: the compiled expression is shared
+ * by every analysis, and those flags make `test`/`exec` depend on `lastIndex` left by the previous call.
+ */
+function compileAuthored(kind: string, pattern: string, flags: string): RegExp {
+  if (/[gy]/.test(flags)) {
+    throw new Error(
+      `Invalid ${kind} pattern /${pattern}/: the "g" and "y" flags keep state between matches and are not allowed (flags: "${flags}").`,
+    );
+  }
+  try {
+    return new RegExp(pattern, flags);
+  } catch (error) {
+    throw new Error(
+      `Invalid ${kind} pattern /${pattern}/: ${error instanceof Error ? error.message : 'unknown error'}`,
+    );
+  }
+}
+
 function compileDetectors(list: readonly SignalDetector[]): CompiledDetector[] {
-  return list.map((detector) => {
-    if (detector.kind !== 'regex') return { detector, regex: null };
-    try {
-      return { detector, regex: new RegExp(detector.pattern, detector.flags) };
-    } catch (error) {
-      throw new Error(
-        `Invalid detector pattern /${detector.pattern}/: ${error instanceof Error ? error.message : 'unknown error'}`,
-      );
-    }
-  });
+  return list.map((detector) =>
+    detector.kind === 'regex'
+      ? { detector, regex: compileAuthored('detector', detector.pattern, detector.flags) }
+      : { detector, regex: null },
+  );
 }
 
 export function compileKnowledgePack(input: KnowledgePack): CompiledPack {
@@ -107,9 +149,15 @@ export function compileKnowledgePack(input: KnowledgePack): CompiledPack {
       subject: c.subject,
       label: c.label,
       valueGroup: c.valueGroup,
-      regex: new RegExp(c.pattern, c.flags),
+      regex: compileAuthored('claim', c.pattern, c.flags),
       roles: c.roles,
       eventTypes: c.eventTypes,
     })),
+    keywordPatterns: new Map(pack.hypotheses.map((h) => [h.id, h.keywords.map(keywordPattern)])),
+    lexiconAny: {
+      hedges: anyPhrase(lexicon.hedges),
+      definitive: anyPhrase(lexicon.definitive),
+      template: anyPhrase(lexicon.template),
+    },
   };
 }

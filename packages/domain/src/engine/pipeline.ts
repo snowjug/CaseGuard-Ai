@@ -18,8 +18,9 @@ import { type DecisionRanking, buildDiagnosticActions } from './actions';
 import { type BeliefTimeline, buildBeliefTimeline } from './belief';
 import { type AnchorInfo, buildClaims } from './claims';
 import { type EngineContext, buildEvidence } from './context';
-import { assembleScenario, futureOnlyTokens, simulateAlternativePath } from './counterfactual';
+import { assembleScenario, simulateAlternativePath } from './counterfactual';
 import { detectForks } from './forks';
+import { futureOnlyTokens, packStaticTokens } from './leak-check';
 import {
   type ActualPath,
   computeActualPath,
@@ -28,6 +29,7 @@ import {
 } from './hindsight';
 import { buildHypotheses } from './hypotheses';
 import { computeRequirementStates, type RequirementState } from './requirements';
+import { ResponderIndex } from './responders';
 import { detectObservations, type Observation } from './signals';
 import { PrefixAnalyzer } from './state';
 import {
@@ -60,6 +62,11 @@ export interface DeterministicAnalysis {
   decisions: Map<string, DecisionRanking>;
   forks: DecisionFork[];
   earliestMeaningfulForkId: string | null;
+  /**
+   * Bounded notes about limits that shortened this analysis (for example the statement-claim cap).
+   * Empty when nothing was truncated; surface them wherever the analysis is presented.
+   */
+  notes: string[];
 }
 
 /** Runs the full deterministic pipeline: signals -> beliefs -> claims -> actions -> forks. */
@@ -69,7 +76,7 @@ export function runDeterministicAnalysis(input: AnalysisInput): DeterministicAna
   const evidence = buildEvidence(view, pack, observations, ctx);
   const timeline = buildBeliefTimeline(view, pack, observations, { seed: ctx.seed });
   const requirementStates = computeRequirementStates(view, pack, observations);
-  const { claims, anchors } = buildClaims({
+  const { claims, anchors, notes } = buildClaims({
     view,
     pack,
     ctx,
@@ -79,6 +86,7 @@ export function runDeterministicAnalysis(input: AnalysisInput): DeterministicAna
     requirementStates,
   });
   const analyzer = new PrefixAnalyzer(view, pack, ctx.caseId, { observations, requirementStates });
+  const responders = new ResponderIndex(view.events);
   const { actions, decisions } = buildDiagnosticActions({
     view,
     pack,
@@ -86,6 +94,7 @@ export function runDeterministicAnalysis(input: AnalysisInput): DeterministicAna
     config,
     timeline,
     analyzer,
+    responders,
   });
   const { hypotheses, links, missing } = buildHypotheses({
     pack,
@@ -112,6 +121,7 @@ export function runDeterministicAnalysis(input: AnalysisInput): DeterministicAna
     actions,
     decisions,
     analyzer,
+    responders,
   });
   return {
     view,
@@ -128,6 +138,7 @@ export function runDeterministicAnalysis(input: AnalysisInput): DeterministicAna
     decisions,
     forks,
     earliestMeaningfulForkId,
+    notes,
   };
 }
 
@@ -163,6 +174,8 @@ export function generateCounterfactuals(request: CounterfactualRequest): Counter
     resolution
       ? `${resolution.summary} ${resolution.rootCause} ${resolution.workaround ?? ''} ${resolution.permanentFix ?? ''}`
       : '',
+    // Scenario text is written from the pack, so identifiers the pack itself contains are not leaks.
+    packStaticTokens(pack),
   );
 
   const fullView = createFullView(events, resolution);

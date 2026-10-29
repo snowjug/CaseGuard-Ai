@@ -14,7 +14,8 @@ import {
 import type { CompiledPack } from '../knowledge/compile';
 import { stableId } from '../util/ids';
 import { round } from '../util/math';
-import { formatDuration, formatUtcStamp, minutesBetween } from '../util/time';
+import { compareIso, formatDuration, formatUtcStamp, minutesBetween } from '../util/time';
+import { knownAt } from './as-of';
 import { isCustomerSide, type EngineContext } from './context';
 import { sentencesOf } from './claims';
 import type { DeterministicAnalysis } from './pipeline';
@@ -42,7 +43,8 @@ const CLIENT_VERSION = /\bversion\s+(\d+(?:\.\d+){1,3})\b/i;
 
 export function buildDigitalTwin(input: TwinInput): DigitalTwin {
   const { caseRecord, events, analysis, pack, ctx, asOf } = input;
-  const known = (iso: string | null): boolean => asOf === null || iso === null || iso <= asOf;
+  const isKnown = knownAt(asOf);
+  const known = (iso: string | null): boolean => iso === null || isKnown(iso);
   const visible = events.filter((e) => known(e.timestamp));
   const visibleIds = new Set(visible.map((e) => e.id));
   const fields: TwinField[] = [];
@@ -250,7 +252,9 @@ export function buildDigitalTwin(input: TwinInput): DigitalTwin {
       if (!addresses.has(ip)) addresses.set(ip, event);
   if (addresses.size > 0) {
     const first = [...addresses.values()][0];
-    const latest = [...addresses.values()].reduce((a, b) => (a.timestamp > b.timestamp ? a : b));
+    const latest = [...addresses.values()].reduce((a, b) =>
+      compareIso(a.timestamp, b.timestamp) > 0 ? a : b,
+    );
     add(
       'environment',
       'addresses',

@@ -1,5 +1,11 @@
 import type { CompiledPack } from '../knowledge/compile';
-import { type Belief, posteriorFrom } from './belief';
+import {
+  type Belief,
+  accumulateObservation,
+  posteriorFrom,
+  posteriorFromLogWeights,
+  startingLogWeights,
+} from './belief';
 import type { RankingState } from './action-value';
 import { computeRequirementStates, satisfiedSetAt, type RequirementState } from './requirements';
 import { detectObservations, type Observation } from './signals';
@@ -74,6 +80,14 @@ export function restrictRequirementStates(
 export class PrefixAnalyzer {
   private readonly observations: readonly Observation[];
   private readonly requirementStates: readonly RequirementState[];
+  /** True when observations are ordered by event, so the events before a boundary are a list prefix. */
+  private readonly ordered: boolean;
+  /**
+   * Log-weights accumulated over the first `count` observations. Decisions are asked for in event
+   * order, so each call only adds the new observations (identical arithmetic to a one-shot posterior);
+   * asking for an earlier boundary restarts it.
+   */
+  private run: { count: number; logw: number[]; signals: Set<string> };
 
   constructor(
     private readonly full: TemporalView,
@@ -88,24 +102,70 @@ export class PrefixAnalyzer {
     this.requirementStates =
       precomputed?.requirementStates ??
       computeRequirementStates(full, pack, [...this.observations]);
+    this.ordered = this.observations.every(
+      (o, i) => i === 0 || (this.observations[i - 1]?.eventIndex ?? 0) <= o.eventIndex,
+    );
+    this.run = this.freshRun();
+  }
+
+  private freshRun(): { count: number; logw: number[]; signals: Set<string> } {
+    return { count: 0, logw: startingLogWeights(this.pack), signals: new Set<string>() };
+  }
+
+  /** Number of observations detected in events before `eventIndex` (binary search; list is ordered). */
+  private countBefore(eventIndex: number): number {
+    let low = 0;
+    let high = this.observations.length;
+    while (low < high) {
+      const mid = (low + high) >>> 1;
+      if ((this.observations[mid]?.eventIndex ?? 0) < eventIndex) low = mid + 1;
+      else high = mid;
+    }
+    return low;
   }
 
   /** Analysis of the events strictly before the event at `eventIndex` (its decision moment). */
   at(eventIndex: number): ViewAnalysis {
-    const observations = this.observations.filter((o) => o.eventIndex < eventIndex);
     const requirementStates = restrictRequirementStates(this.requirementStates, eventIndex);
-    const { belief, rankingState } = rankingStateFor(
-      this.pack,
-      observations,
-      requirementStates,
-      eventIndex - 1,
-    );
+    if (!this.ordered) {
+      const observations = this.observations.filter((o) => o.eventIndex < eventIndex);
+      const { belief, rankingState } = rankingStateFor(
+        this.pack,
+        observations,
+        requirementStates,
+        eventIndex - 1,
+      );
+      return {
+        view: createTemporalPrefixView(this.full, eventIndex),
+        observations,
+        requirementStates,
+        belief,
+        rankingState,
+      };
+    }
+    const count = this.countBefore(eventIndex);
+    if (count < this.run.count) this.run = this.freshRun();
+    for (let i = this.run.count; i < count; i++) {
+      const obs = this.observations[i];
+      if (!obs) continue;
+      accumulateObservation(this.pack, this.run.logw, obs);
+      this.run.signals.add(obs.signalId);
+    }
+    this.run.count = count;
+    const belief = posteriorFromLogWeights(this.pack, this.run.logw);
     return {
       view: createTemporalPrefixView(this.full, eventIndex),
-      observations,
+      observations: this.observations.slice(0, count),
       requirementStates,
       belief,
-      rankingState,
+      rankingState: {
+        belief,
+        observedSignals: new Set(this.run.signals),
+        satisfied:
+          eventIndex - 1 >= 0
+            ? satisfiedSetAt(requirementStates, eventIndex - 1)
+            : new Set<string>(),
+      },
     };
   }
 }

@@ -9,12 +9,13 @@ import {
 } from '@caseguard/schemas';
 import type { CompiledPack } from '../knowledge/compile';
 import { hypothesisRecordId, stableId } from '../util/ids';
-import { clamp, round, tokenJaccard } from '../util/math';
-import { minutesBetween } from '../util/time';
+import { clamp, round, tokens as wordsOf } from '../util/math';
+import { toMs } from '../util/time';
 import { toBreakdowns } from './action-value';
 import type { BeliefTimeline } from './belief';
 import { statedHypothesis } from './claims';
 import { type EngineContext, metaOf } from './context';
+import { ResponderIndex } from './responders';
 import { eventText, firstDetectorMatch } from './signals';
 import { analyzeView, PrefixAnalyzer, type ViewAnalysis } from './state';
 import { createTemporalViewBeforeEvent, type TemporalView } from './temporal';
@@ -42,6 +43,8 @@ export interface ActionsInput {
   timeline: BeliefTimeline;
   /** Shared prefix analyzer; created on demand when omitted. */
   analyzer?: PrefixAnalyzer;
+  /** Shared reply index; created on demand when omitted. */
+  responders?: ResponderIndex;
 }
 
 export interface ActionsOutput {
@@ -56,6 +59,14 @@ const ACTION_EVENT_TYPES: ReadonlySet<string> = new Set([
 ]);
 const REPEAT_CUE = /\b(re-?ran|again|repeat(ed)?|same (query|request)|once more)\b/i;
 const MAX_ENGINEER_DIAGNOSTIC_CLASSES: ReadonlySet<string> = new Set(['diagnostic', 'enabling']);
+
+/** Jaccard similarity of two word sets (same arithmetic as `tokenJaccard`, without re-tokenising). */
+function wordSetJaccard(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
+  if (a.size === 0 && b.size === 0) return 1;
+  let intersection = 0;
+  for (const word of a) if (b.has(word)) intersection++;
+  return intersection / (a.size + b.size - intersection);
+}
 
 /** Normalised cost (weighted time, tokens, customer effort, risk) below which a step is never "wasteful". */
 export const MIN_MEANINGFUL_COST = 0.05;
@@ -99,25 +110,22 @@ export function isActionEvent(event: CaseEvent, pack: CompiledPack): boolean {
   return resolveActionKey(event, pack) !== null;
 }
 
-/** Events that answer `eventId`, transitively (customer replies, tool output, summaries). */
-export function responderClosure(events: readonly CaseEvent[], eventId: string): CaseEvent[] {
-  const out: CaseEvent[] = [];
-  const queue = [eventId];
-  const seen = new Set(queue);
-  while (queue.length > 0) {
-    const current = queue.shift();
-    for (const e of events) {
-      if (e.inResponseTo === current && !seen.has(e.id)) {
-        seen.add(e.id);
-        out.push(e);
-        queue.push(e.id);
-      }
-    }
-  }
-  return out;
+export { ResponderIndex } from './responders';
+
+/**
+ * Events that answer `eventId`, transitively (customer replies, tool output, summaries). Pass a
+ * prebuilt `ResponderIndex` when asking more than once; an event list builds one on the fly.
+ * Only replies that come strictly after what they answer are followed.
+ */
+export function responderClosure(
+  events: readonly CaseEvent[] | ResponderIndex,
+  eventId: string,
+): CaseEvent[] {
+  return (events instanceof ResponderIndex ? events : new ResponderIndex(events)).closure(eventId);
 }
 
-const informationClass = (bits: number): DiagnosticAction['informationGainClass'] =>
+/** Qualitative band of the information (bits) an action produced. */
+export const informationClass = (bits: number): DiagnosticAction['informationGainClass'] =>
   bits >= 0.5 ? 'high' : bits >= 0.2 ? 'moderate' : bits >= 0.05 ? 'low' : 'none';
 
 /**
@@ -194,10 +202,17 @@ export function buildDiagnosticActions(input: ActionsInput): ActionsOutput {
   const { view, pack, ctx, config, timeline } = input;
   const events = view.events;
   const analyzer = input.analyzer ?? new PrefixAnalyzer(view, pack, ctx.caseId);
+  const responderIndex = input.responders ?? new ResponderIndex(events);
   const stepIndexByEvent = new Map(events.map((e, i) => [e.id, i]));
   const decisions = new Map<string, DecisionRanking>();
   const actions: DiagnosticAction[] = [];
-  const earlier: { id: string; key: string | null; text: string; at: string }[] = [];
+  const earlier: {
+    id: string;
+    key: string | null;
+    words: ReadonlySet<string>;
+    atMs: number;
+  }[] = [];
+  const earlierActionByEvent = new Map<string, string>();
   const effortScale = config.effortScale;
 
   events.forEach((event, eventIndex) => {
@@ -214,8 +229,7 @@ export function buildDiagnosticActions(input: ActionsInput): ActionsOutput {
       ? MAX_ENGINEER_DIAGNOSTIC_CLASSES.has(packAction.valueClass)
       : false;
 
-    const responders = responderClosure(events, event.id);
-    const involved = [event, ...responders];
+    const involved = [event, ...responderIndex.closure(event.id)];
     const gain = involved.reduce((sum, e) => {
       const idx = stepIndexByEvent.get(e.id);
       return sum + (idx === undefined ? 0 : (timeline.steps[idx]?.gainBits ?? 0));
@@ -226,14 +240,21 @@ export function buildDiagnosticActions(input: ActionsInput): ActionsOutput {
     );
 
     const priorSame = earlier.filter((p) => p.key !== null && p.key === actionKey);
+    // A declared repeat only counts when it names an action recorded earlier in this view; a forward
+    // or unknown reference must not let later events change how this one is classified.
     const explicitRepeat = event.action?.repeatOf
-      ? stableId('act', ctx.caseId, event.action.repeatOf)
+      ? (earlierActionByEvent.get(event.action.repeatOf) ?? null)
       : null;
-    const similar = priorSame
-      .filter(
-        (p) => minutesBetween(p.at, event.timestamp) <= pack.pack.policies.repeatWindowMinutes,
-      )
-      .find((p) => tokenJaccard(p.text, text) >= 0.5 || REPEAT_CUE.test(text));
+    const words = new Set(wordsOf(text));
+    const startedMs = toMs(event.timestamp);
+    const inWindow = priorSame.filter(
+      (p) => (startedMs - p.atMs) / 60_000 <= pack.pack.policies.repeatWindowMinutes,
+    );
+    // The repeat cue does not depend on the earlier action, so with a cue the first one in the window
+    // matches; otherwise the first with similar wording does. Word sets are built once per action.
+    const similar = REPEAT_CUE.test(text)
+      ? inWindow[0]
+      : inWindow.find((p) => wordSetJaccard(p.words, words) >= 0.5);
     const repeatOfActionId = explicitRepeat ?? similar?.id ?? null;
     const alreadyKnown = (actual?.safety.blockedReasons ?? []).some((r) =>
       r.startsWith('Already known'),
@@ -298,7 +319,8 @@ export function buildDiagnosticActions(input: ActionsInput): ActionsOutput {
       lowValueReasons,
       relativeValueAtDecision: relative,
     });
-    earlier.push({ id, key: actionKey, text, at: event.timestamp });
+    earlier.push({ id, key: actionKey, words, atMs: startedMs });
+    earlierActionByEvent.set(event.id, id);
   });
 
   return { actions, decisions };

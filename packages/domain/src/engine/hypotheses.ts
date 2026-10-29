@@ -14,6 +14,7 @@ import {
 import type { CompiledPack } from '../knowledge/compile';
 import { hypothesisRecordId, stableId } from '../util/ids';
 import { round } from '../util/math';
+import { compareIso } from '../util/time';
 import { rankActions } from './action-value';
 import { type BeliefTimeline, hypothesisStatus, likelihoodOf } from './belief';
 import { evidenceEffectFor } from './claims';
@@ -199,7 +200,10 @@ export function buildHypotheses(input: HypothesesInput): HypothesesOutput {
     const anchoredAction = actions
       .filter((a) => a.statedHypothesisId === id)
       .map((a) => a.startedAt);
-    const anchored = [...anchoredClaim, ...anchoredAction].sort()[0] ?? null;
+    const anchored = [...anchoredClaim, ...anchoredAction].reduce<string | null>(
+      (earliest, at) => (earliest === null || compareIso(at, earliest) < 0 ? at : earliest),
+      null,
+    );
 
     hypotheses.push({
       ...metaOf(ctx),

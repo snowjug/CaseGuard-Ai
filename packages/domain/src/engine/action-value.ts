@@ -60,6 +60,12 @@ export interface RankOptions {
   filter?: (action: KnowledgeAction) => boolean;
   /** Treat diagnosis as reached so remediation/validation actions become eligible. */
   includeRemediation?: boolean;
+  /**
+   * Expected-information-gain results for ONE belief, shared by the evaluations of a ranking (an
+   * action's value can include the value of the actions it unlocks, which are evaluated themselves).
+   * Ranking creates one when omitted; never reuse a cache across different beliefs.
+   */
+  eigCache?: Map<string, { bits: number; outcomes: OutcomeProbability[] }>;
 }
 
 const clampProb = (p: number): number => clamp(p, 0.01, 0.99);
@@ -69,16 +75,15 @@ function vocabulary(action: KnowledgeAction): string[] {
   return [...new Set(action.outcomes.flatMap((o) => o.emitsSignals))];
 }
 
-/**
- * P(outcome | hypothesis): each outcome's weight is the probability of exactly its signals appearing
- * and the others not appearing (independent Bernoulli), normalised across the defined outcomes.
- */
-export function outcomeDistributionFor(
+// The vocabulary only depends on the action, so the internal helpers below take it as an argument
+// and evaluating one action builds it once instead of once per hypothesis and outcome.
+
+function distributionOver(
   pack: CompiledPack,
   action: KnowledgeAction,
+  vocab: readonly string[],
   hypothesisId: string,
 ): number[] {
-  const vocab = vocabulary(action);
   const weights = action.outcomes.map((outcome) => {
     let w = 1;
     for (const s of vocab) {
@@ -90,16 +95,15 @@ export function outcomeDistributionFor(
   return normalize(weights);
 }
 
-/** Likelihood used to update beliefs when an outcome is observed (same dampening as real evidence). */
-export function outcomeUpdateLikelihood(
+function updateLikelihoodFor(
   pack: CompiledPack,
   action: KnowledgeAction,
+  vocab: readonly string[],
   outcomeIndex: number,
   hypothesisId: string,
 ): number {
   const outcome = action.outcomes[outcomeIndex];
   if (!outcome) return 1;
-  const vocab = vocabulary(action);
   if (outcome.emitsSignals.length > 0) {
     let l = 1;
     for (const s of outcome.emitsSignals) {
@@ -114,29 +118,30 @@ export function outcomeUpdateLikelihood(
   return l;
 }
 
-export function applyOutcome(
+function updatedBelief(
   pack: CompiledPack,
   action: KnowledgeAction,
+  vocab: readonly string[],
   outcomeIndex: number,
   belief: Belief,
 ): Belief {
   const ids = pack.hypothesisIds;
   const raw = ids.map(
-    (id) => (belief[id] ?? 0) * outcomeUpdateLikelihood(pack, action, outcomeIndex, id),
+    (id) => (belief[id] ?? 0) * updateLikelihoodFor(pack, action, vocab, outcomeIndex, id),
   );
   const floor = pack.pack.policies.posteriorFloor;
   const probs = normalize(normalize(raw).map((p) => Math.max(p, floor)));
   return Object.fromEntries(ids.map((id, i) => [id, probs[i] ?? 0]));
 }
 
-/** Predictive distribution over an action's outcomes under the current belief. */
-export function predictOutcomes(
+function predictedOutcomes(
   pack: CompiledPack,
   action: KnowledgeAction,
+  vocab: readonly string[],
   belief: Belief,
 ): OutcomeProbability[] {
   const ids = pack.hypothesisIds;
-  const perHyp = ids.map((id) => outcomeDistributionFor(pack, action, id));
+  const perHyp = ids.map((id) => distributionOver(pack, action, vocab, id));
   return action.outcomes.map((outcome, o) => {
     let p = 0;
     ids.forEach((id, h) => {
@@ -152,6 +157,46 @@ export function predictOutcomes(
   });
 }
 
+/**
+ * P(outcome | hypothesis): each outcome's weight is the probability of exactly its signals appearing
+ * and the others not appearing (independent Bernoulli), normalised across the defined outcomes.
+ */
+export function outcomeDistributionFor(
+  pack: CompiledPack,
+  action: KnowledgeAction,
+  hypothesisId: string,
+): number[] {
+  return distributionOver(pack, action, vocabulary(action), hypothesisId);
+}
+
+/** Likelihood used to update beliefs when an outcome is observed (same dampening as real evidence). */
+export function outcomeUpdateLikelihood(
+  pack: CompiledPack,
+  action: KnowledgeAction,
+  outcomeIndex: number,
+  hypothesisId: string,
+): number {
+  return updateLikelihoodFor(pack, action, vocabulary(action), outcomeIndex, hypothesisId);
+}
+
+export function applyOutcome(
+  pack: CompiledPack,
+  action: KnowledgeAction,
+  outcomeIndex: number,
+  belief: Belief,
+): Belief {
+  return updatedBelief(pack, action, vocabulary(action), outcomeIndex, belief);
+}
+
+/** Predictive distribution over an action's outcomes under the current belief. */
+export function predictOutcomes(
+  pack: CompiledPack,
+  action: KnowledgeAction,
+  belief: Belief,
+): OutcomeProbability[] {
+  return predictedOutcomes(pack, action, vocabulary(action), belief);
+}
+
 /** Expected information gain (bits) of an action: H(prior) - E[H(posterior | outcome)]. */
 export function expectedInformationGain(
   pack: CompiledPack,
@@ -159,14 +204,15 @@ export function expectedInformationGain(
   belief: Belief,
 ): { bits: number; outcomes: OutcomeProbability[] } {
   if (action.outcomes.length === 0) return { bits: 0, outcomes: [] };
-  const outcomes = predictOutcomes(pack, action, belief);
+  const vocab = vocabulary(action);
+  const outcomes = predictedOutcomes(pack, action, vocab, belief);
   const prior = beliefToVector(pack, belief);
   const hPrior = entropyBits(prior);
   let expected = 0;
   action.outcomes.forEach((_o, i) => {
     const probability = outcomes[i]?.probability ?? 0;
     if (probability <= 0) return;
-    const post = applyOutcome(pack, action, i, belief);
+    const post = updatedBelief(pack, action, vocab, i, belief);
     expected += probability * entropyBits(beliefToVector(pack, post));
   });
   return { bits: Math.max(0, hPrior - expected), outcomes };
@@ -276,14 +322,22 @@ export function evaluateAction(
   options: RankOptions = {},
 ): ActionEvaluation {
   const w = { ...config.weights, ...options.weights };
-  const own = expectedInformationGain(pack, action, state.belief);
+  const eigOf = (candidate: KnowledgeAction): { bits: number; outcomes: OutcomeProbability[] } => {
+    const cache = options.eigCache;
+    const cached = cache?.get(candidate.id);
+    if (cached) return cached;
+    const fresh = expectedInformationGain(pack, candidate, state.belief);
+    cache?.set(candidate.id, fresh);
+    return fresh;
+  };
+  const own = eigOf(action);
   const revealed = revealedOutcome(pack, action, state.observedSignals);
   const ownEig = revealed.revealed ? 0 : own.bits;
 
   let eig = ownEig;
   let enabled: string | null = null;
   for (const other of unlockedBy(pack, action, state.satisfied)) {
-    const otherEval = expectedInformationGain(pack, other, state.belief);
+    const otherEval = eigOf(other);
     const reveal = revealedOutcome(pack, other, state.observedSignals);
     const credit = reveal.revealed ? 0 : otherEval.bits * action.reliability * 0.9;
     if (credit > eig) {
@@ -357,9 +411,10 @@ export function rankActions(
   state: RankingState,
   options: RankOptions = {},
 ): RankedActions {
+  const shared: RankOptions = options.eigCache ? options : { ...options, eigCache: new Map() };
   const evaluations = pack.pack.actions
-    .filter((a) => (options.filter ? options.filter(a) : true))
-    .map((a) => evaluateAction(pack, config, a, state, options));
+    .filter((a) => (shared.filter ? shared.filter(a) : true))
+    .map((a) => evaluateAction(pack, config, a, state, shared));
   const byScore = (a: ActionEvaluation, b: ActionEvaluation): number =>
     b.score - a.score || (a.action.id < b.action.id ? -1 : 1);
   return {
@@ -368,13 +423,14 @@ export function rankActions(
   };
 }
 
-/** Rank of each candidate under perturbed weights, for the sensitivity display. */
+/**
+ * Rank of each candidate under perturbed weights, for the sensitivity display. Which actions are
+ * candidates does not depend on the cost weights, so the ranked candidates are only re-scored.
+ */
 function sensitivity(
-  pack: CompiledPack,
   config: ActionValueConfig,
-  state: RankingState,
   options: RankOptions,
-  candidateIds: readonly string[],
+  candidates: readonly ActionEvaluation[],
 ): Map<string, { label: string; rank: number; score: number }[]> {
   const delta = config.sensitivityDelta;
   const base = { ...config.weights, ...options.weights };
@@ -393,11 +449,22 @@ function sensitivity(
   }
   const out = new Map<string, { label: string; rank: number; score: number }[]>();
   for (const sc of scenarios) {
-    const ranked = rankActions(pack, config, state, { ...options, weights: sc.weights }).candidates;
-    ranked.forEach((e, i) => {
-      if (!candidateIds.includes(e.action.id)) return;
+    const w = sc.weights;
+    const rescored = candidates
+      .map((e) => ({
+        e,
+        score:
+          e.numerator /
+          (config.epsilon +
+            w.time * e.normalized.time +
+            w.token * e.normalized.token +
+            w.customer * e.normalized.customer +
+            w.risk * e.normalized.risk),
+      }))
+      .sort((a, b) => b.score - a.score || (a.e.action.id < b.e.action.id ? -1 : 1));
+    rescored.forEach(({ e, score }, i) => {
       const list = out.get(e.action.id) ?? [];
-      list.push({ label: sc.label, rank: i + 1, score: round(e.score, 3) });
+      list.push({ label: sc.label, rank: i + 1, score: round(score, 3) });
       out.set(e.action.id, list);
     });
   }
@@ -444,13 +511,7 @@ export function toBreakdowns(
 ): { candidates: ActionValueBreakdown[]; blocked: ActionValueBreakdown[] } {
   const ranked = rankActions(pack, config, state, options);
   const best = ranked.candidates[0]?.score ?? 0;
-  const sens = sensitivity(
-    pack,
-    config,
-    state,
-    options,
-    ranked.candidates.map((c) => c.action.id),
-  );
+  const sens = sensitivity(config, options, ranked.candidates);
   const build = (e: ActionEvaluation, rank: number, withSens: boolean): ActionValueBreakdown => {
     const scenarios = withSens ? (sens.get(e.action.id) ?? []) : [];
     const ranks = [rank, ...scenarios.map((s) => s.rank)];
