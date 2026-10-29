@@ -4,8 +4,11 @@
   "private": true,
   "type": "module",
   "description": "RBAC policy, identity strategies (dev persona, Entra JWT), tenant context, redaction, prompt-injection detection, file validation, URL safety, rate limiting.",
+  "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./rbac": "./src/rbac.ts",
+    "./headers": "./src/headers.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
