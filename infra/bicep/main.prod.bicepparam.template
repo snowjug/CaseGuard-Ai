@@ -1,0 +1,132 @@
+using 'main.bicep'
+
+// =====================================================================================================================
+// CaseGuard AI - PRODUCTION parameter TEMPLATE. NOT DEPLOYABLE AS-IS.
+//
+// The file name deliberately does not end in .bicepparam so tooling never tries to build or deploy it with the
+// placeholders still in place. To use it:
+//   1. Copy it to infra/bicep/main.prod.local.bicepparam (git-ignored by infra/bicep/.gitignore).
+//   2. Replace every angle-bracket placeholder and every all-zero GUID with your own values.
+//   3. Review every line: these are starting points, not recommendations for your workload, region or budget.
+//   4. Run what-if (infra/scripts/what-if.*) against the PRODUCTION subscription, get the change approved, then deploy
+//      through the protected pipeline described in docs/DEPLOYMENT.md.
+// Region is NOT set here: it is the deployment location passed on the command line.
+// Nothing here has been deployed or load-tested. Prices are intentionally absent: see docs/COST_GUIDE.md.
+// =====================================================================================================================
+
+param environmentName = 'prod'
+
+// Tags. dataClassification is fixed to 'synthetic-demo' in main.bicep: re-run docs/THREAT_MODEL.md before changing it.
+param owner = '<owner-team-alias>'
+param costCenter = '<cost-center>'
+
+// Application rollout. Production deploys an immutable tag (commit SHA or release version); 'latest' is rejected.
+param deployContainerApps = bool(readEnvironmentVariable('CASEGUARD_DEPLOY_APPS', 'true'))
+param imageTag = readEnvironmentVariable('CASEGUARD_IMAGE_TAG', '')
+param appVersion = '<release-version>'
+
+// Always-on replicas avoid cold starts. In-memory rate limits and caches are per replica (docs/ASSUMPTIONS.md A-13),
+// so grow maxReplicas only after deciding how limits are shared across replicas.
+param webCpu = '0.5'
+param webMemory = '1.0Gi'
+param webMinReplicas = 1
+param webMaxReplicas = 3
+param apiCpu = '1.0'
+param apiMemory = '2.0Gi'
+param apiMinReplicas = 1
+param apiMaxReplicas = 3
+// Zone redundancy needs a region with availability zones and private networking.
+param containerAppsZoneRedundant = true
+// Keep the migration job timeout above your slowest migration.
+param migrationTimeoutSeconds = 1800
+
+// Microsoft Entra ID. See docs/ENTRA_ID_SETUP.md.
+param entraTenantId = '00000000-0000-0000-0000-000000000000'
+param entraApiAudience = 'api://00000000-0000-0000-0000-000000000000'
+param entraWebClientId = '00000000-0000-0000-0000-000000000000'
+param entraApiScope = 'api://00000000-0000-0000-0000-000000000000/access_as_user'
+param entraTenantMap = {
+  // key: the Entra tenant id, value: the CaseGuard tenant id
+  '00000000-0000-0000-0000-000000000000': '<caseguard-tenant-id>'
+}
+
+// Demo routes and seeding are never enabled in production.
+param demoMode = false
+param demoAutoSeed = false
+
+// Sampling lowers telemetry cost; 1 keeps everything.
+param otelSamplingRatio = '0.2'
+param logLevel = 'info'
+
+// AI. Look up current prices yourself and enter them if you want cost estimates; empty reports cost as unknown.
+param aiCostLimitUsdPerDay = ''
+param aiUnitPriceInputPer1k = ''
+param aiUnitPriceOutputPer1k = ''
+
+// Database: Entra-only authentication, no password anywhere. The managed identity becomes the Entra administrator,
+// and the extra administrators below are for human operators (use a security group).
+// Verify the SKU is available in your region and subscription before relying on it.
+param postgresAuthMode = 'entra'
+param postgresSkuTier = 'GeneralPurpose'
+param postgresSkuName = 'Standard_D2ds_v5'
+param postgresStorageGb = 128
+param postgresBackupRetentionDays = 14
+param postgresGeoRedundantBackup = false
+// Zone-redundant HA needs a region with availability zones and roughly doubles compute cost.
+param postgresHighAvailability = 'ZoneRedundant'
+param postgresAllowAzureServices = false
+// List extensions only if the migrations run CREATE EXTENSION, for example ['pgcrypto'].
+param postgresAllowedExtensions = []
+param postgresAdditionalEntraAdmins = [
+  {
+    objectId: '00000000-0000-0000-0000-000000000000'
+    principalName: '<operators-security-group-name>'
+    principalType: 'Group'
+  }
+]
+
+// Storage, Key Vault, registry. Decide blob retention with the data owner: lifecycle deletion removes case blobs.
+param storageSku = 'Standard_ZRS'
+param blobCoolAfterDays = 30
+param blobDeleteAfterDays = 0
+param blobSoftDeleteDays = 14
+param keyVaultSoftDeleteDays = 90
+param keyVaultPurgeProtection = true
+param registrySku = 'Standard'
+
+// Observability. Ingress (HTTP) logs contain client IPs: enable only after a privacy review.
+param logRetentionDays = 90
+param logDailyCapGb = -1
+param diagnosticsEnabled = true
+param containerAppsHttpLogs = false
+param postgresVerboseDiagnostics = false
+
+// Optional services. Remove what you do not use.
+// AI Search: set deploySearch=false to keep the lexical provider. basic is the smallest tier with private endpoints.
+param deploySearch = true
+param searchSku = 'basic'
+param searchReplicaCount = 1
+param searchPartitionCount = 1
+// Azure OpenAI: prefer an existing account (its model access and quota are managed where they already exist).
+param deployOpenAi = false
+param existingOpenAiResourceId = '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/<openai-resource-group>/providers/Microsoft.CognitiveServices/accounts/<account-name>'
+param existingOpenAiEndpoint = 'https://<custom-subdomain>.openai.azure.com/'
+param openAiDeploymentName = '<existing-deployment-name>'
+// Redis is not used by the application yet; keep it off.
+param deployRedis = false
+
+// Private networking: VNet-integrated Container Apps, private endpoints, public access disabled on data services.
+param enablePrivateNetworking = true
+param vnetAddressPrefix = '10.40.0.0/16'
+param containerAppsSubnetPrefix = '10.40.0.0/23'
+param privateEndpointSubnetPrefix = '10.40.2.0/26'
+
+// Budget and alerts. The amount is a notification threshold in your billing currency, not an estimate. Pass a fixed
+// budgetStartDate (first day of a month) if you redeploy in later months, so the budget does not drift.
+param monthlyBudgetAmount = 1000
+param contactEmails = [
+  '<ops-mailbox@your-domain>'
+]
+param deployAlerts = true
+param alertServerErrorThreshold = 5
+param alertResponseTimeThresholdMs = 2000

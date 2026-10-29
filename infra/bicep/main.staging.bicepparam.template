@@ -1,0 +1,73 @@
+using 'main.bicep'
+
+// =====================================================================================================================
+// CaseGuard AI - STAGING parameter TEMPLATE. NOT DEPLOYABLE AS-IS.
+//
+// Staging rehearses production: Entra-only database, private networking, immutable image tags. It trades capacity for
+// cost: smaller database, no high availability, replicas can scale to zero. Copy to main.staging.local.bicepparam
+// (git-ignored), replace every angle-bracket placeholder and all-zero GUID, and read main.prod.bicepparam.template for the
+// commentary on each setting. Region is passed as the deployment location. Nothing here has been deployed.
+// =====================================================================================================================
+
+param environmentName = 'staging'
+
+param owner = '<owner-team-alias>'
+param costCenter = '<cost-center>'
+
+param deployContainerApps = bool(readEnvironmentVariable('CASEGUARD_DEPLOY_APPS', 'true'))
+param imageTag = readEnvironmentVariable('CASEGUARD_IMAGE_TAG', '')
+
+param webMinReplicas = 0
+param webMaxReplicas = 2
+param apiMinReplicas = 0
+param apiMaxReplicas = 2
+
+param entraTenantId = '00000000-0000-0000-0000-000000000000'
+param entraApiAudience = 'api://00000000-0000-0000-0000-000000000000'
+param entraWebClientId = '00000000-0000-0000-0000-000000000000'
+param entraApiScope = 'api://00000000-0000-0000-0000-000000000000/access_as_user'
+param entraTenantMap = {
+  '00000000-0000-0000-0000-000000000000': '<caseguard-tenant-id>'
+}
+
+param demoMode = false
+param demoAutoSeed = false
+
+// Entra-only authentication, like production, on a smaller server.
+param postgresAuthMode = 'entra'
+param postgresSkuTier = 'Burstable'
+param postgresSkuName = 'Standard_B2s'
+param postgresStorageGb = 32
+param postgresBackupRetentionDays = 7
+param postgresHighAvailability = 'Disabled'
+param postgresAllowAzureServices = false
+param postgresAdditionalEntraAdmins = [
+  {
+    objectId: '00000000-0000-0000-0000-000000000000'
+    principalName: '<operators-security-group-name>'
+    principalType: 'Group'
+  }
+]
+
+param storageSku = 'Standard_LRS'
+param blobCoolAfterDays = 0
+param blobDeleteAfterDays = 60
+param keyVaultSoftDeleteDays = 30
+param keyVaultPurgeProtection = true
+param registrySku = 'Basic'
+
+param logRetentionDays = 30
+param logDailyCapGb = 2
+param diagnosticsEnabled = true
+
+param deploySearch = false
+param deployOpenAi = false
+param deployRedis = false
+
+param enablePrivateNetworking = true
+
+param monthlyBudgetAmount = 300
+param contactEmails = [
+  '<ops-mailbox@your-domain>'
+]
+param deployAlerts = true

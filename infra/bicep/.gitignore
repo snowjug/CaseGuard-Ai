@@ -1,0 +1,7 @@
+# Local, operator-specific parameter files hold real tenant/subscription/app ids and must never be committed.
+*.local.bicepparam
+*.local.json
+*.local.env
+# Compiled ARM output is a build artefact, not source.
+main.json
+modules/*.json
