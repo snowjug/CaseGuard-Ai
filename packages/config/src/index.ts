@@ -27,4 +27,5 @@ export type {
   SearchConfig,
   StorageConfig,
   TelemetryConfig,
+  TrustProxySetting,
 } from './types';

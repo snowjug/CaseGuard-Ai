@@ -1,4 +1,4 @@
-import { envBoolean, envEnum, envInt, envNumber, envString } from './primitives';
+import { envBoolean, envEnum, envInt, envNumber, envString, envTrustProxy } from './primitives';
 import { z } from 'zod';
 
 export const APP_ENVS = ['local', 'test', 'development', 'staging', 'production'] as const;
@@ -17,7 +17,7 @@ export const RawEnvSchema = z.object({
   API_HOST: envString(255),
   API_PORT: envInt(1, 65_535),
   CORS_ALLOWED_ORIGINS: envString(2_000),
-  TRUST_PROXY: envBoolean(),
+  TRUST_PROXY: envTrustProxy(),
   LOG_LEVEL: envEnum(LOG_LEVELS),
 
   AUTH_MODE: envEnum(['dev', 'entra'] as const),

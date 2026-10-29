@@ -285,6 +285,15 @@ describe('provider requirements', () => {
     expect(result.ok && result.config.demo).toEqual({ mode: false, autoSeed: false });
   });
 
+  it('warns when a deployed environment trusts every forwarded hop, but not for a hop count', () => {
+    const every = validateConfig(withProd({ TRUST_PROXY: 'true' }));
+    expect(every.ok && every.config.warnings.join('\n')).toMatch(/TRUST_PROXY=true trusts every/);
+    const counted = validateConfig(withProd({ TRUST_PROXY: '1' }));
+    expect(counted.ok && counted.config.warnings.join('\n')).not.toMatch(/TRUST_PROXY/);
+    const local = validateConfig({ TRUST_PROXY: 'true' });
+    expect(local.ok && local.config.warnings.join('\n')).not.toMatch(/TRUST_PROXY/);
+  });
+
   it('warns about an ineffective AI rate limit and a stray key', () => {
     const result = validateConfig({
       RATE_LIMIT_MAX: '10',

@@ -15,11 +15,18 @@ export interface RuntimeConfig {
   readonly production: boolean;
 }
 
+/**
+ * Which proxies may tell the API the client's address (`X-Forwarded-For`). `false` ignores the header;
+ * `true` believes every hop, so a client can pick its own address (local use only); a number trusts
+ * that many proxies counted from the API; a list trusts proxies at those addresses or ranges.
+ */
+export type TrustProxySetting = boolean | number | readonly string[];
+
 export interface HttpConfig {
   readonly host: string;
   readonly port: number;
   readonly corsAllowedOrigins: readonly string[];
-  readonly trustProxy: boolean;
+  readonly trustProxy: TrustProxySetting;
   readonly bodyLimitBytes: number;
   readonly uploadMaxBytes: number;
 }

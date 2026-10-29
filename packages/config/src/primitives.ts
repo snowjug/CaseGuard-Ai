@@ -41,3 +41,31 @@ export const splitList = (value: string): string[] =>
     .split(',')
     .map((part) => part.trim())
     .filter((part) => part.length > 0);
+
+/** More proxies than this in front of one API is a typo, not a topology. */
+export const MAX_PROXY_HOPS = 10;
+
+/**
+ * Which proxies may set the client address: `false` (none), `true` (every hop), digits (that many
+ * hops, counted from the API), or a comma-separated list of addresses, CIDR ranges and the keywords
+ * `loopback`, `linklocal` and `uniquelocal`. Digits are always a hop count, so `1` means one proxy.
+ */
+export const envTrustProxy = () =>
+  z.preprocess(
+    (value) => {
+      const cleaned = blankToUndefined(value);
+      if (typeof cleaned !== 'string') return cleaned;
+      const lower = cleaned.toLowerCase();
+      if (/^\d+$/.test(lower)) return lower === '0' ? false : Number(lower);
+      if (TRUE_WORDS.has(lower)) return true;
+      if (FALSE_WORDS.has(lower)) return false;
+      return splitList(cleaned);
+    },
+    z
+      .union([
+        z.boolean(),
+        z.number().int().min(1).max(MAX_PROXY_HOPS),
+        z.array(z.string().min(1).max(64)).min(1).max(32),
+      ])
+      .optional(),
+  );

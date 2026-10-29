@@ -16,7 +16,6 @@ describe('value parsing', () => {
   it.each([
     ['true', true],
     ['TRUE', true],
-    ['1', true],
     ['yes', true],
     ['on', true],
     ['false', false],
@@ -29,9 +28,26 @@ describe('value parsing', () => {
     expect(parsed({ TRUST_PROXY: text }).http.trustProxy).toBe(expected);
   });
 
-  it.each(['maybe', '2', 'tru', 'enabled'])('rejects %s as a boolean', (text) => {
-    expect(variablesOf({ TRUST_PROXY: text })).toEqual(['TRUST_PROXY']);
+  it.each([
+    ['1', 1],
+    ['2', 2],
+    [' 3 ', 3],
+  ])('reads %s as a proxy hop count', (text, expected) => {
+    expect(parsed({ TRUST_PROXY: text }).http.trustProxy).toBe(expected);
   });
+
+  it('reads a list of proxy addresses and ranges', () => {
+    expect(
+      parsed({ TRUST_PROXY: '10.0.0.0/8, 192.168.1.5 ,loopback,fd00::/8' }).http.trustProxy,
+    ).toEqual(['10.0.0.0/8', '192.168.1.5', 'loopback', 'fd00::/8']);
+  });
+
+  it.each(['maybe', 'tru', 'enabled', '11', '10.0.0.0/33', 'fd00::/129', 'not-an-address'])(
+    'rejects %s as a proxy setting',
+    (text) => {
+      expect(variablesOf({ TRUST_PROXY: text })).toEqual(['TRUST_PROXY']);
+    },
+  );
 
   it.each([
     ['4000', 4000],

@@ -150,7 +150,7 @@ describe('real environments', () => {
       APP_VERSION: '1.0.0',
       GIT_COMMIT: '0123456789abcdef',
       LOG_LEVEL: 'info',
-      TRUST_PROXY: 'true',
+      TRUST_PROXY: '1',
       ENTRA_ROLE_MAP: JSON.stringify({
         'CaseGuard.Engineer': 'engineer',
         'CaseGuard.Reviewer': 'reviewer',
@@ -192,7 +192,7 @@ describe('real environments', () => {
     expect(config.ai.limits.costLimitUsdPerDay).toBeNull();
     expect(config.auth.azureClientId).toBe('00000000-0000-0000-0000-000000000001');
     expect(config.telemetry.appInsightsConnectionString).not.toBeNull();
-    expect(config.http.trustProxy).toBe(true);
+    expect(config.http.trustProxy).toBe(1);
   });
 
   it('accepts Azure OpenAI with managed identity and Azure AI Search', () => {

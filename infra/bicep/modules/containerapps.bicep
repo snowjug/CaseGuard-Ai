@@ -230,7 +230,9 @@ var plainEnv = filter(
     { name: 'APP_VERSION', value: config.appVersion }
     { name: 'GIT_COMMIT', value: config.gitCommit }
     { name: 'LOG_LEVEL', value: config.logLevel }
-    { name: 'TRUST_PROXY', value: 'true' }
+    // The Container Apps ingress is the one proxy in front of the API: believe the address it appended to
+    // X-Forwarded-For and ignore anything a client put before it (a hop count, never `true`).
+    { name: 'TRUST_PROXY', value: '1' }
     // Persona login is never enabled in Azure: the endpoints are reachable from the internet.
     { name: 'AUTH_MODE', value: 'entra' }
     { name: 'DEV_AUTH_ENABLED', value: 'false' }

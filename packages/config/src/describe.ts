@@ -1,4 +1,11 @@
-import type { AppConfig } from './types';
+import type { AppConfig, TrustProxySetting } from './types';
+
+function describeTrustProxy(setting: TrustProxySetting): string {
+  if (setting === false) return 'off';
+  if (setting === true) return 'every hop';
+  if (typeof setting === 'number') return `${setting} ${setting === 1 ? 'hop' : 'hops'}`;
+  return `${setting.length} address ${setting.length === 1 ? 'range' : 'ranges'}`;
+}
 
 export interface ConfigSummary {
   readonly environment: string;
@@ -9,7 +16,7 @@ export interface ConfigSummary {
     readonly host: string;
     readonly port: number;
     readonly corsOrigins: readonly string[];
-    readonly trustProxy: boolean;
+    readonly trustProxy: string;
   };
   readonly auth: {
     readonly mode: string;
@@ -72,7 +79,7 @@ export function describeConfig(config: AppConfig): ConfigSummary {
       host: config.http.host,
       port: config.http.port,
       corsOrigins: config.http.corsAllowedOrigins,
-      trustProxy: config.http.trustProxy,
+      trustProxy: describeTrustProxy(config.http.trustProxy),
     },
     auth: {
       mode: config.auth.mode,
