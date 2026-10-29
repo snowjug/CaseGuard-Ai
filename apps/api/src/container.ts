@@ -18,6 +18,7 @@ import {
   type Database,
   type Repositories,
 } from './db';
+import { createIdentityResolver } from './identity-sync';
 import type { BaseInfrastructure, Infrastructure } from './infrastructure';
 import { createServices } from './services';
 import type { Services } from './services/ports';
@@ -212,18 +213,7 @@ export async function createInfrastructure(
                 status: user.status,
               };
         },
-        resolveUser: async (claims) => {
-          const user = await repos
-            .forTenant({ tenantId: claims.tenantId, actorId: 'system:auth' })
-            .governance.getUser(claims.objectId);
-          return {
-            userId: claims.objectId,
-            ...(user
-              ? { displayName: user.displayName, email: user.email, synthetic: user.synthetic }
-              : {}),
-            ...(user?.status === 'disabled' ? { disabled: true } : {}),
-          };
-        },
+        resolveUser: createIdentityResolver({ repos, now, logger }),
       },
     );
 
