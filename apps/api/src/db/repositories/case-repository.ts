@@ -40,6 +40,7 @@ import {
   type RepoContext,
 } from './support';
 import type {
+  CaseCounts,
   CaseListItem,
   CaseListQuery,
   CaseRepository,
@@ -400,6 +401,28 @@ export class CaseRepositoryImpl implements CaseRepository {
         [this.ctx.scope.tenantId, caseId, boundary],
       ),
     );
+  }
+
+  async counts(): Promise<CaseCounts> {
+    return this.ctx.run(async (tx) => {
+      const result = await tx.query<{ analysis_state: string; n: number; synthetic_n: number }>(
+        `SELECT analysis_state, count(*)::int AS n, (count(*) FILTER (WHERE synthetic))::int AS synthetic_n
+           FROM cases WHERE tenant_id = $1 GROUP BY analysis_state`,
+        [this.ctx.scope.tenantId],
+      );
+      const byAnalysisState = Object.fromEntries(
+        AnalysisStateSchema.options.map((state) => [state, 0]),
+      ) as Record<AnalysisState, number>;
+      let total = 0;
+      let synthetic = 0;
+      for (const row of result.rows) {
+        byAnalysisState[parseStored(AnalysisStateSchema, row.analysis_state, 'analysis state')] +=
+          row.n;
+        total += row.n;
+        synthetic += row.synthetic_n;
+      }
+      return { total, synthetic, byAnalysisState };
+    });
   }
 
   async setAnalysisState(

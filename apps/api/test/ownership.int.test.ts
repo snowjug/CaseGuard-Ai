@@ -47,7 +47,7 @@ describe('production-like ownership: a non-superuser owns the schema', () => {
       await db.query('GRANT CREATE, USAGE ON SCHEMA public TO cg_owner');
       const owner = asRole(db, 'cg_owner');
 
-      expect((await migrate(owner)).appliedNow).toHaveLength(7);
+      expect((await migrate(owner)).appliedNow).toHaveLength(8);
       await seedFoundation(owner);
 
       const tableOwner = await db.query<{ owner: string }>(

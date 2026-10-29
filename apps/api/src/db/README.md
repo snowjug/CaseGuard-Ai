@@ -9,7 +9,8 @@ client.ts            createDatabase({ url, auth?, poolMax? }) -> Database (pg po
 migrate.ts           migrate(db), getMigrationStatus(db); migrate-cli.ts is `pnpm db:migrate`
 migrations/*.sql     the full schema (tables, indexes, triggers, RLS, grants)
 repositories/        one class per interface in types.ts; createRepositories(db, deps?)
-                     (specs-*.ts hold the entity <-> table projections, re-exported by table-specs.ts)
+                     (specs-*.ts hold the entity <-> table projections, re-exported by table-specs.ts;
+                     analysis-read-models.ts holds the cross-case dashboard read models)
 seed.ts              seedFoundation(db), DEV_PERSONAS (synthetic tenants and users)
 testing.ts           createTestDatabase(), createTestRepositories(), fault injection
 ../storage/          ObjectStore (local directory, Azure Blob), tenant-scoped keys
@@ -101,13 +102,58 @@ configuration) and no extension.
   `ALTER FUNCTION ts_match_vq(tsvector, tsquery) LEAKPROOF` (checked on PGlite; it edits `pg_catalog` and is not
   possible on managed PostgreSQL). Past that scale, use the external search provider instead.
 
+## Dashboard read models (FR-UX-01)
+
+The Command Center and the case list need figures that span cases. They are plain repository methods (no cache,
+no extra tables) over the stored artefacts of each case's **latest analysis** (`cases.last_analysis_run_id`;
+`saveSnapshot` replaces a case's artefacts in one transaction, so a figure never mixes two runs). Every
+statement filters by `tenant_id` itself and also runs under row-level security; both are tested, the first
+with row-level security bypassed.
+
+- `analysis.summarize(caseIds: readonly string[]): Promise<CaseAnalysisSummary[]>` returns, per case,
+  `{ caseId, qualityIndex, avoidableEffortPct, leadingHypothesis: { name, confidence } | null, openWarningCount }`
+  (the analysis-derived fields of `CaseSummarySchema`). One statement serves the whole list (lateral lookups on
+  each case's own key prefixes), however many ids; at most **200** ids, duplicates included, otherwise
+  `ValidationFailedError` (`caseIds`; `caseIds.<n>` for an id that is not a non-empty string of at most 120
+  characters without control characters). An empty list returns `[]` without touching the database.
+  - It returns one entry per requested id **that is a case of this tenant**, in the requested order, duplicates
+    collapsed. A case that was never analysed (or is only queued) is present with `null`, `null`, `null` and `0`.
+    Ids that are not cases of the tenant, unknown or another tenant's, are **omitted**, so a caller cannot tell
+    them apart.
+  - `qualityIndex` is the stored quality assessment's composite score; `avoidableEffortPct` is the value of the
+    stored `avoidable_support_effort` metric, `null` when its status is `unknown`; the leading hypothesis is the
+    one with the highest current confidence (ties: lower ordinal, then id); `openWarningCount` counts warnings
+    in state `open`, so dismissed and resolved ones are not included. A case being re-analysed keeps reporting
+    its last stored analysis until the new one is saved.
+- `analysis.listOpenWarnings({ limit })`: warnings in state `open` across the tenant, `critical` > `high` >
+  `medium` > `low`, then most recently raised, then `rank`, case id and id. `limit` is 1..100.
+- `analysis.listCriticalMissing({ limit, minCriticality? })`: missing evidence with `resolvedAt` null, from each
+  case's latest run only, each item carrying its `caseId`. Ranked by `criticality` (`critical` > `important` >
+  `helpful`, the only priority field of `MissingEvidenceSchema`), then `firstRelevantAt` newest first, then case
+  id and id. By default every criticality is listed, best first, so a small `limit` shows the critical items;
+  `minCriticality: 'critical'` (or `'important'`) restricts the list. `limit` is 1..100. The `minCriticality`
+  option is an addition to the requested signature.
+- `analysis.getHypothesis(caseId, hypothesisId)`: the stored hypothesis, or `null` when that case of this tenant
+  has no such hypothesis.
+- `cases.counts()`: `{ total, synthetic, byAnalysisState }` from one `GROUP BY`; every analysis state is present
+  and zero when no case is in it.
+- Migration 0008 adds two **partial indexes**, `case_warnings_open_idx` (`state = 'open'`) and
+  `missing_evidence_open_idx` (`resolved_at IS NULL`), because most items end up closed and the tenant-wide lists
+  only ever read the open ones. A test shows through `EXPLAIN` that the planner picks them for the application
+  role. Measured once on PGlite as `caseguard_app` under row-level security with 4,000 cases, 20,000 warnings
+  and 12,000 missing-evidence items: `summarize` of 200 ids about 11 ms, `counts` about 6 ms, the warning list
+  7.6 ms to 4.1 ms and the missing-evidence list 8.7 ms to 6.6 ms with the indexes. These are not benchmarks of
+  PostgreSQL 16.
+
 ## Migrations
 
 `migrations/NNNN_name.sql`, applied in order, each in its own transaction, with a checksum recorded in
 `schema_migrations`. **A released migration is never edited**: the runner refuses to continue against a
 database that applied the old text, and `test/migrations.int.test.ts` pins the checksum of every released
 file, so a schema change is always a new file. Add it to `MIGRATION_NAMES` in that test. `0007` adds search
-and the identity-sync changes above; its upgrade path (data written under 0006) is tested.
+and the identity-sync changes above; its upgrade path (data written under 0006) is tested. `0008` adds the
+two partial indexes of the dashboard read models; the same test upgrades a database that stopped at 0006
+through both.
 
 ## Conventions
 

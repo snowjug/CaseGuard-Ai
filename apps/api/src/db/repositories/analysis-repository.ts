@@ -34,6 +34,7 @@ import {
 import type { z } from 'zod';
 import { ConflictError } from '../../errors';
 import { decodeCursor, encodeCursor, normalizeLimit, toPage } from '../cursor';
+import { AnalysisReadModels } from './analysis-read-models';
 import {
   DismissSchema,
   ForkReviewSchema,
@@ -52,7 +53,6 @@ import {
   updateRow,
   validateInput,
   type DataRow,
-  type RepoContext,
 } from './support';
 import type {
   AnalysisRepository,
@@ -62,9 +62,7 @@ import type {
   ReviewClaimInput,
 } from './types';
 
-export class AnalysisRepositoryImpl implements AnalysisRepository {
-  constructor(private readonly ctx: RepoContext) {}
-
+export class AnalysisRepositoryImpl extends AnalysisReadModels implements AnalysisRepository {
   private caseQuery(caseId: string): QueryBuilder {
     const q = new QueryBuilder();
     q.where(`tenant_id = ${q.bind(this.ctx.scope.tenantId)}`);
@@ -298,6 +296,12 @@ export class AnalysisRepositoryImpl implements AnalysisRepository {
       'ordinal, id',
       SNAPSHOT_LIMITS.hypotheses,
     );
+  }
+
+  async getHypothesis(caseId: string, hypothesisId: string): Promise<Hypothesis | null> {
+    const q = this.caseQuery(caseId);
+    q.where(`id = ${q.bind(hypothesisId)}`);
+    return this.selectOne('hypotheses', HypothesisSchema, 'hypothesis', q);
   }
 
   async listActions(caseId: string, asOf?: string): Promise<DiagnosticAction[]> {

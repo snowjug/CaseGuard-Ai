@@ -24,8 +24,11 @@ const MIGRATION_NAMES = [
   '0005_counterfactuals_and_skills',
   '0006_telemetry_audit_and_ops',
   '0007_search_and_identity_sync',
+  '0008_dashboard_read_models',
 ];
 const LATEST_MIGRATION = MIGRATION_NAMES[MIGRATION_NAMES.length - 1];
+/** What a database that predates search (migration 0007) has applied. */
+const BEFORE_SEARCH = MIGRATION_NAMES.slice(0, 6);
 
 /**
  * Checksums of the migrations that have been released. A released migration is never edited: the
@@ -41,6 +44,9 @@ const RELEASED_CHECKSUMS: Record<string, string> = {
     '938144928db38f2a8ba227d4ff8d95ab36bd8a9e8c45fc9e6ae27cf680f2a2c3',
   '0006_telemetry_audit_and_ops':
     '38563e58807a5ec22b4a05119922ca5e8b0d2a4bad981a6243bd387c2f6b5bb3',
+  '0007_search_and_identity_sync':
+    '96b1488647ff5dbe14eb0d16b0482286ce20aa51a65d26495fd38aefa74fc973',
+  '0008_dashboard_read_models': '636b604258169cbac0ada5bd7cda550929f46b27085166938587f9223d3051e0',
 };
 
 async function scratchDir(prefix: string): Promise<string> {
@@ -136,15 +142,15 @@ describe('[NFR-REL-01] migrations', () => {
   );
 
   it(
-    'upgrade a database that already holds data: old rows become searchable and sign-in inserts work',
+    'upgrade a database that already holds data (from 0006): old rows become searchable, sign-in inserts work',
     SLOW,
     async () => {
       const files = await loadMigrations();
       const dir = await scratchDir('upgrade');
-      for (const file of files.filter((f) => f.name !== LATEST_MIGRATION)) {
+      for (const file of files.filter((f) => BEFORE_SEARCH.includes(f.name))) {
         await writeFile(join(dir, `${file.name}.sql`), file.sql);
       }
-      expect((await migrate(db, { dir })).appliedNow).toEqual(MIGRATION_NAMES.slice(0, -1));
+      expect((await migrate(db, { dir })).appliedNow).toEqual(BEFORE_SEARCH);
       await seedFoundation(db);
 
       const repos = createRepositories(db).forTenant(CONTOSO_SCOPE);
@@ -164,15 +170,21 @@ describe('[NFR-REL-01] migrations', () => {
         db.query<{ indexname: string; indexdef: string }>(
           "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'users' AND indexname LIKE 'users_tenant_email%'",
         );
+      const openIndexes = () =>
+        db.query<{ indexname: string; indexdef: string }>(
+          "SELECT indexname, indexdef FROM pg_indexes WHERE indexname LIKE '%\\_open\\_idx' ORDER BY indexname",
+        );
       expect((await insertGranted()).rows[0]?.granted).toBe(false);
       expect((await emailIndexes()).rows.map((row) => row.indexname)).toEqual([
         'users_tenant_email_uq',
       ]);
+      expect((await openIndexes()).rows).toEqual([]);
       await expect(db.query('SELECT search_tsv FROM cases')).rejects.toBeDefined();
 
       const upgraded = await migrate(db);
-      expect(upgraded.appliedNow).toEqual([LATEST_MIGRATION]);
+      expect(upgraded.appliedNow).toEqual(MIGRATION_NAMES.slice(BEFORE_SEARCH.length));
       expect(upgraded.status.pending).toEqual([]);
+      expect(upgraded.status.latest).toBe(LATEST_MIGRATION);
 
       // Rows written before the migration are indexed by it, with no re-ingest or re-analysis.
       const legacy = await repos.search.query({ text: 'legacy', limit: 10 });
@@ -186,6 +198,30 @@ describe('[NFR-REL-01] migrations', () => {
       const [index] = (await emailIndexes()).rows;
       expect(index?.indexname).toBe('users_tenant_email_idx');
       expect(index?.indexdef).not.toMatch(/UNIQUE/);
+
+      // The dashboard indexes (0008) are partial, so they only cover what is still open, and the
+      // read models work on the upgraded data with no re-analysis.
+      const open = (await openIndexes()).rows;
+      expect(open.map((row) => row.indexname)).toEqual([
+        'case_warnings_open_idx',
+        'missing_evidence_open_idx',
+      ]);
+      expect(open[0]?.indexdef).toMatch(/WHERE \(state = 'open'/);
+      expect(open[1]?.indexdef).toMatch(/WHERE \(resolved_at IS NULL\)/);
+      expect(await repos.analysis.summarize(['case_legacy'])).toEqual([
+        {
+          caseId: 'case_legacy',
+          qualityIndex: 72,
+          avoidableEffortPct: 31,
+          leadingHypothesis: { name: 'Proxy rule blocks the sign-in endpoint', confidence: 0.6 },
+          openWarningCount: 2,
+        },
+      ]);
+      expect((await repos.analysis.listOpenWarnings({ limit: 10 })).map((w) => w.id)).toEqual([
+        'warn_case_legacy_scope',
+        'warn_case_legacy_logs',
+      ]);
+      expect((await repos.cases.counts()).byAnalysisState.analyzed).toBe(1);
 
       // The first sign-in of users without an e-mail, or with a shared one, no longer collides.
       for (const [userId, email] of [

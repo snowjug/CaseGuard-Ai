@@ -610,6 +610,13 @@ describe('[NFR-SEC-01] global search never crosses tenants', () => {
 });
 
 describe('[FR-UX-04] global search: the indexes behind it', () => {
+  /** Carries an EXPLAIN plan out of a transaction that has to be rolled back (it drops indexes). */
+  class CapturedPlan extends Error {
+    constructor(readonly plan: string) {
+      super('plan captured; rolling the transaction back');
+    }
+  }
+
   const INDEXES: [table: string, index: string, predicate: string][] = [
     ['cases', 'cases_search_idx', ''],
     ['case_events', 'case_events_search_idx', ''],
@@ -649,19 +656,46 @@ describe('[FR-UX-04] global search: the indexes behind it', () => {
   it.each(INDEXES)(
     'the %s index can serve the statement shape used by the search (%s)',
     async (table, index, predicate) => {
-      // Sequential and plain index scans are switched off so only an index that can answer the
-      // full-text condition remains. (For the application role PostgreSQL will not use it while
-      // row-level security applies: `@@` is not leakproof. See migration 0007.)
-      const plan = await h.database.transaction(async (tx) => {
-        await tx.query('SET LOCAL enable_seqscan = off');
-        await tx.query('SET LOCAL enable_indexscan = off');
-        const result = await tx.query<Record<string, string>>(
-          `EXPLAIN WITH q AS (SELECT websearch_to_tsquery('english', 'quokka') AS tsq)
-           SELECT 1 FROM ${table} WHERE ${predicate}search_tsv @@ (SELECT tsq FROM q)`,
+      // Sequential and plain index scans are switched off, and every other non-unique index of the
+      // table is dropped inside a transaction that is rolled back, so only the GIN index is left to
+      // answer the full-text condition (the open-item index of migration 0008 would otherwise be a
+      // valid, cheaper way to read the open warnings of a tiny table). For the application role
+      // PostgreSQL will not use it while row-level security applies: `@@` is not leakproof (0007).
+      const plan = await h.database
+        .transaction(async (tx) => {
+          await tx.query('SET LOCAL enable_seqscan = off');
+          await tx.query('SET LOCAL enable_indexscan = off');
+          const others = await tx.query<{ name: string }>(
+            `SELECT c.relname AS name
+               FROM pg_index x
+               JOIN pg_class c ON c.oid = x.indexrelid
+              WHERE x.indrelid = $1::regclass AND c.relname <> $2
+                AND NOT x.indisunique AND NOT x.indisprimary`,
+            [table, index],
+          );
+          for (const other of others.rows) await tx.query(`DROP INDEX ${other.name}`);
+          const result = await tx.query<Record<string, string>>(
+            `EXPLAIN WITH q AS (SELECT websearch_to_tsquery('english', 'quokka') AS tsq)
+             SELECT 1 FROM ${table} WHERE ${predicate}search_tsv @@ (SELECT tsq FROM q)`,
+          );
+          throw new CapturedPlan(result.rows.map((row) => Object.values(row)[0]).join('\n'));
+        })
+        .then(
+          () => {
+            throw new Error('The transaction was expected to roll back');
+          },
+          (error: unknown) => {
+            if (error instanceof CapturedPlan) return error.plan;
+            throw error;
+          },
         );
-        return result.rows.map((row) => Object.values(row)[0]).join('\n');
-      });
       expect(plan).toContain(`Bitmap Index Scan on ${index}`);
+      // The rollback left the schema as it was.
+      const left = await h.database.query<{ n: number }>(
+        'SELECT count(*)::int AS n FROM pg_indexes WHERE tablename = $1',
+        [table],
+      );
+      expect(left.rows[0]?.n).toBeGreaterThan(1);
     },
   );
 });

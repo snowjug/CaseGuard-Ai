@@ -144,6 +144,15 @@ export interface EventQuery {
   cursor?: string | undefined;
 }
 
+/** How many cases the tenant holds, for dashboard cards. */
+export interface CaseCounts {
+  total: number;
+  /** Cases flagged `synthetic`. */
+  synthetic: number;
+  /** Every analysis state is present, with 0 when no case is in it. */
+  byAnalysisState: Record<AnalysisState, number>;
+}
+
 export interface CaseRepository {
   /**
    * Atomically stores case + source + participants + events + resolution.
@@ -162,6 +171,8 @@ export interface CaseRepository {
   getAllEvents(caseId: string, query?: { asOf?: string | undefined }): Promise<CaseEvent[]>;
   getEvent(caseId: string, eventId: string): Promise<CaseEvent | null>;
   countEventsAfter(caseId: string, asOf: string): Promise<number>;
+  /** Exact totals for the tenant in one query: all cases, the synthetic ones, and cases per analysis state. */
+  counts(): Promise<CaseCounts>;
   setAnalysisState(
     caseId: string,
     state: AnalysisState,
@@ -225,12 +236,52 @@ export interface DismissWarningInput {
   expectedVersion: number;
 }
 
+/**
+ * The four analysis-derived fields of `CaseSummary` (see `CaseSummarySchema`) for one case, which
+ * `CaseListItem` leaves out. Everything is read from the case's latest analysis.
+ */
+export interface CaseAnalysisSummary {
+  caseId: string;
+  /** Composite score (0-100) of the stored quality assessment; null when the case has none. */
+  qualityIndex: number | null;
+  /** Value (percent) of the stored Avoidable Support Effort metric; null when it is missing or unknown. */
+  avoidableEffortPct: number | null;
+  /** The hypothesis with the highest current confidence (name and confidence); null when there is none. */
+  leadingHypothesis: { name: string; confidence: number } | null;
+  /** Warnings in state `open`. */
+  openWarningCount: number;
+}
+
 export interface AnalysisRepository {
   findRunByInputHash(caseId: string, inputHash: string): Promise<AnalysisRun | null>;
   /** Replaces the case's artefacts in ONE transaction and points the case at the new run. */
   saveSnapshot(snapshot: AnalysisSnapshot): Promise<void>;
   getLatestRun(caseId: string): Promise<AnalysisRun | null>;
   getTwin(caseId: string): Promise<DigitalTwin | null>;
+  /**
+   * Analysis-derived summary fields for up to 200 cases, read with ONE statement however many ids are
+   * given (use it to fill a page of `CaseListItem`s). The result has one entry per requested id that is
+   * a case of this tenant, in the order requested with duplicates collapsed. A case that has not been
+   * analysed gets null, null, null and 0. Ids that are not cases of this tenant (unknown, erased, or
+   * another tenant's) are OMITTED, so the caller cannot tell them apart. An empty list returns [].
+   * More than 200 ids, or an id that is not a non-empty string, is a ValidationFailedError.
+   */
+  summarize(caseIds: readonly string[]): Promise<CaseAnalysisSummary[]>;
+  /**
+   * Open warnings across all cases of the tenant, most severe first (`critical`, `high`, `medium`,
+   * `low`), then most recently raised, then by rank. `limit` is 1..100.
+   */
+  listOpenWarnings(query: { limit: number }): Promise<CaseWarning[]>;
+  /**
+   * Unresolved missing-evidence items across the tenant, only from each case's LATEST analysis, most
+   * critical first (`critical`, `important`, `helpful`), then most recently relevant. `limit` is
+   * 1..100. It lists every criticality by default; pass `minCriticality: 'critical'` for the critical
+   * items only, or `'important'` for critical and important ones.
+   */
+  listCriticalMissing(query: {
+    limit: number;
+    minCriticality?: MissingEvidence['criticality'] | undefined;
+  }): Promise<(MissingEvidence & { caseId: string })[]>;
   listEvidence(
     caseId: string,
     filter?: { asOf?: string | undefined; ids?: readonly string[] | undefined },
@@ -245,6 +296,7 @@ export interface AnalysisRepository {
   reviewClaim(caseId: string, claimId: string, input: ReviewClaimInput): Promise<Claim>;
   listMissing(caseId: string): Promise<MissingEvidence[]>;
   listHypotheses(caseId: string): Promise<Hypothesis[]>;
+  getHypothesis(caseId: string, hypothesisId: string): Promise<Hypothesis | null>;
   listActions(caseId: string, asOf?: string): Promise<DiagnosticAction[]>;
   listForks(caseId: string): Promise<DecisionFork[]>;
   getFork(caseId: string, forkId: string): Promise<DecisionFork | null>;
