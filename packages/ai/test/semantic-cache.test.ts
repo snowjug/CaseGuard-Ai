@@ -1,0 +1,165 @@
+import { describe, expect, it } from 'vitest';
+import { SemanticCache, type CacheScope } from '../src';
+import { FakeClock, capturingMetrics } from './fakes';
+
+const usage = {
+  promptTokens: 100,
+  completionTokens: 20,
+  cachedTokens: 0,
+  totalTokens: 120,
+  source: 'measured',
+} as const;
+const meta = { provider: 'azure-openai', model: 'gpt-test', usage } as const;
+
+const scope = (patch: Partial<CacheScope> = {}): CacheScope => ({
+  tenantId: 'tenant_a',
+  caseId: 'case_1',
+  agent: 'timeline_analyzer',
+  promptHash: 'a'.repeat(64),
+  packVersion: 'kp.teams@1.0.0',
+  boundaryKey: 'at:2026-03-09T09:12:00Z:fp1|gpt-test',
+  ...patch,
+});
+
+const input = (text: string, hash = text) => ({ hash, text });
+
+function cacheOf(
+  options: {
+    ttlSeconds?: number;
+    similarityThreshold?: number;
+    enabled?: boolean;
+    maxEntries?: number;
+  } = {},
+) {
+  const clock = new FakeClock();
+  const metrics = capturingMetrics();
+  const cache = new SemanticCache<{ answer: string }>({
+    clock,
+    enabled: options.enabled ?? true,
+    ttlSeconds: options.ttlSeconds ?? 60,
+    similarityThreshold: options.similarityThreshold ?? 0.9,
+    maxEntries: options.maxEntries ?? 100,
+    metrics,
+  });
+  return { cache, clock, metrics };
+}
+
+describe('SemanticCache [FR-TK-02]', () => {
+  it('[NFR-SEC-01] never shares entries across tenants, even for identical input', () => {
+    const { cache } = cacheOf();
+    cache.set(
+      scope(),
+      input('the sign-in logs show failures'),
+      { answer: 'tenant A answer' },
+      meta,
+    );
+    expect(cache.get(scope(), input('the sign-in logs show failures'))?.value).toEqual({
+      answer: 'tenant A answer',
+    });
+    expect(
+      cache.get(scope({ tenantId: 'tenant_b' }), input('the sign-in logs show failures')),
+    ).toBeNull();
+    expect(cache.clearTenant('tenant_b')).toBe(0);
+    expect(cache.get(scope(), input('the sign-in logs show failures'))).not.toBeNull();
+    expect(cache.clearTenant('tenant_a')).toBe(1);
+  });
+
+  it('[NFR-SEC-01] is also scoped by case, agent, prompt version, knowledge pack and temporal boundary', () => {
+    const { cache } = cacheOf();
+    cache.set(scope(), input('same text'), { answer: 'x' }, meta);
+    for (const patch of [
+      { caseId: 'case_2' },
+      { agent: 'quality_judge' as const },
+      { promptHash: 'b'.repeat(64) },
+      { packVersion: 'kp.teams@2.0.0' },
+      { boundaryKey: 'at:2026-03-10T00:00:00Z:fp2|gpt-test' },
+    ]) {
+      expect(cache.get(scope(patch), input('same text')), JSON.stringify(patch)).toBeNull();
+    }
+  });
+
+  it('[FR-TK-02] entries expire after the TTL', () => {
+    const { cache, clock } = cacheOf({ ttlSeconds: 60 });
+    cache.set(scope(), input('hello world'), { answer: 'x' }, meta);
+    clock.advance(59_000);
+    expect(cache.get(scope(), input('hello world'))).not.toBeNull();
+    clock.advance(2_000);
+    expect(cache.get(scope(), input('hello world'))).toBeNull();
+    expect(cache.stats()).toMatchObject({ expirations: 1, size: 0 });
+  });
+
+  it('[FR-TK-02] serves a lexical near-match above the threshold, never below it', () => {
+    const { cache } = cacheOf({ similarityThreshold: 0.8 });
+    const base =
+      'customer reports intermittent teams sign in failures at two branch offices since morning';
+    cache.set(scope(), input(base, 'hash-a'), { answer: 'x' }, meta);
+    const near = cache.get(scope(), input(`${base} today`, 'hash-b'));
+    expect(near?.kind).toBe('near');
+    expect(near?.similarity).toBeGreaterThanOrEqual(0.8);
+    expect(
+      cache.get(
+        scope(),
+        input('completely different text about proxy inspection policy', 'hash-c'),
+      ),
+    ).toBeNull();
+    const exactOnly = cacheOf({ similarityThreshold: 1 });
+    exactOnly.cache.set(scope(), input(base, 'hash-a'), { answer: 'x' }, meta);
+    expect(exactOnly.cache.get(scope(), input(`${base} today`, 'hash-b'))).toBeNull();
+  });
+
+  it('[FR-TK-02] returns copies, so callers cannot corrupt cached values', () => {
+    const { cache } = cacheOf();
+    cache.set(scope(), input('abc def ghi'), { answer: 'x' }, meta);
+    const hit = cache.get(scope(), input('abc def ghi'));
+    if (hit) hit.value.answer = 'mutated';
+    expect(cache.get(scope(), input('abc def ghi'))?.value.answer).toBe('x');
+  });
+
+  it('[FR-TK-02] reports hit and miss metrics and statistics', () => {
+    const { cache, metrics } = cacheOf();
+    cache.get(scope(), input('nothing cached yet'));
+    cache.set(scope(), input('cached text here'), { answer: 'x' }, meta);
+    cache.get(scope(), input('cached text here'));
+    expect(metrics.sum('ai.cache.miss')).toBe(1);
+    expect(metrics.sum('ai.cache.hit', { kind: 'exact' })).toBe(1);
+    expect(cache.stats()).toMatchObject({ hits: 1, exactHits: 1, misses: 1, size: 1 });
+  });
+
+  it('[FR-TK-02] invalidates explicitly, including when the prompt or knowledge-pack version changes', () => {
+    const { cache } = cacheOf();
+    cache.set(scope(), input('one'), { answer: '1' }, meta);
+    cache.set(scope({ promptHash: 'b'.repeat(64) }), input('two'), { answer: '2' }, meta);
+    cache.set(scope({ packVersion: 'kp.teams@2.0.0' }), input('three'), { answer: '3' }, meta);
+    cache.set(scope({ tenantId: 'tenant_b' }), input('four'), { answer: '4' }, meta);
+    expect(cache.invalidate({ tenantId: 'tenant_a', promptHash: 'b'.repeat(64) })).toBe(1);
+    expect(
+      cache.purgeStale({
+        promptHashes: new Set(['a'.repeat(64)]),
+        packVersions: new Set(['kp.teams@1.0.0']),
+      }),
+    ).toBe(1);
+    expect(cache.stats().size).toBe(2);
+    expect(cache.invalidate({ agent: 'timeline_analyzer' })).toBe(2);
+  });
+
+  it('[FR-TK-02] bounds memory by evicting the least recently used entry', () => {
+    const { cache, clock } = cacheOf({ maxEntries: 2 });
+    cache.set(scope(), input('first entry text'), { answer: '1' }, meta);
+    clock.advance(1);
+    cache.set(scope(), input('second entry text'), { answer: '2' }, meta);
+    clock.advance(1);
+    cache.get(scope(), input('first entry text'));
+    clock.advance(1);
+    cache.set(scope(), input('third entry text'), { answer: '3' }, meta);
+    expect(cache.get(scope(), input('second entry text'))).toBeNull();
+    expect(cache.get(scope(), input('first entry text'))).not.toBeNull();
+    expect(cache.stats().evictions).toBe(1);
+  });
+
+  it('is a no-op when disabled', () => {
+    const { cache } = cacheOf({ enabled: false });
+    cache.set(scope(), input('x y z'), { answer: 'x' }, meta);
+    expect(cache.get(scope(), input('x y z'))).toBeNull();
+    expect(cache.stats().size).toBe(0);
+  });
+});

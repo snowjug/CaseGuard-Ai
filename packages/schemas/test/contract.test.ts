@@ -302,6 +302,7 @@ describe('knowledge pack reference validation', () => {
     ],
     requirements: [],
     claimPatterns: [],
+    inferences: [],
     lexicon: {
       hedges: [],
       definitive: [],
@@ -318,6 +319,7 @@ describe('knowledge pack reference validation', () => {
     policies: {
       diagnosisThreshold: 0.75,
       minimumEvidenceForEscalation: [],
+      escalationActionIds: [],
       destructiveHypothesisThreshold: 0.6,
       lowValueRelativeScore: 0.35,
       lowValueInformationGainBits: 0.08,

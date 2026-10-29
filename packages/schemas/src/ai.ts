@@ -58,6 +58,28 @@ export const ModelExecutionSchema = RecordMetaSchema.extend({
   error: z.string().max(400).nullable(),
   simulated: z.boolean(),
   tokenUsageId: IdSchema.nullable(),
+  /**
+   * Additive (optional) provenance fields. Hashes identify the exact instructions and the
+   * minimised context without storing either (prompts and raw model output are not persisted).
+   */
+  promptHash: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .nullable()
+    .optional(),
+  inputHash: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .nullable()
+    .optional(),
+  /** Why the returned result came from deterministic code instead of the model; null when it did not. */
+  fallbackReason: z.string().max(300).nullable().optional(),
+  /** What produced the result that was returned to the caller. */
+  resultSource: z.enum(['model', 'cache', 'deterministic', 'deterministic_fallback']).optional(),
+  /** Transport-level retries (429/5xx/network) performed inside provider calls. */
+  retries: z.number().int().min(0).optional(),
+  /** Validator-feedback repair attempts (0 or 1). */
+  repairAttempts: z.number().int().min(0).optional(),
 });
 export type ModelExecution = z.infer<typeof ModelExecutionSchema>;
 
@@ -87,6 +109,8 @@ export const TokenUsageSchema = RecordMetaSchema.extend({
   latencyMs: z.number().int().min(0),
   simulated: z.boolean(),
   estimated: z.literal(true),
+  /** Additive (optional): whether the token counts were reported by the provider or estimated. */
+  tokenSource: z.enum(['measured', 'estimated']).optional(),
 });
 export type TokenUsage = z.infer<typeof TokenUsageSchema>;
 
