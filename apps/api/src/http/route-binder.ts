@@ -117,6 +117,9 @@ export const HEAVY_ROUTES: ReadonlySet<RouteId> = new Set<RouteId>([
   'cases.create',
   'cases.createFromFile',
   'demo.seed',
+  // Both read or walk very large amounts of data (a case export, the whole audit hash chain).
+  'governance.export',
+  'governance.auditVerify',
 ]);
 
 /** Reads that expose security-relevant data are audited like mutations. */

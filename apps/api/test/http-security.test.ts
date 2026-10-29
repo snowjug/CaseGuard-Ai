@@ -130,11 +130,18 @@ describe('authorization and audit', () => {
   });
 
   it('lets a permitted role through to the handler', async () => {
-    const h = await harness();
+    const reached: string[] = [];
+    const h = await harness({
+      handlers: {
+        'governance.audit': async () => {
+          reached.push('governance.audit');
+          return { items: [], nextCursor: null };
+        },
+      },
+    });
     const res = await h.call(PERSONAS.admin, { method: 'GET', url: '/api/v1/audit' });
-    // No handler is registered for this route in the partial build, so a permitted call reaches the 501.
-    expect(res.statusCode).toBe(501);
-    expect(res.data.code).toBe('not_implemented');
+    expect(res.statusCode).toBe(200);
+    expect(reached).toEqual(['governance.audit']);
   });
 
   it('keeps read-only roles away from state-changing routes', async () => {
