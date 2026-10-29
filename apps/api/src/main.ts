@@ -31,6 +31,17 @@ async function main(): Promise<void> {
 
   const app = await buildApp({ infra, handlers: createHandlers(infra) });
 
+  // A bug that escapes every handler must not leave a half-working process behind: log it and let the
+  // platform restart the container.
+  process.on('unhandledRejection', (reason) => {
+    logger.fatal({ err: reason }, 'unhandled promise rejection');
+    process.exit(1);
+  });
+  process.on('uncaughtException', (error) => {
+    logger.fatal({ err: error }, 'uncaught exception');
+    process.exit(1);
+  });
+
   let stopping = false;
   const shutdown = async (signal: string): Promise<void> => {
     if (stopping) return;

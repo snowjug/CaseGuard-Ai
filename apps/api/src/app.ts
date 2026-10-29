@@ -23,6 +23,11 @@ export interface BuildAppOptions {
 const REQUEST_TIMEOUT_MS = 60_000;
 /** The ids of path parameters are short; anything longer is not a real identifier. */
 const MAX_PARAM_LENGTH = 200;
+/**
+ * Longer than the idle timeout of the usual fronting proxies (Azure Container Apps ingress and load
+ * balancers sit around 60 s), so the proxy never reuses a connection this server already closed.
+ */
+const KEEP_ALIVE_TIMEOUT_MS = 65_000;
 
 /**
  * Assembles the HTTP server: correlation and metrics, security headers, CORS, rate limits, uploads,
@@ -46,6 +51,9 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     trustProxy: config.http.trustProxy,
     bodyLimit: config.http.bodyLimitBytes,
     requestTimeout: REQUEST_TIMEOUT_MS,
+    keepAliveTimeout: KEEP_ALIVE_TIMEOUT_MS,
+    // GET handlers are never run a second time for HEAD: the contract documents GET only.
+    exposeHeadRoutes: false,
     return503OnClosing: true,
     routerOptions: { maxParamLength: MAX_PARAM_LENGTH },
   });
