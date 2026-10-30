@@ -8,6 +8,7 @@ import {
   type MatchableSkill,
   type SkillConformanceReport,
   type SkillImpactEstimate,
+  type SkillImpactPrecedent,
   type SkillUsageRecord,
 } from '@caseguard/domain';
 import type { CaseReplay } from '../counterfactuals/replay';
@@ -18,6 +19,30 @@ export interface SkillUsage {
   readonly anchorAt: string;
   readonly conformance: SkillConformanceReport;
   readonly impact: SkillImpactEstimate;
+}
+
+/**
+ * What an application is compared with besides the simulated baseline: the recorded path of the case
+ * the skill came from, or why there is none (the application is on that case, or it is not available).
+ */
+export type PrecedentOutcome =
+  | { readonly precedent: SkillImpactPrecedent }
+  | {
+      readonly precedent: null;
+      readonly unavailable: NonNullable<SkillUsageRecord['precedentUnavailable']>;
+    };
+
+/** The precedent fields of a usage record: only the figures an aggregate needs, and the reason when absent. */
+function precedentFields(
+  outcome: PrecedentOutcome | undefined,
+): Pick<SkillUsageRecord, 'precedent' | 'precedentUnavailable'> {
+  if (outcome === undefined) return {};
+  if (outcome.precedent === null) {
+    return { precedent: null, precedentUnavailable: outcome.unavailable };
+  }
+  const { reference, timeToDiagnosisMinutes, tokenEstimate, evidenceCompleteness } =
+    outcome.precedent;
+  return { precedent: { reference, timeToDiagnosisMinutes, tokenEstimate, evidenceCompleteness } };
 }
 
 /** Cases with more events than this are scanned only from their start; the anchor then falls back to the end. */
@@ -65,11 +90,16 @@ export function firstApplicableAt(
  * the recorded path (measured from the case record) against the estimated "without the skill"
  * baseline, and how closely the recorded steps followed the skill. The comparison is an estimate from
  * simulated rollouts with no control group; it is labelled so wherever it is shown.
+ *
+ * With `precedent` the record also carries the recorded path of the case the skill came from, so an
+ * aggregate can compare two recorded paths (different cases, each from its own decision point) next to
+ * the simulated baseline. Without it the record is exactly what it was before.
  */
 export function buildSkillUsage(args: {
   readonly replay: CaseReplay;
   readonly entry: MatchableSkill;
   readonly applied: boolean;
+  readonly precedent?: PrecedentOutcome;
 }): SkillUsage {
   const { replay, entry, applied } = args;
   const { inputs, analysis, engineCtx } = replay;
@@ -128,6 +158,7 @@ export function buildSkillUsage(args: {
       evidenceCompleteness: recorded?.evidenceCompleteness ?? null,
       baselineEvidenceCompleteness: metrics.evidenceCompleteness.mid,
       conformanceScore: conformance.score,
+      ...precedentFields(args.precedent),
     },
   };
 }

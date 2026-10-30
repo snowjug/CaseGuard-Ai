@@ -637,10 +637,21 @@ describe('a published skill: matching, applying and effectiveness', () => {
 
   it('applies a skill to a case once, with conformance and effectiveness, and records who and when', async () => {
     h.clock.advance(60_000);
+    const budget = engineBudgetFor(h.infra);
+    const engineer = {
+      auth: { tenantId: CONTOSO, userId: PERSONAS.engineer },
+      now: () => h.clock.now(),
+    };
+    // Matching the case is cached from here on, so what the application spends is its own.
+    await api.get(PERSONAS.engineer, `/cases/${TWO}/skill-matches`);
+    const unitsBefore = budget.remaining(engineer);
     const res = await api.post(PERSONAS.engineer, `/cases/${TWO}/skills/apply`, {
       skillId: skillA,
     });
     expect(res.statusCode).toBe(200);
+    // Two cold passes were announced to the caller's budget: measuring the case, and (once) the recorded
+    // path of the case the skill came from, which its effectiveness is also compared with.
+    expect(unitsBefore - budget.remaining(engineer)).toBe(2);
     expect(res.data).toMatchObject({
       caseId: TWO,
       skillId: skillA,
@@ -673,11 +684,6 @@ describe('a published skill: matching, applying and effectiveness', () => {
     expect(applications[0]).toMatchObject({ actorId: PERSONAS.engineer, outcome: 'success' });
 
     // Applying again is not a cold pass, so it is not refused when the caller's budget is empty.
-    const budget = engineBudgetFor(h.infra);
-    const engineer = {
-      auth: { tenantId: CONTOSO, userId: PERSONAS.engineer },
-      now: () => h.clock.now(),
-    };
     await api.get(PERSONAS.manager, `/cases/${TWO}/skill-matches`);
     budget.charge(engineer, budget.remaining(engineer));
     const free = await api.post(PERSONAS.engineer, `/cases/${TWO}/skills/apply`, {
@@ -735,11 +741,20 @@ describe('a published skill: matching, applying and effectiveness', () => {
     expect(matchOne?.applicability).not.toBe('not_applicable');
     expect(await h.repos(CONTOSO).skills.listMatchesForCase(ONE)).toEqual([]);
     h.clock.advance(60_000);
+    const budget = engineBudgetFor(h.infra);
+    const curator = {
+      auth: { tenantId: CONTOSO, userId: PERSONAS.curator },
+      now: () => h.clock.now(),
+    };
+    const unitsBefore = budget.remaining(curator);
     const second = await api.post(
       PERSONAS.curator,
       `/cases/${ONE}/skill-matches/${matchOne?.id}/apply`,
     );
     expect(second.statusCode, JSON.stringify(second.data)).toBe(200);
+    // The recorded path of this very case was measured for the first application and is shared: the
+    // second application costs the caller one cold pass, not two.
+    expect(unitsBefore - budget.remaining(curator)).toBe(1);
     expect(second.data).toMatchObject({
       id: matchOne?.id,
       skillId: skillA,
@@ -761,6 +776,17 @@ describe('a published skill: matching, applying and effectiveness', () => {
     });
     expect(detail.skill.effectiveness.matchedCases).toBeGreaterThanOrEqual(2);
     expect(detail.skill.effectiveness.notes.join(' ')).toMatch(/estimate/i);
+
+    // Case One is the case the skill came from, and the curator just applied it there: that application
+    // is not compared with its own recorded path (and says so), while Case Two is compared with it.
+    const effectiveness = detail.skill.effectiveness;
+    expect(effectiveness.precedent).toMatchObject({ cases: 1, references: ['CG-SYN-1001'] });
+    expect(effectiveness.precedent.avgTimeToDiagnosisMinutes).toBeLessThan(
+      effectiveness.precedent.precedentAvgTimeToDiagnosisMinutes,
+    );
+    expect(effectiveness.notes).toContain(
+      '1 application is on the case the skill came from and is not compared with that case’s own recorded path.',
+    );
     const applied = (detail.matches as Json[]).filter((m) => m.applied).map((m) => m.caseId);
     expect(applied.sort()).toEqual([ONE, TWO].sort());
     // The case the skill does not apply to is listed as a match that was never applied.

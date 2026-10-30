@@ -8,10 +8,12 @@ import {
   createTemporalView,
   estimateSkillImpact,
   getCompiledPack,
+  impactPrecedentOf,
   matchSkills,
   runDeterministicAnalysis,
   toMatchConformance,
   type EngineContext,
+  type SkillImpactEstimate,
 } from '@caseguard/domain';
 import { DEFAULT_ACTION_VALUE_CONFIG } from '@caseguard/schemas';
 import type { Database } from '../src/db';
@@ -31,6 +33,7 @@ import {
   apiOf,
   earliestForkScenarios,
   ingestAndAnalyse,
+  ingestCaseTwoCopy,
   moveSkill,
   runValidation,
   settledJob,
@@ -87,6 +90,70 @@ afterAll(async () => {
 });
 
 const audits = (tenantId = CONTOSO) => allAuditEvents(h, tenantId);
+
+/** A stored case replayed through the domain on exactly the input its latest analysis used. */
+async function replayThroughDomain(caseId: string, workload: string) {
+  const repos = h.repos(CONTOSO);
+  const [events, run, resolution] = await Promise.all([
+    repos.cases.getAllEvents(caseId),
+    repos.analysis.getLatestRun(caseId),
+    repos.cases.getResolution(caseId),
+  ]);
+  const pack = getCompiledPack(workload);
+  if (pack === null || run === null) throw new Error('missing pack or run');
+  const ctx = {
+    tenantId: CONTOSO,
+    caseId,
+    runId: run.id,
+    now: run.startedAt,
+    createdBy: 'system:analysis',
+    seed: run.inputHash,
+  } satisfies EngineContext;
+  const analysis = runDeterministicAnalysis({
+    view: createFullView(events, resolution),
+    pack,
+    config: DEFAULT_ACTION_VALUE_CONFIG,
+    ctx,
+  });
+  return { events, pack, ctx, analysis };
+}
+
+/** The domain's impact estimate for Case Two, anchored where the skill first applies (its first email). */
+function impactOfCaseTwo(
+  detail: Json,
+  { events, pack, ctx, analysis }: Awaited<ReturnType<typeof replayThroughDomain>>,
+): SkillImpactEstimate {
+  const anchor = events[0]?.timestamp ?? '';
+  const last = events[events.length - 1]?.timestamp ?? '';
+  const plan = buildGuidedPlan({
+    skill: detail.skill,
+    version: detail.currentVersion,
+    analysisAsOf: analysis,
+    asOf: anchor,
+    pack,
+    config: DEFAULT_ACTION_VALUE_CONFIG,
+    ctx,
+  });
+  const conformance = checkConformance({
+    version: detail.currentVersion,
+    analysis,
+    pack,
+    config: DEFAULT_ACTION_VALUE_CONFIG,
+    caseId: TWO,
+    appliedAt: anchor,
+    throughAt: last,
+  });
+  return estimateSkillImpact({
+    plan,
+    version: detail.currentVersion,
+    analysis,
+    pack,
+    config: DEFAULT_ACTION_VALUE_CONFIG,
+    ctx,
+    synthetic: true,
+    conformance,
+  });
+}
 
 describe('Case One: a better path, reviewed by a person', () => {
   it(
@@ -697,58 +764,93 @@ describe('Case Two: the validated skill applies', () => {
       ]);
 
       // Anchored where the skill first applies (the first email), like the domain's own impact test.
-      const events = await h.repos(CONTOSO).cases.getAllEvents(TWO);
-      const run = await h.repos(CONTOSO).analysis.getLatestRun(TWO);
-      const pack = getCompiledPack(detail.skill.workload);
-      if (pack === null || run === null) throw new Error('missing pack or run');
-      const ctx = {
-        tenantId: CONTOSO,
-        caseId: TWO,
-        runId: run.id,
-        now: run.startedAt,
-        createdBy: 'system:analysis',
-        seed: run.inputHash,
-      } satisfies EngineContext;
-      const resolution = await h.repos(CONTOSO).cases.getResolution(TWO);
-      const analysis = runDeterministicAnalysis({
-        view: createFullView(events, resolution),
-        pack,
-        config: DEFAULT_ACTION_VALUE_CONFIG,
-        ctx,
-      });
-      const anchor = events[0]?.timestamp ?? '';
-      const last = events[events.length - 1]?.timestamp ?? '';
-      const plan = buildGuidedPlan({
-        skill: detail.skill,
-        version: detail.currentVersion,
-        analysisAsOf: analysis,
-        asOf: anchor,
-        pack,
-        config: DEFAULT_ACTION_VALUE_CONFIG,
-        ctx,
-      });
-      const conformance = checkConformance({
-        version: detail.currentVersion,
-        analysis,
-        pack,
-        config: DEFAULT_ACTION_VALUE_CONFIG,
-        caseId: TWO,
-        appliedAt: anchor,
-        throughAt: last,
-      });
-      const impact = estimateSkillImpact({
-        plan,
-        version: detail.currentVersion,
-        analysis,
-        pack,
-        config: DEFAULT_ACTION_VALUE_CONFIG,
-        ctx,
-        synthetic: true,
-        conformance,
-      });
+      const impact = impactOfCaseTwo(
+        detail,
+        await replayThroughDomain(TWO, detail.skill.workload as string),
+      );
       expect(effectiveness.avgTimeToDiagnosisMinutes).toBe(impact.recorded?.timeToDiagnosisMinutes);
       expect(effectiveness.baselineAvgTimeToDiagnosisMinutes).toBe(
         Math.round(impact.baseline.metrics.timeToDiagnosisMinutes.mid * 100) / 100,
+      );
+    },
+  );
+
+  it(
+    'also compares Case Two with the recorded path of the case the skill came from, and says what that is',
+    { timeout: 120_000 },
+    async () => {
+      const detail = (await api.get(PERSONAS.engineer, `/skills/${skillId}`)).data;
+      const effectiveness = detail.skill.effectiveness;
+      const block = effectiveness.precedent;
+      expect(block).toBeDefined();
+      // One application, compared with the one case the skill came from.
+      expect(block).toMatchObject({ cases: 1, references: ['CG-SYN-1001'] });
+      expect(block.avgTimeToDiagnosisMinutes).toBe(effectiveness.avgTimeToDiagnosisMinutes);
+
+      // The direction of the story: faster than the recorded path it learned from, with fewer tokens and
+      // evidence that is no less complete. The simulated baseline above says otherwise (it has no
+      // waiting between steps), which is why both are named.
+      expect(block.avgTimeToDiagnosisMinutes).toBeLessThan(
+        block.precedentAvgTimeToDiagnosisMinutes,
+      );
+      expect(block.tokenChangePct).toBeLessThan(0);
+      expect(block.evidenceCompletenessPoints).toBeGreaterThanOrEqual(0);
+      expect(effectiveness.avgTimeToDiagnosisMinutes).toBeGreaterThan(
+        effectiveness.baselineAvgTimeToDiagnosisMinutes,
+      );
+
+      // Every figure is what the domain measures for the two cases on the stored input.
+      const workload = detail.skill.workload as string;
+      const impact = impactOfCaseTwo(detail, await replayThroughDomain(TWO, workload));
+      const origin = await replayThroughDomain(ONE, workload);
+      const precedent = impactPrecedentOf({
+        reference: 'CG-SYN-1001',
+        analysis: origin.analysis,
+        pack: origin.pack,
+        minimumEvidence: detail.currentVersion.content.minimumEvidence.map(
+          (m: Json) => m.requirementId as string,
+        ),
+      });
+      const recorded = impact.recorded;
+      if (precedent === null || recorded === null) throw new Error('the domain measured no path');
+      const round1 = (x: number) => Math.round(x * 10) / 10;
+      expect(block.precedentAvgTimeToDiagnosisMinutes).toBe(
+        Math.round(precedent.timeToDiagnosisMinutes * 100) / 100,
+      );
+      expect(block.tokenChangePct).toBe(
+        round1(
+          ((recorded.tokenEstimate - precedent.tokenEstimate) / precedent.tokenEstimate) * 100,
+        ),
+      );
+      expect(block.evidenceCompletenessPoints).toBe(
+        round1((recorded.evidenceCompleteness - precedent.evidenceCompleteness) * 100),
+      );
+
+      // The simulated comparison keeps every figure and its own honesty text.
+      const baselineTokens = impact.baseline.metrics.tokenEstimate.mid;
+      expect(effectiveness.estimatedTokenSavingsPct).toBe(
+        round1(((baselineTokens - recorded.tokenEstimate) / baselineTokens) * 100),
+      );
+      expect(effectiveness.baselineAvgTimeToDiagnosisMinutes).toBe(
+        Math.round(impact.baseline.metrics.timeToDiagnosisMinutes.mid * 100) / 100,
+      );
+      expect(effectiveness).toMatchObject({ estimated: true, synthetic: true, applications: 1 });
+
+      // Honest labelling: what the comparison is, and both bases named, never a measured effect.
+      expect(block.basis).toBe(
+        'Compared with the recorded path of the case the skill came from (1 earlier case); different cases, no control group: an estimate, not a measurement.',
+      );
+      const notes = effectiveness.notes as string[];
+      expect(notes[0]).toMatch(/model estimates, not measurements/);
+      expect(notes.join(' ')).toMatch(
+        /seeded simulation of the knowledge-pack policy without the skill/,
+      );
+      expect(notes.join(' ')).toMatch(
+        /recorded path of the case the skill came from \(a different case/,
+      );
+      expect(JSON.stringify(effectiveness)).not.toMatch(BLAME);
+      expect(JSON.stringify(effectiveness)).not.toMatch(
+        /(thanks to the skill|because of the skill|proves|guarantee)/i,
       );
     },
   );
@@ -886,4 +988,62 @@ describe('what the story leaves behind', () => {
       (await api.post(eve, `/cases/${ONE}/skills/extract`, { scenarioId: accepted.id })).statusCode,
     ).toBe(404);
   });
+});
+
+describe('when the case the skill came from is erased', () => {
+  const [THREE, FOUR] = ['case_story_three', 'case_story_four'];
+
+  it(
+    'still applies the skill, without a precedent and without an error, and says why',
+    { timeout: 240_000 },
+    async () => {
+      await ingestCaseTwoCopy(h, THREE, 'CG-SYN-1003');
+      await ingestCaseTwoCopy(h, FOUR, 'CG-SYN-1004');
+      const detailOf = async (): Promise<Json> =>
+        (await api.get(PERSONAS.engineer, `/skills/${skillId}`)).data;
+      const apply = async (caseId: string): Promise<Json> => {
+        h.clock.advance(60_000);
+        const res = await api.post(PERSONAS.engineer, `/cases/${caseId}/skills/apply`, {
+          skillId,
+        });
+        expect(res.statusCode, JSON.stringify(res.data)).toBe(200);
+        expect(res.data).toMatchObject({ caseId, applied: true, appliedBy: PERSONAS.engineer });
+        return res.data;
+      };
+
+      // While Case One exists, every application is compared with its recorded path. Case Two is
+      // re-measured when the next application is recorded, and that measurement is kept for a while.
+      await apply(THREE);
+      const before = (await detailOf()).skill.effectiveness;
+      expect(before).toMatchObject({ applications: 2 });
+      expect(before.precedent).toMatchObject({ cases: 2, references: ['CG-SYN-1001'] });
+
+      // An administrator erases Case One. The skill keeps naming it as its source, but the path is gone.
+      expect(await h.repos(CONTOSO).cases.delete(ONE)).toBe(true);
+      await apply(FOUR);
+
+      const detail = await detailOf();
+      const after = detail.skill.effectiveness;
+      expect(detail.skill.sourceCaseIds).toEqual([ONE]);
+      expect(after).toMatchObject({ applications: 3, estimated: true, synthetic: true });
+      // Case Two and Case Three were compared with the precedent a moment ago; nothing of that is
+      // carried over once the path it was measured on is gone.
+      expect('precedent' in after).toBe(false);
+      expect(after.notes).toContain(
+        'The recorded path of the case the skill came from is not available, so 3 applications have no comparison with it.',
+      );
+      expect(after.notes.join(' ')).not.toMatch(/Two bases are shown/);
+      // The simulated comparison is untouched, for every application.
+      expect(after.avgTimeToDiagnosisMinutes).not.toBeNull();
+      expect(after.baselineAvgTimeToDiagnosisMinutes).not.toBeNull();
+      expect(after.notes[0]).toMatch(/model estimates, not measurements/);
+      // Nothing about the missing case was a failure: it was not logged as one, and nothing was refused.
+      expect(JSON.stringify(h.logs())).not.toMatch(/could not be measured/);
+      const applications = (await audits()).filter(
+        (e) => e.action === 'skill.applied' && e.caseId === FOUR,
+      );
+      expect(applications).toHaveLength(1);
+      expect(applications[0]).toMatchObject({ outcome: 'success', actorId: PERSONAS.engineer });
+    },
+  );
 });

@@ -100,6 +100,49 @@ application is a human decision, so it also survives the skill: when the skill i
 (no longer matchable) the stored match is kept, flagged by the skill's current `lifecycle`, and the
 whole-case list still shows it. As-of lists never offer a skill that cannot be matched.
 
+## What matching reads of a skill, and the hindsight notice
+
+A skill's provenance lists the parts that were derived with knowledge of the source case's recorded
+resolution (`provenance.hindsight.parts`) and carries a notice saying what they do. The notice is a claim
+about this code, so it is pinned by `packages/domain/test/skills-hindsight.test.ts`:
+
+- Matching reads **trigger conditions and exclusions**, some of which were learned with hindsight (the
+  triggers are marked `(hindsight-informed)`). They take part in the score and the verdict, but each is
+  checked only against the evidence the **matched case** had recorded at the match instant (the temporal
+  view); nothing of that case's future, and nothing of the source case, reaches them.
+- The match decision (score and verdict) never reads the **branch probabilities** (hindsight or
+  decision-time), the success conditions, the known failure modes, the expected benefit or the confidence.
+  The guided plan that comes with a match does show the decision-time probabilities, and never the hindsight
+  ones.
+
+The reading is the reason the skill extracted from a case is left out of as-of matches over that very case
+(see above): its hindsight-informed conditions would name what the case only showed later.
+
+## Effectiveness: two bases, both estimates
+
+`aggregateSkillEffectiveness` (domain) is recomputed from the usage records of the skill's applications
+every time one is recorded (`application.ts`), and stored on the skill (`SkillDna.effectiveness`). It
+compares each application two ways, and names both (`notes`, `confidence.rationale`):
+
+- **A simulated "without the skill" baseline** (the original fields: `avgTimeToDiagnosisMinutes`,
+  `baselineAvgTimeToDiagnosisMinutes`, `estimatedTokenSavingsPct`). It is a seeded simulation of the
+  knowledge-pack policy with no waiting between steps, so recorded times read longer than it by construction,
+  and the pack already encodes much of what a skill captures. It is kept as it was, with its caveats.
+- **The recorded path of the case the skill came from** (the optional `precedent` block). Both are recorded
+  paths measured from their own decision point with the same definitions (`measureActualPath`), so they are
+  like-for-like, though they are different cases and there is no control group. Fields: `cases`,
+  `references`, `avgTimeToDiagnosisMinutes` against `precedentAvgTimeToDiagnosisMinutes` (over the same
+  applications), `tokenChangePct` (negative means fewer tokens), `evidenceCompletenessPoints` (positive means
+  more complete) and a fixed `basis` sentence ("... an estimate, not a measurement").
+
+`precedent.ts` measures the origin once per run of that case (`PrecedentLoader`, keyed by tenant, skill
+version, origin case, its run and the governed configuration) and shares it with every application. An
+application on the origin case itself is not compared with its own path, and when the origin case was erased,
+was never analysed or cannot be measured the application gets no precedent and no error; both are said in
+`notes` ("... is not available, so n applications have no comparison with it"). When no application has a
+precedent the block is absent. The first application of a run also spends one more cold pass of the caller's
+engine budget on that measurement (`beforeColdPass`), the later ones none.
+
 ## Driving it from code
 
 ```ts

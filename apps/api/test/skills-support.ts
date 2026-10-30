@@ -8,7 +8,7 @@ import {
   type Json,
 } from './support/app-harness';
 import { contextFor } from './support/context';
-import { SAMPLE_FILES, ingestSample, toIngestInput } from './support/samples';
+import { SAMPLE_FILES, ingestSample, loadSampleBundle, toIngestInput } from './support/samples';
 
 /** Helpers shared by the counterfactual and SkillDNA integration tests (HTTP only, real personas). */
 
@@ -100,6 +100,32 @@ export async function ingestIrrelevantCase(h: Harness, caseId: string): Promise<
     redactionReplacements: 0,
   });
   await h.repos(CONTOSO).cases.ingest(toIngestInput(normalized, JSON.stringify(IRRELEVANT_BUNDLE)));
+  const ctx = contextFor(h, PERSONAS.engineer);
+  await ctx.services.analysis.analyzeCase(ctx, caseId);
+}
+
+/**
+ * Ingests a copy of Case Two under another case reference (the library keeps one case per reference and
+ * per payload) and analyses it: one more case the skill of Case One applies to.
+ */
+export async function ingestCaseTwoCopy(
+  h: Harness,
+  caseId: string,
+  reference: string,
+): Promise<void> {
+  const original = loadSampleBundle(SAMPLE_FILES.caseTwo);
+  const copy: CaseBundle = { ...original, case: { ...original.case, reference } };
+  const normalized = normalizeBundle(copy, {
+    tenantId: CONTOSO,
+    caseId,
+    sourceId: `src_${caseId}`,
+    createdBy: 'system:test',
+    now: '2026-10-29T00:00:00.000Z',
+    sourceKind: 'builtin_sample',
+    storedPayload: JSON.stringify(copy),
+    redactionReplacements: 0,
+  });
+  await h.repos(CONTOSO).cases.ingest(toIngestInput(normalized, JSON.stringify(copy)));
   const ctx = contextFor(h, PERSONAS.engineer);
   await ctx.services.analysis.analyzeCase(ctx, caseId);
 }

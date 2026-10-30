@@ -12,6 +12,7 @@ import { LruCache } from '../counterfactuals/cache';
 import type { ReplayLoader } from '../counterfactuals/replay';
 import type { ColdPassOptions } from '../ports';
 import { loadMatchContext, type CaseMatcher } from './matching';
+import { PrecedentLoader, precedentFor, type OriginPrecedent } from './precedent';
 import { buildSkillUsage, matchedOnlyRecord } from './usage';
 
 /** Effectiveness is estimated from this many of the most recent applications; older ones are only counted. */
@@ -26,16 +27,24 @@ const APPLY_ATTEMPTS = 3;
  * (applying twice changes nothing and is audited once), refuses skills that are not yet in a pilot,
  * validated or published state and skills that do not apply to the case, and stores the match and
  * updates the skill's effectiveness aggregate in the same transaction as its audit event. The passes
- * that are not served from a cache (matching, and measuring a first application) are announced to
- * `options.beforeColdPass`, where the HTTP layer spends the caller's engine budget.
+ * that are not served from a cache (matching, measuring a first application, and measuring the
+ * recorded path of the case the skill came from) are announced to `options.beforeColdPass`, where the
+ * HTTP layer spends the caller's engine budget.
+ *
+ * Effectiveness is measured two ways, and both are estimates: against a simulated "without the skill"
+ * baseline, and against the recorded path of the case the skill came from (`precedent.ts`). The
+ * second is skipped, and says so, for an application on that case itself and when that case is gone.
  */
 export class SkillApplier {
   private readonly usage = new LruCache<SkillUsageRecord>(USAGE_CACHE_ENTRIES);
+  private readonly precedents: PrecedentLoader;
 
   constructor(
     private readonly replays: ReplayLoader,
     private readonly matcher: CaseMatcher,
-  ) {}
+  ) {
+    this.precedents = new PrecedentLoader(replays);
+  }
 
   /**
    * `skillMatches.apply`: a match is addressed by its deterministic id, which the list route returned:
@@ -89,7 +98,7 @@ export class SkillApplier {
     options.beforeColdPass?.();
     for (let attempt = 1; ; attempt += 1) {
       try {
-        return await this.record(ctx, caseId, skill, match);
+        return await this.record(ctx, caseId, skill, match, options);
       } catch (error) {
         // Someone else changed the skill while its effectiveness was being recomputed: recompute.
         if (!(error instanceof VersionConflictError) || attempt >= APPLY_ATTEMPTS) throw error;
@@ -102,13 +111,21 @@ export class SkillApplier {
     caseId: string,
     skill: SkillDna,
     match: SkillMatch,
+    options: ColdPassOptions,
   ): Promise<SkillMatch> {
     const replay = await this.replays.load(ctx, caseId);
     const entry = replay.inputs.skills.find((candidate) => candidate.skill.id === skill.id);
     if (entry === undefined)
       throw new ConflictError('The skill is no longer available for matching.');
-    const usage = buildSkillUsage({ replay, entry, applied: true });
-    const records = await this.recordsFor(ctx, skill, usage.record);
+    // Resolved once for the whole recomputation: the recorded path of the case the skill came from.
+    const origin = await this.precedents.resolve(ctx, entry, options);
+    const usage = buildSkillUsage({
+      replay,
+      entry,
+      applied: true,
+      precedent: precedentFor(origin, caseId),
+    });
+    const records = await this.recordsFor(ctx, skill, usage.record, origin);
     const effectiveness = aggregateSkillEffectiveness(records, { skillId: skill.id }).effectiveness;
 
     const now = ctx.now().toISOString();
@@ -160,12 +177,14 @@ export class SkillApplier {
 
   /**
    * The usage of every case the skill was matched or applied to. The newest applications contribute
-   * recorded and baseline measures (cached per skill version, case and run); the rest only count.
+   * recorded and baseline measures (cached per skill version, case and run, and per origin
+   * measurement); the rest only count.
    */
   private async recordsFor(
     ctx: RequestContext,
     skill: SkillDna,
     current: SkillUsageRecord,
+    origin: OriginPrecedent,
   ): Promise<SkillUsageRecord[]> {
     const records: SkillUsageRecord[] = [current];
     const stored = await ctx.repos.skills.listMatchesForSkill(skill.id);
@@ -185,7 +204,7 @@ export class SkillApplier {
         continue;
       }
       const measuredRecord =
-        measured < MAX_USAGE_CASES ? await this.measure(ctx, skill, match) : null;
+        measured < MAX_USAGE_CASES ? await this.measure(ctx, skill, match, origin) : null;
       if (measuredRecord !== null) {
         measured += 1;
         records.push(measuredRecord);
@@ -204,6 +223,7 @@ export class SkillApplier {
     ctx: RequestContext,
     skill: SkillDna,
     match: SkillMatch,
+    origin: OriginPrecedent,
   ): Promise<SkillUsageRecord | null> {
     try {
       const replay = await this.replays.load(ctx, match.caseId);
@@ -217,11 +237,17 @@ export class SkillApplier {
         entry.version.id,
         match.caseId,
         replay.run.id,
+        origin.key,
       ].join('|');
       const nowMs = ctx.now().getTime();
       const cached = this.usage.get(key, nowMs);
       if (cached !== undefined) return cached;
-      const record = buildSkillUsage({ replay, entry, applied: true }).record;
+      const record = buildSkillUsage({
+        replay,
+        entry,
+        applied: true,
+        precedent: precedentFor(origin, match.caseId),
+      }).record;
       this.usage.set(key, record, nowMs);
       return record;
     } catch (error) {

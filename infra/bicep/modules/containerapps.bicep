@@ -238,7 +238,7 @@ var plainEnv = filter(
     // The Container Apps ingress is the one proxy in front of the API: believe the address it appended to
     // X-Forwarded-For and ignore anything a client put before it (a hop count, never `true`).
     { name: 'TRUST_PROXY', value: '1' }
-    // Persona login is never enabled in Azure: the endpoints are reachable from the internet.
+    // Persona login is never enabled in Azure, even though the API itself is only reachable from the web app.
     { name: 'AUTH_MODE', value: 'entra' }
     { name: 'DEV_AUTH_ENABLED', value: 'false' }
     { name: 'ENTRA_TENANT_ID', value: config.entraTenantId }
