@@ -5,12 +5,15 @@ import { IDEMPOTENCY_PURGE_INTERVAL_MS, purgeExpiredIdempotency } from './mainte
 import { createHandlers } from './routes';
 import { autoSeedDemo } from './services/demo/auto-seed';
 import { JOB_STALE_AFTER_MS } from './services/job-service';
+import { startTelemetry } from './telemetry';
 import packageJson from '../package.json';
 
 /** How long shutdown waits for running jobs before giving up (Container Apps allows 30 s by default). */
 const SHUTDOWN_GRACE_MS = 20_000;
 /** How often a replica looks for jobs whose owner stopped responding. */
 const ORPHAN_SWEEP_INTERVAL_MS = 30_000;
+/** The longest the server waits for the telemetry exporter before it starts listening anyway. */
+const TELEMETRY_START_WAIT_MS = 5_000;
 
 function loadConfigOrExit(): AppConfig {
   try {
@@ -28,6 +31,13 @@ async function main(): Promise<void> {
   const config = loadConfigOrExit();
   const infra = await createInfrastructure(config);
   const { logger } = infra;
+
+  // Optional export to Application Insights; off unless APPLICATIONINSIGHTS_CONNECTION_STRING is set, and a
+  // failure here never stops start-up. It cannot run before `createInfrastructure`, which creates the
+  // logger and the metrics registry it reports to. It starts now and is given a few seconds before the
+  // server listens: loading the SDK can be slow on a cold disk, and that must not keep the container from
+  // answering its start-up probe (requests that arrive before it is ready are simply not traced).
+  const telemetryStarting = startTelemetry({ config, logger, metrics: infra.metrics });
 
   for (const warning of config.warnings) logger.warn({ warning }, 'configuration warning');
 
@@ -91,6 +101,8 @@ async function main(): Promise<void> {
     clearInterval(purger);
     try {
       await app.close();
+      // Flush spans and metrics while the process is still whole; bounded, and it never throws.
+      await (await telemetryStarting).shutdown();
       await infra.close();
       process.exit(0);
     } catch (error) {
@@ -104,6 +116,12 @@ async function main(): Promise<void> {
   // Demo data is seeded after migrations and before the first request; a failure is logged and the
   // server still starts (the next start, or `pnpm demo:seed`, resumes where it stopped).
   if (config.demo.autoSeed) await autoSeedDemo(infra);
+
+  // Give telemetry a few seconds to be ready for the first request, never longer (see above).
+  await Promise.race([
+    telemetryStarting,
+    new Promise<void>((resolve) => setTimeout(resolve, TELEMETRY_START_WAIT_MS).unref()),
+  ]);
 
   await app.listen({ host: config.http.host, port: config.http.port });
   logger.info(describeConfig(config), 'CaseGuard API started');

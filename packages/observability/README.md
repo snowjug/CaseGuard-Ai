@@ -49,6 +49,31 @@ const otel = bindMetricsToOtel(registry);
 Outgoing calls: spread `propagationHeaders()` into the request headers so the downstream service joins
 the trace. Wrap work in `withSpan(name, attributes, fn)`; it is free without an SDK.
 
+## Request spans
+
+`startServerSpan({ method, route, routeId, requestId, traceparent, tracestate })` starts the SERVER span
+of an inbound request. While no OpenTelemetry SDK is registered (`hasTracerProvider()`) it returns
+`undefined` and does nothing else, so it can run on every request. The span is named
+`<METHOD> <routeId | route pattern | unmatched>` and carries only the attributes of
+`SERVER_SPAN_ATTRIBUTES` (`http.request.method`, `http.route`, `http.response.status_code`,
+`cg.request_id`, `cg.route_id`); the input has no URL field, and a route that is not a plain pattern
+(a query, a fragment, whitespace, an absolute URL) is ignored. A valid inbound `traceparent` becomes
+the remote parent; a malformed one is ignored. The returned handle has `run(fn)` (makes the span
+active), `captureError(error)` (remembered, and recorded scrubbed and without a stack only if the
+request ends 5xx) and `end(statusCode?)` (ends the span once). The span's ids are also written to the
+request context, so log lines and `propagationHeaders()` match the exported trace even when the SDK
+has no context manager. The Fastify adapter is `registerTracing` in `apps/api/src/http/tracing.ts`.
+
+`safeErrorCode(error)` returns the `code` or `name` of an error when it is identifier-like, never its
+message: use it to report failures of calls whose messages can echo secrets, such as a connection string.
+
+## Test doubles
+
+`@caseguard/observability/testing` (not part of the production entry point) registers stand-ins for the
+SDK as the OpenTelemetry globals: `installInMemoryTracing()` (an in-memory tracer provider with
+deterministic ids and an async context manager) and `installRecordingMeter()` (a meter that records
+every instrument and measurement). Both return a handle whose `uninstall()` belongs in `afterEach`.
+
 ## Redaction
 
 Four layers, so one miss does not leak: (1) a deep scrub of every logged object (credential and PII
@@ -104,7 +129,8 @@ text for unauthenticated probes. `systemHealth()` returns the `SystemHealth` DTO
 
 ## Honest limits
 
-Validated with fakes: a recording tracer, a fake OpenTelemetry meter and in-memory destinations. The
-Fastify wiring above, a live OpenTelemetry SDK and Azure Monitor or Application Insights are not
-exercised by this package's tests. Exposing `/metrics` (and who may scrape it) is a decision for the
-API layer.
+Validated with fakes: an in-memory tracer, a recording OpenTelemetry meter and in-memory destinations.
+The API's Fastify wiring is covered by `apps/api` tests that use those fakes. A live OpenTelemetry SDK
+was exercised once, by hand, against a loopback stand-in for the Azure Monitor ingestion endpoint (see
+`docs/OBSERVABILITY.md`, section 9); Azure Monitor and Application Insights themselves have never been
+observed. Exposing `/metrics` (and who may scrape it) is a decision for the API layer.

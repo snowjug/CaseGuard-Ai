@@ -96,11 +96,19 @@ export {
 // Tracing
 export {
   getActiveTraceIds,
+  getRegisteredTracer,
+  hasTracerProvider,
   INSTRUMENTATION_NAME,
   recordSpanError,
   sanitizeSpanAttributes,
+  SERVER_SPAN_ATTRIBUTES,
+  startServerSpan,
+  UNMATCHED_ROUTE,
   withSpan,
   type ActiveTraceIds,
+  type ServerSpan,
+  type ServerSpanInput,
+  type ServerSpanOptions,
   type SpanAttributeLimits,
   type SpanOptions,
 } from './tracing';
@@ -198,6 +206,7 @@ export {
   createTelemetryEventBuilder,
   hashToUnitInterval,
   measure,
+  safeErrorCode,
   shouldSample,
   TELEMETRY_EVENT_NAMES,
   TELEMETRY_SCHEMA_VERSION,

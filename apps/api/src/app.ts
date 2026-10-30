@@ -13,6 +13,7 @@ import { registerLifecycle } from './http/lifecycle';
 import { registerOpenApi } from './http/openapi';
 import { registerRoutes, type HandlerMap } from './http/route-binder';
 import { registerSecurity } from './http/security';
+import { registerTracing } from './http/tracing';
 import type { Infrastructure } from './infrastructure';
 
 export interface BuildAppOptions {
@@ -46,7 +47,7 @@ function proxyTrust(setting: TrustProxySetting): NonNullable<FastifyServerOption
 }
 
 /**
- * Assembles the HTTP server: correlation and metrics, security headers, CORS, rate limits, uploads,
+ * Assembles the HTTP server: correlation, tracing and metrics, security headers, CORS, rate limits, uploads,
  * the OpenAPI document, health probes and every route of the contract. Nothing is started here;
  * the caller decides whether to `listen` (main) or `inject` (tests).
  */
@@ -79,6 +80,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   app.setSerializerCompiler(serializerCompiler);
 
   registerLifecycle(app, infra);
+  registerTracing(app, infra);
   await registerSecurity(app, infra);
   registerErrorHandling(app, infra);
   await registerOpenApi(app, infra);

@@ -1,3 +1,4 @@
+export { safeErrorCode } from './error-code';
 export {
   createTelemetryEventBuilder,
   TELEMETRY_EVENT_NAMES,
