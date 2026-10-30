@@ -8,6 +8,7 @@ import { TEST_DATABASE_STARTUP_TIMEOUT_MS } from '../src/db/testing';
 import { DenialAuditThrottle } from '../src/http/denial-throttle';
 import { hashRequest, idempotencyScope } from '../src/http/idempotency';
 import type { HandlerMap, UploadedFile } from '../src/http/route-binder';
+import { buildIngestInput } from './builders';
 import {
   CONTOSO,
   PERSONAS,
@@ -494,6 +495,15 @@ describe('client address header (API behind the web tier)', () => {
 });
 
 describe('idempotency', () => {
+  // A response about a case that does not exist is deliberately not stored (the case may have been
+  // erased while the request ran), so the replay tests need cases that exist.
+  beforeAll(async () => {
+    const setup = await harness();
+    for (const caseId of ['case_1', 'case_other']) {
+      await setup.repos(CONTOSO).cases.ingest(buildIngestInput({ tenantId: CONTOSO, caseId }));
+    }
+  }, TEST_DATABASE_STARTUP_TIMEOUT_MS);
+
   it('keeps a key private to the user who chose it', async () => {
     const counter = { calls: 0 };
     const h = await harness({ handlers: analysisHandlers(counter) });

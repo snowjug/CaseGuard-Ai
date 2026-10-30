@@ -9,7 +9,14 @@ import {
 import type { Database } from '../src/db';
 import { TEST_DATABASE_STARTUP_TIMEOUT_MS } from '../src/db/testing';
 import type { HandlerMap } from '../src/http/route-binder';
-import { PERSONAS, createHarness, openSharedDatabase, type Harness } from './support/app-harness';
+import { buildIngestInput } from './builders';
+import {
+  CONTOSO,
+  PERSONAS,
+  createHarness,
+  openSharedDatabase,
+  type Harness,
+} from './support/app-harness';
 import { fakeJob } from './support/fixtures';
 
 let database: Database;
@@ -249,6 +256,15 @@ describe('error handling', () => {
 
 describe('idempotency', () => {
   const key = 'idem-key-0001-abcd';
+
+  // A response about a case that does not exist is deliberately not stored (the case may have been
+  // erased while the request ran), so the replay tests need a case that does.
+  beforeAll(async () => {
+    const setup = await harness();
+    await setup
+      .repos(CONTOSO)
+      .cases.ingest(buildIngestInput({ tenantId: CONTOSO, caseId: 'case_7' }));
+  }, TEST_DATABASE_STARTUP_TIMEOUT_MS);
 
   function startAnalysis(
     h: Harness,
