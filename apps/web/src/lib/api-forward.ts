@@ -170,7 +170,9 @@ export function clientAddressFromForwardedFor(
  * bucket) and none is set when there is no usable address.
  *
  * Next applies `request.headers` as the COMPLETE set of upstream request headers, and removes any header that is not
- * in it, which is why this starts from a copy of every incoming header.
+ * in it, which is why this starts from a copy of every incoming header. Next ignores an empty list, which would leave a
+ * client-sent `x-cg-client-ip` in place, but the list is never empty: Next adds the `x-forwarded-*` headers to every
+ * request before the proxy runs (checked with a bare HTTP/1.0 request that carried nothing but the spoofed header).
  */
 function upstreamHeaders(request: NextRequest): Headers {
   const headers = new Headers(request.headers);
@@ -183,7 +185,7 @@ function upstreamHeaders(request: NextRequest): Headers {
 /**
  * Rewrites the request to the API origin. The method, body and headers travel to the API unchanged, except that
  * `x-cg-client-ip` is set by us (see `upstreamHeaders`), and the API's response, including `x-request-id`, comes back
- * untouched: no CSP or nonce is attached to it.
+ * without a CSP or nonce.
  */
 export function forwardToApi(request: NextRequest): NextResponse {
   const resolved = resolveApiOrigin();

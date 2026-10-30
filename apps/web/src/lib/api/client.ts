@@ -29,6 +29,12 @@ export interface CallOptions {
   timeoutMs?: number | undefined;
   /** Request body for multipart routes (`ingestion.previewFile`, `cases.createFromFile`). */
   formData?: FormData | undefined;
+  /**
+   * Overrides how many times an idempotent request is repeated after a transient failure (429 and 5xx included). Use
+   * `0` where the caller shows the failure itself, for example a rate-limited earlier view with its own countdown.
+   * Whatever the value, a `Retry-After` above 5 seconds is not waited for: the failure is thrown at once.
+   */
+  maxRetries?: number | undefined;
 }
 
 /** Typed input of `callApi`, derived from the route registry: params, query and body are required exactly when the route needs them. */
@@ -90,6 +96,8 @@ const defaultSleep = (ms: number, signal?: AbortSignal): Promise<void> =>
 
 const SAMPLE_RATE = 0.1;
 const DEFAULT_TIMEOUT_MS = 30_000;
+/** A longer `Retry-After` is never slept through by a retry: the failure is thrown so the page can show a countdown. */
+const MAX_RETRY_AFTER_MS = 5_000;
 
 interface InternalInput {
   params?: Record<string, string | number> | undefined;
@@ -141,7 +149,9 @@ export function createApiClient(deps: ApiClientDeps = {}): ApiClient {
     const url = `${baseUrl}${path}${buildQueryString(input.query)}`;
     const correlationId = newCorrelationId();
     const idempotent = route.method === 'GET' || route.idempotent === true;
-    const maxRetries = idempotent ? (deps.maxRetries ?? (route.method === 'GET' ? 2 : 1)) : 0;
+    const maxRetries = idempotent
+      ? (input.maxRetries ?? deps.maxRetries ?? (route.method === 'GET' ? 2 : 1))
+      : 0;
     const idempotencyKey = route.idempotent
       ? (input.idempotencyKey ?? newIdempotencyKey())
       : undefined;
@@ -184,6 +194,8 @@ export function createApiClient(deps: ApiClientDeps = {}): ApiClient {
       } catch (error) {
         const retryable = error instanceof ApiError && error.isRetryable;
         if (!retryable || attempt >= maxRetries) throw error;
+        if (error.retryAfterMs !== undefined && error.retryAfterMs > MAX_RETRY_AFTER_MS)
+          throw error;
         const backoff = Math.min(2000, 250 * 2 ** attempt) * (0.75 + random() * 0.5);
         await sleep(error.retryAfterMs ?? backoff, input.signal);
         attempt += 1;

@@ -1,6 +1,5 @@
 'use client';
 
-import type { UseQueryResult } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import type { ApiError } from '../../lib/api/errors';
 import { useAuth } from '../../lib/auth/context';
@@ -12,9 +11,19 @@ export interface QueryBoundaryMeta {
   isRefreshing: boolean;
 }
 
+/** The part of a TanStack query result the boundary reads: `useApiQuery` and `useApiPages` results both satisfy it. */
+export interface BoundaryQuery<T> {
+  isPending: boolean;
+  isError: boolean;
+  error: ApiError | null;
+  data: T | undefined;
+  isFetching: boolean;
+  refetch: () => unknown;
+}
+
 export interface QueryBoundaryProps<T> {
-  /** The result of `useApiQuery`. */
-  query: UseQueryResult<T, ApiError>;
+  /** The result of `useApiQuery` (or `useApiPages`). */
+  query: BoundaryQuery<T>;
   /** Shown during the first load (the page's own skeleton: it should match the final layout). */
   skeleton: ReactNode;
   /** Headline noun for errors: "The Command Center". */
@@ -50,6 +59,8 @@ export function QueryBoundary<T>({
       />
     );
   }
-  if (isEmpty?.(query.data)) return <>{empty}</>;
-  return <>{children(query.data, { isRefreshing: query.isFetching })}</>;
+  const data = query.data;
+  if (data === undefined) return <>{skeleton}</>;
+  if (isEmpty?.(data)) return <>{empty}</>;
+  return <>{children(data, { isRefreshing: query.isFetching })}</>;
 }

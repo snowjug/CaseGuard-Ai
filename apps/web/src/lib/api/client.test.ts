@@ -289,6 +289,74 @@ describe('[FR-API-03] callApi: retries', () => {
     expect(patientSleep).toHaveBeenCalledWith(4000, undefined);
   });
 
+  it('throws a long Retry-After at once instead of sleeping through it (up to 5 s is still waited for)', async () => {
+    const limited = (seconds: number, status = 429): Response =>
+      new Response(
+        JSON.stringify({
+          type: 'urn:x',
+          title: 'Slow down',
+          status,
+          code: status === 429 ? 'rate_limited' : 'unavailable',
+        }),
+        {
+          status,
+          headers: {
+            'content-type': 'application/problem+json',
+            'retry-after': String(seconds),
+          },
+        },
+      );
+
+    for (const status of [429, 503]) {
+      const long = vi.fn(async () => limited(30, status));
+      const longSleep = vi.fn(noSleep);
+      const error = (await createApiClient({ fetch: long, sleep: longSleep })
+        .call('cases.list')
+        .catch((e: unknown) => e)) as ApiError;
+      expect(long).toHaveBeenCalledTimes(1);
+      expect(longSleep).not.toHaveBeenCalled();
+      expect(error).toMatchObject({ status, retryAfterMs: 30_000 });
+    }
+
+    const edge = vi.fn(async () => limited(5));
+    const edgeSleep = vi.fn(noSleep);
+    await createApiClient({ fetch: edge, sleep: edgeSleep })
+      .call('cases.list')
+      .catch(() => undefined);
+    expect(edge).toHaveBeenCalledTimes(3);
+    expect(edgeSleep).toHaveBeenCalledWith(5000, undefined);
+
+    const over = vi.fn(async () => limited(6));
+    await createApiClient({ fetch: over, sleep: noSleep })
+      .call('cases.list')
+      .catch(() => undefined);
+    expect(over).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not let a long Retry-After make a later attempt wait either', async () => {
+    const limited = (seconds: number): Response =>
+      new Response(
+        JSON.stringify({ type: 'urn:x', title: 'Slow', status: 429, code: 'rate_limited' }),
+        {
+          status: 429,
+          headers: { 'content-type': 'application/problem+json', 'retry-after': String(seconds) },
+        },
+      );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(limited(1))
+      .mockResolvedValueOnce(limited(60))
+      .mockResolvedValueOnce(json({ items: [], nextCursor: null }));
+    const sleep = vi.fn(noSleep);
+    const error = (await createApiClient({ fetch: fetchMock, sleep })
+      .call('cases.list')
+      .catch((e: unknown) => e)) as ApiError;
+    expect(error).toMatchObject({ status: 429, retryAfterMs: 60_000 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledTimes(1);
+    expect(sleep).toHaveBeenCalledWith(1000, undefined);
+  });
+
   it('does not retry the web server reporting that it is not configured to reach the API', async () => {
     const fetchMock = vi.fn(async () =>
       problem(502, 'upstream_not_configured', { detail: 'API_INTERNAL_URL is not set.' }),
