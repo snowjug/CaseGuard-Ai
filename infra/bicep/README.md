@@ -338,7 +338,7 @@ The templates were written against the build contract, not against finished code
 - The environment-variable names are those of the contract (`BUILD_CONTRACT.md` section 6); `packages/config` was not yet present to compare. `ENTRA_ISSUER` and `ENTRA_JWKS_URI` are deliberately not set (derivable from the tenant id).
 - `DATABASE_URL` as built here (`postgres://user[:password]@host:5432/caseguard?sslmode=require`) is accepted by the API; in `entra` mode the user is the managed identity name and the password is an access token obtained with `DefaultAzureCredential` (`AZURE_CLIENT_ID` is set for that).
 - The migration job needs the same configuration as the API (the shared config validation), so it receives the same environment.
-- The web build inlines `NEXT_PUBLIC_*` (see `docker-compose.yml`) while `API_INTERNAL_URL` is read at runtime; the OAuth redirect URI used by the web app is the site root (to be confirmed in docs/ENTRA_ID_SETUP.md).
+- The web build inlines `NEXT_PUBLIC_*` (see `docker-compose.yml`) while `API_INTERNAL_URL` is read at runtime; the OAuth redirect URI used by the web app is the page origin (`window.location.origin`: the site root with no path), as read from `apps/web/src/lib/auth/entra.tsx` and documented in docs/ENTRA_ID_SETUP.md. Register exactly that origin as a SPA redirect URI.
 - The structured log field names used by the queries in docs/OBSERVABILITY.md.
 
 ## Not included (documented limitations)

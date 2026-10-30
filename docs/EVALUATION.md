@@ -31,14 +31,14 @@ Counts are Vitest's own totals from `pnpm.cmd exec vitest run` inside each packa
 | Package                  |                       Test files |                              Tests | Result                                                             | Notes                                                                                                                       |
 | ------------------------ | -------------------------------: | ---------------------------------: | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
 | `packages/schemas`       |                                1 |                                 18 | all passed                                                         | Contract and enum tests                                                                                                     |
-| `packages/config`        |                                4 |                                131 | all passed                                                         | Fail-fast guards and parsing (124 in my first run; tests for `TRUST_PROXY` landed since)                                    |
+| `packages/config`        |                                4 |                                132 | all passed                                                         | Fail-fast guards and parsing (124 in my first run; tests for `TRUST_PROXY` and `TRUST_CLIENT_IP_HEADER` landed since)       |
 | `packages/security`      |                               17 |                                604 | all passed                                                         | Auth, RBAC, redaction, injection, uploads, headers, URL safety                                                              |
 | `packages/observability` |                               13 |                                848 | all passed                                                         | Logger, redaction, metrics, tracing hooks                                                                                   |
 | `packages/ai`            |                               13 |                                180 | all passed                                                         | Validators, prompts, governor, cache, resilience, orchestrator, Azure provider **against a local mock**, evaluation harness |
 | `packages/domain`        |                               47 |                                928 | **925 passed, 3 failed** (see below)                               | Engine, ingestion parsers, quality, metrics, warnings, coaching, SkillDNA; fast-check properties                            |
 | `packages/testing`       |                                0 |                                  0 | no tests                                                           | Shared fixtures only                                                                                                        |
 | `packages/ui`            |                               10 |                                183 | all passed with `--maxWorkers=1` (first run: 180 passed, 3 failed) | See the note below                                                                                                          |
-| `apps/web`               |                               13 |                                158 | all passed (`--maxWorkers=2`, 479 s)                               | jsdom + Testing Library; heavy                                                                                              |
+| `apps/web`               |                               13 |                                158 | all passed (`--maxWorkers=2`, 479 s)                               | jsdom + Testing Library; heavy. `src/proxy.test.ts` has grown since this run (not re-run, see below)                        |
 | `apps/api`               | 56 (29 `.int.test.ts`, 27 other) | 345 in the 21 files run (299 + 46) | all 21 files passed                                                | Only 21 of 56 files were run, see below                                                                                     |
 
 **Sum of the five fully passing packages (schemas, config, security, observability, ai): 48 files, 1,781 tests, all passing.**
@@ -81,7 +81,11 @@ load-sensitive test-environment problem, not as a product defect, and the 183 as
 (`src/lib/url-state.test.tsx`) twice failed to start (`Failed to start forks worker ... Timeout waiting for worker to respond`, a
 60 s worker start limit) while the other twelve passed, and the same file passed alone in 12 s once the machine was quiet. The web
 test configuration also changed (uncommitted) while I worked, and the number of web tests grew, so the early partial counts
-(127 + 10) are not comparable with the final 158.
+(127 + 10) are not comparable with the final 158. After that run `src/proxy.test.ts` gained the client-address groups `[API-FWD-03]`
+and `[API-FWD-04]`; I could not re-run the file because the worker start timed out three times on the saturated machine (CPU at 100%
+from other work), so the 158 does not include them. What I did run is the helper they exercise,
+`clientAddressFromForwardedFor`, through a small `tsx` probe on 14 sample header values (right-most entry, port and bracket stripping,
+refusal of an invalid last entry and of an IPv6 zone id): all matched the documented behaviour.
 
 Not run for this document: Playwright end-to-end and accessibility tests, the full `pnpm test` / `pnpm test:int`, `pnpm lint`,
 `pnpm typecheck` and `pnpm build` across the workspace, Docker image builds (no daemon), `audit:deps`, `infra:validate`.

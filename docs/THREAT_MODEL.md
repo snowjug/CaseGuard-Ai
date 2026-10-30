@@ -88,6 +88,7 @@ flowchart LR
 
 - The deterministic provider's injection heuristics are pattern-based and can be evaded; the Azure path should add Azure AI Content Safety _Prompt Shields_ (listed in the roadmap, **not implemented**).
 - In-memory rate limiting is per replica; multi-replica production needs a shared store.
+- Rate limits count the client address that the web tier reports in `x-cg-client-ip`. The API believes it only with `TRUST_CLIENT_IP_HEADER=true`, which has no configuration guard and must never be enabled on an API that browsers can reach directly. This was tested with simulated headers only and never observed behind a real Container Apps ingress; verify it with post-deploy check 12 ([DEPLOYMENT.md](DEPLOYMENT.md#57-post-deploy-smoke-tests), [SECURITY.md](SECURITY.md#client-address-for-rate-limits)).
 - Entra integration has not been exercised against a live tenant in this environment.
 - Malware scanning is an integration hook only; no scanner is bundled.
 - Row-level security parity on managed PostgreSQL must be verified during first deployment.

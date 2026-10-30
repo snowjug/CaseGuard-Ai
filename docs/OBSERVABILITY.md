@@ -72,7 +72,19 @@ Searched in `apps/api/src` and `packages/ai/src` (`event:` values). Common field
 | `ai.provider.unexpected`          | `error`                                                                                                                                                                                            | `agent`, `error`                                                                                                                                                                                                                                                                                                              | A provider failed in a way the provider code did not classify                                                                                                                                                                                                                                           |
 | `ai.deterministic.invalid`        | `error`                                                                                                                                                                                            | `agent`, `kinds`, `issues` (at most five issue codes)                                                                                                                                                                                                                                                                         | The deterministic result itself failed validation (an internal defect)                                                                                                                                                                                                                                  |
 
-Other lines have **no** `event` field and must be found by `msg`: `Azure AI Search failed; using lexical search` (`warn`, field `failure`: `unsafe_endpoint`, `invalid_index`, `invalid_tenant`, `timeout`, `aborted`, `auth`, `network`, `http_error`, `too_large`, `invalid_response` or `unexpected`), `Azure AI Search returned documents of another tenant; they were discarded` (`error`, field `discarded`), `database migrations applied` (`info`, field `applied`), `configuration warning` (`warn`), `CaseGuard API started` (`info`, a redacted configuration summary), `marked jobs that lost their server as failed` (`warn`, field `recovered`), `shutting down` and `unhandled promise rejection` / `uncaught exception` (`fatal`).
+Other lines have **no** `event` field and must be found by `msg`: the search lines below, `database migrations applied` (`info`, field `applied`), `configuration warning` (`warn`), `CaseGuard API started` (`info`, a redacted configuration summary that includes `http.trustProxy` and `http.trustClientIpHeader`), `marked jobs that lost their server as failed` (`warn`, field `recovered`), `shutting down` and `unhandled promise rejection` / `uncaught exception` (`fatal`).
+
+Search lines (`apps/api/src/services/search/search-service.ts`; the query text is never logged, and documents and hits are reported by count only):
+
+| `msg`                                                                       | Level   | Fields                                                   | Meaning                                                                                                                                                                                                                                                 |
+| --------------------------------------------------------------------------- | ------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Azure AI Search failed; using lexical search`                              | `warn`  | `failure`                                                | The external call failed and the PostgreSQL full-text search answered. `failure` is one of `unsafe_endpoint`, `invalid_index`, `invalid_tenant`, `timeout`, `aborted`, `auth`, `network`, `http_error`, `too_large`, `invalid_response` or `unexpected` |
+| `Azure AI Search returned no usable documents; using lexical search`        | `warn`  | `failure` (always `no_usable_documents`)                 | The index answered with documents, none of which could be used (every one was dropped), so the PostgreSQL full-text search answered. An answer with **no** documents is not this case: it is returned as an empty list without a fallback               |
+| `Azure AI Search returned malformed documents; they were discarded`         | `warn`  | `discarded`                                              | Documents of the caller's tenant dropped for a wrong shape, an invalid link or case id, or an empty title. Counted in `caseguard_errors_total{component="search", code="invalid_document"}`                                                             |
+| `Azure AI Search returned documents of another tenant; they were discarded` | `error` | `discarded`                                              | Documents naming another tenant were dropped (the index ignored the filter or holds mixed data). Counted as `code="foreign_tenant_document"`. Treat any occurrence as a security incident                                                               |
+| `Search hits that do not satisfy the result contract were discarded`        | `warn`  | `provider` (`azure-ai-search` or `lexical`), `discarded` | Hits of either provider dropped by the last check before the answer (response schema, valid ids, a case that fits the type, an `href` that is one of the app's own routes). Counted as `code="invalid_result"`                                          |
+
+A dropped document or hit never fails the request. The requirements for index documents are in [runbooks/search-unavailable.md](runbooks/search-unavailable.md#index-document-requirements).
 
 **Audit events are not in the log stream.** They are rows in `audit_events` (`GET /api/v1/audit`, verification at `GET /api/v1/audit/verify`, permission `audit:read`), for example `case.ingested`, `case.deleted`, `analysis.completed`, `access.denied`, `governance.settings.updated`, `roles.assigned`, `export.created`, `counterfactual.run_requested` and the fallback `api.<routeId>`. A log event with the same name (for example `case.ingested`) is a different record. The audit `access.denied` event is throttled per caller and route (see [DATA_MODEL.md](DATA_MODEL.md#7-the-audit-hash-chain)); a replayed idempotent request is marked `details.replayed`.
 
@@ -80,13 +92,13 @@ Other lines have **no** `event` field and must be found by `msg`: `Azure AI Sear
 
 These names appeared in earlier versions of this document and in runbooks. **No code emits them.** Do not build alerts on them. When one is implemented it should move to the table above.
 
-| Planned name                                                                                | Intended meaning                            | What to use today                                                                                                                                                        |
-| ------------------------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `skill.published`, `skill.approved`, `skill.rejected`, `skill.retired`, `skill.rolled_back` | Skill lifecycle activity in the log         | Audit events in `audit_events` (`GET /api/v1/audit`) and the in-process metric `caseguard_skill_transitions_total`                                                       |
-| `injection.flagged`                                                                         | A prompt-injection detection in the log     | `injectionDetected` in `case.ingested`, `injectionIndicators` in `ai.model.execution`, and `caseguard_prompt_injection_flags_total`                                      |
-| `authz.*`, `rate_limit.*`, `upload.*`                                                       | Authorisation, throttling and upload events | `access.denied` and `http.error` (a 429 is `code` `rate_limited`), `ingest.unsafe_upload_refused`, and `caseguard_rate_limit_hits_total`                                 |
-| `retrieval.*`                                                                               | Search latency and provider fallback        | The `http.request` line of `/api/v1/search`, the warning `Azure AI Search failed; using lexical search`, and `caseguard_retrieval_duration_seconds`                      |
-| `counterfactual.*`                                                                          | Counterfactual generation lifecycle         | `ai.model.execution` with `agent == 'counterfactual_simulator'`, the job `counterfactual` (`GET /api/v1/jobs`), and `caseguard_counterfactual_leak_check_failures_total` |
+| Planned name                                                                                | Intended meaning                            | What to use today                                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `skill.published`, `skill.approved`, `skill.rejected`, `skill.retired`, `skill.rolled_back` | Skill lifecycle activity in the log         | Audit events in `audit_events` (`GET /api/v1/audit`) and the in-process metric `caseguard_skill_transitions_total`                                                                                                          |
+| `injection.flagged`                                                                         | A prompt-injection detection in the log     | `injectionDetected` in `case.ingested`, `injectionIndicators` in `ai.model.execution`, and `caseguard_prompt_injection_flags_total`                                                                                         |
+| `authz.*`, `rate_limit.*`, `upload.*`                                                       | Authorisation, throttling and upload events | `access.denied` and `http.error` (a 429 is `code` `rate_limited`), `ingest.unsafe_upload_refused`, and `caseguard_rate_limit_hits_total`                                                                                    |
+| `retrieval.*`                                                                               | Search latency and provider fallback        | The `http.request` line of `/api/v1/search`, the search warnings listed under "Events emitted today" (fallback, dropped documents), `caseguard_retrieval_duration_seconds` and `caseguard_errors_total{component="search"}` |
+| `counterfactual.*`                                                                          | Counterfactual generation lifecycle         | `ai.model.execution` with `agent == 'counterfactual_simulator'`, the job `counterfactual` (`GET /api/v1/jobs`), and `caseguard_counterfactual_leak_check_failures_total`                                                    |
 
 ### Base function
 
@@ -130,11 +142,12 @@ let CgApiLogs = () {
         completionTokens = tolong(j.completionTokens),
         provider = tostring(j.provider),
         tokenSource = tostring(j.tokenSource),
-        failure = tostring(j.failure)
+        failure = tostring(j.failure),
+        discarded = toint(j.discarded)
 };
 ```
 
-`level` is a label string, so compare with `level in ('error', 'fatal')`, never with a number. `statusCode` exists only on `http.request` lines; `execStatus`, `provider` and `tokenSource` only on `ai.model.execution` lines (the same JSON key `status` is the numeric HTTP status on `http.error` and `access.denied` lines, which these queries do not need); `failure` only on the Azure AI Search fallback warning. `durationMs` is filled from `durationMs` (HTTP) or `latencyMs` (model calls).
+`level` is a label string, so compare with `level in ('error', 'fatal')`, never with a number. `statusCode` exists only on `http.request` lines; `execStatus`, `provider` and `tokenSource` only on `ai.model.execution` lines, except that `provider` is also on the search line `Search hits that do not satisfy the result contract were discarded` (the same JSON key `status` is the numeric HTTP status on `http.error` and `access.denied` lines, which these queries do not need); `failure` and `discarded` only on the search warnings. `durationMs` is filled from `durationMs` (HTTP) or `latencyMs` (model calls).
 
 ## 3. Verify the log contract first
 
@@ -307,7 +320,7 @@ Money is deliberately absent: multiply tokens by the unit prices **you** looked 
 ### 4.6 Retrieval latency
 
 ```kusto
-// Search requests as the API saw them (the application emits no retrieval.* events; provider and fallback are only in the in-process metric)
+// Search requests as the API saw them (the application emits no retrieval.* events; which provider answered is only in the in-process metric, fallbacks and dropped documents are the warnings below)
 CgApiLogs()
 | where TimeGenerated > ago(24h) and event == 'http.request' and route == '/api/v1/search' and isnotnull(durationMs)
 | summarize calls = count(), p50 = percentile(durationMs, 50), p95 = percentile(durationMs, 95) by bin(TimeGenerated, 15m)
@@ -315,12 +328,27 @@ CgApiLogs()
 ```
 
 ```kusto
-// Azure AI Search failures that fell back to lexical search (the warning has no `event`; the `failure` codes are listed in section 2)
+// Azure AI Search fallbacks to lexical search, by reason (the warnings have no `event`; the `failure` codes, including no_usable_documents, are listed in section 2)
 CgApiLogs()
-| where TimeGenerated > ago(24h) and msg == 'Azure AI Search failed; using lexical search'
+| where TimeGenerated > ago(24h)
+    and msg in ('Azure AI Search failed; using lexical search', 'Azure AI Search returned no usable documents; using lexical search')
 | summarize fallbacks = count() by failure, bin(TimeGenerated, 15m)
 | render columnchart
 ```
+
+```kusto
+// Documents and hits the API dropped (counts only). foreign-tenant lines are level error and are a security incident
+CgApiLogs()
+| where TimeGenerated > ago(24h)
+    and msg in (
+        'Azure AI Search returned malformed documents; they were discarded',
+        'Azure AI Search returned documents of another tenant; they were discarded',
+        'Search hits that do not satisfy the result contract were discarded')
+| summarize lines = count(), discarded = sum(discarded) by msg, level, provider, bin(TimeGenerated, 1h)
+| order by TimeGenerated desc
+```
+
+An empty result list for a query that should match is **not** logged: when the index answers with no documents the API returns an empty list without a fallback, and the only trace is the retrieval metric with `outcome="ok"`. The index document requirements and the triage steps are in [runbooks/search-unavailable.md](runbooks/search-unavailable.md).
 
 ```kusto
 // Azure AI Search service side (when deployed); column names depend on the diagnostic mode, check AzureDiagnostics first
@@ -375,6 +403,8 @@ CgApiLogs()
 ```
 
 The general rate limit runs before authentication, so once a client address has used up its quota, further bad credentials are answered 429 without ever being authenticated: they appear as `http.error` lines with `code` `rate_limited` (debug level) and **not** as `auth.failure`. A sustained burst therefore shows `auth.failure` lines up to the quota and then silence plus a rising `rate_limit_hits_total{limiter="general"}`.
+
+Which address a 429 was counted against cannot be seen in the log: the limiter runs before the caller is known, so those lines have no tenant or user, and the API never writes a client address to its own logs (the per-client buckets, including the address taken from `x-cg-client-ip`, live in memory only). If many different visitors are throttled at once, suspect a shared bucket: check that the start-up line `CaseGuard API started` shows `trustClientIpHeader: true` on the API in Azure, and run the two-client check (check 12) in [DEPLOYMENT.md](DEPLOYMENT.md#57-post-deploy-smoke-tests) (this behaviour is tested with simulated headers only, never behind a real Container Apps ingress).
 
 ```kusto
 // Refused requests per tenant and route (the caller is known by then)
@@ -503,18 +533,18 @@ CgApiLogs()
 - **Readable through the API.** `GET /api/v1/system/metrics` (permission `telemetry:read`) returns a summary built from the registry: `totalRequests`, `errorRequests`, `errorRate`, `latencyMs` (p50, p95, p99, max), `byRoute` (at most 100), `modelExecutions` (total, failures, average latency) and `securityEvents` (`authFailures`, `forbidden`, `rateLimited`, `injectionFlags`), counted since the process started. `GET /api/v1/system/health` reports dependencies and migrations.
 - **Per process.** Counters reset on restart and are not shared between replicas.
 
-| Metric (`caseguard_` prefix)                                                                                                                                                                           | Recorded by the API today                                                                        |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| `http_requests_total`, `http_request_duration_seconds` (labels `method`, `route`, `status_class`)                                                                                                      | Yes (one per finished request)                                                                   |
-| `errors_total` (`component`, `code`)                                                                                                                                                                   | Yes (`http`, `audit`, `idempotency`)                                                             |
-| `jobs_active`, `job_duration_seconds`, `job_failures_total`, `queue_depth`                                                                                                                             | Yes (job service)                                                                                |
-| `model_calls_total`, `model_tokens_total`, `model_call_duration_seconds`, `model_cache_lookups_total`, `model_fallbacks_total`, `model_validation_failures_total`                                      | Yes (every AI task; validation kinds are folded into `schema`, `citation`, `policy`, `temporal`) |
-| `model_cache_hit_ratio`                                                                                                                                                                                | Defined; derived from the lookup counters                                                        |
-| `counterfactual_leak_check_failures_total`                                                                                                                                                             | Yes, incremented only when a leak is found (it must stay 0)                                      |
-| `auth_failures_total` (`reason`), `forbidden_total` (`permission`), `rate_limit_hits_total` (`limiter` = `general` or `heavy`), `prompt_injection_flags_total` (`source` = `ingestion` or `case_text`) | Yes                                                                                              |
-| `retrieval_duration_seconds` (`provider`, `outcome` = `ok`, `error`, `fallback`)                                                                                                                       | Yes (global search)                                                                              |
-| `skill_transitions_total` (`transition`, `outcome`)                                                                                                                                                    | Yes (SkillDNA governance and mutation)                                                           |
-| `build_info`, `process_start_time_seconds`                                                                                                                                                             | Yes                                                                                              |
-| `analysis_duration_seconds`, `db_query_duration_seconds`                                                                                                                                               | **Defined but not recorded by anything**                                                         |
+| Metric (`caseguard_` prefix)                                                                                                                                                                           | Recorded by the API today                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `http_requests_total`, `http_request_duration_seconds` (labels `method`, `route`, `status_class`)                                                                                                      | Yes (one per finished request)                                                                                                                                                       |
+| `errors_total` (`component`, `code`)                                                                                                                                                                   | Yes (`http`, `audit`, `idempotency`, `search`; the `search` codes are `invalid_document`, `foreign_tenant_document` and `invalid_result`, one increment per dropped document or hit) |
+| `jobs_active`, `job_duration_seconds`, `job_failures_total`, `queue_depth`                                                                                                                             | Yes (job service)                                                                                                                                                                    |
+| `model_calls_total`, `model_tokens_total`, `model_call_duration_seconds`, `model_cache_lookups_total`, `model_fallbacks_total`, `model_validation_failures_total`                                      | Yes (every AI task; validation kinds are folded into `schema`, `citation`, `policy`, `temporal`)                                                                                     |
+| `model_cache_hit_ratio`                                                                                                                                                                                | Defined; derived from the lookup counters                                                                                                                                            |
+| `counterfactual_leak_check_failures_total`                                                                                                                                                             | Yes, incremented only when a leak is found (it must stay 0)                                                                                                                          |
+| `auth_failures_total` (`reason`), `forbidden_total` (`permission`), `rate_limit_hits_total` (`limiter` = `general` or `heavy`), `prompt_injection_flags_total` (`source` = `ingestion` or `case_text`) | Yes                                                                                                                                                                                  |
+| `retrieval_duration_seconds` (`provider`, `outcome` = `ok`, `error`, `fallback`)                                                                                                                       | Yes (global search; `fallback` also covers an index answer with no usable document)                                                                                                  |
+| `skill_transitions_total` (`transition`, `outcome`)                                                                                                                                                    | Yes (SkillDNA governance and mutation)                                                                                                                                               |
+| `build_info`, `process_start_time_seconds`                                                                                                                                                             | Yes                                                                                                                                                                                  |
+| `analysis_duration_seconds`, `db_query_duration_seconds`                                                                                                                                               | **Defined but not recorded by anything**                                                                                                                                             |
 
 Token counts in `model_tokens_total` carry a `source` label (`measured` or `estimated`); with the deterministic provider they are always `estimated`.
