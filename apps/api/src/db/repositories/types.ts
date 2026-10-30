@@ -160,6 +160,12 @@ export interface CaseRepository {
    */
   ingest(input: IngestCaseInput): Promise<{ case: Case; created: boolean }>;
   findByContentHash(contentHash: string): Promise<Case | null>;
+  /**
+   * The case of this tenant whose reference is exactly `reference` (case-sensitive), or null. A
+   * reference is unique within a tenant (migration 0010), so there is at most one. A string that cannot
+   * be a reference (empty, over 200 characters, control characters) is a ValidationFailedError.
+   */
+  findByReference(reference: string): Promise<Case | null>;
   list(query: CaseListQuery): Promise<Page<CaseListItem>>;
   get(caseId: string): Promise<Case | null>;
   getSource(caseId: string): Promise<CaseSource | null>;
@@ -516,8 +522,18 @@ export interface ReviewStats {
 
 export interface ReviewRepository {
   record(decision: ReviewDecision): Promise<void>;
+  /**
+   * Decisions newest first (`decidedAt`, then id) with keyset pagination, optionally only those of one
+   * case and/or only those about one kind of target. `targetType` matches the stored target type
+   * exactly (`skill` does not match `skill_version`) and must be one of `REVIEW_TARGETS`
+   * (`claim`, `fork`, `counterfactual`, `warning`, `skill`, `skill_version`, `action_value`,
+   * `hypothesis`, `twin_field`); anything else, including an empty string, is a ValidationFailedError.
+   * Filtering happens in the database (migration 0012 adds the indexes), so only matching decisions
+   * are read, validated and returned. A cursor continues the list it came from.
+   */
   list(query: {
     caseId?: string | undefined;
+    targetType?: string | undefined;
     limit: number;
     cursor?: string | undefined;
   }): Promise<Page<ReviewDecision>>;
@@ -566,11 +582,47 @@ export type IdempotencyBegin =
   | { state: 'in_progress' }
   | { state: 'conflict' };
 
+export interface CompleteIdempotentOptions {
+  /**
+   * The case the response is about (`case.id` of an ingest result, `job.caseId` of a job, the
+   * `caseId` path parameter). It links the stored response to the case, so erasing the case deletes
+   * it, and a response for a case that no longer exists is not stored. Optional: a response without
+   * a link is still removed by `purgeForCase` (and by `CaseRepository.delete`), found by content.
+   */
+  caseId?: string | null | undefined;
+}
+
 export interface IdempotencyRepository {
   /** Reserves the key. `conflict` means the same key was used with a different request hash. */
   begin(key: string, scopeName: string, requestHash: string): Promise<IdempotencyBegin>;
-  complete(key: string, scopeName: string, status: number, response: unknown): Promise<void>;
+  /**
+   * Stores the response of the request that reserved the key. If `options.caseId` names a case that
+   * no longer exists (erased while the request ran) nothing is stored and the reservation is dropped,
+   * so a retry runs again instead of replaying a response about erased data.
+   */
+  complete(
+    key: string,
+    scopeName: string,
+    status: number,
+    response: unknown,
+    options?: CompleteIdempotentOptions,
+  ): Promise<void>;
   release(key: string, scopeName: string): Promise<void>;
+  /**
+   * Deletes this tenant's completed keys whose stored response is about `caseId` and returns how many:
+   * those linked to the case by `complete(..., { caseId })`, found by index, and those without a
+   * link, found by looking for the id (as a whole word, so `case_1` does not match `case_10`) in the
+   * stored response. Reserved keys hold no response and are left alone. Never touches another tenant.
+   * `CaseRepository.delete` does this too, so erasing a case needs no separate call.
+   */
+  purgeForCase(caseId: string): Promise<number>;
+  /**
+   * Deletes up to `limit` (default 1000, at most 10000) of this tenant's keys that have expired and
+   * returns how many; call again while it returns `limit`. Safe to run periodically and from several
+   * processes at once (rows another purge holds are skipped). Expired keys are also removed, in one
+   * statement, whenever a new key is reserved for the tenant.
+   */
+  purgeExpired(limit?: number): Promise<number>;
 }
 
 export interface DemoRepository {

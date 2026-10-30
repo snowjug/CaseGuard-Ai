@@ -113,6 +113,20 @@ describe('test builders', () => {
     expect(input.case.hasResolution).toBe(true);
   });
 
+  it('gives each case id a reference of its own (they are unique per tenant), CG-1001 to the default case', () => {
+    expect(buildCase().reference).toBe('CG-1001');
+    expect(buildIngestInput().case.reference).toBe('CG-1001');
+    const ids = ['case_a', 'case_b', 'case_c', 'case_a1', 'case_a2'];
+    expect(new Set(ids.map((caseId) => buildIngestInput({ caseId }).case.reference)).size).toBe(
+      ids.length,
+    );
+    expect(buildIngestInput({ caseId: 'case_a' }).case.reference).toBe('CG-case_a');
+    expect(buildCase({ id: 'case_z' }).reference).toBe('CG-case_z');
+    // Whatever the caller says wins.
+    expect(buildIngestInput({ caseId: 'case_a', reference: 'CG-7' }).case.reference).toBe('CG-7');
+    expect(buildCase({ id: 'case_z', reference: 'CG-9' }).reference).toBe('CG-9');
+  });
+
   it('builds a full analysis snapshot that satisfies every schema and cross-reference', () => {
     const input = buildIngestInput();
     const snapshot = buildSnapshot(input);

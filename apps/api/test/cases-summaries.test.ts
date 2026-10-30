@@ -1,26 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CaseAnalysisSummary, CaseListItem } from '../src/db';
+import type { CaseAnalysisSummary } from '../src/db';
 import type { RequestContext } from '../src/http/request-context';
 import { summarizeCases } from '../src/services/cases';
-
-const item = (id: string): CaseListItem => ({
-  id,
-  reference: `CG-${id}`,
-  title: 'Teams sign-in fails',
-  product: 'Microsoft Teams',
-  workload: 'teams-authentication',
-  severity: 'A',
-  status: 'open',
-  customerAlias: 'Customer',
-  openedAt: '2026-01-05T09:00:00.000Z',
-  closedAt: null,
-  synthetic: true,
-  eventCount: 3,
-  analysisState: 'not_analyzed',
-  analyzedAt: null,
-  hasResolution: false,
-  injectionDetected: false,
-});
+import { listItemOf as item } from './ingestion-fixtures';
 
 const figures = (caseId: string): CaseAnalysisSummary => ({
   caseId,

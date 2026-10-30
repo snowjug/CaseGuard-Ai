@@ -1,6 +1,7 @@
 import { ConfigError, describeConfig, loadConfig, type AppConfig } from '@caseguard/config';
 import { buildApp } from './app';
 import { createInfrastructure, knownTenantIds } from './container';
+import { IDEMPOTENCY_PURGE_INTERVAL_MS, purgeExpiredIdempotency } from './maintenance';
 import { createHandlers } from './routes';
 import { JOB_STALE_AFTER_MS } from './services/job-service';
 import packageJson from '../package.json';
@@ -49,6 +50,19 @@ async function main(): Promise<void> {
       }, ORPHAN_SWEEP_INTERVAL_MS);
   sweeper?.unref();
 
+  // Expired idempotency keys are removed whenever a tenant reserves a new one; this catches the
+  // tenants that went quiet. It runs everywhere, including local runs.
+  const purgeIdempotency = async (): Promise<void> => {
+    const purged = await purgeExpiredIdempotency(infra, tenantIds);
+    if (purged > 0) logger.info({ purged }, 'removed expired idempotency keys');
+  };
+  await purgeIdempotency();
+  const purger = setInterval(() => {
+    purgeIdempotency().catch((error: unknown) =>
+      logger.error({ err: error }, 'could not purge idempotency keys'),
+    );
+  }, IDEMPOTENCY_PURGE_INTERVAL_MS);
+  purger.unref();
   const app = await buildApp({ infra, handlers: createHandlers(infra) });
 
   // A bug that escapes every handler must not leave a half-working process behind: log it and let the
@@ -73,6 +87,7 @@ async function main(): Promise<void> {
     }, SHUTDOWN_GRACE_MS);
     deadline.unref();
     if (sweeper !== null) clearInterval(sweeper);
+    clearInterval(purger);
     try {
       await app.close();
       await infra.close();

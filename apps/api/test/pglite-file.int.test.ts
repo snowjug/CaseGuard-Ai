@@ -30,7 +30,7 @@ describe('[NFR-REL-01] file-backed PGlite', () => {
 
       const first = await createDatabase({ url: `pglite://${dir}` });
       try {
-        expect((await migrate(first)).appliedNow).toHaveLength(9);
+        expect((await migrate(first)).appliedNow).toHaveLength(12);
         await seedFoundation(first);
       } finally {
         await first.close();

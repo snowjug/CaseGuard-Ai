@@ -26,10 +26,15 @@ const MIGRATION_NAMES = [
   '0007_search_and_identity_sync',
   '0008_dashboard_read_models',
   '0009_job_heartbeat',
+  '0010_case_reference_unique',
+  '0011_idempotency_case_link',
+  '0012_review_target_type_idx',
 ];
 const LATEST_MIGRATION = MIGRATION_NAMES[MIGRATION_NAMES.length - 1];
 /** What a database that predates search (migration 0007) has applied. */
 const BEFORE_SEARCH = MIGRATION_NAMES.slice(0, 6);
+/** What a database that predates unique case references (migration 0010) has applied. */
+const BEFORE_REFERENCE_UNIQUE = MIGRATION_NAMES.slice(0, 9);
 
 /**
  * Checksums of the migrations that have been released. A released migration is never edited: the
@@ -49,6 +54,9 @@ const RELEASED_CHECKSUMS: Record<string, string> = {
     '96b1488647ff5dbe14eb0d16b0482286ce20aa51a65d26495fd38aefa74fc973',
   '0008_dashboard_read_models': '636b604258169cbac0ada5bd7cda550929f46b27085166938587f9223d3051e0',
   '0009_job_heartbeat': 'bbab84d91f639e0abdf764af8c538f35ba000dbb4c5cae52cc8b610cd1dd1795',
+  '0010_case_reference_unique': '18a0c123a01a538d8de53b98f47db3c96f5c4b052ef567db9a2654cc6820d954',
+  '0011_idempotency_case_link': 'e22b88ff5f35e780102f38ffe79ede1648c477ead6c6bf8b3fc60f154fc70dcb',
+  '0012_review_target_type_idx': '8511073601bf6546fb48b68544ba5e79f51de6d1e3f0a4fa8c4674180bcaf4ce',
 };
 
 async function scratchDir(prefix: string): Promise<string> {
@@ -163,6 +171,14 @@ describe('[NFR-REL-01] migrations', () => {
       });
       await repos.cases.ingest(input);
       await repos.analysis.saveSnapshot(buildSnapshot(input));
+      // A response stored before 0011: completed, about the case, and with no link to it.
+      await db.query(
+        `INSERT INTO idempotency_keys (tenant_id, scope_name, key, request_hash, state, response_status,
+                                       response, created_at, completed_at, expires_at)
+         VALUES ($1, 'cases.create:legacy', 'legacy-key-00000001', 'hash', 'completed', 201, $2::jsonb,
+                 now(), now(), now() + interval '1 day')`,
+        [CONTOSO_SCOPE.tenantId, JSON.stringify({ case: { id: 'case_legacy' }, created: true })],
+      );
 
       const insertGranted = () =>
         db.query<{ granted: boolean }>(
@@ -225,6 +241,55 @@ describe('[NFR-REL-01] migrations', () => {
       ]);
       expect((await repos.cases.counts()).byAnalysisState.analyzed).toBe(1);
 
+      // 0010: a reference is unique within a tenant and found through the constraint's own index
+      // (the plain index of 0003 is gone).
+      const referenceIndexes = await db.query<{ indexname: string }>(
+        `SELECT indexname FROM pg_indexes
+          WHERE tablename = 'cases' AND indexname IN ('cases_reference_idx', 'cases_tenant_reference_uq')`,
+      );
+      expect(referenceIndexes.rows.map((row) => row.indexname)).toEqual([
+        'cases_tenant_reference_uq',
+      ]);
+      expect((await repos.cases.findByReference(input.case.reference))?.id).toBe('case_legacy');
+      await expect(
+        repos.cases.ingest(
+          buildIngestInput({
+            caseId: 'case_second',
+            receivedSeed: 'second',
+            reference: input.case.reference,
+          }),
+        ),
+      ).rejects.toMatchObject({ code: 'conflict', details: { reason: 'duplicate' } });
+
+      // 0011: the key written before it has no link, and is still removed with its case.
+      const link = await db.query(
+        `SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'idempotency_keys' AND column_name = 'case_id'`,
+      );
+      expect(link.rows).toHaveLength(1);
+      const legacyKey = await db.query<{ case_id: string | null }>(
+        "SELECT case_id FROM idempotency_keys WHERE key = 'legacy-key-00000001'",
+      );
+      expect(legacyKey.rows).toEqual([{ case_id: null }]);
+      expect(await repos.idempotency.purgeForCase('case_legacy')).toBe(1);
+      expect(
+        (await db.query('SELECT 1 FROM idempotency_keys WHERE key = $1', ['legacy-key-00000001']))
+          .rows,
+      ).toHaveLength(0);
+
+      // 0012: decisions can be listed by target type through their own indexes.
+      const reviewIndexes = await db.query<{ indexname: string }>(
+        `SELECT indexname FROM pg_indexes
+          WHERE tablename = 'review_decisions' AND indexname LIKE '%\\_type\\_idx' ORDER BY indexname`,
+      );
+      expect(reviewIndexes.rows.map((row) => row.indexname)).toEqual([
+        'review_decisions_case_type_idx',
+        'review_decisions_type_idx',
+      ]);
+      expect((await repos.reviews.list({ limit: 5, targetType: 'action_value' })).items).toEqual(
+        [],
+      );
+
       // The first sign-in of users without an e-mail, or with a shared one, no longer collides.
       for (const [userId, email] of [
         ['entra-1', null],
@@ -243,6 +308,70 @@ describe('[NFR-REL-01] migrations', () => {
       expect((await repos.governance.listUsers()).map((user) => user.id)).toEqual(
         expect.arrayContaining(['entra-1', 'entra-2', 'entra-3', 'entra-4']),
       );
+    },
+  );
+
+  it(
+    'refuse the unique case reference (0010) while two cases of a tenant share one, say which migration and constraint, and apply once they no longer do',
+    SLOW,
+    async () => {
+      const files = await loadMigrations();
+      const dir = await scratchDir('duplicates');
+      for (const file of files.filter((f) => BEFORE_REFERENCE_UNIQUE.includes(f.name))) {
+        await writeFile(join(dir, `${file.name}.sql`), file.sql);
+      }
+      expect((await migrate(db, { dir })).appliedNow).toEqual(BEFORE_REFERENCE_UNIQUE);
+      await seedFoundation(db);
+
+      // Possible until 0010: nothing but the service checked the reference.
+      const repos = createRepositories(db).forTenant(CONTOSO_SCOPE);
+      for (const [caseId, seed] of [
+        ['case_one', '1'],
+        ['case_two', '2'],
+      ] as const) {
+        await repos.cases.ingest(
+          buildIngestInput({ caseId, receivedSeed: seed, reference: 'CG-SHARED' }),
+        );
+      }
+
+      const failure = await migrate(db).then(
+        () => null,
+        (error: unknown) => error,
+      );
+      expect(failure).toBeInstanceOf(MigrationError);
+      const message = (failure as MigrationError).message;
+      expect(message).toMatch(/0010_case_reference_unique/);
+      expect(message).toMatch(/23505/);
+      expect(message).toMatch(/cases_tenant_reference_uq/);
+      expect(message).not.toMatch(/CG-SHARED|CREATE|ALTER/); // no data and no SQL in the message
+
+      // All or nothing: the migration left no trace, and 0011 was not attempted.
+      const status = await getMigrationStatus(db);
+      expect(status.applied.map((entry) => entry.name)).toEqual(BEFORE_REFERENCE_UNIQUE);
+      expect(status.pending).toEqual(MIGRATION_NAMES.slice(BEFORE_REFERENCE_UNIQUE.length));
+      const referenceObjects = () =>
+        db.query<{ name: string }>(
+          `SELECT indexname AS name FROM pg_indexes
+            WHERE tablename = 'cases' AND indexname IN ('cases_reference_idx', 'cases_tenant_reference_uq')`,
+        );
+      expect((await referenceObjects()).rows.map((row) => row.name)).toEqual([
+        'cases_reference_idx',
+      ]);
+
+      // The operator resolves the pair with SQL, as the migration comment says (here by renaming one
+      // case, in both the column and the stored entity), and runs the migration again.
+      await db.query(
+        `UPDATE cases SET reference = 'CG-SHARED-2', data = jsonb_set(data, '{reference}', '"CG-SHARED-2"')
+          WHERE tenant_id = $1 AND id = 'case_two'`,
+        [CONTOSO_SCOPE.tenantId],
+      );
+      const resumed = await migrate(db);
+      expect(resumed.appliedNow).toEqual(MIGRATION_NAMES.slice(BEFORE_REFERENCE_UNIQUE.length));
+      expect((await referenceObjects()).rows.map((row) => row.name)).toEqual([
+        'cases_tenant_reference_uq',
+      ]);
+      expect((await repos.cases.findByReference('CG-SHARED'))?.id).toBe('case_one');
+      expect((await repos.cases.findByReference('CG-SHARED-2'))?.id).toBe('case_two');
     },
   );
 
@@ -300,7 +429,10 @@ describe('[NFR-REL-01] migrations', () => {
       join(dir, '0002_broken.sql'),
       'CREATE TABLE half_done (id int);\nINSERT INTO half_done VALUES (1);\nSELECT * FROM table_that_does_not_exist;\n',
     );
-    await expect(migrate(db, { dir })).rejects.toBeDefined();
+    await expect(migrate(db, { dir })).rejects.toBeInstanceOf(MigrationError);
+    await expect(migrate(db, { dir })).rejects.toThrow(
+      /Migration 0002_broken failed and was rolled back \(database error 42P01\)/,
+    );
     const status = await getMigrationStatus(db, { dir });
     expect(status.applied.map((a) => a.name)).toEqual(['0001_ok']);
     expect(status.pending).toEqual(['0002_broken']);

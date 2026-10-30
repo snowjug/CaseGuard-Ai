@@ -1,13 +1,14 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { describeFailure } from './errors';
 import { sha256Hex } from './hash';
 import type { Database, MigrationStatus, SqlExecutor } from './repositories/types';
 
 /** Raised when migrations cannot be applied safely (drift, unreadable or malformed files). */
 export class MigrationError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = 'MigrationError';
   }
 }
@@ -160,7 +161,16 @@ async function applyOne(db: Database, file: MigrationFile): Promise<boolean> {
       // Another process applied it while this one was waiting for the lock.
       return false;
     }
-    await tx.query(file.sql);
+    try {
+      await tx.query(file.sql);
+    } catch (error) {
+      // The database error is already sanitised (no SQL, no values); with the migration's name, the
+      // SQLSTATE and the constraint it names are what an operator needs to act on.
+      throw new MigrationError(
+        `Migration ${file.name} failed and was rolled back (${describeFailure(error)})`,
+        { cause: error },
+      );
+    }
     await tx.query('INSERT INTO schema_migrations (name, checksum) VALUES ($1, $2)', [
       file.name,
       file.checksum,

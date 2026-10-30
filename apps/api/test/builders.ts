@@ -75,13 +75,24 @@ export function buildCaseSource(overrides: Partial<CaseSource> = {}, payload = '
   };
 }
 
+const DEFAULT_CASE_ID = 'case_alpha';
+
+/**
+ * The reference a built case gets when none is given. References are unique within a tenant, so it
+ * follows the case id: `CG-1001` for the default case (what the tests of one case expect), and
+ * `CG-<case id>` for every other.
+ */
+export function defaultReference(caseId: string): string {
+  return caseId === DEFAULT_CASE_ID ? 'CG-1001' : `CG-${caseId}`;
+}
+
 export function buildCase(overrides: Partial<Case> = {}): Case {
   const tenantId = overrides.tenantId ?? TENANT_A;
-  const id = overrides.id ?? 'case_alpha';
+  const id = overrides.id ?? DEFAULT_CASE_ID;
   return {
     ...meta(tenantId),
     id,
-    reference: 'CG-1001',
+    reference: defaultReference(id),
     title: 'Synthetic sign-in failures for a multi-user tenant',
     product: 'Synthetic Collaboration Suite',
     workload: 'teams-authentication',
@@ -188,7 +199,7 @@ const EVENT_TYPES: Pick<
 /** A complete, internally consistent ingest request (case, source, participants, events, payload). */
 export function buildIngestInput(options: IngestOptions = {}): IngestCaseInput {
   const tenantId = options.tenantId ?? TENANT_A;
-  const caseId = options.caseId ?? 'case_alpha';
+  const caseId = options.caseId ?? DEFAULT_CASE_ID;
   const sourceId = options.sourceId ?? `src_${caseId}`;
   const eventCount = options.eventCount ?? 6;
   const withResolution = options.withResolution ?? false;
@@ -255,7 +266,7 @@ export function buildIngestInput(options: IngestOptions = {}): IngestCaseInput {
     tenantId,
     id: caseId,
     sourceId,
-    reference: options.reference ?? 'CG-1001',
+    reference: options.reference ?? defaultReference(caseId),
     title: options.title ?? 'Synthetic sign-in failures for a multi-user tenant',
     workload: options.workload ?? 'teams-authentication',
     openedAt: options.openedAt ?? T0,

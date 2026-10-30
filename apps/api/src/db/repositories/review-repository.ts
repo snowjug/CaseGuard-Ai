@@ -1,4 +1,10 @@
-import { ReviewDecisionSchema, type Page, type ReviewDecision } from '@caseguard/schemas';
+import {
+  REVIEW_TARGETS,
+  ReviewDecisionSchema,
+  type Page,
+  type ReviewDecision,
+} from '@caseguard/schemas';
+import { ValidationFailedError } from '../../errors';
 import { decodeCursor, encodeCursor, normalizeLimit, toPage } from '../cursor';
 import { REVIEW_DECISIONS } from './table-specs';
 import {
@@ -14,6 +20,9 @@ import type { ReviewRepository, ReviewStats } from './types';
 
 /** Decisions that mean "the reviewer accepted it" in the statistics. */
 const ACCEPTING = ['approve', 'confirm'];
+
+/** The only values a stored decision can have as its target type (they are validated on write). */
+const TargetTypeSchema = ReviewDecisionSchema.shape.targetType;
 
 interface StatsRow {
   reviewed_claims: number;
@@ -34,14 +43,27 @@ export class ReviewRepositoryImpl implements ReviewRepository {
 
   async list(query: {
     caseId?: string | undefined;
+    targetType?: string | undefined;
     limit: number;
     cursor?: string | undefined;
   }): Promise<Page<ReviewDecision>> {
     const limit = normalizeLimit(query.limit);
     const cursor = decodeCursor('reviews', query.cursor, ['timestamp', 'text']);
+    // An unknown type can never match a stored decision, so it is a mistake worth a 422, not an empty page.
+    let targetType: string | undefined;
+    if (query.targetType !== undefined) {
+      const parsed = TargetTypeSchema.safeParse(query.targetType);
+      if (!parsed.success) {
+        throw new ValidationFailedError('Invalid review target type', [
+          { path: 'targetType', message: `Expected one of: ${REVIEW_TARGETS.join(', ')}` },
+        ]);
+      }
+      targetType = parsed.data;
+    }
     const q = new QueryBuilder();
     q.where(`tenant_id = ${q.bind(this.ctx.scope.tenantId)}`);
     if (query.caseId) q.where(`case_id = ${q.bind(query.caseId)}`);
+    if (targetType !== undefined) q.where(`target_type = ${q.bind(targetType)}`);
     if (cursor) {
       q.where(`(decided_at, id) < (${q.bind(cursor[0])}::timestamptz, ${q.bind(cursor[1])}::text)`);
     }

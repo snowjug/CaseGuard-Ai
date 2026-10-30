@@ -123,6 +123,7 @@ export const IMMUTABLE_SQLSTATE = 'CG001';
 /** Friendlier messages for the constraints callers are most likely to trip over. */
 const CONSTRAINT_MESSAGES: Record<string, string> = {
   case_sources_tenant_received_sha_uq: 'A case with this content has already been ingested',
+  cases_tenant_reference_uq: 'A case with this reference already exists in this workspace',
   skills_tenant_key_uq: 'A skill with this key already exists',
   skill_versions_semver_uq: 'This skill already has a version with the same version number',
   jobs_idempotency_uq: 'A job with this idempotency key already exists',
@@ -194,6 +195,20 @@ function mapSqlState(info: DatabaseErrorInfo): Error {
       return withCause(
         new ValidationFailedError('The content contains characters that cannot be stored', [
           { path: 'content', message: 'Remove NUL or invalid characters and retry' },
+        ]),
+        cause,
+      );
+    // A value the caller supplied does not fit its column type: out of range (22003), not a date
+    // (22007), an impossible date (22008) or not a number/JSON text (22P02). Callers validate first;
+    // this is the last line, so such a value is a 422 and not an "unexpected" 500. No value or SQL
+    // text is copied into the message.
+    case '22003':
+    case '22007':
+    case '22008':
+    case '22P02':
+      return withCause(
+        new ValidationFailedError('A value in the request is out of range or malformed', [
+          { path: 'request', message: 'Check the numbers, dates and identifiers in the request' },
         ]),
         cause,
       );

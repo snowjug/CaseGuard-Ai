@@ -188,6 +188,10 @@ describe('error mapping never leaks SQL text, parameters or row values', () => {
     ['23514', ValidationFailedError],
     ['22P05', ValidationFailedError],
     ['22021', ValidationFailedError],
+    ['22003', ValidationFailedError],
+    ['22007', ValidationFailedError],
+    ['22008', ValidationFailedError],
+    ['22P02', ValidationFailedError],
     ['40001', ConflictError],
     ['40P01', ConflictError],
     ['CG001', ConflictError],
@@ -203,6 +207,45 @@ describe('error mapping never leaks SQL text, parameters or row values', () => {
     expect(mapped).toBeInstanceOf(AppError);
     expect(serialised(mapped)).not.toMatch(/secret|INSERT INTO/);
   });
+
+  it.each([
+    ['22003', 'numeric_value_out_of_range', 'value "2147483648" is out of range for type integer'],
+    [
+      '22007',
+      'invalid_datetime_format',
+      'invalid input syntax for type timestamp with time zone: "garbage-secret"',
+    ],
+    [
+      '22008',
+      'datetime_field_overflow',
+      'date/time field value out of range: "0000-01-01T00:00:00.000Z"',
+    ],
+    [
+      '22P02',
+      'invalid_text_representation',
+      'invalid input syntax for type integer: "secret-text"',
+    ],
+  ])(
+    '[NFR-SEC-05] SQLSTATE %s (%s) is a 422 with a fixed message that carries no value',
+    (code, _name, driverMessage) => {
+      const mapped = mapDatabaseError(dbError(code, { message: driverMessage, routine: 'int4in' }));
+      expect(mapped).toBeInstanceOf(ValidationFailedError);
+      expect(mapped).toMatchObject({
+        code: 'validation_failed',
+        status: 422,
+        message: 'A value in the request is out of range or malformed',
+      });
+      expect((mapped as ValidationFailedError).issues).toEqual([
+        { path: 'request', message: 'Check the numbers, dates and identifiers in the request' },
+      ]);
+      // The SQLSTATE stays available to the logs through the sanitised cause.
+      expect(getDatabaseErrorCode(mapped)).toBe(code);
+      expect(mapped.cause).toBeInstanceOf(SanitizedDatabaseError);
+      expect(serialised(mapped)).not.toMatch(
+        /secret|2147483648|0000-01-01|garbage|INSERT INTO|out of range for type/,
+      );
+    },
+  );
 
   it('distinguishes row-level-security violations from missing privileges', () => {
     const rls = mapDatabaseError(

@@ -1,4 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { IdSchema } from '@caseguard/schemas';
 import { canonicalJson, sha256Hex } from '@caseguard/security';
 import { ConflictError, IdempotencyConflictError, ValidationFailedError } from '../errors';
 import type { RequestContext } from './request-context';
@@ -73,6 +74,8 @@ export interface IdempotentRun {
   readonly scope: string;
   readonly status: number;
   readonly requestHash: string;
+  /** The route's path parameters: a `caseId` among them links the stored response to that case. */
+  readonly params?: unknown;
   readonly execute: () => Promise<unknown>;
 }
 
@@ -80,6 +83,26 @@ export interface IdempotentOutcome {
   readonly body: unknown;
   /** The stored response of an earlier identical request; the handler did not run. */
   readonly replayed: boolean;
+}
+
+function idField(value: unknown, name: string): string | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const found = (value as Record<string, unknown>)[name];
+  return typeof found === 'string' && IdSchema.safeParse(found).success ? found : null;
+}
+
+/**
+ * The case a response is about: the `caseId` path parameter, else the case of an ingest result or the
+ * case of a job. A stored response can quote case content, so the data tier links it to the case and
+ * erases it with the case.
+ */
+export function linkedCaseId(params: unknown, body: unknown): string | null {
+  return (
+    idField(params, 'caseId') ??
+    idField((body as { case?: unknown } | null)?.case, 'id') ??
+    idField((body as { job?: unknown } | null)?.job, 'caseId') ??
+    idField(body, 'caseId')
+  );
 }
 
 /**
@@ -117,7 +140,9 @@ export async function runIdempotent(
   }
 
   try {
-    await ctx.repos.idempotency.complete(run.key, run.scope, run.status, body);
+    await ctx.repos.idempotency.complete(run.key, run.scope, run.status, body, {
+      caseId: linkedCaseId(run.params, body),
+    });
   } catch (error) {
     // The work is already committed. Failing the request would invite a retry that repeats it, so the
     // client gets the real result; the key stays reserved until its reservation expires, and the

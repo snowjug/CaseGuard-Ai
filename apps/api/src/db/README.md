@@ -52,10 +52,48 @@ that migrations, seeding and the repositories work when a non-superuser owns the
   duration of one statement; the triggers then allow the cascade from `cases` (DELETE only, never UPDATE).
   Audit events are never deletable. The setting protects against accidents and bugs, **not** against
   someone who can run arbitrary SQL as `caseguard_app`.
+- Erasing a case also erases what the idempotency store kept about it (next section).
 - Audit events form a per-tenant hash chain (`sha256(prevHash + "\n" + canonicalJson(event))`, genesis
   `prevHash` is 64 zeros). `verify()` reports the first invalid sequence. A DBA who removes the _tail_ of a
   chain or rewrites every later event consistently is only detectable against an externally anchored head
   hash, which is not implemented.
+
+## Idempotency keys and erasure (FR-ING-07)
+
+A completed `Idempotency-Key` keeps its response for 24 hours so a retry can replay it, and that response
+carries the case summary and injection excerpts of an ingest, or the job of a case. A retry must never replay
+a case that was erased, so erasure reaches the idempotency store in two complementary ways:
+
+- **By link.** `idempotency.complete(key, scope, status, response, { caseId })` stores the case the response
+  is about in `idempotency_keys.case_id` (migration 0011: a composite foreign key to `cases` with
+  `ON DELETE CASCADE`, and a partial index on the linked keys). The database then deletes the key in the same
+  statement that deletes the case, whoever runs it. If `caseId` names a case that no longer exists (erased
+  while the request ran) nothing is stored and the reservation is dropped, so the retry runs again instead of
+  replaying erased data; the foreign key makes that airtight under concurrency (`complete` holds the case row
+  with `FOR KEY SHARE`). A key can be linked to one case.
+- **By content.** A key without a link (a caller that did not pass `caseId`, or a future route) is found by
+  looking for the case id **as a whole word** in the stored response of the tenant's completed, unlinked keys:
+  delimited by anything that cannot be part of an id, such as a JSON quote or the slash of a link, so `case_1`
+  does not match `case_10`. It reads the tenant's unlinked keys (at most a day's worth), so it is the fallback;
+  linking is the cheap path. Measured once on PGlite (WebAssembly, slower than a native server): 2,000 unlinked
+  keys of 10 KB take about 0.4 s to search and 10,000 about 2.3 s (2,000 of 100 KB, about 5 s); once every
+  response is linked there are no unlinked keys and nothing is searched.
+- `idempotency.purgeForCase(caseId): Promise<number>` runs both for the tenant and says how many keys went
+  (reserved keys hold no response and are left alone). **`CaseRepository.delete` already does it** in its own
+  transaction, so erasing a case needs no separate call; calling it first, as api-cases may, simply returns the
+  count and leaves nothing for `delete` to remove.
+- `idempotency.purgeExpired(limit?: number): Promise<number>` deletes up to `limit` (default 1,000, at most
+  10,000) of the tenant's expired keys, oldest first, and returns how many; call again while it returns
+  `limit`. It is bound to the tenant of the repositories: there is no repository method that lists tenants
+  (`tenants` is under forced row-level security, so a non-superuser connection cannot read it without a tenant),
+  so a periodic sweep has to know the tenant ids. Concurrent sweeps share the work (`FOR UPDATE SKIP LOCKED`).
+  The batch is a `MATERIALIZED` CTE on purpose: as a plain subquery of `DELETE ... USING` (or `IN`) the planner
+  can re-run it for every row it joins, and every re-run takes the next `limit` rows that this statement has not
+  deleted yet, so a batch of 5 silently becomes everything that expired (observed on PGlite; a regression
+  test covers both the application role and a session without row-level security).
+- What the HTTP binder should pass as `caseId`: `case.id` for `cases.create` and `cases.createFromFile`,
+  `job.caseId` for `analysis.start`, `counterfactuals.run`, `skills.extract` and `skills.proposeMutation` (the
+  source case) - or, for all but the creates, the `caseId` path parameter.
 
 ## Entra just-in-time user sync (NFR-SEC-02)
 
@@ -145,6 +183,45 @@ with row-level security bypassed.
   7.6 ms to 4.1 ms and the missing-evidence list 8.7 ms to 6.6 ms with the indexes. These are not benchmarks of
   PostgreSQL 16.
 
+## Case references (FR-ING-08)
+
+A case reference (`CG-SYN-1001`) is what people quote, and it is **unique within a tenant** (migration 0010,
+`UNIQUE (tenant_id, reference)`, which also replaces the plain `cases_reference_idx`). The comparison is exact
+and case-sensitive, as the service's check always was; another tenant may use the same reference.
+
+- `cases.findByReference(reference): Promise<Case | null>` is the exact, tenant-bound lookup (through that
+  unique index). A string that cannot be a reference (empty, over 200 characters, control characters) is a
+  `ValidationFailedError`; anything else that matches nothing, however odd, is `null` (no pattern semantics).
+- A case with different content under a used reference is refused by the database: `ingest` throws the
+  existing `ConflictError` with `details.reason === 'duplicate'` and the message "A case with this reference
+  already exists in this workspace" (the constraint, `cases_tenant_reference_uq`, is named in the sanitised
+  cause for the logs). The ingest is one transaction, so nothing of the refused case is left, and what shares
+  its transaction (the audit record) rolls back with it. Ingesting the same content again is still the
+  idempotent replay, not a conflict. Two concurrent ingests under one new reference: one wins.
+- **Upgrading a database that already holds two cases of a tenant with one reference** is refused by migration
+  0010: it fails (SQLSTATE 23505 on `cases_tenant_reference_uq`, all or nothing) and the runner reports the
+  migration name and constraint. List the pairs with
+  `SELECT tenant_id, reference, count(*) FROM cases GROUP BY 1, 2 HAVING count(*) > 1;`, rename or erase all
+  but one case of each (a rename must update both the `reference` column and `data->'reference'`), and run
+  `pnpm db:migrate` again.
+
+## Review decisions by target type
+
+`reviews.list({ caseId?, targetType?, limit, cursor? })` lists decisions newest first (`decidedAt`, then id).
+`targetType` is an exact match on the stored target type and must be one of `REVIEW_TARGETS` (`claim`, `fork`,
+`counterfactual`, `warning`, `skill`, `skill_version`, `action_value`, `hypothesis`, `twin_field`): anything
+else, including an empty string, is a `ValidationFailedError` (an unknown type can never match, so it is a
+mistake worth a 422, not an empty page). It combines with `caseId`; a cursor continues the list it came from.
+Filtering happens in the database, so only matching decisions are read, validated and returned.
+
+Migration 0012 adds `review_decisions_type_idx (tenant_id, target_type, decided_at DESC, id DESC)` and
+`review_decisions_case_type_idx (tenant_id, case_id, target_type, decided_at DESC, id DESC) WHERE case_id IS NOT
+NULL`. Before them the tenant-wide list had to read and sort every decision of the type (and again for every
+page), and the per-case list read all of a case's decisions to filter them. Measured once on PGlite as
+`caseguard_app` under row-level security (30,000 decisions in a tenant, about 700 bytes each, 100 per case):
+tenant and type, 427 matches, 14.7 ms and 412 buffers with a sort, now 0.4 ms and 54 buffers without; one type
+within a case, 103 buffers, now 8. A test checks through `EXPLAIN` that the planner picks them and does not sort.
+
 ## Job liveness (heartbeat)
 
 Jobs run inside the API process that accepted them (see `services/job-service.ts`). With more than one replica,
@@ -168,7 +245,13 @@ database that applied the old text, and `test/migrations.int.test.ts` pins the c
 file, so a schema change is always a new file. Add it to `MIGRATION_NAMES` in that test. `0007` adds search
 and the identity-sync changes above; its upgrade path (data written under 0006) is tested. `0008` adds the
 two partial indexes of the dashboard read models; the same test upgrades a database that stopped at 0006
-through both. `0009` adds the job heartbeat column.
+through both. `0009` adds the job heartbeat column. `0010` makes case references unique, `0011` links
+idempotency keys to cases and `0012` indexes review decisions by target type; a database that stopped at 0009
+upgrades through all three (also tested, including the refusal when references are duplicated). A migration
+that fails is rolled back whole and reported with its name, the SQLSTATE and the constraint (no SQL, no values),
+for example `Migration 0010_case_reference_unique failed and was rolled back (database error 23505 (table
+cases, constraint cases_tenant_reference_uq))`. Application code needs the schema it was written for: run the
+migrations before starting a new version (`DB_AUTO_MIGRATE` does).
 
 ## Conventions
 
@@ -179,21 +262,30 @@ through both. `0009` adds the job heartbeat column.
 - Timestamps are `timestamptz` written with millisecond precision; drivers return ISO strings ending in
   `Z`. Numbers are `integer`/`double precision` (no bigint).
 - Keyset cursors are opaque (`base64url(JSON).checksum`), bound to the list they were issued for, and
-  invalid ones raise `ValidationFailedError`. Page size is 1–200.
+  invalid ones raise `ValidationFailedError`. Page size is 1–200. The checksum is an integrity check, not a
+  secret (anyone can compute it), so decoding also **range-checks every value**: timestamps must be real UTC
+  instants in millisecond form with years 0001-9999 (`2026-02-30` and year 0 are refused, as PostgreSQL does),
+  integers must be non-negative and fit a PostgreSQL `integer`, and text sort keys must be ids under the rules
+  of `IdSchema`. Whatever decodes is safe to bind as `integer`, `timestamptz` or `text`; a forged cursor is a
+  422, never a database error (tested with valid checksums for every list, and by comparing what the decoder
+  accepts with what PostgreSQL reads). As a second line, SQLSTATE 22003, 22007, 22008 and 22P02 (and 22021,
+  22P05) from any statement are mapped to `ValidationFailedError` with a fixed message that carries no value or
+  SQL.
 - jsonb parameters are passed as JSON text (`toJsonParam`); arrays are only allowed for `text[]` columns.
 
 ## PGlite vs PostgreSQL differences handled in code
 
-| Topic                    | PGlite                                                                                                                                       | PostgreSQL (`pg`)                                                                                           |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Connections              | one; transactions are serialised, so a call on `db` inside a transaction callback would wait forever. It throws a descriptive error instead. | pool; each `transaction` pins one connection                                                                |
-| Advisory locks           | not needed (skipped)                                                                                                                         | `pg_advisory_xact_lock` serialises audit appends and same-content ingests per tenant                        |
-| Server version           | PostgreSQL 18                                                                                                                                | 16; the SQL avoids anything newer than 16                                                                   |
-| Full-text search         | verified here (generated `tsvector`, GIN, `websearch_to_tsquery`, `ts_headline` with empty quoted delimiters)                                | same features since PostgreSQL 12; the delimiter and plan behaviour above are **not verified** on 16        |
-| Parameterless statements | `exec` (simple protocol, multi-statement)                                                                                                    | `query(text)` (simple protocol)                                                                             |
-| Result types             | custom `parsers` for timestamptz/int8/numeric                                                                                                | `types.getTypeParser` override with the same functions                                                      |
-| Role                     | always superuser                                                                                                                             | must be a non-superuser member of `caseguard_app`                                                           |
-| Auth / TLS               | none                                                                                                                                         | `DATABASE_AUTH=entra` (token as password) and `sslmode` in the URL, **not validated against a live server** |
+| Topic                    | PGlite                                                                                                                                       | PostgreSQL (`pg`)                                                                                                                                                                                                                             |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Connections              | one; transactions are serialised, so a call on `db` inside a transaction callback would wait forever. It throws a descriptive error instead. | pool; each `transaction` pins one connection                                                                                                                                                                                                  |
+| Advisory locks           | not needed (skipped)                                                                                                                         | `pg_advisory_xact_lock` serialises audit appends and same-content ingests per tenant                                                                                                                                                          |
+| Races between sessions   | one connection, so nothing interleaves and these cannot be exercised                                                                         | `FOR UPDATE SKIP LOCKED` (purge batches), `FOR KEY SHARE` with the foreign key (an idempotent response against an erasure) and the unique index (two ingests of one reference) rely on PostgreSQL's locking by design; **not exercised here** |
+| Server version           | PostgreSQL 18                                                                                                                                | 16; the SQL avoids anything newer than 16                                                                                                                                                                                                     |
+| Full-text search         | verified here (generated `tsvector`, GIN, `websearch_to_tsquery`, `ts_headline` with empty quoted delimiters)                                | same features since PostgreSQL 12; the delimiter and plan behaviour above are **not verified** on 16                                                                                                                                          |
+| Parameterless statements | `exec` (simple protocol, multi-statement)                                                                                                    | `query(text)` (simple protocol)                                                                                                                                                                                                               |
+| Result types             | custom `parsers` for timestamptz/int8/numeric                                                                                                | `types.getTypeParser` override with the same functions                                                                                                                                                                                        |
+| Role                     | always superuser                                                                                                                             | must be a non-superuser member of `caseguard_app`                                                                                                                                                                                             |
+| Auth / TLS               | none                                                                                                                                         | `DATABASE_AUTH=entra` (token as password) and `sslmode` in the URL, **not validated against a live server**                                                                                                                                   |
 
 A file-backed PGlite directory (`pglite://.data/caseguard`) must be opened by one process at a time.
 

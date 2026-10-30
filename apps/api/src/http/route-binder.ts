@@ -389,6 +389,7 @@ export function registerRoutes(app: FastifyInstance, options: BindOptions): void
             body: request.body,
             file: file === undefined ? undefined : { sha256: file.sha256, name: file.fileName },
           }),
+          params: request.params,
           execute,
         });
         body = outcome.body;

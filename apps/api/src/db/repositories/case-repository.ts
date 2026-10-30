@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { ValidationFailedError } from '../../errors';
 import { decodeCursor, encodeCursor, normalizeLimit, toPage } from '../cursor';
 import { sha256Hex } from '../hash';
+import { purgeCaseResponses } from './idempotency-repository';
 import {
   CASES,
   CASE_EVENTS,
@@ -58,6 +59,13 @@ const IndexRowSchema = z.object({
   product: z.string(),
   workload: z.string(),
 });
+
+/** What can be looked up as a reference: any text a case could carry, minus control characters. */
+const ReferenceLookupSchema = z
+  .string()
+  .min(1)
+  .max(200)
+  .refine((value) => !/\p{Cc}/u.test(value), 'Control characters are not allowed');
 
 interface PreparedIngest {
   caseRecord: Case;
@@ -236,6 +244,18 @@ export class CaseRepositoryImpl implements CaseRepository {
       );
       const sourceRow = bySource.rows[0];
       return sourceRow ? parseStored(CaseSchema, sourceRow.data, 'case') : null;
+    });
+  }
+
+  async findByReference(reference: string): Promise<Case | null> {
+    const exact = validateInput(ReferenceLookupSchema, reference, 'case reference');
+    return this.ctx.run(async (tx) => {
+      const result = await tx.query<DataRow>(
+        'SELECT data FROM cases WHERE tenant_id = $1 AND reference = $2',
+        [this.ctx.scope.tenantId, exact],
+      );
+      const row = result.rows[0];
+      return row ? parseStored(CaseSchema, row.data, 'case') : null;
     });
   }
 
@@ -463,13 +483,19 @@ export class CaseRepositoryImpl implements CaseRepository {
   }
 
   async delete(caseId: string): Promise<boolean> {
+    const { tenantId } = this.ctx.scope;
     return this.ctx.run((tx) =>
       withErasure(tx, async () => {
+        // The cascade also removes the idempotent responses linked to the case (migration 0011).
         const result = await tx.query('DELETE FROM cases WHERE tenant_id = $1 AND id = $2', [
-          this.ctx.scope.tenantId,
+          tenantId,
           caseId,
         ]);
-        return result.rowCount > 0;
+        const erased = result.rowCount > 0;
+        // Responses stored without a link are found by content: a retry with the same
+        // Idempotency-Key must never replay an erased case.
+        if (erased) await purgeCaseResponses(tx, tenantId, caseId);
+        return erased;
       }),
     );
   }
