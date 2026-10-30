@@ -1,0 +1,459 @@
+'use client';
+
+import { ROLE_LABELS, type AuditEvent } from '@caseguard/schemas';
+import {
+  CopyButton,
+  EmptyState,
+  LoadingSkeleton,
+  Notice,
+  Panel,
+  StatusBadge,
+  UiLink,
+  cg,
+  formatDateTimeUtc,
+} from '@caseguard/ui';
+import { Button, Field, Input, Select, makeStyles, tokens } from '@fluentui/react-components';
+import { ArrowSyncRegular, HistoryRegular, ShieldCheckmarkRegular } from '@fluentui/react-icons';
+import { keepPreviousData } from '@tanstack/react-query';
+import { useCallback, useId, useMemo } from 'react';
+import { QueryErrorState } from '../../components/common/QueryErrorState';
+import { useApiQuery } from '../../lib/api/hooks';
+import { pagedBoundary, useApiPages } from '../../lib/api/pages';
+import { useAuth } from '../../lib/auth/context';
+import { caseHref } from '../../lib/deep-links';
+import { shortId } from '../../lib/format';
+import { useDebouncedValue } from '../../lib/use-debounced-value';
+import { useUrlStates } from '../../lib/url-state';
+import { VirtualRow, useWindowVirtualizer } from '../../lib/virtual-list';
+import {
+  AUDIT_FILTERS,
+  KNOWN_AUDIT_ACTIONS,
+  OUTCOME_FILTERS,
+  OUTCOME_LABELS,
+  activeAuditFilters,
+  auditQuery,
+  type AuditFilterValues,
+} from './audit-filters';
+import { CaseFilterSelect } from './CaseFilterSelect';
+import { ExpandableText } from './ExpandableText';
+import { retryPages, useAutoLoadNext } from './use-auto-load';
+
+const useStyles = makeStyles({
+  stack: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
+  filters: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'flex-end',
+    gap: cg.space[3],
+    padding: cg.space[3],
+    borderRadius: cg.radius.lg,
+    border: `1px solid ${cg.borderSubtle}`,
+    backgroundColor: cg.surface,
+  },
+  field: { flex: '1 1 160px', minWidth: 0 },
+  wide: { flex: '2 1 220px', minWidth: 0 },
+  status: { margin: 0, color: cg.textSecondary, fontSize: tokens.fontSizeBase300 },
+  list: { margin: 0, padding: 0, listStyle: 'none' },
+  row: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[1],
+    padding: `${cg.space[3]} ${cg.space[3]}`,
+    marginBottom: cg.space[2],
+    borderRadius: cg.radius.md,
+    border: `1px solid ${cg.borderSubtle}`,
+    backgroundColor: cg.surface,
+    minWidth: 0,
+  },
+  head: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: cg.space[2] },
+  seq: {
+    fontVariantNumeric: 'tabular-nums',
+    color: cg.textMuted,
+    fontSize: tokens.fontSizeBase200,
+  },
+  action: {
+    fontFamily: cg.font.mono,
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightSemibold,
+    overflowWrap: 'anywhere',
+  },
+  meta: {
+    margin: 0,
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: `${cg.space[1]} ${cg.space[4]}`,
+    fontSize: tokens.fontSizeBase200,
+    color: cg.textSecondary,
+  },
+  hashes: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: `${cg.space[1]} ${cg.space[3]}`,
+    fontFamily: cg.font.mono,
+    fontSize: tokens.fontSizeBase200,
+    color: cg.textMuted,
+  },
+  chip: { display: 'inline-flex', alignItems: 'center', gap: '2px' },
+  link: { color: cg.textLink },
+  more: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[3] },
+  verifyRow: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: cg.space[3] },
+});
+
+/** Estimated height of an audit row before it is measured. */
+const ESTIMATED_ROW = 132;
+
+function AuditRow({ event }: { event: AuditEvent }) {
+  const styles = useStyles();
+  const outcome =
+    event.outcome === 'success'
+      ? ({ status: 'productive', label: 'Success' } as const)
+      : event.outcome === 'denied'
+        ? ({ status: 'unsupported', label: 'Denied' } as const)
+        : ({ status: 'unsupported', label: 'Failure' } as const);
+  const role =
+    event.actorRole === 'system'
+      ? 'System'
+      : event.actorRole === 'anonymous'
+        ? 'Anonymous'
+        : ROLE_LABELS[event.actorRole];
+  const hasDetails = Object.keys(event.details).length > 0;
+  return (
+    <article className={styles.row} aria-label={`Audit event ${event.sequence}: ${event.action}`}>
+      <div className={styles.head}>
+        <span className={styles.seq}>#{event.sequence}</span>
+        <span className={styles.action}>{event.action}</span>
+        <StatusBadge status={outcome.status} label={outcome.label} />
+        <time dateTime={event.occurredAt} className={styles.seq}>
+          {formatDateTimeUtc(event.occurredAt, { seconds: true })}
+        </time>
+      </div>
+      <p className={styles.meta}>
+        <span>
+          Actor: {event.actorId} ({role})
+        </span>
+        <span>
+          Target: {event.targetType}
+          {event.targetId ? ` · ${event.targetId}` : ''}
+        </span>
+        {event.caseId ? (
+          <span>
+            Case:{' '}
+            <UiLink href={caseHref(event.caseId)} className={styles.link}>
+              {shortId(event.caseId, 18)}
+            </UiLink>
+          </span>
+        ) : null}
+      </p>
+      {hasDetails ? (
+        <ExpandableText text={JSON.stringify(event.details, null, 2)} limit={160} mono />
+      ) : null}
+      <div className={styles.hashes}>
+        <span className={styles.chip}>
+          hash {event.hash.slice(0, 10)}…
+          <CopyButton value={event.hash} label={`Copy the hash of event ${event.sequence}`} />
+        </span>
+        <span className={styles.chip}>
+          previous {event.prevHash.slice(0, 10)}…
+          <CopyButton
+            value={event.prevHash}
+            label={`Copy the previous hash of event ${event.sequence}`}
+          />
+        </span>
+        <span className={styles.chip}>
+          {event.correlationId}
+          <CopyButton
+            value={event.correlationId}
+            label={`Copy the correlation id of event ${event.sequence}`}
+          />
+        </span>
+      </div>
+    </article>
+  );
+}
+
+function ChainVerification() {
+  const styles = useStyles();
+  const auth = useAuth();
+  const query = useApiQuery('governance.auditVerify', undefined, {
+    enabled: auth.status === 'ready',
+  });
+  const result = query.data;
+  return (
+    <Panel
+      title="Hash-chain verification"
+      description="Every audit event is chained to the one before it, so a removed or edited event breaks the chain."
+      help="Each event stores the hash of the previous one and its own hash over its content. Verifying walks the whole chain and recomputes every hash: any gap, edit or reordering shows up as the first sequence number that no longer matches."
+      actions={
+        <Button
+          appearance="outline"
+          size="small"
+          icon={<ArrowSyncRegular />}
+          disabled={query.isFetching}
+          onClick={() => void query.refetch()}
+        >
+          {query.isFetching ? 'Verifying…' : 'Verify again'}
+        </Button>
+      }
+    >
+      {query.isPending ? (
+        <LoadingSkeleton variant="text" count={2} label="Verifying the audit chain" />
+      ) : query.isError || !result ? (
+        <QueryErrorState
+          error={query.error}
+          subject="The chain verification"
+          compact
+          onRetry={() => void query.refetch()}
+          retrying={query.isFetching}
+        />
+      ) : result.valid ? (
+        <div className={styles.verifyRow} role="status">
+          <StatusBadge status="productive" label="Chain intact" />
+          <span>
+            {result.detail} · checked {formatDateTimeUtc(result.checkedAt, { seconds: true })}
+          </span>
+        </div>
+      ) : (
+        <div role="alert">
+          <Notice variant="warning" title="The audit chain is broken">
+            {result.detail}
+            {result.firstInvalidSequence !== null
+              ? ` The first event that does not match is #${result.firstInvalidSequence}.`
+              : ''}{' '}
+            {result.eventsChecked} events were checked at{' '}
+            {formatDateTimeUtc(result.checkedAt, { seconds: true })}. Treat the log after that point
+            as untrusted and investigate.
+          </Notice>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+/**
+ * Audit log (`governance.audit`, `governance.auditVerify`): append-only, hash-chained events, newest first, with
+ * filters in the URL, a virtualised list that loads more as you scroll and the chain verification result. Reading the
+ * log is itself audited, so nothing here refreshes by itself.
+ */
+export function AuditPanel() {
+  const styles = useStyles();
+  const auth = useAuth();
+  const ready = auth.status === 'ready';
+  const [filters, update] = useUrlStates(AUDIT_FILTERS);
+  const listId = useId();
+  const values: AuditFilterValues = filters;
+  // Text filters update the URL at once but only query after typing pauses, so each keystroke is not an audited read.
+  const debouncedAction = useDebouncedValue(values.act, 400);
+  const debouncedActor = useDebouncedValue(values.actor, 400);
+  const pages = useApiPages(
+    'governance.audit',
+    { query: auditQuery({ ...values, act: debouncedAction, actor: debouncedActor }) },
+    { enabled: ready, placeholderData: keepPreviousData },
+  );
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = pages;
+  const events = useMemo(() => pages.data?.pages.flatMap((page) => page.items) ?? [], [pages.data]);
+  const total = pages.data?.pages[0]?.total;
+
+  const getKey = useCallback((index: number) => events[index]?.id ?? String(index), [events]);
+  const { containerRef, items, totalSize, virtualized, onMeasure } = useWindowVirtualizer({
+    count: events.length,
+    getKey,
+    estimateSize: ESTIMATED_ROW,
+  });
+  const sentinel = useAutoLoadNext(pages);
+
+  const active = activeAuditFilters(values);
+  const clear = (): void =>
+    update({ act: '', actor: '', acase: null, aout: 'all', afrom: '', ato: '' });
+  const boundary = pagedBoundary(pages);
+  const suggestions = useMemo(
+    () => [...new Set([...KNOWN_AUDIT_ACTIONS, ...events.map((event) => event.action)])].sort(),
+    [events],
+  );
+
+  return (
+    <div className={styles.stack}>
+      <ChainVerification />
+      <Panel
+        title="Audit events"
+        description="Newest first. Filters narrow the list; the action and actor filters match exactly."
+        help="The audit log records who did what, to what, when and with what outcome: sign-ins that were refused, settings changed, roles assigned, exports, reviews, skill approvals and demo resets. Details hold ids and counters, never case text or secrets. The log is append-only."
+        actions={
+          <Button
+            appearance="outline"
+            size="small"
+            icon={<ArrowSyncRegular />}
+            disabled={!ready || pages.isFetching}
+            onClick={() => void pages.refetch()}
+          >
+            {pages.isFetching && !pages.isPending ? 'Refreshing…' : 'Refresh'}
+          </Button>
+        }
+      >
+        <Notice variant="info" compact title={null}>
+          Reading the audit log is itself recorded in the audit log, so this list does not refresh
+          on its own.
+        </Notice>
+        <form
+          role="search"
+          aria-label="Filter audit events"
+          className={styles.filters}
+          onSubmit={(event) => event.preventDefault()}
+        >
+          <Field label="Action" className={styles.wide}>
+            <Input
+              value={values.act}
+              list={listId}
+              maxLength={80}
+              placeholder="For example skill.published"
+              onChange={(_event, data) => update({ act: data.value })}
+            />
+          </Field>
+          <datalist id={listId}>
+            {suggestions.map((action) => (
+              <option key={action} value={action} />
+            ))}
+          </datalist>
+          <Field label="Actor id" className={styles.field}>
+            <Input
+              value={values.actor}
+              maxLength={120}
+              placeholder="user_alex_admin"
+              onChange={(_event, data) => update({ actor: data.value })}
+            />
+          </Field>
+          <Field label="Outcome" className={styles.field}>
+            <Select
+              value={values.aout}
+              onChange={(_event, data) =>
+                update({ aout: data.value as (typeof OUTCOME_FILTERS)[number] })
+              }
+            >
+              {OUTCOME_FILTERS.map((value) => (
+                <option key={value} value={value}>
+                  {OUTCOME_LABELS[value]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Case" className={styles.field}>
+            <CaseFilterSelect
+              value={values.acase ?? ''}
+              emptyLabel="Any case"
+              showTitle={false}
+              onChange={(value) => update({ acase: value || null })}
+            />
+          </Field>
+          <Field label="From (UTC date)" className={styles.field}>
+            <Input
+              type="date"
+              value={values.afrom}
+              onChange={(_event, data) => update({ afrom: data.value })}
+            />
+          </Field>
+          <Field label="To (UTC date)" className={styles.field}>
+            <Input
+              type="date"
+              value={values.ato}
+              onChange={(_event, data) => update({ ato: data.value })}
+            />
+          </Field>
+          <Button appearance="subtle" disabled={active === 0} onClick={clear}>
+            Clear filters
+          </Button>
+        </form>
+        {boundary.isPending ? (
+          <LoadingSkeleton variant="list" count={4} label="Loading audit events" />
+        ) : boundary.isError ? (
+          <QueryErrorState
+            error={boundary.error}
+            subject="The audit log"
+            onRetry={() => void pages.refetch()}
+            retrying={pages.isFetching}
+          />
+        ) : (
+          <>
+            {pages.isError ? (
+              <QueryErrorState
+                error={pages.error}
+                subject={
+                  pages.isFetchNextPageError ? 'More audit events' : 'The latest audit events'
+                }
+                compact
+                onRetry={() => retryPages(pages)}
+                retrying={pages.isFetching}
+              />
+            ) : null}
+            <p className={styles.status} role="status" aria-live="polite">
+              {events.length === 0
+                ? 'No audit events to show.'
+                : `Showing ${events.length} ${events.length === 1 ? 'event' : 'events'}${
+                    typeof total === 'number' ? ` of ${total}` : ''
+                  }${hasNextPage ? '; more load as you scroll' : ''}${
+                    active > 0 ? `, ${active} ${active === 1 ? 'filter' : 'filters'} on` : ''
+                  }.`}
+            </p>
+            {events.length === 0 ? (
+              <EmptyState
+                headingLevel={3}
+                icon={active > 0 ? <HistoryRegular /> : <ShieldCheckmarkRegular />}
+                title={active > 0 ? 'No audit events match these filters' : 'No audit events yet'}
+                description={
+                  active > 0
+                    ? 'Loosen or clear the filters to see more of the log.'
+                    : 'Events appear here as people and the system act: ingesting, analysing, reviewing and changing settings.'
+                }
+                {...(active > 0
+                  ? {
+                      action: (
+                        <Button appearance="primary" onClick={clear}>
+                          Clear filters
+                        </Button>
+                      ),
+                    }
+                  : {})}
+              />
+            ) : (
+              <ul
+                ref={containerRef}
+                className={styles.list}
+                aria-label={`Audit events, ${events.length} shown`}
+                style={virtualized ? { position: 'relative', height: totalSize } : undefined}
+              >
+                {items.map((item) => {
+                  const event = events[item.index];
+                  if (!event) return null;
+                  return (
+                    <VirtualRow
+                      key={item.key}
+                      itemKey={item.key}
+                      index={item.index}
+                      count={events.length}
+                      start={item.start}
+                      virtualized={virtualized}
+                      onMeasure={onMeasure}
+                    >
+                      <AuditRow event={event} />
+                    </VirtualRow>
+                  );
+                })}
+              </ul>
+            )}
+            {hasNextPage ? (
+              <div className={styles.more}>
+                <div ref={sentinel} aria-hidden="true" />
+                <Button
+                  appearance="outline"
+                  disabled={isFetchingNextPage}
+                  onClick={() => void fetchNextPage()}
+                >
+                  {isFetchingNextPage ? 'Loading…' : 'Load more events'}
+                </Button>
+              </div>
+            ) : null}
+          </>
+        )}
+      </Panel>
+    </div>
+  );
+}
