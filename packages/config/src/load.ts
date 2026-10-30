@@ -1,6 +1,7 @@
 import { DEFAULT_FEATURE_FLAGS } from '@caseguard/schemas';
 import type { BuildContext } from './context';
 import { ConfigError, type ConfigIssue } from './errors';
+import { blankToUndefined } from './primitives';
 import { RawEnvSchema } from './raw-env';
 import { buildAi } from './sections/ai';
 import { buildAuth } from './sections/auth';
@@ -32,21 +33,42 @@ function freezeSections<T extends object>(value: T): T {
   return Object.freeze(value);
 }
 
+/**
+ * An unset APP_ENV means `local`, which enables persona login and the other development defaults.
+ * That is right on a laptop and wrong in a production runtime, where a forgotten variable must not
+ * silently select it. NODE_ENV=production (the API image sets it) therefore requires APP_ENV to be
+ * named explicitly; any valid value is accepted. Matching ignores case and surrounding whitespace so
+ * a variant such as `Production` cannot slip past the guard.
+ */
+function unsetAppEnvInProduction(env: EnvSource): ConfigIssue | null {
+  const nodeEnv = blankToUndefined(env.NODE_ENV);
+  const production = typeof nodeEnv === 'string' && nodeEnv.toLowerCase() === 'production';
+  if (!production || blankToUndefined(env.APP_ENV) !== undefined) return null;
+  return {
+    variable: 'APP_ENV',
+    message:
+      'must be set explicitly when NODE_ENV=production: an unset value would mean local, which enables persona login and other development defaults',
+  };
+}
+
 /** Parses and validates the environment without throwing. */
 export function validateConfig(
   env: EnvSource = process.env,
   options: LoadConfigOptions = {},
 ): ConfigResult {
+  // APP_ENV decides which rules apply to every other variable, so an unset one in production is
+  // reported on its own (together with any variable too malformed to parse) instead of validating
+  // the rest under a guess.
+  const unsetAppEnv = unsetAppEnvInProduction(env);
   const parsed = RawEnvSchema.safeParse(env);
   if (!parsed.success) {
-    return {
-      ok: false,
-      issues: parsed.error.issues.map((issue) => ({
-        variable: String(issue.path[0] ?? '(environment)'),
-        message: issue.message,
-      })),
-    };
+    const malformed = parsed.error.issues.map((issue) => ({
+      variable: String(issue.path[0] ?? '(environment)'),
+      message: issue.message,
+    }));
+    return { ok: false, issues: unsetAppEnv === null ? malformed : [unsetAppEnv, ...malformed] };
   }
+  if (unsetAppEnv !== null) return { ok: false, issues: [unsetAppEnv] };
 
   const raw = parsed.data;
   const appEnv = raw.APP_ENV ?? 'local';

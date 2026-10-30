@@ -57,6 +57,19 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/**
+ * Tests that count real sandbox entries must not depend on how fast the machine is: a stall of a
+ * loaded host that outlasts the default deadline would time a run out, a timed-out run is repeated
+ * (and a timed-out probe caches the pattern as unsafe), and either changes the count. These tests
+ * therefore run the real sandbox with a deadline no stall reaches. Deadline behaviour has its own
+ * tests, with injected clocks and runners.
+ */
+function useGenerousDeadlines(): void {
+  vi.spyOn(DEFAULT_PATTERN_DEPS, 'runner').mockImplementation((regex, texts, limits) =>
+    runInSandbox(regex, texts, limits, 120_000),
+  );
+}
+
 describe('custom redaction patterns (admin supplied)', { timeout: 60_000 }, () => {
   it('redacts matches with the custom placeholder and reports a custom finding', () => {
     const result = redactText('Tickets CUST-123456 and CUST-654321, not CUST-12', {
@@ -516,6 +529,8 @@ describe('custom redaction patterns (admin supplied)', { timeout: 60_000 }, () =
   });
 
   describe('compiled patterns are cached by content (H3)', () => {
+    beforeEach(useGenerousDeadlines);
+
     it('runs the probe once per distinct pattern, whatever array carries it', () => {
       const { runner, calls } = counting(NO_MATCHES);
       const deps = withRunner(runner);
@@ -609,6 +624,8 @@ describe(
   'one sandbox evaluation per pattern and batch, not per string (H3)',
   { timeout: 120_000 },
   () => {
+    beforeEach(useGenerousDeadlines);
+
     const acct = patterns(['acct', 'ACME\\d-[0-9]{6}']);
     const lines = (count: number, size = 400): string[] =>
       Array.from(

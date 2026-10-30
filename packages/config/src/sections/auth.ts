@@ -94,30 +94,35 @@ function buildEntra(ctx: BuildContext): EntraConfig | null {
 }
 
 /**
- * Identity configuration. The persona login exists only for AUTH_MODE=dev outside production and
- * can never be combined with Entra, so a deployment cannot accidentally accept both.
+ * Identity configuration (SEC-1). The persona login (AUTH_MODE=dev with DEV_AUTH_ENABLED=true, the
+ * forgeable x-cg-persona header) exists only when APP_ENV is local or test. Development, staging and
+ * production refuse it with a hard error: `development` is the name of the internet-facing Azure
+ * development environment, where a forged header would grant any role. It can never be combined with
+ * Entra either, so a deployment cannot accidentally accept both. The authenticator factory in
+ * packages/security repeats these rules as a second lock.
  */
 export function buildAuth(ctx: BuildContext): AuthConfig {
   const { raw } = ctx;
   const mode = raw.AUTH_MODE ?? (ctx.localLike ? 'dev' : 'entra');
   const devAuthEnabled = raw.DEV_AUTH_ENABLED ?? (ctx.localLike && mode === 'dev');
 
-  if (ctx.production && mode !== 'entra') {
-    ctx.fail('AUTH_MODE', "must be 'entra' when APP_ENV=production");
-  }
-  if (ctx.production && devAuthEnabled) {
-    ctx.fail('DEV_AUTH_ENABLED', 'must be false when APP_ENV=production');
-  }
-  if (mode === 'dev' && !devAuthEnabled && !ctx.production) {
+  if (!ctx.localLike) {
+    if (mode !== 'entra') {
+      ctx.fail(
+        'AUTH_MODE',
+        "must be 'entra' unless APP_ENV is local or test (persona login exists only there)",
+      );
+    }
+    if (devAuthEnabled) {
+      ctx.fail(
+        'DEV_AUTH_ENABLED',
+        'must be false unless APP_ENV is local or test (persona login exists only there)',
+      );
+    }
+  } else if (mode === 'dev' && !devAuthEnabled) {
     ctx.fail('DEV_AUTH_ENABLED', 'AUTH_MODE=dev also requires DEV_AUTH_ENABLED=true');
-  }
-  if (mode === 'entra' && devAuthEnabled) {
+  } else if (mode === 'entra' && devAuthEnabled) {
     ctx.fail('DEV_AUTH_ENABLED', 'persona login cannot be enabled while AUTH_MODE=entra');
-  }
-  if (mode === 'dev' && !ctx.localLike && !ctx.production) {
-    ctx.warn(
-      'Development identity is enabled outside local and test environments; personas have no real authentication.',
-    );
   }
 
   return {

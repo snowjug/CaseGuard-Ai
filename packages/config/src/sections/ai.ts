@@ -4,6 +4,31 @@ import type { AiConfig, AiLimits } from '../types';
 
 const DEFAULT_API_VERSION = '2024-10-21';
 
+/*
+ * The two rules below copy what the Azure OpenAI provider enforces when it is constructed
+ * (`parseEndpoint` and `assertDeployment` in packages/ai/src/providers/azure/http.ts); a value the
+ * provider refuses throws `not_configured` at runtime, so it must be refused here, at start-up.
+ * packages/config cannot import packages/ai (the dependency runs the other way), so the rules are
+ * duplicated and kept in step by apps/api/test/config-provider-parity.test.ts. Configuration may be
+ * stricter than the provider (https only; no `@`, `?` or `#` at all, even an empty query) but never
+ * looser.
+ */
+const AZURE_OPENAI_DEPLOYMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
+/** A bare https origin: no credentials, no path other than `/`, no query, no fragment. */
+function isBareHttpsOrigin(value: string): boolean {
+  if (!/^https:\/\//i.test(value) || /[@?#]/.test(value)) return false;
+  const url = parseUrl(value, ['https:']);
+  return (
+    url !== null &&
+    url.username === '' &&
+    url.password === '' &&
+    (url.pathname === '/' || url.pathname === '') &&
+    url.search === '' &&
+    url.hash === ''
+  );
+}
+
 function buildLimits(ctx: BuildContext): AiLimits {
   const { raw } = ctx;
   const costLimit = raw.AI_COST_LIMIT_USD_PER_DAY ?? null;
@@ -39,12 +64,22 @@ export function buildAi(ctx: BuildContext): AiConfig {
   if (provider === 'deterministic') return { provider, limits };
 
   const endpoint = raw.AZURE_OPENAI_ENDPOINT;
-  if (endpoint === undefined || !parseUrl(endpoint, ['https:'])) {
-    ctx.fail('AZURE_OPENAI_ENDPOINT', 'is required for azure-openai and must be an https URL');
+  if (endpoint === undefined) {
+    ctx.fail('AZURE_OPENAI_ENDPOINT', 'is required for azure-openai');
+  } else if (!isBareHttpsOrigin(endpoint)) {
+    ctx.fail(
+      'AZURE_OPENAI_ENDPOINT',
+      'must be a bare https origin such as https://<resource>.openai.azure.com (no path, query, fragment or credentials)',
+    );
   }
   const deployment = raw.AZURE_OPENAI_DEPLOYMENT;
-  if (deployment === undefined || !/^[A-Za-z0-9._-]{1,128}$/.test(deployment)) {
-    ctx.fail('AZURE_OPENAI_DEPLOYMENT', 'is required for azure-openai (letters, digits, . _ -)');
+  if (deployment === undefined) {
+    ctx.fail('AZURE_OPENAI_DEPLOYMENT', 'is required for azure-openai');
+  } else if (!AZURE_OPENAI_DEPLOYMENT.test(deployment)) {
+    ctx.fail(
+      'AZURE_OPENAI_DEPLOYMENT',
+      'must be 1 to 64 letters, digits, ".", "_" or "-", starting with a letter or digit',
+    );
   }
   const auth = raw.AZURE_OPENAI_AUTH ?? 'managed-identity';
   const apiKey = raw.AZURE_OPENAI_API_KEY;

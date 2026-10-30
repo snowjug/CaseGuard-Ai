@@ -39,7 +39,7 @@ In scope: the code, infrastructure templates (`infra/`), workflows (`.github/`) 
 
 Out of scope:
 
-- Findings that need the **development persona login** (`AUTH_MODE=dev`): it intentionally has no real authentication and is refused when `APP_ENV=production`. A way to enable it in production **is** in scope.
+- Findings that need the **development persona login** (`AUTH_MODE=dev`): it intentionally has no real authentication, is for local and test only, and is refused when `APP_ENV` is `development`, `staging` or `production`. A way to enable it outside local and test **is** in scope.
 - Vulnerabilities in third-party services or dependencies without a demonstrated impact here (report those upstream; see `docs/dependency-exceptions.json` for accepted risks).
 - Volumetric denial of service, social engineering, physical attacks, and automated scanner output without a working proof of impact.
 - Anything that requires access to someone else's Azure subscription, tenant or data.

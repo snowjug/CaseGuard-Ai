@@ -76,7 +76,7 @@ function identityRow(config: AppConfig, checkedAt: string): DependencyHealth {
       status: 'healthy',
       latencyMs: null,
       detail:
-        'Development personas: synthetic identities, not a real identity provider. Disabled in staging and production.',
+        'Development personas: synthetic identities, not a real identity provider. Allowed only when APP_ENV is local or test; refused everywhere else.',
       checkedAt,
       simulated: true,
     };

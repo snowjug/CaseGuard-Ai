@@ -83,7 +83,7 @@ describe('value parsing', () => {
 
   it('ignores variables it does not know', () => {
     expect(
-      parsed({ PATH: '/usr/bin', HOME: '/home/x', NODE_ENV: 'production', UNRELATED: '1' }).runtime
+      parsed({ PATH: '/usr/bin', HOME: '/home/x', NODE_ENV: 'development', UNRELATED: '1' }).runtime
         .env,
     ).toBe('local');
   });

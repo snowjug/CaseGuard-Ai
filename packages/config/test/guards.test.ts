@@ -103,13 +103,9 @@ describe('[NFR-SEC-03] production safety guards', () => {
     );
   });
 
-  it('refuses persona login combined with Entra in every environment', () => {
-    const found = issuesFor({
-      ...PRODUCTION_ENV,
-      APP_ENV: 'development',
-      DEV_AUTH_ENABLED: 'true',
-    });
-    expect(found.map((i) => i.variable)).toContain('DEV_AUTH_ENABLED');
+  it('refuses persona login combined with Entra', () => {
+    const found = issuesFor({ ...PRODUCTION_ENV, APP_ENV: 'local', DEV_AUTH_ENABLED: 'true' });
+    expect(found.map((i) => i.variable)).toEqual(['DEV_AUTH_ENABLED']);
     expect(found[0]?.message).toMatch(/cannot be enabled while AUTH_MODE=entra/);
   });
 
@@ -118,7 +114,8 @@ describe('[NFR-SEC-03] production safety guards', () => {
     expect(found.map((i) => i.variable)).toContain('DEV_AUTH_ENABLED');
   });
 
-  it('allows development identity in a deployed development environment but warns', () => {
+  it('[SEC-1] refuses development identity in the deployed development environment, demo or not', () => {
+    // APP_ENV=development is the internet-facing Azure development environment, not a laptop.
     const result = validateConfig({
       ...PRODUCTION_ENV,
       APP_ENV: 'development',
@@ -126,8 +123,10 @@ describe('[NFR-SEC-03] production safety guards', () => {
       DEV_AUTH_ENABLED: 'true',
       DEMO_MODE: 'true',
     });
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.config.warnings.join(' ')).toMatch(/Development identity/);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.issues.map((i) => i.variable)).toEqual(['AUTH_MODE', 'DEV_AUTH_ENABLED']);
+    for (const issue of result.issues) expect(issue.message).toMatch(/local or test/);
   });
 });
 

@@ -36,8 +36,8 @@ export interface DevPersonaAuthenticatorOptions {
 
 /**
  * Development-only identity: trusts the `x-cg-persona` header, which any client can forge. That is
- * acceptable only for synthetic data on a developer machine, so construction fails unless dev auth
- * was explicitly enabled and the environment is one where it is allowed (NFR-SEC-03).
+ * acceptable only for synthetic data on a developer machine or in automated tests, so construction
+ * fails unless dev auth was explicitly enabled and APP_ENV is `local` or `test` (NFR-SEC-03, SEC-1).
  */
 export class DevPersonaAuthenticator implements Authenticator {
   readonly mode = 'dev' as const;
@@ -52,7 +52,7 @@ export class DevPersonaAuthenticator implements Authenticator {
     }
     if (!isDevAuthAllowedEnvironment(options.environment)) {
       throw new AuthConfigurationError(
-        `Development persona authentication is not available in the "${String(options.environment)}" environment`,
+        `Development persona authentication is not available in the "${String(options.environment)}" environment (local and test only)`,
       );
     }
     this.headerName = options.headerName ?? DEV_PERSONA_HEADER;

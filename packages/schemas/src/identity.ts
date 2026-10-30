@@ -83,7 +83,7 @@ export const UserSchema = z.object({
 });
 export type User = z.infer<typeof UserSchema>;
 
-/** Development persona offered by the persona picker (only when AUTH_MODE=dev outside production). */
+/** Development persona offered by the persona picker (only when AUTH_MODE=dev and APP_ENV is local or test). */
 export const PersonaSchema = z.object({
   id: IdSchema,
   displayName: z.string(),

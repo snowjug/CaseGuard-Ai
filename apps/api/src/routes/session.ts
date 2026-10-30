@@ -20,7 +20,7 @@ export function buildNotices(
   }
   if (auth.authMode === 'dev') {
     notices.push(
-      'Development sign-in is active: personas are not real identities. It is disabled in staging and production.',
+      'Development sign-in is active: personas are not real identities. It is allowed only when APP_ENV is local or test.',
     );
   }
   if (config.ai.provider === 'deterministic') {

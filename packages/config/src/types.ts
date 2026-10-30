@@ -51,7 +51,7 @@ export interface EntraConfig {
 
 export interface AuthConfig {
   readonly mode: AuthMode;
-  /** Second explicit switch for the persona login. Never true in production. */
+  /** Second explicit switch for the persona login. Never true unless APP_ENV is local or test. */
   readonly devAuthEnabled: boolean;
   readonly entra: EntraConfig | null;
   /** User-assigned managed identity client id used by DefaultAzureCredential, when set. */

@@ -2,7 +2,7 @@ import type { JWTVerifyGetKey } from 'jose';
 import type { AppEnvironment, AuthMode, Role } from '@caseguard/schemas';
 import { AuthConfigurationError } from '../errors';
 import { DevPersonaAuthenticator, type DevPersonaAuthenticatorOptions } from './dev';
-import { isDevAuthAllowedEnvironment, PRODUCTION_LIKE_ENVIRONMENTS } from './environment';
+import { isDevAuthAllowedEnvironment } from './environment';
 import { EntraJwtAuthenticator, type EntraJwtAuthenticatorOptions } from './entra';
 import type { Authenticator } from './types';
 
@@ -47,14 +47,11 @@ export interface AuthenticatorDeps {
   now?: () => Date;
 }
 
-function isProductionLike(environment: AppEnvironment): boolean {
-  return PRODUCTION_LIKE_ENVIRONMENTS.includes(environment);
-}
-
 /**
  * Builds the authenticator for the configured mode and refuses unsafe combinations outright
- * (NFR-SEC-03): dev auth in a production-like environment, or `DEV_AUTH_ENABLED=true` anywhere near
- * production even when Entra is the active mode.
+ * (NFR-SEC-03, SEC-1). Persona login exists only when APP_ENV is `local` or `test`, so dev auth is
+ * refused in every other environment (development, staging, production and unknown names), and so is
+ * `DEV_AUTH_ENABLED=true` there even when Entra is the active mode.
  */
 export function createAuthenticator(
   options: CreateAuthenticatorOptions,
@@ -63,7 +60,7 @@ export function createAuthenticator(
   if (options.mode === 'dev') {
     if (!isDevAuthAllowedEnvironment(options.environment)) {
       throw new AuthConfigurationError(
-        `AUTH_MODE=dev is not allowed when APP_ENV=${options.environment}`,
+        `AUTH_MODE=dev is not allowed when APP_ENV=${options.environment} (persona login exists only when APP_ENV is local or test)`,
       );
     }
     if (options.devAuthEnabled !== true) {
@@ -79,9 +76,9 @@ export function createAuthenticator(
     });
   }
 
-  if (isProductionLike(options.environment) && options.devAuthEnabled) {
+  if (!isDevAuthAllowedEnvironment(options.environment) && options.devAuthEnabled) {
     throw new AuthConfigurationError(
-      `DEV_AUTH_ENABLED must be false when APP_ENV=${options.environment}, even with AUTH_MODE=entra`,
+      `DEV_AUTH_ENABLED must be false when APP_ENV=${options.environment}, even with AUTH_MODE=entra (persona login exists only when APP_ENV is local or test)`,
     );
   }
 

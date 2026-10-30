@@ -12,6 +12,7 @@ import {
   withFaultInjection,
   type FaultInjectingDatabase,
 } from '../src/db/testing';
+import { createAiService } from '../src/services/ai';
 import type { AiPort } from '../src/services/ports';
 import { PERSONAS, createHarness, openSharedDatabase, type Harness } from './support/app-harness';
 
@@ -338,20 +339,34 @@ describe('[FR-TK-03] system.provider', () => {
     expect(res.body).not.toContain(AZURE_KEY);
   });
 
-  it('flags an endpoint the provider refuses as not healthy, without echoing it', async () => {
-    const h = await harness({
-      env: {
-        ...AZURE_ENV,
-        AZURE_OPENAI_ENDPOINT: 'https://example-openai.openai.azure.com/openai?api-key=leak',
-      },
+  it('reports a provider that could not be created as not healthy, serving deterministic code, without echoing the endpoint', async () => {
+    const h = await harness({ env: AZURE_ENV });
+    // Configuration refuses endpoints the provider would refuse, so the failure is injected: the real
+    // service, with a factory that fails and a message that names the endpoint and the key.
+    Object.assign(h.infra.services, {
+      ai: createAiService(h.infra, {
+        providerFactory: async () => {
+          throw new Error(
+            `cannot build provider for ${AZURE_ENV.AZURE_OPENAI_ENDPOINT} key ${AZURE_KEY}`,
+          );
+        },
+      }),
     });
     const res = await h.call(PERSONAS.reviewer, { method: 'GET', url: `${API}/system/provider` });
     expect(res.statusCode).toBe(200);
     const status = ProviderStatusSchema.parse(res.data);
-    expect(status).toMatchObject({ kind: 'azure-openai', healthy: false });
-    expect(status.detail).toContain('could not be initialised');
-    expect(res.body).not.toContain('api-key=leak');
+    expect(status).toMatchObject({ kind: 'deterministic', simulated: true, healthy: false });
+    expect(status.detail).toContain('could not be created');
+    expect(res.body).not.toContain('cannot build provider');
     expect(res.body).not.toContain(AZURE_KEY);
+
+    const health = SystemHealthSchema.parse(
+      (await h.call(PERSONAS.reviewer, { method: 'GET', url: `${API}/system/health` })).data,
+    );
+    expect(byName(health.dependencies).get('model_provider')).toMatchObject({
+      status: 'degraded',
+      simulated: true,
+    });
   });
 
   it('is limited to telemetry:read holders', async () => {

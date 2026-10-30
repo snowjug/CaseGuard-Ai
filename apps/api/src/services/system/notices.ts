@@ -24,7 +24,7 @@ export function integrationNotices(config: AppConfig): string[] {
   if (config.storage.provider === 'azure-blob') notices.push(AZURE_BLOB_VALIDATION_NOTE);
   notices.push(
     config.auth.mode === 'dev'
-      ? 'Development sign-in is active: personas are not real identities. It is refused in staging and production.'
+      ? 'Development sign-in is active: personas are not real identities. It is allowed only when APP_ENV is local or test.'
       : 'Microsoft Entra ID sign-in is implemented and unit-tested with locally generated keys only; it has not been exercised against a live tenant.',
   );
   if (config.database.kind === 'postgres') {

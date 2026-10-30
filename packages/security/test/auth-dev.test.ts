@@ -76,24 +76,41 @@ describe('DevPersonaAuthenticator construction', () => {
     }
   });
 
-  it('[NFR-SEC-03] refuses production and staging even with allowDev: true', () => {
-    for (const environment of ['production', 'staging'] as const) {
+  it('[NFR-SEC-03] refuses every environment except local and test, even with allowDev: true', () => {
+    // `development` is the internet-facing Azure dev environment: a forged header would grant any role.
+    for (const environment of ['development', 'staging', 'production'] as const) {
       expect(() => build(environment), environment).toThrow(AuthConfigurationError);
     }
   });
 
-  it('[NFR-SEC-03] fails closed on unknown environment names', () => {
-    for (const environment of ['prod', 'PRODUCTION', '', 'live'] as const) {
-      expect(() => build(environment as AppEnvironment), environment).toThrow(
+  it('[NFR-SEC-03] fails closed on unknown environment names and case variants', () => {
+    for (const environment of [
+      'prod',
+      'PRODUCTION',
+      '',
+      'live',
+      'Local',
+      'LOCAL',
+      'TEST',
+      ' local',
+      'local ',
+      'test\n',
+      'dev',
+    ] as const) {
+      expect(() => build(environment as AppEnvironment), JSON.stringify(environment)).toThrow(
         AuthConfigurationError,
       );
     }
   });
 
-  it('is available in local, test and development', () => {
-    for (const environment of ['local', 'test', 'development'] as const) {
+  it('is available only in local and test', () => {
+    for (const environment of ['local', 'test'] as const) {
       expect(() => build(environment), environment).not.toThrow();
     }
+  });
+
+  it('tells the operator that persona login is for local and test only', () => {
+    expect(() => build('development')).toThrow(/local and test only/);
   });
 });
 

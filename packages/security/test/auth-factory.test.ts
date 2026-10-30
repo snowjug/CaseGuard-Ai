@@ -37,8 +37,8 @@ beforeAll(async () => {
 });
 
 describe('createAuthenticator: development identity (NFR-SEC-03)', () => {
-  it('[NFR-SEC-03] throws for dev mode in production and staging', () => {
-    for (const environment of ['production', 'staging'] as const) {
+  it('[NFR-SEC-03] throws for dev mode in development, staging and production', () => {
+    for (const environment of ['development', 'staging', 'production'] as const) {
       expect(
         () =>
           createAuthenticator(
@@ -60,12 +60,16 @@ describe('createAuthenticator: development identity (NFR-SEC-03)', () => {
   });
 
   it('[NFR-SEC-03] throws for unknown environment names (fail closed)', () => {
-    expect(() =>
-      createAuthenticator(
-        { mode: 'dev', environment: 'prod' as AppEnvironment, devAuthEnabled: true },
-        { lookupPersona },
-      ),
-    ).toThrow(AuthConfigurationError);
+    for (const environment of ['prod', 'Local', 'TEST', ' local', ''] as const) {
+      expect(
+        () =>
+          createAuthenticator(
+            { mode: 'dev', environment: environment as AppEnvironment, devAuthEnabled: true },
+            { lookupPersona },
+          ),
+        JSON.stringify(environment),
+      ).toThrow(AuthConfigurationError);
+    }
   });
 
   it('needs a persona directory', () => {
@@ -74,8 +78,8 @@ describe('createAuthenticator: development identity (NFR-SEC-03)', () => {
     ).toThrow(/lookupPersona/);
   });
 
-  it('builds the dev authenticator for local, test and development', () => {
-    for (const environment of ['local', 'test', 'development'] as const) {
+  it('builds the dev authenticator for local and test only', () => {
+    for (const environment of ['local', 'test'] as const) {
       const authenticator = createAuthenticator(
         { mode: 'dev', environment, devAuthEnabled: true },
         { lookupPersona },
@@ -84,8 +88,8 @@ describe('createAuthenticator: development identity (NFR-SEC-03)', () => {
     }
   });
 
-  it('[NFR-SEC-03] refuses DEV_AUTH_ENABLED=true in production-like environments even in entra mode', () => {
-    for (const environment of ['production', 'staging'] as const) {
+  it('[NFR-SEC-03] refuses DEV_AUTH_ENABLED=true outside local and test even in entra mode', () => {
+    for (const environment of ['development', 'staging', 'production'] as const) {
       expect(
         () =>
           createAuthenticator(
@@ -93,6 +97,24 @@ describe('createAuthenticator: development identity (NFR-SEC-03)', () => {
             { keyResolver: idp.keyResolver },
           ),
         environment,
+      ).toThrow(/DEV_AUTH_ENABLED/);
+    }
+  });
+
+  it('[NFR-SEC-03] refuses DEV_AUTH_ENABLED=true for unknown environment names in entra mode', () => {
+    for (const environment of ['prod', 'LOCAL', 'live', ''] as const) {
+      expect(
+        () =>
+          createAuthenticator(
+            {
+              mode: 'entra',
+              environment: environment as AppEnvironment,
+              devAuthEnabled: true,
+              entra: entra(),
+            },
+            { keyResolver: idp.keyResolver },
+          ),
+        JSON.stringify(environment),
       ).toThrow(/DEV_AUTH_ENABLED/);
     }
   });

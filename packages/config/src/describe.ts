@@ -7,6 +7,15 @@ function describeTrustProxy(setting: TrustProxySetting): string {
   return `${setting.length} address ${setting.length === 1 ? 'range' : 'ranges'}`;
 }
 
+/** Scheme, host and port only: userinfo, path, query and fragment can never reach a log line. */
+function originOf(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return 'invalid';
+  }
+}
+
 export interface ConfigSummary {
   readonly environment: string;
   readonly service: string;
@@ -35,6 +44,9 @@ export interface ConfigSummary {
   readonly search: Record<string, string>;
   readonly ai: {
     readonly provider: string;
+    /** Origin of the Azure OpenAI endpoint (never a path, query or credentials); null otherwise. */
+    readonly endpoint: string | null;
+    readonly deployment: string | null;
     readonly auth: string | null;
     readonly credentialConfigured: boolean;
     readonly costCapConfigured: boolean;
@@ -99,6 +111,8 @@ export function describeConfig(config: AppConfig): ConfigSummary {
     search,
     ai: {
       provider: config.ai.provider,
+      endpoint: config.ai.provider === 'azure-openai' ? originOf(config.ai.endpoint) : null,
+      deployment: config.ai.provider === 'azure-openai' ? config.ai.deployment : null,
       auth: config.ai.provider === 'azure-openai' ? config.ai.auth : null,
       credentialConfigured: config.ai.provider === 'azure-openai' && config.ai.apiKey !== null,
       costCapConfigured: config.ai.limits.costLimitUsdPerDay !== null,
