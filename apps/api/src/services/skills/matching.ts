@@ -1,10 +1,8 @@
 import {
-  checkConformance,
   compareIso,
   createTemporalView,
   matchSkills,
   runDeterministicAnalysis,
-  toMatchConformance,
   type DeterministicAnalysis,
   type EngineContext,
 } from '@caseguard/domain';
@@ -13,6 +11,7 @@ import { canonicalJson, sha256Hex } from '@caseguard/security';
 import type { RequestContext } from '../../http/request-context';
 import { engineContextForRun, loadAnalysisInputs, type AnalysisInputs } from '../analysis';
 import { LruCache } from '../counterfactuals/cache';
+import { withApplication } from './applied';
 import { lastEventAtOf } from './usage';
 
 const AS_OF_CACHE_ENTRIES = 16;
@@ -134,23 +133,16 @@ export class CaseMatcher {
         const happened =
           wholeCase || (appliedAt !== null && compareIso(appliedAt, requested ?? asOf) <= 0);
         if (happened) {
-          match = {
-            ...fresh,
-            applied: true,
-            appliedAt: before.appliedAt,
-            appliedBy: before.appliedBy,
-            conformance: toMatchConformance(
-              checkConformance({
-                version: entry.version,
-                analysis: analysisAsOf,
-                pack: inputs.pack,
-                config: inputs.actionConfig,
-                caseId,
-                appliedAt: before.appliedAt,
-                throughAt: asOf,
-              }),
-            ),
-          };
+          match = withApplication({
+            fresh,
+            before,
+            entry,
+            analysis: analysisAsOf,
+            pack: inputs.pack,
+            config: inputs.actionConfig,
+            caseId,
+            throughAt: asOf,
+          });
         }
       }
       return { match, before };

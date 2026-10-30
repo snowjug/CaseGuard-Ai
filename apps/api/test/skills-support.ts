@@ -217,3 +217,28 @@ export async function runValidation(
 ): Promise<ApiResponse> {
   return api.post(persona, `/skills/${skillId}/simulation-test`, body);
 }
+
+/**
+ * Walks a freshly extracted skill (`discovered`) to the pilot along the story's path, with the
+ * people the gates require: the curator drafts, the reviewer runs the simulation test and signs it
+ * off, the curator approves the pilot. The extractor must not be one of them.
+ */
+export async function walkToPilot(h: Harness, api: TestApi, skillId: string): Promise<void> {
+  const fail = (what: string, res: ApiResponse): Error =>
+    new Error(`${what}: HTTP ${res.statusCode} ${JSON.stringify(res.data)}`);
+  h.clock.advance(60_000);
+  const drafted = await moveSkill(api, PERSONAS.curator, skillId, 'draft');
+  if (drafted.statusCode !== 200) throw fail('draft', drafted);
+  h.clock.advance(60_000);
+  const test = await runValidation(api, PERSONAS.reviewer, skillId, { kind: 'simulation_test' });
+  if (test.statusCode !== 200) throw fail('simulation test', test);
+  for (const [persona, toState] of [
+    [PERSONAS.reviewer, 'simulation_tested'],
+    [PERSONAS.reviewer, 'expert_reviewed'],
+    [PERSONAS.curator, 'pilot'],
+  ] as const) {
+    h.clock.advance(60_000);
+    const moved = await moveSkill(api, persona, skillId, toState);
+    if (moved.statusCode !== 200) throw fail(toState, moved);
+  }
+}

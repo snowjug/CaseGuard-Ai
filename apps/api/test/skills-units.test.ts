@@ -6,9 +6,11 @@ import {
   extractSkillCandidates,
   generateCounterfactuals,
   getCompiledPack,
+  matchSkills,
   runDeterministicAnalysis,
   skillFail,
   skillOk,
+  toMatchConformance,
   type EngineContext,
   type ExtractionRefusal,
   type SkillActor,
@@ -22,10 +24,12 @@ import {
   type CounterfactualScenario,
   type DecisionFork,
   type SkillApproval,
+  type SkillMatch,
   type SkillValidation,
 } from '@caseguard/schemas';
 import { toProblem } from '../src/http/problem';
 import type { AnalysisInputs } from '../src/services/analysis';
+import { carryApplications } from '../src/services/analysis/carry';
 import type { CaseReplay } from '../src/services/counterfactuals/replay';
 import {
   SELF_APPROVAL_MESSAGE,
@@ -519,6 +523,76 @@ describe('what an application contributes to effectiveness', () => {
       evidenceCompleteness: null,
       baselineEvidenceCompleteness: null,
       conformanceScore: null,
+    });
+  });
+
+  describe('carrying an application through a re-analysis', () => {
+    const withSkill: AnalysisInputs = { ...inputs, skills: [entry] };
+    const through = lastEventAtOf(replay);
+    const freshMatch = matchSkills({
+      skills: [entry],
+      analysisAsOf: analysisTwo,
+      asOf: through,
+      pack,
+      config: DEFAULT_ACTION_VALUE_CONFIG,
+      ctx: ctxTwo,
+      caseInfo: { workload: two.case.workload, product: two.case.product },
+    }).matches[0];
+    if (freshMatch === undefined) throw new Error('the skill produced no match');
+    // What a stored match looks like after the engineer applied the skill (with a stale figure).
+    const stored: SkillMatch = {
+      ...freshMatch,
+      applied: true,
+      appliedAt: '2026-06-01T09:00:00.000Z',
+      appliedBy: 'user_ava_engineer',
+      conformance: { stepsFollowed: 1, stepsTotal: 9, score: 0.111 },
+    };
+    const carry = (previous: SkillMatch[], fresh: SkillMatch[] = [freshMatch]) =>
+      carryApplications({ fresh, previous, inputs: withSkill, analysis: analysisTwo });
+
+    it('keeps who applied the skill and when, and recomputes the conformance on the new analysis', () => {
+      const [carried] = carry([stored]);
+      expect(carried).toMatchObject({
+        id: freshMatch.id,
+        applied: true,
+        appliedAt: '2026-06-01T09:00:00.000Z',
+        appliedBy: 'user_ava_engineer',
+      });
+      // The same figure the application recorded, not the stale one that was stored.
+      const recorded = buildSkillUsage({
+        replay: { ...replay, inputs: withSkill },
+        entry,
+        applied: true,
+      });
+      expect(carried?.conformance).toEqual(toMatchConformance(recorded.conformance));
+      expect(carried?.conformance?.score).toBeGreaterThanOrEqual(0.75);
+      // Everything else is the fresh match.
+      expect({
+        ...carried,
+        applied: false,
+        appliedAt: null,
+        appliedBy: null,
+        conformance: null,
+      }).toEqual(freshMatch);
+    });
+
+    it('leaves a match nobody applied exactly as the analysis computed it', () => {
+      expect(carry([{ ...stored, applied: false, appliedAt: null, appliedBy: null }])).toEqual([
+        freshMatch,
+      ]);
+      expect(carry([])).toEqual([freshMatch]);
+    });
+
+    it('has nothing to carry onto when the skill is no longer matched or not in the library', () => {
+      expect(carry([stored], [])).toEqual([]);
+      expect(
+        carryApplications({
+          fresh: [freshMatch],
+          previous: [stored],
+          inputs: { ...inputs, skills: [] },
+          analysis: analysisTwo,
+        }),
+      ).toEqual([freshMatch]);
     });
   });
 });

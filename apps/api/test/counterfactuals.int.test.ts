@@ -247,6 +247,8 @@ describe('counterfactuals.run', () => {
       'leakChecksFailed',
       'modelExecutions',
       'rejected',
+      'reviewsCarried',
+      'reviewsReset',
       'scenarios',
       'strategies',
     ]);

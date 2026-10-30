@@ -13,13 +13,8 @@ import type { RequestContext } from '../../http/request-context';
 import type { ServiceDeps } from '..';
 import type { CounterfactualPort, JobHandle, JobSpec } from '../ports';
 import { LruCache } from './cache';
-import {
-  carryReview,
-  defaultScenarioPlan,
-  generateForFork,
-  orderStrategies,
-  sameSimulation,
-} from './generate';
+import { planReviewCarry, recordReviewResets, sameSimulation } from './carry';
+import { defaultScenarioPlan, generateForFork, orderStrategies } from './generate';
 import { finalizeScenario, futureTokensFor, runSimulatorTask } from './narrative';
 import { ReplayLoader } from './replay';
 import { reviewScenario } from './review';
@@ -289,14 +284,17 @@ export class CounterfactualService implements CounterfactualPort {
     }
 
     await report('save', `Saving ${prepared.length} scenario${prepared.length === 1 ? '' : 's'}`);
-    const existing = await ctx.repos.counterfactuals.list(caseId, { forkId });
-    const toSave = prepared.map((scenario) => {
-      const before = existing.find((candidate) => candidate.id === scenario.id);
-      return before === undefined ? scenario : carryReview(before, scenario);
-    });
-    const leakFailures = toSave.filter((scenario) => !scenario.boundary.leakCheck.passed).length;
+    const leakFailures = prepared.filter((scenario) => !scenario.boundary.leakCheck.passed).length;
+    // Read inside the transaction: a decision recorded a moment ago must be the one that is carried.
     await ctx.repos.transaction(async (tx) => {
-      await tx.counterfactuals.saveScenarios(toSave);
+      const existing = await tx.counterfactuals.list(caseId, { forkId });
+      const plan = planReviewCarry(existing, prepared);
+      await tx.counterfactuals.saveScenarios(plan.scenarios);
+      await recordReviewResets(ctx, tx, {
+        caseId,
+        analysisRunId: replay.run.id,
+        reset: plan.reset,
+      });
       await ctx.audit(
         {
           action: 'counterfactual.generated',
@@ -308,10 +306,13 @@ export class CounterfactualService implements CounterfactualPort {
             forkId,
             analysisRunId: replay.run.id,
             strategies,
-            scenarios: toSave.length,
-            rejected: toSave.filter((scenario) => scenario.status === 'rejected').length,
+            scenarios: prepared.length,
+            rejected: prepared.filter((scenario) => scenario.status === 'rejected').length,
             leakChecksFailed: leakFailures,
-            modelExecutions: toSave.filter((scenario) => scenario.modelExecutionId !== null).length,
+            modelExecutions: prepared.filter((scenario) => scenario.modelExecutionId !== null)
+              .length,
+            reviewsCarried: plan.carried.length,
+            reviewsReset: plan.reset.length,
           },
         },
         tx,
@@ -319,7 +320,7 @@ export class CounterfactualService implements CounterfactualPort {
     });
     if (leakFailures > 0) ctx.metrics.recordLeakCheckFailure(leakFailures);
 
-    const ids = new Set(toSave.map((scenario) => scenario.id));
+    const ids = new Set(prepared.map((scenario) => scenario.id));
     const saved = await ctx.repos.counterfactuals.list(caseId, { forkId });
     return saved.filter((scenario) => ids.has(scenario.id));
   }

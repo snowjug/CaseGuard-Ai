@@ -2,8 +2,10 @@ import type { StartAnalysisResponse } from '@caseguard/schemas';
 import { sha256Hex } from '@caseguard/security';
 import type { RequestContext } from '../../http/request-context';
 import type { ServiceDeps } from '..';
+import { planReviewCarry, recordReviewResets } from '../counterfactuals/carry';
 import { runAnalysisAgents } from './agents';
-import { computeAnalysis, type StageReporter } from './compute';
+import { carryApplications } from './carry';
+import { computeAnalysis, type AnalysisComputation, type StageReporter } from './compute';
 import { ENGINE_VERSION, computeInputHash, engineContextFor, loadAnalysisInputs } from './inputs';
 import { buildSnapshot } from './snapshot';
 import type { AnalysisOutcome, AnalysisPort, AnalyzeOptions, JobHandle, JobSpec } from '../ports';
@@ -155,11 +157,25 @@ export class AnalysisService implements AnalysisPort {
       handle?.throwIfCancelled();
 
       await report('save', 'Saving the analysis');
+      // What people recorded about the previous run is not recomputed: it is carried onto the new one.
+      const previousMatches = await ctx.repos.skills.listMatchesForCase(caseId);
+      const withApplications: AnalysisComputation = {
+        ...computation,
+        skillMatches: {
+          ...computation.skillMatches,
+          matches: carryApplications({
+            fresh: computation.skillMatches.matches,
+            previous: previousMatches,
+            inputs,
+            analysis: computation.analysis,
+          }),
+        },
+      };
       const completedAt = ctx.now().toISOString();
       const snapshot = buildSnapshot({
         ctx,
         inputs,
-        computation,
+        computation: withApplications,
         executions,
         runId,
         inputHash: hash,
@@ -170,7 +186,12 @@ export class AnalysisService implements AnalysisPort {
       });
       await ctx.repos.transaction(async (tx) => {
         await tx.analysis.saveSnapshot(snapshot);
-        await tx.counterfactuals.saveScenarios(computation.scenarios);
+        // Read after the snapshot took the case lock, so a decision recorded a moment ago is the one
+        // carried. A reviewer's decision survives when the regenerated simulation is the same and is
+        // reset (and audited) when the engine or its inputs changed it.
+        const plan = planReviewCarry(await tx.counterfactuals.list(caseId), computation.scenarios);
+        await tx.counterfactuals.saveScenarios(plan.scenarios);
+        await recordReviewResets(ctx, tx, { caseId, analysisRunId: runId, reset: plan.reset });
         await ctx.audit(
           {
             action: 'analysis.completed',
@@ -183,6 +204,8 @@ export class AnalysisService implements AnalysisPort {
               forks: snapshot.run.counts.forks,
               claims: snapshot.run.counts.claims,
               scenarios: computation.scenarios.length,
+              reviewsCarried: plan.carried.length,
+              reviewsReset: plan.reset.length,
               provider: status.kind,
               simulated: status.simulated,
             },

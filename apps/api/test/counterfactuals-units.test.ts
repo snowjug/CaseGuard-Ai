@@ -17,12 +17,16 @@ import {
 } from '@caseguard/schemas';
 import { LruCache } from '../src/services/counterfactuals/cache';
 import {
-  MAX_DEFAULT_FORKS,
   carryReview,
+  isDecided,
+  planReviewCarry,
+  sameSimulation,
+} from '../src/services/counterfactuals/carry';
+import {
+  MAX_DEFAULT_FORKS,
   defaultScenarioPlan,
   generateForFork,
   orderStrategies,
-  sameSimulation,
   type GenerationSource,
 } from '../src/services/counterfactuals/generate';
 import {
@@ -74,6 +78,9 @@ const generated = generateForFork(sourceWith(), fork, COUNTERFACTUAL_STRATEGIES)
 const balancedScenario = generated.scenarios.find((s) => s.strategy === 'balanced');
 if (balancedScenario === undefined) throw new Error('the engine produced no balanced scenario');
 const balanced: CounterfactualScenario = balancedScenario;
+const firstStep = balanced.steps[0];
+if (firstStep === undefined) throw new Error('the balanced scenario has no steps');
+const rest = balanced.steps.slice(1);
 
 describe('the default scenario plan', () => {
   it('gives the earliest meaningful fork every strategy and the other eligible forks the balanced one', () => {
@@ -176,7 +183,7 @@ describe('temporal integrity of the pure generator', () => {
 });
 
 describe('what counts as the same simulation', () => {
-  it('ignores the run, the model execution, the review and the bookkeeping, nothing else', () => {
+  it('ignores the run, the model execution, the review, the wording of the steps and the bookkeeping', () => {
     const rebooked: CounterfactualScenario = {
       ...balanced,
       analysisRunId: 'run_other',
@@ -191,13 +198,39 @@ describe('what counts as the same simulation', () => {
       },
     };
     expect(sameSimulation(balanced, rebooked)).toBe(true);
-    const step = balanced.steps[0];
-    if (step === undefined) throw new Error('no steps');
-    const changed: CounterfactualScenario = {
+    // A validated model proposal may reword a step; the simulated path is still the same one.
+    const reworded: CounterfactualScenario = {
       ...balanced,
-      steps: [{ ...step, rationale: 'different wording' }, ...balanced.steps.slice(1)],
+      steps: [{ ...firstStep, rationale: 'A model worded this step differently.' }, ...rest],
     };
-    expect(sameSimulation(balanced, changed)).toBe(false);
+    expect(sameSimulation(balanced, reworded)).toBe(true);
+  });
+
+  it('is a different simulation as soon as an action, a number, the seed or a check changes', () => {
+    const variants: Record<string, CounterfactualScenario> = {
+      action: { ...balanced, steps: [{ ...firstStep, actionKey: 'act.other' }, ...rest] },
+      'step count': { ...balanced, steps: rest },
+      number: {
+        ...balanced,
+        counterfactualMetrics: {
+          ...balanced.counterfactualMetrics,
+          operationalRisk: balanced.counterfactualMetrics.operationalRisk + 0.01,
+        },
+      },
+      seed: { ...balanced, rollouts: { ...balanced.rollouts, seed: 'another-seed' } },
+      status: { ...balanced, status: 'rejected' },
+      'leak check': {
+        ...balanced,
+        boundary: {
+          ...balanced.boundary,
+          leakCheck: { ...balanced.boundary.leakCheck, passed: false },
+        },
+      },
+      summary: { ...balanced, summary: 'changed' },
+    };
+    for (const [what, variant] of Object.entries(variants)) {
+      expect(sameSimulation(balanced, variant), what).toBe(false);
+    }
   });
 
   it('keeps a reviewer’s decision only when the regenerated simulation is identical', () => {
@@ -218,6 +251,106 @@ describe('what counts as the same simulation', () => {
     });
     const different = { ...regenerated, summary: 'changed', steps: balanced.steps.slice(1) };
     expect(carryReview(accepted, different).reviewState).toBe('pending');
+  });
+});
+
+describe('carrying reviews through a regeneration', () => {
+  const decision = {
+    reviewReason: 'A reason a person wrote.',
+    reviewedBy: 'user_riley_reviewer',
+    reviewedAt: '2026-01-15T10:00:00.000Z',
+  };
+  const stored = (state: CounterfactualScenario['reviewState']): CounterfactualScenario => ({
+    ...balanced,
+    ...decision,
+    reviewState: state,
+    version: 2,
+  });
+  // What a later run produces: the same engine output under a new run, so a pending scenario.
+  const regenerated: CounterfactualScenario = {
+    ...balanced,
+    analysisRunId: 'run_unit_2',
+    version: 1,
+  };
+  const changed: CounterfactualScenario = {
+    ...regenerated,
+    rollouts: { ...balanced.rollouts, seed: 'another-seed' },
+  };
+  const other = generated.scenarios.find((s) => s.strategy === 'fastest_diagnosis');
+  if (other === undefined) throw new Error('the engine produced no fastest_diagnosis scenario');
+
+  it('tells a decided scenario from one that is still waiting', () => {
+    expect(isDecided(balanced)).toBe(false);
+    for (const state of ['confirmed', 'rejected', 'corrected'] as const) {
+      expect(isDecided(stored(state)), state).toBe(true);
+    }
+  });
+
+  it('keeps an accepted and a rejected decision when the simulation is the same', () => {
+    for (const state of ['confirmed', 'rejected'] as const) {
+      const plan = planReviewCarry([stored(state)], [regenerated]);
+      expect(plan.carried).toEqual([stored(state)]);
+      expect(plan.reset).toEqual([]);
+      // The regenerated scenario, with the decision: its run and version are the new ones.
+      expect(plan.scenarios).toEqual([{ ...regenerated, ...decision, reviewState: state }]);
+    }
+  });
+
+  it('keeps the decision when only the wording of a step differs', () => {
+    const reworded: CounterfactualScenario = {
+      ...regenerated,
+      steps: [{ ...firstStep, rationale: 'Reworded by a model.' }, ...rest],
+    };
+    const plan = planReviewCarry([stored('confirmed')], [reworded]);
+    expect(plan.reset).toEqual([]);
+    expect(plan.scenarios[0]).toMatchObject({ reviewState: 'confirmed', ...decision });
+    expect(plan.scenarios[0]?.steps[0]?.rationale).toBe('Reworded by a model.');
+  });
+
+  it('resets the decision, and says so, when the simulation changed', () => {
+    const plan = planReviewCarry([stored('confirmed')], [changed]);
+    expect(plan.carried).toEqual([]);
+    expect(plan.reset).toEqual([stored('confirmed')]);
+    expect(plan.scenarios).toEqual([changed]);
+    expect(plan.scenarios[0]).toMatchObject({
+      reviewState: 'pending',
+      reviewReason: null,
+      reviewedBy: null,
+      reviewedAt: null,
+    });
+  });
+
+  it('has nothing to carry or reset for a scenario nobody decided on, or one that is new', () => {
+    const waiting = planReviewCarry([balanced], [changed]);
+    expect(waiting).toEqual({ scenarios: [changed], carried: [], reset: [] });
+    const fresh = planReviewCarry([], [regenerated]);
+    expect(fresh).toEqual({ scenarios: [regenerated], carried: [], reset: [] });
+  });
+
+  it('plans only what was regenerated and leaves other stored scenarios alone', () => {
+    const plan = planReviewCarry(
+      [stored('confirmed'), { ...other, ...decision, reviewState: 'rejected' }],
+      [regenerated],
+    );
+    expect(plan.scenarios.map((s) => s.id)).toEqual([balanced.id]);
+    expect(plan.carried.map((s) => s.id)).toEqual([balanced.id]);
+    expect(plan.reset).toEqual([]);
+  });
+
+  it('decides each scenario on its own', () => {
+    const regeneratedOther: CounterfactualScenario = {
+      ...other,
+      analysisRunId: 'run_unit_2',
+      version: 1,
+      rollouts: { ...other.rollouts, seed: 'another-seed' },
+    };
+    const plan = planReviewCarry(
+      [stored('confirmed'), { ...other, ...decision, reviewState: 'rejected' }],
+      [regenerated, regeneratedOther],
+    );
+    expect(plan.scenarios.map((s) => s.reviewState)).toEqual(['confirmed', 'pending']);
+    expect(plan.carried.map((s) => s.id)).toEqual([balanced.id]);
+    expect(plan.reset.map((s) => s.id)).toEqual([other.id]);
   });
 });
 

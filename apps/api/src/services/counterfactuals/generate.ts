@@ -6,11 +6,9 @@ import {
 } from '@caseguard/domain';
 import {
   COUNTERFACTUAL_STRATEGIES,
-  type CounterfactualScenario,
   type CounterfactualStrategy,
   type DecisionFork,
 } from '@caseguard/schemas';
-import { canonicalJson } from '@caseguard/security';
 import type { AnalysisInputs } from '../analysis';
 
 /** Same bound as the analysis pipeline: simulating every fork of a pathological case is wasted work. */
@@ -79,53 +77,4 @@ export function generateForFork(
     config: inputs.actionConfig,
     ctx: engineCtx,
   });
-}
-
-/**
- * The part of a scenario that describes the simulation itself: everything a reviewer judged. The
- * run that produced it, the model execution that validated it, the review decision and the record
- * bookkeeping are left out.
- */
-function simulationOf(scenario: CounterfactualScenario): string {
-  return canonicalJson({
-    ...scenario,
-    analysisRunId: undefined,
-    modelExecutionId: undefined,
-    reviewState: undefined,
-    reviewReason: undefined,
-    reviewedBy: undefined,
-    reviewedAt: undefined,
-    version: undefined,
-    createdAt: undefined,
-    updatedAt: undefined,
-    createdBy: undefined,
-    boundary: {
-      ...scenario.boundary,
-      leakCheck: { ...scenario.boundary.leakCheck, checkedAt: undefined },
-    },
-  });
-}
-
-/** True when two scenarios describe exactly the same simulated path, boundary and checks. */
-export function sameSimulation(a: CounterfactualScenario, b: CounterfactualScenario): boolean {
-  return simulationOf(a) === simulationOf(b);
-}
-
-/**
- * A regenerated scenario that reproduces a stored one keeps the reviewer's decision: the reviewer
- * judged this exact simulation, and only its provenance (the run or model execution) changed.
- * Anything else starts as pending again.
- */
-export function carryReview(
-  stored: CounterfactualScenario,
-  generated: CounterfactualScenario,
-): CounterfactualScenario {
-  if (!sameSimulation(stored, generated)) return generated;
-  return {
-    ...generated,
-    reviewState: stored.reviewState,
-    reviewReason: stored.reviewReason,
-    reviewedBy: stored.reviewedBy,
-    reviewedAt: stored.reviewedAt,
-  };
 }

@@ -30,7 +30,9 @@ import { SkillValidator } from './validation';
 /**
  * The SkillDNA library: extraction from accepted counterfactuals, the governed lifecycle (four-eyes
  * and validation gates), versions, mutation proposals and rollback, simulation and regression tests,
- * as-of matching with guided plans, and applications with conformance and effectiveness.
+ * as-of matching with guided plans, and applications with conformance and effectiveness. The README
+ * next to this file names who walks a skill through its gates (the engineer extracts, the curator
+ * drafts and approves the pilot, the reviewer validates, the administrator publishes) and why.
  */
 export class SkillsService implements SkillsPort {
   private readonly replays = new ReplayLoader();
