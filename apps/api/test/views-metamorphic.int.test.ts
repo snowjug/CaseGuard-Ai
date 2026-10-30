@@ -19,13 +19,11 @@
  *
  * MASKING. Only what names a world or a request rather than the case is masked: the tenant id, the
  * analysis run id, the ids derived from the run id (quality assessments and metric estimates carry the
- * run in their id), the moment a view was generated (`generatedAt` is the clock of the request) and
- * `withheldOverrides`, the number of reviewer overrides an action ranking cannot show. That count is of
- * the world's own later reviewer input, which this test makes different on purpose (the real case has
- * one override per instant, a copy only its own), so it is asserted apart: in both worlds
- * `reviewerOverrides` is empty (nothing of an override decided after the instant is shown) and
- * `withheldOverrides` equals the number of (instant, action) overrides the world recorded, all of them
- * decided after every window. Nothing of an override itself is masked.
+ * run in their id) and the moment a view was generated (`generatedAt` is the clock of the request).
+ * Nothing of the human input is masked, and no field of any response may count it: the real case has
+ * one override per instant, each copy only its own, and every as-of response must still be
+ * byte-identical (the action ranking lists the overrides decided by the window, never how many exist
+ * after it).
  *
  * WHAT IT DOES NOT PROVE. Both worlds share the code under test, so it shows independence from the
  * future, not that the past is analysed correctly (other suites compare against a fresh engine).
@@ -343,7 +341,7 @@ function views(
   return list;
 }
 
-/** How many (instant, action) overrides a world recorded: every one of them after every window asked about. */
+/** How many (instant, action) overrides a world recorded, every one of them after every window asked about. */
 async function recordedOverrides(
   harness: Harness,
   tenantId: string,
@@ -387,18 +385,23 @@ async function compareAt(
       );
     }
     if (name === 'action values') {
-      // The one thing masked above, asserted apart: each world only counts the overrides it holds.
+      // The two worlds hold different amounts of reviewer input recorded after every window (the real
+      // case one override per instant, a copy only its own), and the byte comparison above (nothing is
+      // masked) already shows that no field of the response tells. Pinned apart so it cannot go vacuous.
       const worlds = [
         ['real', original.data, await recordedOverrides(real, CONTOSO, caseId)],
         ['copy', rewritten.data, await recordedOverrides(copy, FABRIKAM, caseId)],
       ] as const;
       for (const [world, body, recorded] of worlds) {
         const listed = (body.reviewerOverrides as unknown[]).length;
-        if (listed !== 0 || body.withheldOverrides !== recorded || recorded === 0) {
+        if (listed !== 0 || 'withheldOverrides' in body || recorded === 0) {
           differences.push(
-            `${asOf} action values: ${world} lists ${listed} and withholds ${body.withheldOverrides} of ${recorded} overrides`,
+            `${asOf} action values: ${world} lists ${listed} overrides, ${recorded} recorded later, keys ${Object.keys(body).join(',')}`,
           );
         }
+      }
+      if (worlds[0][2] === worlds[1][2]) {
+        differences.push(`${asOf} action values: both worlds recorded ${worlds[0][2]} overrides`);
       }
     }
     if (name === 'timeline') {

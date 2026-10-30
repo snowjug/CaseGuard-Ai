@@ -305,18 +305,14 @@ export const ActionRankingSchema = z.object({
   /**
    * The reviewer overrides of the case this view may show, newest decision first, the latest decision
    * per (instant, action) only. The whole record lists every override of the case; a window (`asOf` or
-   * `forkId`) lists only those decided, and about an instant, at or before its end. A candidate shows
-   * inline (`override`) only the one about this ranking's own instant. Absent from servers that predate it.
+   * `forkId`) lists only those decided, and about an instant, at or before its end, and carries nothing
+   * of the others, not even how many there are. A candidate shows inline (`override`) only the one about
+   * this ranking's own instant. Absent from servers that predate it.
    */
   reviewerOverrides: z
     .array(ActionOverrideRecordSchema)
     .max(ACTION_OVERRIDES_LISTED_MAX)
     .optional(),
-  /**
-   * How many (instant, action) overrides the window cannot show: a count, never content. 0 for the whole
-   * record. Absent from servers that predate it.
-   */
-  withheldOverrides: z.number().int().min(0).optional(),
 });
 export type ActionRanking = z.infer<typeof ActionRankingSchema>;
 

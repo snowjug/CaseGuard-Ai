@@ -1397,7 +1397,7 @@ describe('action value', () => {
         at: served.override.at,
       },
     ]);
-    expect(res.data.withheldOverrides).toBe(0);
+    expect(res.data).not.toHaveProperty('withheldOverrides');
 
     // It persists, and a newer decision for the same action replaces it.
     h.clock.advance(60_000);
@@ -1415,13 +1415,14 @@ describe('action value', () => {
     expect(again.reviewerOverrides).toMatchObject([
       { instant: canonical(instant.asOf), actionKey: target.actionKey, rank: 2 },
     ]);
-    expect(again.withheldOverrides).toBe(0);
-    // Another instant is untouched: the override is about a later instant, so the window only counts it.
+    expect(again).not.toHaveProperty('withheldOverrides');
+    // Another instant is untouched: the override is about a later instant, so the window shows none of
+    // it, not even that it exists.
     const elsewhere = eventBySuffix(oneEvents, 'e07').timestamp;
     const other = (await get(api(ONE, `/action-values?asOf=${elsewhere}`))).data;
     expect(other.candidates.every((entry: Json) => entry.override === null)).toBe(true);
     expect(other.reviewerOverrides).toEqual([]);
-    expect(other.withheldOverrides).toBe(1);
+    expect(other).not.toHaveProperty('withheldOverrides');
 
     const reviews = (await h.repos(CONTOSO).reviews.list({ caseId: ONE, limit: 100 })).items;
     const decisions = reviews.filter((item) => item.targetType === 'action_value');
@@ -1749,9 +1750,9 @@ const shift = (iso: string, ms: number): string => new Date(Date.parse(iso) + ms
 /**
  * What the policy lets a view that ends at `end` (null: the whole record) show: only what was decided
  * by then AND is about an instant at or before it; per (instant, action) the latest such decision,
- * newest first. What it cannot show it only counts, once per (instant, action).
+ * newest first. Nothing else is shown or counted.
  */
-function visibleOverrides(decisions: readonly Decided[], end: string | null) {
+function visibleOverrides(decisions: readonly Decided[], end: string | null): Decided[] {
   const limit = end === null ? Number.POSITIVE_INFINITY : Date.parse(end);
   const current = new Map<string, Decided>();
   const newestFirst = [...decisions].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
@@ -1759,8 +1760,7 @@ function visibleOverrides(decisions: readonly Decided[], end: string | null) {
     if (Date.parse(entry.at) > limit || Date.parse(entry.instant) > limit) continue;
     if (!current.has(pairOf(entry))) current.set(pairOf(entry), entry);
   }
-  const shown = [...current.values()];
-  return { shown, withheld: new Set(decisions.map(pairOf)).size - shown.length };
+  return [...current.values()];
 }
 
 describe('reviewer overrides listed with the ranking', () => {
@@ -1828,7 +1828,7 @@ describe('reviewer overrides listed with the ranking', () => {
     expect(res.statusCode, res.body).toBe(200);
     const body = res.data;
     ActionRankingSchema.parse(body);
-    const { shown, withheld } = visibleOverrides(recorded, end);
+    const shown = visibleOverrides(recorded, end);
     expect(body.reviewerOverrides).toEqual(
       shown.map((entry) => ({
         instant: entry.instant,
@@ -1840,7 +1840,9 @@ describe('reviewer overrides listed with the ranking', () => {
         at: entry.at,
       })),
     );
-    expect(body.withheldOverrides).toBe(withheld);
+    // Not even the number of the overrides the view cannot show is sent.
+    expect(Object.keys(body)).not.toContain('withheldOverrides');
+    expect(res.body).not.toContain('withheldOverrides');
     // On a candidate only the override about the ranking's own instant is shown, as it always was.
     const own = canonical(body.asOf);
     const inline = Object.fromEntries(
@@ -1947,7 +1949,6 @@ describe('reviewer overrides listed with the ranking', () => {
     expect(reasonsOf(body.reviewerOverrides)).toEqual(
       [d4, d3, d2, dFork].map((entry) => entry.reason),
     );
-    expect(body.withheldOverrides).toBe(0);
     // The ranking is the one at the last event: only the override about that instant is on a candidate,
     // and the three about earlier instants are in the list alone.
     expect(body.asOf).toBe(times.t31);
@@ -1989,60 +1990,56 @@ describe('reviewer overrides listed with the ranking', () => {
     ).toEqual([d3.reason]);
   });
 
-  it('[FR-AV-02] shows a window neither the overrides decided after it nor their content, only how many it cannot show', async () => {
-    const window = async (end: string, shown: readonly Decided[], withheld: number) => {
+  it('[FR-AV-02] shows a window only the overrides decided by then, and nothing of the others, not even their number', async () => {
+    const viewAt = async (end: string, shown: readonly Decided[]) => {
       const res = await rankedAt(end);
       expectOverrides(res, end);
       expect(reasonsOf(res.data.reviewerOverrides)).toEqual(shown.map((entry) => entry.reason));
-      expect(res.data.withheldOverrides).toBe(withheld);
       return res;
     };
     // Four (instant, action) overrides exist. Before the first fork nothing is about an instant it knows.
-    await window(times.first, [], 4);
+    await viewAt(times.first, []);
     // The one decided before the case, about the fork's own instant, is in its window and on its candidate.
-    const atFork = await window(times.fork, [dFork], 3);
+    const atFork = await viewAt(times.fork, [dFork]);
     const onCandidate = atFork.data.candidates.find(
       (entry: Json) => entry.actionKey === dFork.actionKey,
     );
     expect(onCandidate.override).toMatchObject({ rank: 1, reason: dFork.reason });
-    await window(times.t07, [dFork], 3);
+    await viewAt(times.t07, [dFork]);
     // A decision is part of the window from its own instant on (the boundary is inclusive).
-    await window(shift(d1.at, -1), [dFork], 3);
-    await window(d1.at, [d1, dFork], 2);
-    await window(shift(d2.at, -1), [d1, dFork], 2);
-    await window(d2.at, [d2, d1, dFork], 1);
+    await viewAt(shift(d1.at, -1), [dFork]);
+    await viewAt(d1.at, [d1, dFork]);
+    await viewAt(shift(d2.at, -1), [d1, dFork]);
+    await viewAt(d2.at, [d2, d1, dFork]);
     // The override about the last instant, decided long before it, is in no earlier window.
-    await window(shift(times.t31, -1), [d2, d1, dFork], 1);
-    const atLast = await window(times.t31, [d2, d1, dFork, dFuture], 0);
+    await viewAt(shift(times.t31, -1), [d2, d1, dFork]);
+    const atLast = await viewAt(times.t31, [d2, d1, dFork, dFuture]);
     const lastInline = atLast.data.candidates.filter((entry: Json) => entry.override !== null);
     expect(lastInline.map((entry: Json) => entry.override.reason)).toEqual([dFuture.reason]);
     // Later decisions replace earlier ones from their own instant on, and not before.
-    await window('2026-06-30T23:59:59.999Z', [d2, d1, dFork, dFuture], 0);
-    await window(d3.at, [d3, d2, dFork, dFuture], 0);
-    await window(d4.at, [d4, d3, d2, dFork], 0);
-    await window('2026-12-31T00:00:00Z', [d4, d3, d2, dFork], 0);
+    await viewAt('2026-06-30T23:59:59.999Z', [d2, d1, dFork, dFuture]);
+    await viewAt(d3.at, [d3, d2, dFork, dFuture]);
+    await viewAt(d4.at, [d4, d3, d2, dFork]);
+    await viewAt('2026-12-31T00:00:00Z', [d4, d3, d2, dFork]);
   });
 
   it('[FR-AV-02] applies the same rule to the ranking just before a fork decision', async () => {
     const forks = (await ask('/forks')).data.items as Json[];
     expect(forks.length).toBeGreaterThan(3);
-    let listed = 0;
-    let withheld = 0;
+    const sizes: number[] = [];
     for (const fork of forks) {
       const res = await ask(`/action-values?forkId=${fork.id}`);
       expect(res.data.asOf).toBe(fork.timestamp);
       expectOverrides(res, fork.timestamp);
-      listed += res.data.reviewerOverrides.length;
-      withheld += res.data.withheldOverrides;
+      sizes.push(res.data.reviewerOverrides.length);
     }
-    // Not vacuous: some windows list overrides and some withhold some.
-    expect(listed).toBeGreaterThan(0);
-    expect(withheld).toBeGreaterThan(0);
+    // Not vacuous: some of these windows list overrides, and some know fewer than the whole record.
+    expect(Math.max(...sizes)).toBeGreaterThan(0);
+    expect(Math.min(...sizes)).toBeLessThan(4);
     // The earliest fork: the decision about its own instant is on the candidate it concerns.
     const earliest = forks.find((fork) => fork.isEarliestMeaningful);
     const res = await ask(`/action-values?forkId=${earliest?.id}`);
     expect(reasonsOf(res.data.reviewerOverrides)).toEqual([dFork.reason]);
-    expect(res.data.withheldOverrides).toBe(3);
     const onCandidate = res.data.candidates.find(
       (entry: Json) => entry.actionKey === dFork.actionKey,
     );
@@ -2057,6 +2054,52 @@ describe('reviewer overrides listed with the ranking', () => {
     ];
     for (const instant of instants) expectOverrides(await rankedAt(instant), instant);
   }, 600_000);
+
+  it('[FR-AV-02] answers an earlier window byte for byte the same after more overrides are made', async () => {
+    const windows = [
+      times.first,
+      times.fork,
+      times.t07,
+      d1.at,
+      times.t15,
+      times.t24,
+      times.t31,
+      '2026-09-30T00:00:00Z',
+    ];
+    const before: string[] = [];
+    for (const end of windows) before.push((await rankedAt(end)).body);
+    const wholeBefore = (await ask('/action-values')).body;
+
+    // Made after all of those windows: an override of a pair that did not exist, and a newer
+    // decision for one that did. Neither may show in an earlier window, in any field or number.
+    const fresh = (await rankedAt(times.t24)).data.candidates[1];
+    await record(
+      { instant: times.t24, actionKey: fresh.actionKey, label: fresh.label },
+      2,
+      'Reason-token-ovr-fifth: a pair that is new',
+      '2026-10-01T00:00:00.000Z',
+    );
+    await record(
+      { instant: times.t15, actionKey: d2.actionKey, label: d2.actionName },
+      2,
+      'Reason-token-ovr-sixth: a newer decision',
+      '2026-10-02T00:00:00.000Z',
+    );
+    for (const [index, end] of windows.entries()) {
+      const res = await rankedAt(end);
+      expect(res.body, end).toBe(before[index]);
+      expectOverrides(res, end);
+    }
+
+    // They do exist: the whole record and a window after them show both.
+    const wholeAfter = await ask('/action-values');
+    expect(wholeAfter.body).not.toBe(wholeBefore);
+    expectOverrides(wholeAfter, null);
+    expect(wholeAfter.body).toContain('Reason-token-ovr-fifth');
+    const afterAll = await rankedAt('2026-12-31T00:00:00Z');
+    expectOverrides(afterAll, '2026-12-31T00:00:00Z');
+    expect(afterAll.body).toContain('Reason-token-ovr-sixth');
+  });
 
   it('[NFR-SEC-01] never lists another tenant’s or another case’s overrides', async () => {
     const theirs = 'Reason-token-ovr-fabrikam';

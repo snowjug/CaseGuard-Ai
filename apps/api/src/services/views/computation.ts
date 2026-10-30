@@ -25,7 +25,6 @@ import {
   passKey,
   passView,
   type PassCacheOptions,
-  type PassEntry,
   type RankingCore,
 } from './passes';
 import { requireRun, type ViewState } from './state';
@@ -49,6 +48,15 @@ class BoundaryMemo {
 }
 
 /**
+ * One boundary's place in the shared cache. A memo is looked up (`peek`) and only created and cached
+ * (`acquire`) by a request that has been allowed to work, so a refused request leaves nothing behind.
+ */
+interface BoundarySlot {
+  peek(): BoundaryMemo | undefined;
+  acquire(): BoundaryMemo;
+}
+
+/**
  * One request's view of one temporal boundary of a case, computed lazily. `asOf: null` is the whole
  * record (exactly the stored analysis: same context, so the same artefact ids and bands); an instant is
  * the engine run on only what was known then. Nothing here is a filtered copy of the final analysis, so
@@ -59,12 +67,15 @@ class BoundaryMemo {
  * memoised per boundary. Only cold work is charged to the engine budget, and a request is charged at
  * most once: a cold pass always costs a unit; the per-instant work costs one when nobody has paid for
  * this boundary yet. So a fresh instant costs one unit however many views of it are asked for, and a
- * flood of instants one millisecond apart is bounded by the budget like any other.
+ * flood of instants one millisecond apart is bounded by the budget like any other. Nothing is cached
+ * before the charge succeeds: a request that is refused (a 429) neither fills the caches nor evicts
+ * what somebody else paid for.
  */
 export class ViewComputation {
   readonly view: TemporalView;
   readonly engineCtx: EngineContext;
-  private readonly entry: PassEntry;
+  /** Identifies this window in the pass cache; nothing is cached under it until work is allowed. */
+  private readonly windowKey: string;
   private analysisMemo: Promise<DeterministicAnalysis> | undefined;
   private charged = false;
 
@@ -73,7 +84,7 @@ export class ViewComputation {
     readonly run: AnalysisRun,
     /** The boundary as the client wrote it, for echoing; null is the whole record. */
     readonly asOf: string | null,
-    private readonly memo: BoundaryMemo,
+    private readonly boundary: BoundarySlot,
     private readonly passes: PassCache,
     private readonly fingerprint: string,
     private readonly charge: (() => void) | undefined,
@@ -85,7 +96,7 @@ export class ViewComputation {
             resolution: inputs.resolution,
           });
     this.engineCtx = passContext(run, inputs, this.view);
-    this.entry = passes.entry(passKey(run, this.view, fingerprint), this.view.events.length);
+    this.windowKey = passKey(run, this.view, fingerprint);
   }
 
   /** The events inside the boundary, in record order. */
@@ -105,10 +116,10 @@ export class ViewComputation {
    * budget is empty.
    */
   private chargeOnce(scope: 'pass' | 'instant'): void {
-    if (this.charged || (scope === 'instant' && this.memo.paid)) return;
+    if (this.charged || (scope === 'instant' && this.boundary.peek()?.paid === true)) return;
     this.charge?.();
     this.charged = true;
-    this.memo.paid = true;
+    this.boundary.acquire().paid = true;
   }
 
   /**
@@ -125,7 +136,7 @@ export class ViewComputation {
         ctx: this.engineCtx,
       });
       this.analysisMemo = this.passes
-        .analysis(this.entry, makeInput, () => this.chargeOnce('pass'))
+        .analysis(this.windowKey, this.view.events.length, makeInput, () => this.chargeOnce('pass'))
         .then((pass) => ({ ...pass, view: this.view }));
     }
     return this.analysisMemo;
@@ -140,19 +151,20 @@ export class ViewComputation {
 
   private async canonicalQuality(): Promise<QualityAssessment> {
     const analysis = await this.analysis();
+    const cached = this.boundary.peek()?.quality;
+    if (cached !== undefined) return cached;
     const { inputs } = this;
-    if (this.memo.quality === undefined) {
-      this.chargeOnce('instant');
-      this.memo.quality = computeQualityReview({
-        analysis,
-        pack: inputs.pack,
-        ctx: this.engineCtx,
-        config: inputs.qualityConfig,
-        actionConfig: inputs.actionConfig,
-        asOf: this.asOf === null ? null : canonicalInstant(this.asOf),
-      });
-    }
-    return this.memo.quality;
+    this.chargeOnce('instant');
+    const quality = computeQualityReview({
+      analysis,
+      pack: inputs.pack,
+      ctx: this.engineCtx,
+      config: inputs.qualityConfig,
+      actionConfig: inputs.actionConfig,
+      asOf: this.asOf === null ? null : canonicalInstant(this.asOf),
+    });
+    this.boundary.acquire().quality = quality;
+    return quality;
   }
 
   /**
@@ -163,30 +175,31 @@ export class ViewComputation {
   async metrics(): Promise<MetricEstimate[]> {
     const analysis = await this.analysis();
     const review = await this.canonicalQuality();
+    const cached = this.boundary.peek()?.metrics;
+    if (cached !== undefined) return cached;
     const { inputs } = this;
-    if (this.memo.metrics === undefined) {
-      this.chargeOnce('instant');
-      const avoidable = computeAvoidableEffort({ analysis, pack: inputs.pack, scenarios: [] });
-      const efficiency = computeEfficiency({
-        analysis,
-        pack: inputs.pack,
-        caseId: inputs.caseRecord.id,
-        synthetic: inputs.caseRecord.synthetic,
-        unitPrices: inputs.unitPrices,
-        avoidable,
-      });
-      this.memo.metrics = buildMetricEstimates({
-        analysis,
-        pack: inputs.pack,
-        ctx: this.engineCtx,
-        review,
-        avoidable,
-        efficiency,
-        synthetic: inputs.caseRecord.synthetic,
-        actionConfig: inputs.actionConfig,
-      });
-    }
-    return this.memo.metrics;
+    this.chargeOnce('instant');
+    const avoidable = computeAvoidableEffort({ analysis, pack: inputs.pack, scenarios: [] });
+    const efficiency = computeEfficiency({
+      analysis,
+      pack: inputs.pack,
+      caseId: inputs.caseRecord.id,
+      synthetic: inputs.caseRecord.synthetic,
+      unitPrices: inputs.unitPrices,
+      avoidable,
+    });
+    const metrics = buildMetricEstimates({
+      analysis,
+      pack: inputs.pack,
+      ctx: this.engineCtx,
+      review,
+      avoidable,
+      efficiency,
+      synthetic: inputs.caseRecord.synthetic,
+      actionConfig: inputs.actionConfig,
+    });
+    this.boundary.acquire().metrics = metrics;
+    return metrics;
   }
 
   /**
@@ -201,7 +214,7 @@ export class ViewComputation {
       .map((d) => `${d.dedupeKey}@${d.at}`)
       .sort()
       .join('|');
-    const cached = this.memo.warnings.get(key);
+    const cached = this.boundary.peek()?.warnings.get(key);
     if (cached !== undefined) return cached;
 
     this.chargeOnce('instant');
@@ -217,7 +230,7 @@ export class ViewComputation {
       analysis,
       dismissals: relevant,
     });
-    this.memo.warnings.set(key, replay);
+    this.boundary.acquire().warnings.set(key, replay);
     return replay;
   }
 
@@ -227,11 +240,11 @@ export class ViewComputation {
    * re-reads those events, so a cold one is charged like other per-instant work.
    */
   rankingFor(key: string, build: () => RankingCore): RankingCore {
-    const cached = this.entry.rankings.get(key);
+    const cached = this.passes.peek(this.windowKey)?.rankings.get(key);
     if (cached !== undefined) return cached;
     this.chargeOnce('instant');
     const built = build();
-    this.entry.rankings.set(key, built);
+    this.passes.acquire(this.windowKey, this.view.events.length).rankings.set(key, built);
     return built;
   }
 }
@@ -267,7 +280,8 @@ export class ViewCache {
   /**
    * The computation of a boundary for one request. Every spelling of one instant, and every instant of
    * one window, resolves to the same cached pass; `caller` is charged only if that pass, or the warning
-   * replay of this exact instant, has to be computed cold.
+   * replay of this exact instant, has to be computed cold. Creating a computation caches nothing: the
+   * window and the boundary are cached by the first work the request is allowed to do.
    */
   computation(
     caller: EngineBudgetCaller,
@@ -286,17 +300,23 @@ export class ViewCache {
       inputs.events.length,
       inputs.resolution === null ? 0 : 1,
     ].join('|');
-    let memo = this.boundaries.get(key);
-    if (memo === undefined) {
-      memo = new BoundaryMemo();
-      this.boundaries.set(key, memo);
-    }
     const budget = this.budget;
+    const boundary: BoundarySlot = {
+      peek: () => this.boundaries.get(key),
+      acquire: () => {
+        let memo = this.boundaries.get(key);
+        if (memo === undefined) {
+          memo = new BoundaryMemo();
+          this.boundaries.set(key, memo);
+        }
+        return memo;
+      },
+    };
     return new ViewComputation(
       inputs,
       run,
       asOf,
-      memo,
+      boundary,
       this.passes,
       fingerprint,
       budget === undefined ? undefined : () => budget.charge(caller),

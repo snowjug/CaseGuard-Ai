@@ -11,13 +11,14 @@ import type { RequestContext } from '../../http/request-context';
  * moment it was made. A review recorded after the window is information the window did not have: its
  * note may cite later facts, and even a bare label can carry hindsight (a reviewer who knows the root
  * cause upgrades an assumption to a confirmed fact). So an earlier window shows the machine
- * classification, a claim that is still `pending`, no override and the warning as open. The one trace
- * of an override is a count: an action ranking says how many it cannot show (`withheldOverrides`),
- * never what they are, and lists only those decided, and about an instant, by the end of its window
- * (`overrides.ts`). It does take from a later decision the stored `version` number, because the
- * optimistic lock of a review started from that window needs it (it tells that something was edited,
- * not what or when). The whole record (no `asOf`) shows every decision. The same rule keeps
- * `updatedAt`, which a later decision moves, out of a window.
+ * classification, a claim that is still `pending`, no override and the warning as open. An override
+ * leaves no trace at all, not even a count: an action ranking lists only the overrides decided, and
+ * about an instant, by the end of its window (`overrides.ts`), so its response is a function of the
+ * input made up to then and of nothing after it. The one thing taken from a later decision is the
+ * stored `version` number (claims, forks, warnings), because the optimistic lock of a review started
+ * from that window needs it (it tells that something was edited, not what or when). The whole record
+ * (no `asOf`) shows every decision. The same rule keeps `updatedAt`, which a later decision moves, out
+ * of a window.
  */
 
 /** True when a decision recorded at `at` already existed in the window ending at `asOf` (null: no window). */

@@ -1,7 +1,7 @@
 /* The scan for reviewer overrides, without a database: what it asks the repository for, which decisions
- * it lists inline and in the list, which it counts as withheld inside a window, what it ignores, and
- * what it does when there are more than it will read or list. The same rules against the real routes
- * and database are in views.test.ts. */
+ * it lists inline and in the list, which it shows inside a window (and that it leaves no trace of the
+ * rest, not even their number), what it ignores, and what it does when there are more than it will
+ * read or list. The same rules against the real routes and database are in views.test.ts. */
 import { describe, expect, it } from 'vitest';
 import { ACTION_OVERRIDES_LISTED_MAX, type Page, type ReviewDecision } from '@caseguard/schemas';
 import {
@@ -83,8 +83,9 @@ const whole = (ctx: OverrideSource, instant = INSTANT): Promise<OverrideScan> =>
 const within = (ctx: OverrideSource, end: string): Promise<OverrideScan> =>
   loadOverrides(ctx, 'case_a', query(end, end));
 
+/** Everything the scan returns, whatever fields it has (a Map does not serialize, so it is spread). */
 const serialized = (scan: OverrideScan): string =>
-  JSON.stringify({ inline: [...scan.inline], listed: scan.listed, withheld: scan.withheld });
+  JSON.stringify({ ...scan, inline: [...scan.inline] });
 
 describe('the scan for reviewer overrides', () => {
   it('[FR-AV-02] asks only for the action-value decisions of the case, page by page', async () => {
@@ -103,10 +104,9 @@ describe('the scan for reviewer overrides', () => {
     expect(found.inline.get('act.capture')).toMatchObject({ rank: 3 });
     expect(found.inline.size).toBe(1);
     expect(found.listed).toHaveLength(1);
-    expect(found.withheld).toBe(0);
   });
 
-  it('[FR-AV-02] counts inside a window only what was decided by then, the latest of those', async () => {
+  it('[FR-AV-02] shows inside a window only what was decided by then, the latest of those', async () => {
     const { ctx } = source([
       [
         decision('rev_3', 3, '2026-07-03T00:00:00.000Z', 'Reason-token-late'),
@@ -122,14 +122,12 @@ describe('the scan for reviewer overrides', () => {
       at: INSTANT,
     });
     expect(inWindow.listed).toMatchObject([{ instant: INSTANT, rank: 2, at: INSTANT }]);
-    expect(inWindow.withheld).toBe(0);
     expect(serialized(inWindow)).not.toContain('Reason-token-late');
 
     // A window that ends before the instant the override is about cannot show it, however early it was decided.
     const before = await within(ctx, '2026-03-11T14:09:59.999Z');
     expect(before.inline.size).toBe(0);
     expect(before.listed).toEqual([]);
-    expect(before.withheld).toBe(1);
     expect(serialized(before)).not.toContain('Reason-token');
 
     // The whole record shows the latest decision of all.
@@ -234,10 +232,9 @@ describe('the scan for reviewer overrides', () => {
       ['act.verify-fix', 3],
       ['act.capture', 1],
     ]);
-    expect(found.withheld).toBe(0);
   });
 
-  it('[FR-AV-02] in a window lists only what was decided by then and is about an instant at or before it, and counts the rest by pair', async () => {
+  it('[FR-AV-02] in a window lists only what was decided by then and is about an instant at or before it', async () => {
     const { ctx } = source([
       [
         decision('rev_a', 1, '2026-07-03T00:00:00.000Z', 'Reason-token-a', `${LATER}|act.capture`),
@@ -268,38 +265,93 @@ describe('the scan for reviewer overrides', () => {
       '2026-03-01T00:00:00.000Z',
     ]);
 
-    // Four (instant, action) pairs exist; at the instant itself none of them can be shown: the
-    // decisions were made later, or (rev_e) are about an instant that has not come yet.
+    // At the instant itself none of the four can be shown: the decisions were made later, or (rev_e)
+    // are about an instant that has not come yet. Nothing of them is left, not even their number.
     const atInstant = await within(ctx, INSTANT);
     expect(atInstant.listed).toEqual([]);
     expect(atInstant.inline.size).toBe(0);
-    expect(atInstant.withheld).toBe(4);
     expect(serialized(atInstant)).not.toContain('Reason-token');
+    expect(Object.keys(atInstant).sort()).toEqual(['inline', 'listed']);
 
     // The older decision of a pair is current while the newer one is still in the future.
     const first = await within(ctx, '2026-03-11T14:15:00.000Z');
     expect(first.listed).toMatchObject([{ instant: INSTANT, rank: 4, reason: 'Reason-token-d' }]);
-    expect(first.withheld).toBe(3);
     expect(serialized(first)).not.toMatch(/Reason-token-[abce]/);
 
     // The newer decision supersedes it the moment it exists (the boundary is inclusive).
     const second = await within(ctx, '2026-03-11T14:20:00.000Z');
     expect(second.listed).toMatchObject([{ instant: INSTANT, rank: 5, reason: 'Reason-token-c' }]);
-    expect(second.withheld).toBe(3);
     const justBefore = await within(ctx, '2026-03-11T14:19:59.999Z');
     expect(justBefore.listed).toMatchObject([{ rank: 4 }]);
 
-    // At LATER the early decision about LATER is in, the ones decided in July are still withheld.
+    // At LATER the early decision about LATER is in, the ones decided in July are still out.
     const atLater = await within(ctx, LATER);
     expect(atLater.listed).toMatchObject([{ rank: 5 }, { instant: LATER, rank: 6 }]);
     expect(atLater.inline.get('act.verify-fix')).toMatchObject({ rank: 6 });
-    expect(atLater.withheld).toBe(2);
     expect(serialized(atLater)).not.toMatch(/Reason-token-[abd]/);
 
     // After every decision the window shows what the whole record shows.
     const after = await within(ctx, '2026-12-31T00:00:00.000Z');
     expect(after.listed).toEqual(whenRankedAt.listed);
-    expect(after.withheld).toBe(0);
+  });
+
+  it('[FR-AV-02] answers a window the same whether or not overrides were made after it', async () => {
+    const known = [
+      decision('rev_known', 2, '2026-03-11T14:09:00.000Z', 'Reason-token-known'),
+      decision(
+        'rev_other',
+        3,
+        '2026-03-11T14:08:00.000Z',
+        'Reason-token-other',
+        '2026-03-11T14:00:00.000Z|act.verify-fix',
+      ),
+    ];
+    // Not known at INSTANT: decided later about its own instant (superseding rev_known in the whole
+    // record), about a later instant (decided early or late), or about an earlier instant but later.
+    const unknown = {
+      newest: [
+        decision(
+          'rev_l4',
+          6,
+          '2026-07-03T00:00:00.000Z',
+          'Reason-token-l4',
+          '2026-03-11T14:05:00.000Z|act.capture',
+        ),
+        decision(
+          'rev_l3',
+          4,
+          '2026-07-02T00:00:00.000Z',
+          'Reason-token-l3',
+          `${LATER}|act.verify-fix`,
+        ),
+        decision('rev_l1', 5, '2026-07-01T00:00:00.000Z', 'Reason-token-l1'),
+      ],
+      oldest: [
+        decision(
+          'rev_l2',
+          1,
+          '2026-03-01T00:00:00.000Z',
+          'Reason-token-l2',
+          `${LATER}|act.capture`,
+        ),
+      ],
+    };
+    const without = await within(source([known]).ctx, INSTANT);
+    const withLater = await within(
+      source([[...unknown.newest, ...known, ...unknown.oldest]]).ctx,
+      INSTANT,
+    );
+    expect(without.listed.map((entry) => entry.reason)).toEqual([
+      'Reason-token-known',
+      'Reason-token-other',
+    ]);
+    // Byte for byte: no entry, no field and no number tells that the later overrides exist.
+    expect(serialized(withLater)).toBe(serialized(without));
+    expect(serialized(withLater)).not.toMatch(/Reason-token-l\d/);
+    expect(Object.keys(withLater).sort()).toEqual(['inline', 'listed']);
+    // The whole record does see them: the test is not vacuous.
+    const everything = await whole(source([[...unknown.newest, ...known, ...unknown.oldest]]).ctx);
+    expect(serialized(everything)).toMatch(/Reason-token-l1/);
   });
 
   const valid = decision('rev_ok', 2, '2026-07-01T00:00:00.000Z', 'Valid');
@@ -383,28 +435,23 @@ describe('the scan for reviewer overrides', () => {
     ['a time that is not a time', decision('k3', 1, 'not a time', 'Forged')],
   ];
 
-  it.each(forged)(
-    '[FR-AV-02] ignores %s: it is neither listed nor counted',
-    async (_name, forgery) => {
-      const { ctx } = source([[forgery, valid]]);
-      const full = await whole(ctx);
-      expect(full.listed).toMatchObject([{ reason: 'Valid', rank: 2 }]);
-      expect(full.inline.size).toBe(1);
-      expect(full.withheld).toBe(0);
-      // Before the valid decision exists, only it is counted as withheld.
-      const early = await within(ctx, INSTANT);
-      expect(early.listed).toEqual([]);
-      expect(early.withheld).toBe(1);
-      expect(serialized(full) + serialized(early)).not.toContain('Forged');
-    },
-  );
+  it.each(forged)('[FR-AV-02] ignores %s: it is not an override', async (_name, forgery) => {
+    const { ctx } = source([[forgery, valid]]);
+    const full = await whole(ctx);
+    expect(full.listed).toMatchObject([{ reason: 'Valid', rank: 2 }]);
+    expect(full.inline.size).toBe(1);
+    // Before the valid decision exists the window has nothing, and the forgery changes nothing of that.
+    const early = await within(ctx, INSTANT);
+    expect(early.listed).toEqual([]);
+    expect(early.inline.size).toBe(0);
+    expect(serialized(full) + serialized(early)).not.toContain('Forged');
+  });
 
   it('[FR-AV-02] shows nothing from a window whose end is not an instant', async () => {
     const { ctx } = source([[decision('rev_1', 2, '2026-07-01T00:00:00.000Z', 'Reason-token-x')]]);
     const broken = await loadOverrides(ctx, 'case_a', query(INSTANT, 'not an instant'));
     expect(broken.listed).toEqual([]);
     expect(broken.inline.size).toBe(0);
-    expect(broken.withheld).toBe(1);
     expect(serialized(broken)).not.toContain('Reason-token');
   });
 
@@ -427,11 +474,10 @@ describe('the scan for reviewer overrides', () => {
     expect(found.listed).toHaveLength(ACTION_OVERRIDES_LISTED_MAX);
     expect(found.listed[0]?.actionKey).toBe('act.k200');
     expect(found.listed.at(-1)?.actionKey).toBe('act.k1');
-    // The oldest override is cut from the list; it stays on its candidate, and is not "withheld".
+    // The oldest override is cut from the list; it stays on its candidate.
     expect(found.listed.some((entry) => entry.actionKey === 'act.k0')).toBe(false);
     expect(found.inline.size).toBe(ACTION_OVERRIDES_LISTED_MAX + 1);
     expect(found.inline.has('act.k0')).toBe(true);
-    expect(found.withheld).toBe(0);
     expect(warnings).toHaveLength(1);
     expect(warnings[0]?.details).toEqual({
       caseId: 'case_a',

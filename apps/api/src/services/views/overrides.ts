@@ -39,8 +39,6 @@ export interface OverrideScan {
   readonly inline: ReadonlyMap<string, StoredOverride>;
   /** Every override the view may show, newest decision first, at most `ACTION_OVERRIDES_LISTED_MAX`. */
   readonly listed: readonly ActionOverrideRecord[];
-  /** How many (instant, action) overrides of the case this window cannot show: a count, never content. */
-  readonly withheld: number;
 }
 
 interface ParsedOverride {
@@ -59,7 +57,7 @@ interface ParsedOverride {
 /**
  * An override as `overrideAction` writes it. A decision with another kind, an id that is not
  * `<canonical instant>|<action key>` or a value that is not a rank is ignored, so a forged record can
- * neither crash the scan nor appear in a view or in a count.
+ * neither crash the scan nor appear in a view.
  */
 function parseOverride(decision: ReviewDecision): ParsedOverride | null {
   if (decision.targetType !== 'action_value' || decision.decision !== 'override') return null;
@@ -91,8 +89,9 @@ function parseOverride(decision: ReviewDecision): ParsedOverride | null {
  * instant and one action, so a case holds one current override per (instant, action) pair and the
  * latest decision wins. Inside a window (`knownBy` is its end) an override takes part only when it was
  * decided by then AND is about an instant at or before it (see the policy in `overlay.ts`): the latest
- * decision made by then is the current one, and everything else leaves no trace but its count in
- * `withheld`. The whole record (`knownBy` null) shows every pair.
+ * decision made by then is the current one, and everything else leaves no trace at all, not even a
+ * count: the result is a function of the decisions made up to the window's end, and of nothing after
+ * it. The whole record (`knownBy` null) shows every pair.
  *
  * Only `action_value` decisions of the case are read (the repository filters them in the database),
  * newest first, OVERRIDE_PAGE at a time, up to OVERRIDE_MAX_PAGES pages; this one pass builds both the
@@ -110,7 +109,6 @@ export async function loadOverrides(
   // A window whose end is not a valid instant knows nothing: the comparison is false for NaN.
   const inWindow = (ms: number): boolean => end === null || ms <= end;
 
-  const pairs = new Set<string>();
   const visible = new Map<string, ParsedOverride>();
   let cursor: string | undefined;
   let scanned = 0;
@@ -125,7 +123,6 @@ export async function loadOverrides(
     for (const decision of page.items) {
       const parsed = parseOverride(decision);
       if (parsed === null) continue;
-      pairs.add(parsed.pair);
       // Newest first: the first decision seen inside the window is the current one for its pair, and
       // the order the pairs are first seen in is the order of their current decisions, newest first.
       if (visible.has(parsed.pair) || !inWindow(parsed.atMs) || !inWindow(parsed.instantMs))
@@ -171,5 +168,5 @@ export async function loadOverrides(
       by: entry.by,
       at: entry.at,
     }));
-  return { inline, listed, withheld: pairs.size - visible.size };
+  return { inline, listed };
 }

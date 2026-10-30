@@ -32,10 +32,15 @@ seeded by it would show confidence ranges that change with text recorded after t
 - **Pass cache.** Bounded by an estimate of what passes retain (48 KiB per visible event plus 64 KiB;
   measured 12 to 45 KiB of JSON per event up to 2,000 events) against 96 MiB, and by 256 entries. That
   keeps about three complete scans of the prefixes of a 31-event case, or the latest pass alone for a
-  2,000-event case; the newest pass is never evicted by its own weight.
+  2,000-event case; the newest pass is never evicted by its own weight. **Only paid work is cached:** a
+  window enters the cache (weighed in full) when a request that has been charged, or runs unmetered,
+  starts its pass or builds a ranking in it, never when a computation is merely created. A request the
+  budget refuses (429) therefore leaves nothing behind and cannot evict a pass another user paid for,
+  by weight or by count; a pass that fails is dropped again unless a ranking was built in its window.
 - **Boundary memo.** What does depend on the exact instant (quality, metrics, the warning replay) is
-  memoised per boundary in a 128-entry LRU holding no events and no pass. A ranking depends on the
-  visible events only and lives with the window.
+  memoised per boundary in a 128-entry LRU holding no events and no pass, under the same rule: the memo
+  is created when the first request is charged for the boundary, and read by key when it is needed. A
+  ranking depends on the visible events only and lives with the window.
 - **Engine budget** (`services/engine-budget.ts`, shared with skill matching): a token bucket per tenant
   and user, 30 units per 60 seconds, on `ctx.now()`. Only cold work is charged and a request is charged
   at most once: a cold pass always costs a unit; the per-instant work (quality, metrics, replay, a cold
@@ -51,12 +56,12 @@ seeded by it would show confidence ranges that change with text recorded after t
 A decision made by a person takes part in a view only from the moment it was made. An as-of response is
 a function of the record and of the human input made up to the instant, nothing else.
 
-| Input                                        | In a window ending at `asOf`                                                                                                                                                                                                                                                                                                                                                     | In the whole record (no `asOf`)                                                                   |
-| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Claim review (label, state, note, who, when) | Shown only if `reviewedAt <= asOf`. Otherwise the machine classification, `pending`, no note, no reviewer.                                                                                                                                                                                                                                                                       | Always                                                                                            |
-| Action-value override                        | Listed in `reviewerOverrides` only if it was decided by `asOf` AND is about an instant at or before it; the latest decision made by then wins per (instant, action). On a candidate (`override`) only for the ranking's own instant. Everything else leaves no trace but its count in `withheldOverrides`: no reason, rank, `by`, `at`. Also for a decision-time view of a fork. | Every override of the case: the latest decision per (instant, action), newest first (200 at most) |
-| Warning dismissal                            | Applied by the replay only if `at <= asOf`                                                                                                                                                                                                                                                                                                                                       | Applied                                                                                           |
-| Fork review                                  | Shown only if the fork was not updated after `asOf` (a fork records no review time)                                                                                                                                                                                                                                                                                              | Always                                                                                            |
+| Input                                        | In a window ending at `asOf`                                                                                                                                                                                                                                                                                                                                               | In the whole record (no `asOf`)                                                                   |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Claim review (label, state, note, who, when) | Shown only if `reviewedAt <= asOf`. Otherwise the machine classification, `pending`, no note, no reviewer.                                                                                                                                                                                                                                                                 | Always                                                                                            |
+| Action-value override                        | Listed in `reviewerOverrides` only if it was decided by `asOf` AND is about an instant at or before it; the latest decision made by then wins per (instant, action). On a candidate (`override`) only for the ranking's own instant. Nothing of any other override: no reason, rank, `by`, `at`, and not even how many there are. Also for a decision-time view of a fork. | Every override of the case: the latest decision per (instant, action), newest first (200 at most) |
+| Warning dismissal                            | Applied by the replay only if `at <= asOf`                                                                                                                                                                                                                                                                                                                                 | Applied                                                                                           |
+| Fork review                                  | Shown only if the fork was not updated after `asOf` (a fork records no review time)                                                                                                                                                                                                                                                                                        | Always                                                                                            |
 
 Why labels too, not only notes: a reviewer who knows the root cause upgrades an assumption to a
 confirmed fact; shown in an earlier window that label would be hindsight even with no note. The metamorphic
@@ -74,11 +79,15 @@ ranking therefore carries `reviewerOverrides` next to its candidates: one entry 
 the latest decision, newest first, with `instant`, `actionKey`, `actionName` (the pack's name, else the
 key), `rank`, `reason`, `by` and `at`. The candidates keep `override` exactly as before (only the
 override about the ranking's own instant). A window lists only what was both decided and is about an
-instant by its end. `withheldOverrides` is how many (instant, action) overrides of the case it cannot
-list: a count, never content, like `withheldFutureEventCount` for events; it does tell that later
-reviewer input exists. One bounded pass over the case's `action_value` decisions (25 pages of 200)
+instant by its end, and carries nothing of the others, not even their number: a count of "overrides
+you cannot see" would itself be human input from after the instant, which no other view leaks (claim
+reviews, fork reviews and dismissals leave no trace in an earlier window either). So the response of a
+window is byte-identical whether or not later overrides exist, and the metamorphic test compares it
+with nothing masked. One bounded pass over the case's `action_value` decisions (25 pages of 200)
 builds both views; reaching that bound, or listing more than 200 entries, is logged with counts only,
-and a decision whose target id or value is malformed is ignored and counted nowhere.
+and a decision whose target id or value is malformed is ignored. The bound is the one place where the
+amount of later input could matter (a case with more than 5,000 override decisions loses the oldest
+from the scan, and says so in the log); a time filter in the review repository would remove it.
 
 The response to the person who just decided (`claims.review`, `actionValue.override`) shows the whole
 record, their own decision included. Reasons go to the review record only: never to audit details or
@@ -98,12 +107,12 @@ did not know.
 
 ## Tests
 
-| File                            | Proves                                                                                                                                    |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `views.test.ts`                 | Every route: shape, 401/403, tenant isolation, validation, reviews, audit, optimistic locks, re-analysis survival, human input in windows |
-| `views-temporal.test.ts`        | Leak scans at several instants; equality with a fresh engine analysis; the cache and budget over HTTP                                     |
-| `views-metamorphic.int.test.ts` | Byte-identical as-of responses between the real cases and copies with everything after the cut rewritten                                  |
-| `views-cache.test.ts`           | One pass per window, the budget, the size-bounded cache, seeds (no database)                                                              |
-| `views-units.test.ts`           | Overlays, paging, filters, LRU, helpers                                                                                                   |
-| `views-overrides.test.ts`       | The override scan (no database): list, window and withheld count, latest per pair, malformed decisions, the 200 and 25-page bounds        |
-| `engine-budget.test.ts`         | The token bucket                                                                                                                          |
+| File                            | Proves                                                                                                                                                              |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `views.test.ts`                 | Every route: shape, 401/403, tenant isolation, validation, reviews, audit, optimistic locks, re-analysis survival, human input in windows                           |
+| `views-temporal.test.ts`        | Leak scans at several instants; equality with a fresh engine analysis; the cache and budget over HTTP                                                               |
+| `views-metamorphic.int.test.ts` | Byte-identical as-of responses between the real cases and copies with everything after the cut rewritten                                                            |
+| `views-cache.test.ts`           | One pass per window, the budget, the size-bounded cache, nothing cached for a refused request, seeds (no database)                                                  |
+| `views-units.test.ts`           | Overlays, paging, filters, LRU, helpers                                                                                                                             |
+| `views-overrides.test.ts`       | The override scan (no database): list and window, latest per pair, the same answer with or without later overrides, malformed decisions, the 200 and 25-page bounds |
+| `engine-budget.test.ts`         | The token bucket                                                                                                                                                    |

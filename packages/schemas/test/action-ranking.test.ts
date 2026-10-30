@@ -28,24 +28,26 @@ const override = {
 };
 
 describe('the action ranking and its reviewer overrides', () => {
-  it('[FR-AV-02] still accepts a ranking without the override fields, as an older server sends it', () => {
+  it('[FR-AV-02] still accepts a ranking without the override list, as an older server sends it', () => {
     const parsed = ActionRankingSchema.parse(ranking);
     expect(parsed.reviewerOverrides).toBeUndefined();
-    expect(parsed.withheldOverrides).toBeUndefined();
     expect(ROUTES['actionValue.rank'].response).toBe(ActionRankingSchema);
   });
 
-  it('[FR-AV-02] accepts the list of overrides and the count of those a window cannot show', () => {
-    const parsed = ActionRankingSchema.parse({
-      ...ranking,
-      reviewerOverrides: [override],
-      withheldOverrides: 2,
-    });
+  it('[FR-AV-02] accepts the list of overrides', () => {
+    const parsed = ActionRankingSchema.parse({ ...ranking, reviewerOverrides: [override] });
     expect(parsed.reviewerOverrides).toEqual([override]);
-    expect(parsed.withheldOverrides).toBe(2);
   });
 
-  it('[FR-AV-02] bounds the list and refuses malformed entries and counts', () => {
+  it('[FR-AV-02] has no field for the number of overrides a window cannot show', () => {
+    // How many later overrides exist is itself something an earlier window did not know, so the
+    // contract has nowhere to put it: a response that still carries the count is parsed without it.
+    expect(Object.keys(ActionRankingSchema.shape)).not.toContain('withheldOverrides');
+    const parsed = ActionRankingSchema.parse({ ...ranking, withheldOverrides: 2 });
+    expect(parsed).not.toHaveProperty('withheldOverrides');
+  });
+
+  it('[FR-AV-02] bounds the list and refuses malformed entries', () => {
     const entries = Array.from({ length: ACTION_OVERRIDES_LISTED_MAX }, () => override);
     expect(ActionRankingSchema.safeParse({ ...ranking, reviewerOverrides: entries }).success).toBe(
       true,
@@ -54,12 +56,6 @@ describe('the action ranking and its reviewer overrides', () => {
       ActionRankingSchema.safeParse({ ...ranking, reviewerOverrides: [...entries, override] })
         .success,
     ).toBe(false);
-    expect(ActionRankingSchema.safeParse({ ...ranking, withheldOverrides: -1 }).success).toBe(
-      false,
-    );
-    expect(ActionRankingSchema.safeParse({ ...ranking, withheldOverrides: 1.5 }).success).toBe(
-      false,
-    );
     for (const broken of [
       { ...override, rank: 0 },
       { ...override, instant: 'yesterday' },

@@ -123,7 +123,6 @@ function assemble(target: RankingTarget, overrides: OverrideScan): ActionRanking
     })),
     blocked: core.blocked,
     reviewerOverrides: [...overrides.listed],
-    withheldOverrides: overrides.withheld,
   };
 }
 

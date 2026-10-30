@@ -162,18 +162,16 @@ export async function ingestBundle(
 
 /**
  * Masks what names a world or a request rather than the case: the tenant id, the analysis run id, the
- * ids derived from the run id (quality assessments and metric estimates carry the run in their id), the
- * moment a view was generated (the clock of the request, not data of the case) and the number of
- * overrides a ranking cannot show. That count is of the world's own reviewer input, which the test makes
- * different on purpose, so it is asserted apart (nothing of the overrides themselves is ever masked).
+ * ids derived from the run id (quality assessments and metric estimates carry the run in their id) and
+ * the moment a view was generated (the clock of the request, not data of the case). Nothing of the
+ * human input is masked: an earlier window must not show it, not even how many decisions were made.
  */
 export function maskWorld(body: string, tenants: readonly [from: string, to: string]): string {
   return body
     .replaceAll(tenants[0], tenants[1])
     .replace(/\brun_[0-9A-Za-z]+/g, 'run_MASKED')
     .replace(/\b(qa|met)_[0-9a-f]{16,}\b/g, '$1_MASKED')
-    .replace(/"generatedAt":"[^"]*"/g, '"generatedAt":"MASKED"')
-    .replace(/"withheldOverrides":\d+/g, '"withheldOverrides":MASKED');
+    .replace(/"generatedAt":"[^"]*"/g, '"generatedAt":"MASKED"');
 }
 
 export interface Difference {

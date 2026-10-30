@@ -98,17 +98,25 @@ function callers(start = Date.parse('2026-06-01T00:00:00.000Z')) {
 
 /** A cache whose engine pass is a counter: it hands back one precomputed analysis, or the real engine's. */
 function countingCache(
-  options: { budget?: EngineBudget; maxBytes?: number; engine?: 'stub' | 'real' } = {},
+  options: {
+    budget?: EngineBudget;
+    maxBytes?: number;
+    maxEntries?: number;
+    boundaries?: number;
+    engine?: 'stub' | 'real';
+  } = {},
 ) {
   const seen: AnalysisInput[] = [];
   const cache = new ViewCache({
     ...(options.budget === undefined ? {} : { budget: options.budget }),
+    ...(options.boundaries === undefined ? {} : { boundaries: options.boundaries }),
     passes: {
       analyse: (input) => {
         seen.push(input);
         return options.engine === 'real' ? runDeterministicAnalysis(input) : real;
       },
       ...(options.maxBytes === undefined ? {} : { maxBytes: options.maxBytes }),
+      ...(options.maxEntries === undefined ? {} : { maxEntries: options.maxEntries }),
     },
   });
   return { cache, seen };
@@ -502,6 +510,151 @@ describe('the pass cache is bounded by an estimate of what it holds', () => {
     expect(cache.weight).toBe(0);
     expect(() => new LruCache(1, { maxWeight: 0, weigh: () => 0 })).toThrow(RangeError);
     expect(VIEW_BOUNDARY_CAPACITY).toBeGreaterThanOrEqual(64);
+  });
+});
+
+describe('a request the engine budget refuses leaves nothing behind', () => {
+  const visibleOf = (instant: string): number =>
+    createTemporalView(inputs.events, instant, { resolution: inputs.resolution }).events.length;
+  /** Windows nobody has paid for: every request for one of them is refused by an empty bucket. */
+  const strangers = (): string[] =>
+    ['e16', 'e18', 'e20', 'e22', 'e24', 'e26', 'e28', 'e30'].map(at);
+
+  /** Five passes somebody paid for, in a cache with room for exactly them, and a caller with no budget. */
+  async function warmVictims(bound: 'bytes' | 'entries') {
+    const { as } = callers();
+    const budget = new EngineBudget({ passes: 10, windowMs: 60_000 });
+    const victims = ['e10', 'e11', 'e12', 'e13', 'e14'].map(at);
+    const room =
+      bound === 'bytes'
+        ? {
+            maxBytes: victims.reduce(
+              (sum, instant) => sum + estimatePassBytes(visibleOf(instant)),
+              0,
+            ),
+          }
+        : { maxEntries: victims.length };
+    const { cache, seen } = countingCache({ budget, ...room });
+    const victim = as('t', 'victim');
+    for (const instant of victims) {
+      await cache.computation(victim, inputs, run, instant).analysis();
+    }
+    const attacker = as('t', 'attacker');
+    budget.charge(attacker, budget.passes);
+    expect(budget.remaining(attacker)).toBe(0);
+    return { cache, seen, victim, attacker, victims };
+  }
+
+  it.each(['bytes', 'entries'] as const)(
+    '[NFR-SEC-05] never lets refused requests for other windows evict passes somebody paid for (bounded by %s)',
+    async (bound) => {
+      const { cache, seen, victim, attacker, victims } = await warmVictims(bound);
+      const before = cache.passes.stats;
+      expect(before.entries).toBe(victims.length);
+
+      for (const instant of strangers()) {
+        await expect(cache.computation(attacker, inputs, run, instant).analysis()).rejects.toThrow(
+          RateLimitedError,
+        );
+      }
+      // Nothing was cached for them: neither the entries nor the weight grew, and no pass ran.
+      expect(cache.passes.stats).toEqual(before);
+      expect(seen).toHaveLength(victims.length);
+
+      // Every paid pass is still there, free for the one who paid and for anybody else.
+      for (const instant of victims) {
+        await cache.computation(victim, inputs, run, instant).analysis();
+        await cache.computation(attacker, inputs, run, instant).analysis();
+      }
+      expect(seen).toHaveLength(victims.length);
+      expect(cache.passes.stats.coldPasses).toBe(before.coldPasses);
+    },
+  );
+
+  it('[NFR-SEC-05] caches nothing for a ranking the budget refuses', async () => {
+    const { cache, attacker } = await warmVictims('bytes');
+    const before = cache.passes.stats;
+    for (const instant of strangers()) {
+      const refused = cache.computation(attacker, inputs, run, instant);
+      expect(() =>
+        refused.rankingFor('at', () => {
+          throw new Error('a ranking is never built for a refused request');
+        }),
+      ).toThrow(RateLimitedError);
+    }
+    expect(cache.passes.stats).toEqual(before);
+  });
+
+  it('[NFR-SEC-05] keeps every paid boundary when refused requests ask for other instants', async () => {
+    const { as } = callers();
+    const budget = new EngineBudget({ passes: 10, windowMs: 60_000 });
+    const { cache } = countingCache({ budget, engine: 'real', boundaries: 4 });
+    const victim = as('t', 'victim');
+    const instants = ['e10', 'e11', 'e12'].map(at);
+    for (const instant of instants) {
+      await cache.computation(victim, inputs, run, instant).quality();
+    }
+    const paid = budget.remaining(victim);
+    expect(paid).toBe(7);
+    expect(cache.size).toBe(instants.length);
+
+    // Other instants of the same windows: the passes are cached, so only the work of the instant
+    // itself is refused, and the refusal must not push a paid boundary out of its (tiny) cache.
+    const attacker = as('t', 'attacker');
+    budget.charge(attacker, budget.passes);
+    for (const instant of instants) {
+      for (const offset of [1, 2, 3]) {
+        await expect(
+          cache.computation(attacker, inputs, run, shifted(instant, offset)).quality(),
+        ).rejects.toThrow(RateLimitedError);
+      }
+    }
+    expect(cache.size).toBe(instants.length);
+    for (const instant of instants) {
+      await cache.computation(victim, inputs, run, instant).quality();
+    }
+    expect(budget.remaining(victim)).toBe(paid);
+  });
+
+  it('[NFR-SEC-05] caches a window, weighed in full, only once its pass was paid for and started', async () => {
+    const { cache } = countingCache();
+    const instant = at('e12');
+    const computation = cache.computation(anyone, inputs, run, instant);
+    // Asking for a computation caches nothing; being allowed to work does.
+    expect(cache.passes.stats).toMatchObject({ entries: 0, estimatedBytes: 0 });
+    await computation.analysis();
+    const weight = estimatePassBytes(visibleOf(instant));
+    expect(cache.passes.stats).toMatchObject({ entries: 1, estimatedBytes: weight });
+    // The same window again is a free read and weighs no more.
+    await cache.computation(anyone, inputs, run, shifted(instant, 1)).analysis();
+    expect(cache.passes.stats).toMatchObject({ entries: 1, estimatedBytes: weight, reused: 1 });
+  });
+
+  it('[NFR-SEC-05] keeps nothing for a pass that failed, but keeps a ranking built for its window', async () => {
+    const failing = new ViewCache({
+      passes: {
+        analyse: () => {
+          throw new Error('engine failure');
+        },
+      },
+    });
+    const instant = at('e07');
+    await expect(failing.computation(anyone, inputs, run, instant).analysis()).rejects.toThrow(
+      'engine failure',
+    );
+    expect(failing.passes.stats).toMatchObject({ entries: 0, estimatedBytes: 0 });
+
+    const core = { posterior: [], candidates: [], blocked: [] };
+    const computation = failing.computation(anyone, inputs, run, instant);
+    computation.rankingFor('at', () => core);
+    await expect(computation.analysis()).rejects.toThrow('engine failure');
+    expect(failing.passes.stats.entries).toBe(1);
+    const again = failing.computation(anyone, inputs, run, shifted(instant, 1));
+    expect(
+      again.rankingFor('at', () => {
+        throw new Error('the ranking of the window is still cached');
+      }),
+    ).toBe(core);
   });
 });
 

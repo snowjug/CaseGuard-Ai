@@ -801,6 +801,52 @@ describe('recomputation is cached and metered', () => {
     expect(budget().remaining(caller(asker))).toBe(29);
   });
 
+  it('[NFR-SEC-05] caches nothing for the requests it refuses, whichever route they ask', async () => {
+    g.clock.advance(ENGINE_BUDGET_WINDOW_MS);
+    // Windows the engineer pays for; then a reviewer with nothing left to spend asks for other ones.
+    const paid = ['e03', 'e05', 'e08', 'e10'].map((s) => eventBySuffix(events, s).timestamp);
+    for (const asOf of paid) {
+      expect((await hypotheses(asOf, PERSONAS.engineer)).statusCode, asOf).toBe(200);
+    }
+    const asker = PERSONAS.reviewer;
+    budget().charge(caller(asker), budget().passes);
+    expect(budget().remaining(caller(asker))).toBe(0);
+    const snapshot = () => ({ ...deps().cache.passes.stats, boundaries: deps().cache.size });
+    const before = snapshot();
+    expect(before.entries).toBeGreaterThanOrEqual(paid.length);
+
+    const routes = [
+      'hypotheses',
+      'twin',
+      'actions',
+      'graph',
+      'quality',
+      'metrics',
+      'warnings',
+      'action-values',
+      'timeline',
+      'evidence',
+      'forks',
+    ];
+    const strangers = ['e04', 'e06', 'e07', 'e09', 'e11', 'e13', 'e14', 'e15', 'e16', 'e17', 'e18'];
+    for (const [index, suffix] of strangers.entries()) {
+      const asOf = eventBySuffix(events, suffix).timestamp;
+      const route = routes[index % routes.length] ?? 'hypotheses';
+      const res = await ask(`/${route}?${at(asOf)}`);
+      expect(res.statusCode, `${route} at ${asOf}`).toBe(429);
+    }
+    // Neither the pass cache nor the boundary memos took any of them in, and nothing was computed.
+    expect(snapshot()).toEqual(before);
+
+    // The windows that were paid for are all still cached, and free for the caller with no budget.
+    const spent = cold();
+    for (const asOf of paid) {
+      expect((await hypotheses(asOf, asker)).statusCode, asOf).toBe(200);
+    }
+    expect(cold()).toBe(spent);
+    expect(budget().remaining(caller(asker))).toBe(0);
+  });
+
   it('[NFR-SEC-05] draws on one bucket per tenant and user, never on a case', async () => {
     g.clock.advance(ENGINE_BUDGET_WINDOW_MS);
     const first = (await h.repos(CONTOSO).cases.getAllEvents(TWO))[6]?.timestamp ?? '';

@@ -17,6 +17,11 @@ import { LruCache } from './lru';
  * whose boundaries lie between the same two events (or are one instant spelled two ways) share it.
  * Passes are the memory-heavy part of a recomputation, so the cache that holds them is bounded by an
  * estimate of what they retain, not only by how many there are.
+ *
+ * Only work somebody was allowed to start is cached. A window enters the cache when a request that
+ * has been charged (or runs unmetered) asks for its pass or builds a ranking in it, never before, so
+ * the requests the engine budget refuses leave nothing behind and cannot evict a pass another user
+ * paid for, by weight or by count.
  */
 
 /**
@@ -95,8 +100,21 @@ export class PassCache {
     };
   }
 
-  /** The shared state of one window (created empty on first use; nothing is charged or computed). */
-  entry(key: string, visibleEvents: number): PassEntry {
+  /**
+   * What is cached for a window, if anything. Reading never creates an entry: a window enters the cache
+   * only once a request that is allowed to work on it asks for it (`acquire`, `analysis`), so a request
+   * the engine budget refuses can neither fill the cache nor push out passes somebody paid for.
+   */
+  peek(key: string): PassEntry | undefined {
+    return this.entries.get(key);
+  }
+
+  /**
+   * The cached state of a window, created and weighed in full on first use. Only for a caller that is
+   * allowed to work on the window (it has been charged, or the work is unmetered): inserting is what
+   * evicts the stalest entries.
+   */
+  acquire(key: string, visibleEvents: number): PassEntry {
     let found = this.entries.get(key);
     if (found === undefined) {
       found = new PassEntry(estimatePassBytes(visibleEvents));
@@ -108,24 +126,31 @@ export class PassCache {
   /**
    * The engine pass of a window. A cached or running pass is returned as it is; otherwise
    * `beforeStart` runs first (it is where a caller is charged, and it may refuse by throwing, before
-   * any engine work is done) and the pass starts on the input `makeInput` builds, which is only built
-   * then. Concurrent requests for one window share one run.
+   * any engine work is done and with nothing cached for the window) and the pass starts on the input
+   * `makeInput` builds, which is only built then. Concurrent requests for one window share one run.
    */
   analysis(
-    entry: PassEntry,
+    key: string,
+    visibleEvents: number,
     makeInput: () => AnalysisInput,
     beforeStart: () => void,
   ): Promise<DeterministicAnalysis> {
-    if (entry.analysis !== undefined) {
+    const cached = this.entries.get(key);
+    if (cached?.analysis !== undefined) {
       this.hits += 1;
-      return entry.analysis;
+      return cached.analysis;
     }
     beforeStart();
+    const entry = cached ?? this.acquire(key, visibleEvents);
     this.cold += 1;
     const started = yieldToEventLoop().then(() => this.analyse(makeInput()));
     entry.analysis = started;
     started.catch(() => {
-      if (entry.analysis === started) entry.analysis = undefined;
+      if (entry.analysis !== started) return;
+      // A retry can run. A window left with nothing but a weight for a pass that does not exist is
+      // dropped; a ranking built for it meanwhile keeps it.
+      entry.analysis = undefined;
+      if (entry.rankings.size === 0 && this.entries.get(key) === entry) this.entries.delete(key);
     });
     return started;
   }
