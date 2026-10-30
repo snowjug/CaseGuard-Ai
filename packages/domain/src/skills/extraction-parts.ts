@@ -12,8 +12,14 @@ import type { CompiledPack } from '../knowledge/compile';
 import { round } from '../util/math';
 import { clip } from './util';
 
+/**
+ * What the provenance of a skill says about its hindsight parts. It has to stay true of the code:
+ * matching reads the trigger conditions and the exclusions (some of them were learned with hindsight,
+ * and are marked so), always against the evidence of the matched case at the match instant, and never
+ * the branch probabilities or the other hindsight parts. `skills-hindsight.test.ts` pins every clause.
+ */
 export const HINDSIGHT_NOTICE =
-  'Parts listed as hindsight were derived with knowledge of the recorded resolution. They are labelled estimates and are never used to decide whether the skill matches a case.';
+  'Parts listed as hindsight were derived with knowledge of the source case’s recorded resolution and are labelled estimates. Hindsight trigger conditions and exclusions do take part in matching, but only against what the matched case had recorded at that moment; hindsight branch probabilities and the other listed parts never decide whether the skill matches.';
 
 /** Reasons the decision fork itself cannot seed a skill (empty when it can). */
 export function forkRefusals(fork: DecisionFork, ctx: EngineContext): string[] {

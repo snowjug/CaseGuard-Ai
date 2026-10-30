@@ -7,6 +7,7 @@ import {
   type SkillImpactEstimate,
 } from '../src';
 import { positionOf } from '../src/skills/impact';
+import { defaultDecisionEventId, measureActualPath } from '../src/skills/actual';
 import { CONFIG, eventBySuffix } from './helpers';
 import { ONE, TWO, asOf, withPoisonedFuture } from './skills-fixtures';
 import {
@@ -188,6 +189,49 @@ describe('the estimated comparison with the "without the skill" baseline', () =>
     expect(context.note).toMatch(/different case: shown for context only/);
     expect(estimate({ precedent: null }).baseline).toEqual(result.baseline);
     expect(estimate({ precedent: null }).precedent).toBeNull();
+  });
+
+  it('[FR-ASE-01] the precedent is measured with the definitions of the recorded path it is compared with', () => {
+    const decisionEventId = defaultDecisionEventId(ONE.analysis);
+    const fromIndex = ONE.analysis.view.events.findIndex((e) => e.id === decisionEventId);
+    const fromAt = ONE.analysis.view.events[fromIndex]?.timestamp ?? '';
+    const measured = measureActualPath({
+      analysis: ONE.analysis,
+      pack: ONE.pack,
+      fromIndex,
+      fromAt,
+      minimumEvidence,
+    });
+    if (!measured || !precedent) throw new Error('expected both paths to be measured');
+    expect(precedent).toEqual({
+      reference: 'CG-SYN-1001',
+      timeToDiagnosisMinutes: measured.timeToDiagnosisMinutes,
+      customerEffortMinutes: measured.customerEffortMinutes,
+      actionCount: measured.actionCount,
+      tokenEstimate: measured.tokenEstimate,
+      evidenceCompleteness: measured.evidenceCompleteness,
+      reachedDiagnosis: measured.reachedDiagnosis,
+    });
+    expect(precedent.reachedDiagnosis).toBe(true);
+    expect(precedent.tokenEstimate).toBeGreaterThan(0);
+    // The context block of an estimate carries the same figures.
+    expect(result.precedent).toMatchObject({
+      tokenEstimate: precedent.tokenEstimate,
+      evidenceCompleteness: precedent.evidenceCompleteness,
+      reachedDiagnosis: true,
+    });
+  });
+
+  it('[FR-ASE-01] Case Two reads faster and lighter than the recorded path of the case its skill came from', () => {
+    const recorded = result.recorded;
+    if (!recorded || !precedent) throw new Error('expected both recorded paths');
+    // Both are recorded paths from their own decision point to the recorded diagnosis, so unlike the
+    // simulated baseline (no waiting between steps, a pack that already knows the domain) they compare.
+    expect(recorded.reachedDiagnosis).toBe(true);
+    expect(recorded.timeToDiagnosisMinutes).toBeLessThan(precedent.timeToDiagnosisMinutes);
+    expect(recorded.tokenEstimate).toBeLessThan(precedent.tokenEstimate);
+    expect(recorded.evidenceCompleteness).toBeGreaterThanOrEqual(precedent.evidenceCompleteness);
+    expect(recorded.customerEffortMinutes).toBeLessThan(precedent.customerEffortMinutes);
   });
 
   it('[FR-ASE-01] says so when nothing was recorded after the plan time', () => {

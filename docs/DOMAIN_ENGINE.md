@@ -453,12 +453,19 @@ database CHECK on `skill_approvals`). Role permissions are in [SECURITY.md](SECU
 trigger conditions that hold at the as-of instant. An exclusion that holds gives `not_applicable` (0); an unmet required
 condition gives `not_applicable` with score `0.5 * coverage`; otherwise `applies` at 0.7 or more and `partial` at 0.35 or
 more. Matching re-reads the case through a temporal view, so later events and the resolution cannot influence it.
+Trigger conditions and exclusions that were learned with hindsight (the triggers are marked `(hindsight-informed)` and
+listed in `provenance.hindsight.parts`) count like any other, but each is checked only against what the matched case had
+recorded at that instant; branch probabilities, including `hindsightProbability`, never enter the score or the verdict
+(`packages/domain/test/skills-hindsight.test.ts` pins both).
 **Conformance** (`checkConformance`) compares the engineer's actual steps with the skill (high at 0.75, moderate at 0.5).
 `buildGuidedPlan` gives the next-step plan.
 
 **Evaluation of a skill**: `runSkillSimulationTest` and `runSkillRegressionSuite` replay the skill's path on stored cases
-(`replaySkillPath`) against a baseline policy; `estimateSkillImpact` estimates the saving with a precedent and a range;
-`aggregateSkillEffectiveness` summarises recorded usage; `proposeMutations` suggests changes from new cases (always a
+(`replaySkillPath`) against a baseline policy; `estimateSkillImpact` estimates the saving against a simulated baseline
+and shows the recorded path of the source case as context (`impactPrecedentOf`); `aggregateSkillEffectiveness`
+summarises recorded usage on two bases, both estimates: the simulated baseline, and (optional `precedent` block) the
+recorded path of the case the skill came from, which is like-for-like because both are recorded paths from their own
+decision point; `proposeMutations` suggests changes from new cases (always a
 proposal that goes through the lifecycle); `diffSkillVersions` and `rollbackSkill` support versioning.
 
 ## 14. Hardening notes

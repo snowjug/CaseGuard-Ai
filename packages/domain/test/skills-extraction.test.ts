@@ -154,7 +154,12 @@ describe('SkillDNA extraction from an eligible fork and a valid scenario', () =>
       used: true,
       resolutionHypothesisKey: 'hyp.dns-resolution',
     });
-    expect(p.hindsight.notice).toMatch(/never used to decide whether the skill matches/);
+    // The notice has to stay true of the code; `skills-hindsight.test.ts` pins every clause against matching.
+    expect(p.hindsight.notice).toMatch(/do take part in matching/);
+    expect(p.hindsight.notice).toMatch(/only against what the matched case had recorded/);
+    expect(p.hindsight.notice).toMatch(
+      /branch probabilities and the other listed parts never decide/,
+    );
     expect(p.hindsight.parts).toEqual(
       expect.arrayContaining([
         'exclusions',

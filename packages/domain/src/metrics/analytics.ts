@@ -183,12 +183,27 @@ export function buildAnalyticsOverview(
     .map((s) => {
       const { avgTimeToDiagnosisMinutes: now, baselineAvgTimeToDiagnosisMinutes: base } =
         s.effectiveness;
+      // The recorded path of the case the skill came from is like for like; the simulated baseline has
+      // no waiting between steps, so recorded times read longer than it by construction.
+      const precedent = s.effectiveness.precedent;
+      const earlier = precedent?.precedentAvgTimeToDiagnosisMinutes ?? null;
+      const withSkill = precedent?.avgTimeToDiagnosisMinutes ?? null;
+      const fromEarlier = withSkill !== null && earlier !== null && earlier > 0;
+      const fromSimulated = now !== null && base !== null && base > 0;
       return {
         skillId: s.id,
         name: s.name,
         applications: s.effectiveness.applications,
-        timeToDiagnosisDeltaPct:
-          now !== null && base !== null && base > 0 ? round(((base - now) / base) * 100, 1) : null,
+        timeToDiagnosisDeltaPct: fromEarlier
+          ? round(((earlier - withSkill) / earlier) * 100, 1)
+          : fromSimulated
+            ? round(((base - now) / base) * 100, 1)
+            : null,
+        ...(fromEarlier
+          ? { timeToDiagnosisBasis: 'earlier_case' as const }
+          : fromSimulated
+            ? { timeToDiagnosisBasis: 'simulated_baseline' as const }
+            : {}),
         synthetic: s.synthetic,
       };
     })

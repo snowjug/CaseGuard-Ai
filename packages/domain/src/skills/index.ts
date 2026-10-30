@@ -123,5 +123,6 @@ export {
 export {
   aggregateSkillEffectiveness,
   type SkillEffectivenessReport,
+  type SkillUsagePrecedent,
   type SkillUsageRecord,
 } from './effectiveness';

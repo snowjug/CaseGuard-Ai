@@ -70,12 +70,25 @@ const metricRows = (caseId: string, list: MetricEstimate[]): AnalyticsInput['met
       : null,
   }));
 
+type Precedent = NonNullable<AnalyticsInput['skills'][number]['effectiveness']['precedent']>;
+
+const precedentOf = (current: number | null, earlier: number | null): Precedent => ({
+  cases: 1,
+  references: ['CG-SYN-1001'],
+  avgTimeToDiagnosisMinutes: current,
+  precedentAvgTimeToDiagnosisMinutes: earlier,
+  tokenChangePct: -80,
+  evidenceCompletenessPoints: 0,
+  basis: 'Compared with the recorded path of the case the skill came from.',
+});
+
 const skill = (
   id: string,
   lifecycle: AnalyticsInput['skills'][number]['lifecycle'],
   applications: number,
   current: number | null,
   baseline: number | null,
+  precedent?: Precedent,
 ): AnalyticsInput['skills'][number] => ({
   id,
   name: `Skill ${id}`,
@@ -91,6 +104,7 @@ const skill = (
     notes: [],
     synthetic: true,
     estimated: true,
+    ...(precedent ? { precedent } : {}),
   },
 });
 
@@ -266,8 +280,45 @@ describe('quality analytics (FR-AN-01)', () => {
     expect(result.skillEffectiveness[0]).toMatchObject({
       applications: 4,
       timeToDiagnosisDeltaPct: 50,
+      timeToDiagnosisBasis: 'simulated_baseline',
     });
     expect(result.skillEffectiveness[1]?.timeToDiagnosisDeltaPct).toBeNull();
+    expect(result.skillEffectiveness[1]).not.toHaveProperty('timeToDiagnosisBasis');
+  });
+
+  it('[FR-AN-01] effectiveness prefers the like-for-like earlier case over the simulated baseline', () => {
+    const withPrecedent = overview(
+      {},
+      {
+        ...input,
+        skills: [
+          // The simulated baseline says -50%, the earlier case says 75%: the earlier case wins.
+          skill('skill_a', 'published', 4, 180, 120, precedentOf(30, 120)),
+          // Nothing to compare with in the earlier case: fall back to the simulated baseline.
+          skill('skill_b', 'pilot', 3, 60, 120, precedentOf(null, 120)),
+          // A zero precedent cannot be divided by.
+          skill('skill_c', 'validated', 2, null, null, precedentOf(30, 0)),
+          // Slower than the earlier case: a negative change, not clamped.
+          skill('skill_d', 'validated', 1, null, null, precedentOf(150, 100)),
+        ],
+      },
+    );
+    const byId = new Map(withPrecedent.skillEffectiveness.map((row) => [row.skillId, row]));
+    expect(byId.get('skill_a')).toMatchObject({
+      timeToDiagnosisDeltaPct: 75,
+      timeToDiagnosisBasis: 'earlier_case',
+    });
+    expect(byId.get('skill_b')).toMatchObject({
+      timeToDiagnosisDeltaPct: 50,
+      timeToDiagnosisBasis: 'simulated_baseline',
+    });
+    expect(byId.get('skill_c')?.timeToDiagnosisDeltaPct).toBeNull();
+    expect(byId.get('skill_c')).not.toHaveProperty('timeToDiagnosisBasis');
+    expect(byId.get('skill_d')).toMatchObject({
+      timeToDiagnosisDeltaPct: -50,
+      timeToDiagnosisBasis: 'earlier_case',
+    });
+    expect(AnalyticsOverviewSchema.safeParse(withPrecedent).success).toBe(true);
   });
 
   it('[FR-AN-01] token efficiency, counterfactual acceptance and reviewer disagreement', () => {

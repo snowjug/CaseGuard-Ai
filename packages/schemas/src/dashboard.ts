@@ -202,7 +202,13 @@ export const AnalyticsOverviewSchema = z.object({
       skillId: IdSchema,
       name: z.string(),
       applications: z.number().int(),
+      /** Positive: diagnosed faster. Measured against `timeToDiagnosisBasis`. */
       timeToDiagnosisDeltaPct: z.number().nullable(),
+      /**
+       * What the time is compared with: the recorded path of the case the skill came from (like for
+       * like) or, when that is not available, a simulated baseline that has no waiting between steps.
+       */
+      timeToDiagnosisBasis: z.enum(['earlier_case', 'simulated_baseline']).optional(),
       synthetic: z.boolean(),
     }),
   ),

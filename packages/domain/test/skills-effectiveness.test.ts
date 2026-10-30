@@ -1,7 +1,14 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { SkillEffectivenessSchema } from '@caseguard/schemas';
-import { aggregateSkillEffectiveness, mean, rangeOf, round, type SkillUsageRecord } from '../src';
+import {
+  aggregateSkillEffectiveness,
+  mean,
+  rangeOf,
+  round,
+  type SkillUsagePrecedent,
+  type SkillUsageRecord,
+} from '../src';
 
 const record = (over: Partial<SkillUsageRecord> = {}): SkillUsageRecord => ({
   skillId: 'skill_a',
@@ -184,6 +191,244 @@ describe('skill effectiveness aggregated from recorded applications', () => {
   });
 });
 
+describe('effectiveness against the recorded path of the case the skill came from', () => {
+  // The origin's own recorded path: slower, heavier and less complete than the applications below.
+  const precedent = (over: Partial<SkillUsagePrecedent> = {}): SkillUsagePrecedent => ({
+    reference: 'CG-SYN-1001',
+    timeToDiagnosisMinutes: 400,
+    tokenEstimate: 8000,
+    evidenceCompleteness: 0.5,
+    ...over,
+  });
+  const BASIS =
+    'Compared with the recorded path of the case the skill came from (1 earlier case); different cases, no control group: an estimate, not a measurement.';
+
+  it('[FR-SK-06] has no precedent block without applications, and says nothing about a second basis', () => {
+    const empty = aggregateSkillEffectiveness([]);
+    expect(empty.effectiveness.precedent).toBeUndefined();
+    expect('precedent' in empty.effectiveness).toBe(false);
+    expect(empty.effectiveness.notes).toEqual([
+      'No applications recorded yet.',
+      'No engineer-level data is used: usage is aggregated per skill.',
+    ]);
+    expect(empty.confidence.rationale).not.toMatch(/recorded path/);
+    // Records without a precedent (as every record was before it existed) give exactly the old output.
+    const legacy = aggregateSkillEffectiveness(sample);
+    expect(legacy.effectiveness.precedent).toBeUndefined();
+    expect('precedent' in legacy.effectiveness).toBe(false);
+    expect(legacy.confidence.rationale).not.toMatch(/recorded path/);
+  });
+
+  it('[FR-SK-06] compares one application with the recorded path of the origin: faster, fewer tokens, as estimates', () => {
+    const one = aggregateSkillEffectiveness([record({ precedent: precedent() })]);
+    expect(one.effectiveness.precedent).toEqual({
+      cases: 1,
+      references: ['CG-SYN-1001'],
+      avgTimeToDiagnosisMinutes: 120,
+      precedentAvgTimeToDiagnosisMinutes: 400,
+      tokenChangePct: -50,
+      evidenceCompletenessPoints: 50,
+      basis: BASIS,
+    });
+    expect(() => SkillEffectivenessSchema.parse(one.effectiveness)).not.toThrow();
+    expect(one.effectiveness.estimated).toBe(true);
+    // Both bases are named, so neither is read as the other.
+    expect(one.effectiveness.notes).toEqual([
+      'Estimated from 1 recorded application; figures are model estimates, not measurements.',
+      expect.stringMatching(
+        /^Two bases are shown, and both are estimates: a seeded simulation of the knowledge-pack policy without the skill \(it has no waiting between steps, so recorded times read longer than it by construction\) and the recorded path of the case the skill came from \(a different case, with no control group\)\.$/,
+      ),
+      'No engineer-level data is used: usage is aggregated per skill.',
+    ]);
+    expect(one.confidence.rationale).toBe(
+      '1 applied case, all synthetic; estimates come from simulated baselines without a control group, and from the recorded path of the case the skill came from (a different case, also without a control group).',
+    );
+    const text = [one.effectiveness.precedent?.basis, ...one.effectiveness.notes].join(' ');
+    expect(text).not.toMatch(/(proves|guarantee|thanks to the skill|because of the skill)/i);
+  });
+
+  it('[FR-SK-06] leaves every figure against the simulated baseline exactly as it was', () => {
+    const plain = aggregateSkillEffectiveness(sample);
+    const withPrecedent = aggregateSkillEffectiveness(
+      sample.map((r) => (r.applied ? { ...r, precedent: precedent() } : r)),
+    );
+    const { precedent: block, notes, ...figures } = withPrecedent.effectiveness;
+    const { notes: plainNotes, ...plainFigures } = plain.effectiveness;
+    expect(figures).toEqual(plainFigures);
+    expect(block?.cases).toBe(3);
+    expect(notes.slice(0, 1)).toEqual(plainNotes.slice(0, 1));
+    expect(notes.at(-1)).toBe(plainNotes.at(-1));
+    // Adoption, acceptance, saved time and uplift are the simulated comparison; none of them moved.
+    for (const key of [
+      'adoption',
+      'suggestionAcceptance',
+      'estimatedTimeSaved',
+      'evidenceCompletenessUplift',
+      'privacy',
+      'notices',
+    ] as const) {
+      expect(withPrecedent[key], key).toEqual(plain[key]);
+    }
+  });
+
+  it('[FR-SK-06] reports a worse result as such: slower, heavier and less complete than the origin', () => {
+    const worse = aggregateSkillEffectiveness([
+      record({
+        timeToDiagnosisMinutes: 500,
+        tokenEstimate: 10000,
+        evidenceCompleteness: 0.4,
+        precedent: precedent(),
+      }),
+    ]);
+    expect(worse.effectiveness.precedent).toMatchObject({
+      avgTimeToDiagnosisMinutes: 500,
+      precedentAvgTimeToDiagnosisMinutes: 400,
+      tokenChangePct: 25,
+      evidenceCompletenessPoints: -10,
+    });
+  });
+
+  it('[FR-SK-06] counts only applications that have a precedent, and explains the ones that do not', () => {
+    const mixed = aggregateSkillEffectiveness([
+      record({ caseId: 'c_compared', precedent: precedent() }),
+      record({ caseId: 'c_origin', precedent: null, precedentUnavailable: 'origin_case' }),
+      record({ caseId: 'c_gone', precedent: null, precedentUnavailable: 'origin_unavailable' }),
+      // Written before precedents existed: no figure and no reason, so no claim either.
+      record({ caseId: 'c_legacy' }),
+      // Only offered, never applied: never compared.
+      record({
+        caseId: 'c_offered',
+        applied: false,
+        precedent: precedent({ timeToDiagnosisMinutes: 1 }),
+      }),
+    ]);
+    expect(mixed.effectiveness.applications).toBe(4);
+    expect(mixed.effectiveness.precedent).toMatchObject({
+      cases: 1,
+      avgTimeToDiagnosisMinutes: 120,
+      precedentAvgTimeToDiagnosisMinutes: 400,
+    });
+    expect(mixed.effectiveness.notes).toEqual([
+      'Estimated from 4 recorded applications; figures are model estimates, not measurements.',
+      expect.stringMatching(/^Two bases are shown/),
+      '1 application is on the case the skill came from and is not compared with that case’s own recorded path.',
+      'The recorded path of the case the skill came from is not available, so 1 application has no comparison with it.',
+      'No engineer-level data is used: usage is aggregated per skill.',
+    ]);
+  });
+
+  it('[FR-SK-06] without any usable precedent there is no block, only the reason, in the plural too', () => {
+    const gone = aggregateSkillEffectiveness([
+      record({ caseId: 'c_1', precedent: null, precedentUnavailable: 'origin_unavailable' }),
+      record({ caseId: 'c_2', precedent: null, precedentUnavailable: 'origin_unavailable' }),
+      record({ caseId: 'c_3', precedent: null, precedentUnavailable: 'origin_case' }),
+    ]);
+    expect(gone.effectiveness.precedent).toBeUndefined();
+    expect(gone.effectiveness.notes).toEqual([
+      'Estimated from 3 recorded applications; figures are model estimates, not measurements.',
+      '1 application is on the case the skill came from and is not compared with that case’s own recorded path.',
+      'The recorded path of the case the skill came from is not available, so 2 applications have no comparison with it.',
+      'No engineer-level data is used: usage is aggregated per skill.',
+    ]);
+    expect(gone.confidence.rationale).not.toMatch(/recorded path/);
+    const notes = gone.effectiveness.notes;
+    expect(new Set(notes).size).toBe(notes.length);
+  });
+
+  it('[FR-SK-06] compares each metric only over the applications that have both figures', () => {
+    const partial = aggregateSkillEffectiveness([
+      record({
+        caseId: 'c_a',
+        timeToDiagnosisMinutes: 100,
+        tokenEstimate: 1000,
+        evidenceCompleteness: 1,
+        precedent: precedent({ reference: 'CG-B', tokenEstimate: 4000 }),
+      }),
+      // Never reached a diagnosis and has no completeness figure: only its tokens can be compared.
+      record({
+        caseId: 'c_b',
+        timeToDiagnosisMinutes: null,
+        tokenEstimate: 3000,
+        evidenceCompleteness: null,
+        precedent: precedent({ reference: 'CG-A', tokenEstimate: 4000 }),
+      }),
+    ]);
+    expect(partial.effectiveness.precedent).toEqual({
+      cases: 2,
+      references: ['CG-A', 'CG-B'],
+      avgTimeToDiagnosisMinutes: 100,
+      precedentAvgTimeToDiagnosisMinutes: 400,
+      // (1000 + 3000 - 8000) / 8000
+      tokenChangePct: -50,
+      evidenceCompletenessPoints: 50,
+      basis:
+        'Compared with the recorded path of the case the skill came from (2 earlier cases); different cases, no control group: an estimate, not a measurement.',
+    });
+  });
+
+  it('[FR-SK-06] says nothing it cannot measure: no times, no tokens to compare, no completeness', () => {
+    const bare = aggregateSkillEffectiveness([
+      record({
+        timeToDiagnosisMinutes: null,
+        tokenEstimate: null,
+        evidenceCompleteness: null,
+        precedent: precedent(),
+      }),
+      record({
+        caseId: 'c_2',
+        tokenEstimate: 100,
+        precedent: precedent({ tokenEstimate: 0 }),
+      }),
+    ]);
+    expect(bare.effectiveness.precedent).toMatchObject({
+      cases: 2,
+      avgTimeToDiagnosisMinutes: 120,
+      precedentAvgTimeToDiagnosisMinutes: 400,
+      // The only token pair has a precedent of zero tokens, so there is nothing to divide by.
+      tokenChangePct: null,
+      evidenceCompletenessPoints: 50,
+    });
+    const none = aggregateSkillEffectiveness([
+      record({
+        timeToDiagnosisMinutes: null,
+        tokenEstimate: null,
+        evidenceCompleteness: null,
+        precedent: precedent(),
+      }),
+    ]);
+    expect(none.effectiveness.precedent).toMatchObject({
+      cases: 1,
+      avgTimeToDiagnosisMinutes: null,
+      precedentAvgTimeToDiagnosisMinutes: null,
+      tokenChangePct: null,
+      evidenceCompletenessPoints: null,
+    });
+    expect(() => SkillEffectivenessSchema.parse(none.effectiveness)).not.toThrow();
+  });
+
+  it('[FR-SK-06] does not depend on the order of the records, with or without precedents', () => {
+    const records = [
+      record({ caseId: 'c_1', precedent: precedent() }),
+      record({
+        caseId: 'c_2',
+        timeToDiagnosisMinutes: 300,
+        precedent: precedent({ reference: 'CG-B' }),
+      }),
+      record({ caseId: 'c_3', precedent: null, precedentUnavailable: 'origin_case' }),
+    ];
+    expect(aggregateSkillEffectiveness([...records].reverse())).toEqual(
+      aggregateSkillEffectiveness(records),
+    );
+  });
+});
+
+const precedentArb = fc.record({
+  reference: fc.constantFrom('CG-SYN-1001', 'CG-SYN-2001'),
+  timeToDiagnosisMinutes: fc.integer({ min: 1, max: 6000 }),
+  tokenEstimate: fc.integer({ min: 0, max: 20000 }),
+  evidenceCompleteness: fc.double({ min: 0, max: 1, noNaN: true }),
+});
+
 const recordArb = fc.record({
   skillId: fc.constantFrom('skill_a', 'skill_b'),
   versionId: fc.constantFrom('skv_1', 'skv_2'),
@@ -202,6 +447,12 @@ const recordArb = fc.record({
     nil: null,
   }),
   conformanceScore: fc.option(fc.double({ min: 0, max: 1, noNaN: true }), { nil: null }),
+  precedent: fc.option(precedentArb, { nil: null }),
+  precedentUnavailable: fc.constantFrom(
+    'origin_case' as const,
+    'origin_unavailable' as const,
+    undefined,
+  ),
 });
 
 describe('effectiveness properties', () => {
@@ -225,6 +476,39 @@ describe('effectiveness properties', () => {
         expect(out.privacy.personalData).toBe(false);
       }),
       { numRuns: 200, seed: 20261029 },
+    );
+  });
+
+  it('[FR-SK-06] a precedent block stays within what it can mean and never changes the simulated figures', () => {
+    fc.assert(
+      fc.property(fc.array(recordArb, { maxLength: 30 }), (records) => {
+        const out = aggregateSkillEffectiveness(records).effectiveness;
+        const block = out.precedent;
+        if (block !== undefined) {
+          expect(block.cases).toBeGreaterThanOrEqual(1);
+          expect(block.cases).toBeLessThanOrEqual(out.applications);
+          expect(block.references.length).toBeGreaterThanOrEqual(1);
+          expect([...block.references].sort()).toEqual(block.references);
+          // Fewer tokens can save at most all of them; times come in pairs.
+          if (block.tokenChangePct !== null)
+            expect(block.tokenChangePct).toBeGreaterThanOrEqual(-100);
+          if (block.evidenceCompletenessPoints !== null) {
+            expect(Math.abs(block.evidenceCompletenessPoints)).toBeLessThanOrEqual(100);
+          }
+          expect(block.avgTimeToDiagnosisMinutes === null).toBe(
+            block.precedentAvgTimeToDiagnosisMinutes === null,
+          );
+          expect(block.basis).toMatch(
+            /different cases, no control group: an estimate, not a measurement\.$/,
+          );
+        }
+        const bare = records.map(({ precedent: _p, precedentUnavailable: _u, ...rest }) => rest);
+        const { precedent: _block, notes: _notes, ...figures } = out;
+        const { notes: _bareNotes, ...bareFigures } =
+          aggregateSkillEffectiveness(bare).effectiveness;
+        expect(figures).toEqual(bareFigures);
+      }),
+      { numRuns: 150, seed: 20261031 },
     );
   });
 

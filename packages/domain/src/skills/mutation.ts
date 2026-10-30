@@ -13,6 +13,7 @@ import {
   type BranchContext,
 } from './content-builders';
 import { diffSkillVersions } from './diff';
+import { HINDSIGHT_NOTICE } from './extraction-parts';
 import { deriveTriggers, exclusionSignalIds, familyOf } from './ladder';
 import {
   breaksPremise,
@@ -359,6 +360,8 @@ export function proposeMutations(input: ProposeMutationsInput): SkillResult<Muta
       ...content.provenance,
       hindsight: {
         ...content.provenance.hindsight,
+        // A proposal states what is true now, even when its base was written with an older wording.
+        notice: HINDSIGHT_NOTICE,
         parts: [...new Set([...content.provenance.hindsight.parts, ...hindsightParts])],
       },
       decisionTimeParts: [...new Set([...content.provenance.decisionTimeParts, ...decisionParts])],

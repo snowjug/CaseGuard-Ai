@@ -22,12 +22,23 @@ import { simulateBaselinePolicy, type BaselineResult } from './replay';
 import { knowledgeStateFromView } from './state';
 import { pct } from './util';
 
-/** A recorded path from another case (for example the skill's source case), shown for context only. */
+/**
+ * A recorded path from another case (for example the skill's source case). On its own it is context
+ * for an impact estimate. Every figure is measured from the case record exactly as the recorded path of
+ * the case under estimate (`measureActualPath`), each from its own decision point, so the two are
+ * comparable with each other even though they describe different cases.
+ */
 export interface ImpactPrecedent {
   reference: string;
   timeToDiagnosisMinutes: number;
   customerEffortMinutes: number;
   actionCount: number;
+  /** Estimated material read for the recorded steps, defined as for the recorded path. */
+  tokenEstimate: number;
+  /** Share (0-1) of the minimum-evidence items held at the recorded diagnosis, defined as for the recorded path. */
+  evidenceCompleteness: number;
+  /** False when the recorded path ends without a confirmed diagnosis: its time is then not a time to diagnosis. */
+  reachedDiagnosis: boolean;
 }
 
 /**
@@ -58,6 +69,9 @@ export function impactPrecedentOf(args: {
         timeToDiagnosisMinutes: measure.timeToDiagnosisMinutes,
         customerEffortMinutes: measure.customerEffortMinutes,
         actionCount: measure.actionCount,
+        tokenEstimate: measure.tokenEstimate,
+        evidenceCompleteness: measure.evidenceCompleteness,
+        reachedDiagnosis: measure.reachedDiagnosis,
       }
     : null;
 }

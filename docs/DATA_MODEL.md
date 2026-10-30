@@ -301,6 +301,11 @@ A skill validation's `scope` (`full`, or `case` for a run on one named case; abs
 run is stored as `inconclusive` with its real per-check results. `skill_matches` rows are written by the analysis
 snapshot and by an application, never by a read (matches are computed on demand with deterministic ids).
 
+A skill's `effectiveness` (JSON in `data`, recomputed whenever an application is recorded) compares applications with a
+simulated "without the skill" baseline in its original fields and, in the optional `precedent` block, with the recorded
+path of the case the skill came from (both are estimates; the block is absent when no application could be compared, for
+example when the origin case was erased: the skill keeps naming it in `source_case_ids`, but its path is gone).
+
 ### 4.5 Telemetry, audit and operations (0006, 0008, 0009, 0011, 0012)
 
 | Table               | Key columns                                                                                                                                              | App role                       | Notes                                                                                                                                                                                                                                                                                      |

@@ -181,6 +181,29 @@ export const SkillValidationStatusSchema = z.enum([
 ]);
 export type SkillValidationStatus = z.infer<typeof SkillValidationStatusSchema>;
 
+/**
+ * Additive: the applications of a skill compared with the recorded path of the case the skill came
+ * from. Both are recorded paths measured from their own decision point in the same way, so the figures
+ * are like-for-like, but they are different cases and there is no control group: an estimate.
+ */
+export const SkillPrecedentComparisonSchema = z.object({
+  /** Applied cases that were compared with a precedent. */
+  cases: z.number().int().min(0),
+  /** References of the precedent cases (the cases the skill came from), sorted. */
+  references: z.array(z.string().max(120)),
+  /** Mean recorded minutes to diagnosis of the compared applications. */
+  avgTimeToDiagnosisMinutes: z.number().nullable(),
+  /** Mean recorded minutes to diagnosis of the precedent, over the same applications. */
+  precedentAvgTimeToDiagnosisMinutes: z.number().nullable(),
+  /** Estimated tokens against the precedent, in percent: negative means fewer tokens. */
+  tokenChangePct: z.number().nullable(),
+  /** Minimum-evidence completeness against the precedent, in percentage points: positive means more complete. */
+  evidenceCompletenessPoints: z.number().nullable(),
+  /** What the comparison is and is not, in words that are fixed by the aggregator. */
+  basis: z.string(),
+});
+export type SkillPrecedentComparison = z.infer<typeof SkillPrecedentComparisonSchema>;
+
 export const SkillEffectivenessSchema = z.object({
   applications: z.number().int().min(0),
   matchedCases: z.number().int().min(0),
@@ -192,6 +215,12 @@ export const SkillEffectivenessSchema = z.object({
   /** True while every contributing case is synthetic: figures demonstrate the pipeline only. */
   synthetic: z.boolean(),
   estimated: z.literal(true),
+  /**
+   * Additive, optional so records stored before it existed still parse. Present only when at least one
+   * application could be compared with the recorded path of the case the skill came from. The fields
+   * above compare with a simulated "without the skill" baseline instead.
+   */
+  precedent: SkillPrecedentComparisonSchema.optional(),
 });
 export type SkillEffectiveness = z.infer<typeof SkillEffectivenessSchema>;
 
