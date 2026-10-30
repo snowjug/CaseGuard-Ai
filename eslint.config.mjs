@@ -13,6 +13,7 @@ export default tseslint.config(
       '**/dist/**',
       '**/build/**',
       '**/.next/**',
+      '**/.next-*/**',
       '**/coverage/**',
       '**/.data/**',
       '**/playwright-report/**',

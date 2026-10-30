@@ -12,6 +12,7 @@
 # Dependencies and build output are produced inside the image
 **/node_modules
 **/.next
+**/.next-*
 **/dist
 **/build
 **/coverage

@@ -11,6 +11,7 @@
   },
   "include": [
     "next-env.d.ts",
+    "next.config.ts",
     "src",
     "test",
     "vitest.config.ts",
