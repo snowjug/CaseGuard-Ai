@@ -363,7 +363,9 @@ Other metrics (`buildMetricEstimates`, seven in contract order: `case_quality_in
 `avoidable_support_effort`, `reasoning_efficiency`, `customer_effort`, `resolution_confidence`, `token_efficiency`) are all
 labelled as estimates. `computeReasoningEfficiency` is the mean over ranked decisions of
 `value(chosen) / value(best safe) * 100`, decision-time only. `computeEfficiency` labels each figure `measured` (from
-`event.ai` telemetry), `estimated` (knowledge-pack fallback), `mixed` or `unavailable`; cost is reported **only** when the
+`event.ai` telemetry), `estimated` (knowledge-pack fallback), `mixed` or `unavailable`; on a synthetic case the recorded
+telemetry is itself simulated, so the token-efficiency display says "simulated telemetry" where it would say "measured"
+(since `2026.2.1`; the `basis` field is unchanged). Cost is reported **only** when the
 operator supplied unit prices. `buildAnalyticsOverview` emits portfolio aggregates only: counts, averages and pack labels,
 no case text, no names, nothing ranked per person.
 
@@ -480,6 +482,14 @@ proposal that goes through the lifecycle); `diffSkillVersions` and `rollbackSkil
   `hardening-bench.ts` measure typical and hostile inputs; results are in [EVALUATION.md](EVALUATION.md#6-performance).
 - **Determinism.** `src/` contains no `Date.now()`, no `Math.random()`, no file or network access (checked with a
   search); the only Node import is `node:crypto` for hashing. The clock and seed are parameters.
+- **Engine version.** `ENGINE_VERSION` (`apps/api/src/services/analysis/inputs.ts`, currently `2026.2.1`) is part of the
+  analysis input hash, so a change of meaning re-analyses stored cases instead of reusing them. `2026.2.0`: a view's belief is
+  one number (the last step of its own timeline), scenario summaries are written from the decision instant and the simulated
+  path alone, and the "Retrospectively produced little information" note needs a complete case with a recorded resolution
+  (sections 3 and 4). `2026.2.1`: the token-efficiency figure of a synthetic case displays "simulated telemetry" instead of
+  "measured" (text only: the `basis` field and every number are unchanged, and real cases keep "measured"). After a version
+  change a reviewer's decision on a counterfactual scenario survives only if the regenerated simulation is identical;
+  otherwise it is reset and the reset is audited.
 
 ## 15. What the engine does not do
 

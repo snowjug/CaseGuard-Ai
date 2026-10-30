@@ -113,13 +113,19 @@ To reset local data: stop the API, then `Remove-Item -Recurse -Force apps\api\.d
 ## 7. Migrations
 
 ```powershell
-pnpm.cmd db:migrate              # applies pending migrations to DATABASE_URL and prints the result
-pnpm.cmd db:migrate --status     # reports only; exit code 1 when migrations are pending or a checksum changed
+pnpm.cmd db:migrate              # applies pending migrations to DATABASE_URL, then provisions the tenants asked for, and prints the result
+pnpm.cmd db:migrate --status     # reports only; exit code 1 when migrations are pending, a checksum changed or a requested tenant is missing
+pnpm.cmd db:migrate --tenant <id>   # also provisions that tenant (repeatable); the tenants of ENTRA_TENANT_MAP are always requested
 ```
 
-Ran against `DATABASE_URL=pglite://memory`: `pnpm.cmd db:migrate` applied `0001_foundation` to `0012_review_target_type_idx` and reported
-"Applied: 12, pending: 0" in about 44 seconds, and `pnpm.cmd db:migrate --status` on a fresh memory database reported "Applied: 0,
-pending: 12" and exited with status 1, as documented. The API also migrates at start-up when `DB_AUTO_MIGRATE=true`, which is the
+Ran against `DATABASE_URL=pglite://memory` (a new empty database each time, discarded on exit): `pnpm.cmd db:migrate` applied
+`0001_foundation` to `0012_review_target_type_idx`, reported "Applied: 12, pending: 0" and ended with
+`Tenants: none requested (set ENTRA_TENANT_MAP or pass --tenant <id>)` (20 seconds in the latest run, 44 seconds in an earlier
+one on a more loaded machine). `pnpm.cmd db:migrate --tenant tenant_probe` ended with `Tenants: tenant_probe created` (9 seconds).
+`pnpm.cmd db:migrate --status` on a fresh memory database reported "Applied: 0, pending: 12" and exited with status 1, as
+documented (pnpm adds its own `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL` lines). Tenant provisioning exists for deployed environments, where
+nothing seeds a tenant; it creates the tenant row and its default settings, never a user or an audit event, and was verified on PGlite
+only ([DEPLOYMENT.md](DEPLOYMENT.md#55-migrations), [apps/api/src/db/README.md](../apps/api/src/db/README.md)). The API also migrates at start-up when `DB_AUTO_MIGRATE=true`, which is the
 default for `local` and `test` only; deployed environments run `node dist/db/migrate-cli.js` as a separate job (designed, never
 executed). Checksums, the advisory lock and CRLF handling are described in
 [DATA_MODEL.md](DATA_MODEL.md#10-migration-policy). Never edit a released migration: add a new one.

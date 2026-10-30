@@ -101,7 +101,7 @@ The administrator governs configuration, roles, audit and data, and watches the 
 | Watch system health and the provider | System Health | `system.health`, `system.metrics`, `system.provider` (`telemetry:read`)                             | Dependency health, migrations, the AI provider status and in-process metrics, with an honest label when a dependency is a local stand-in. A provider that cannot be created is reported as degraded while deterministic code serves.                                                     |
 | Run the guided demo                  | Demo Guide    | `demo.state` (`case:read`), `demo.seed`, `demo.reset` (`demo:manage`)                               | A 13-step story derived from stored facts. Seed and reset work only in a synthetic demo tenant, the `portfolio` profile plays the whole story as the seeded personas, and a reset keeps users, settings and the audit trail ([LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md#82-demo-data)). |
 
-**Limits that matter:** the development login has no real authentication (SP-6); Entra and the Azure services have never been exercised for real (VG-2, VG-3, VG-4); a deployed environment needs its tenant provisioned by hand (OP-7); the OpenAPI document is served in more environments than "deployed" suggests (SP-9).
+**Limits that matter:** the development login has no real authentication (SP-6); Entra and the Azure services have never been exercised for real (VG-2, VG-3, VG-4); a deployed environment gets its tenant from the migration job, which was verified on PGlite only, and creates no demo personas (OP-7); the OpenAPI document is served in more environments than "deployed" suggests (SP-9).
 
 ## Cross-cutting use cases
 
