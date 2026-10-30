@@ -6,8 +6,9 @@ Applies when `AI_PROVIDER=azure-openai`. The deterministic provider has no exter
 
 ## Symptoms
 
-- `GET /api/v1/system/provider` reports `healthy: false` (or `healthy: null` when no call has succeeded yet; `configured: false` when the endpoint or deployment is missing) with a `detail` message. An open circuit breaker is reported as `degraded`.
-- `ai.model.execution` log lines end as `failed`, `timed_out`, `circuit_open` or `budget_exceeded` (also `rejected_by_validation` when an output is refused by the validators), usually with a `fallbackReason`; `ai.provider.retry` and `ai.circuit.transition` warnings appear.
+- `GET /api/v1/system/provider` reports `healthy: false` (or `healthy: null` when no call has been made yet; `configured: false` when the endpoint or deployment is missing) with a `detail` message. `healthy` is `false` while the last call failed or the circuit breaker is open; the dependency status is then `degraded`. After three consecutive configuration faults (401, 403, 404 or unusable settings) the `detail` says the provider is misconfigured and the circuit breaker opens.
+- `ai.model.execution` log lines end as `failed`, `timed_out`, `circuit_open` or `budget_exceeded` (also `rejected_by_validation` when an output is refused by the validators), usually with a `fallbackReason`; `ai.provider.failure`, `ai.provider.retry` and `ai.circuit.transition` warnings appear.
+- `ai.provider.failure` (one per failed call) carries the error `code`, the HTTP `status` and a sanitised `causeCode` (for example `ENOTFOUND` for a DNS failure, `ECONNREFUSED`, or the credential error name for a managed-identity problem); it never carries a URL, token, header or response body.
 - Errors in the logs mention HTTP 401/403, 404 `DeploymentNotFound`, 429, 5xx, DNS failures or content-filter rejections.
 - Users do **not** see failed analyses: a failed model task falls back to the deterministic result, so analyses and counterfactual runs still complete (see Impact).
 
@@ -15,7 +16,7 @@ Applies when `AI_PROVIDER=azure-openai`. The deterministic provider has no exter
 
 - The model only _proposes_; deterministic code (probability math, safety policy, citation checks) produces every stored artefact, and no unvalidated model output is used. In the committed API a failed model task is logged and skipped, or replaced by the deterministic result, and never blocks an analysis or a counterfactual scenario ([AI_ORCHESTRATION.md](../AI_ORCHESTRATION.md) sections 8 and 11). What is lost is the model's proposal or narrative wording, and the executions are recorded as failed.
 - Read-only views of existing cases, ledgers and skills keep working. No data is lost.
-- Latency and cost: retries inside the provider (`AI_MAX_RETRIES`, default 2; a `Retry-After` above 15 s ends retrying) multiply calls during a partial outage; the circuit breaker (opens after five consecutive health failures, stays open 30 s, then allows one probe) and the bulkhead (4 concurrent calls, queue of 16) bound this.
+- Latency and cost: retries inside the provider (`AI_MAX_RETRIES`, default 2; a `Retry-After` above 15 s ends retrying) multiply calls during a partial outage; the circuit breaker (opens after five consecutive health failures or three consecutive configuration faults, stays open 30 s, then allows one probe) and the bulkhead (4 concurrent calls, queue of 16) bound this.
 - If the provider object could not be built at all (an endpoint refused by the outbound URL guard, a failed `@azure/identity` import), the failure is cached for the life of the process: `system.provider` stays `healthy: false` until the revision restarts.
 
 ## Detection
@@ -75,7 +76,7 @@ Pick the least disruptive option that stops user-visible failures:
 
 ## Verification
 
-- `GET /api/v1/system/provider` shows `healthy: true` and the expected `model` (a remote provider reports `null` until a call has succeeded, so trigger one analysis first).
+- `GET /api/v1/system/provider` shows `healthy: true` and the expected `model` (a remote provider reports `null` until a call has been made and `false` after a failed call until one succeeds, so trigger one analysis first).
 - Query 4.4 shows a falling failure rate; at least one analysis completes end to end with `succeeded` executions.
 - No `circuit_open` events in the last 30 minutes.
 

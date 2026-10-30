@@ -129,6 +129,10 @@ export interface BuiltContext {
   allText: string;
   /** SHA-256 of the canonical context: stable under future-only changes (temporal integrity). */
   contextHash: string;
+  /** SHA-256 of the context without the prose of events: what makes two requests different requests. */
+  structureKey: string;
+  /** The prose alone (event text and the evidence and claim text derived from it): the near-match text. */
+  prose: string;
   injection: readonly ContextInjectionFinding[];
   stats: ContextStats;
 }

@@ -29,7 +29,7 @@ function stampOf(ref: CitationRef, index: ContextIndex): EventStamp | null {
 const timeOf = (stamp: EventStamp): number => Date.parse(stamp.at);
 
 /** True when `a` happened before `b` (or at the same moment, for `inclusive`). */
-function precedes(a: EventStamp, b: EventStamp, inclusive: boolean): boolean {
+export function precedes(a: EventStamp, b: EventStamp, inclusive: boolean): boolean {
   const dt = timeOf(a) - timeOf(b);
   if (dt !== 0) return dt < 0;
   return inclusive ? a.sequence <= b.sequence : a.sequence < b.sequence;

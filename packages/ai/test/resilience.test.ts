@@ -127,6 +127,109 @@ describe('CircuitBreaker [NFR-REL-01]', () => {
     ] as const)
       expect(counts(code), code).toBe(false);
   });
+
+  it('[NFR-REL-01] classifies which failures are a persistent configuration fault', () => {
+    const fault = (code: ConstructorParameters<typeof ProviderError>[0], status: number | null) =>
+      new ProviderError(code, 'x', { status }).isConfigurationFault;
+    expect(fault('unauthorized', 401)).toBe(true);
+    expect(fault('forbidden', 403)).toBe(true);
+    expect(fault('not_configured', null)).toBe(true);
+    expect(fault('bad_request', 404)).toBe(true);
+    expect(fault('bad_request', 400)).toBe(false);
+    expect(fault('bad_request', null)).toBe(false);
+    for (const code of [
+      'timeout',
+      'rate_limited',
+      'server_error',
+      'network',
+      'content_filtered',
+      'model_refusal',
+      'invalid_response',
+      'overloaded',
+      'cancelled',
+    ] as const)
+      expect(fault(code, null), code).toBe(false);
+  });
+});
+
+describe('CircuitBreaker configuration faults [NFR-REL-01]', () => {
+  it('[NFR-REL-01] opens after three consecutive configuration faults, below a higher failure threshold', () => {
+    const { breaker } = breakerOf(5);
+    breaker.recordConfigurationFault();
+    breaker.recordConfigurationFault();
+    expect(breaker.state()).toBe('closed');
+    expect(breaker.misconfigured).toBe(false);
+    breaker.recordConfigurationFault();
+    expect(breaker.state()).toBe('open');
+    expect(breaker.misconfigured).toBe(true);
+    expect(breaker.configurationFaults()).toBe(3);
+    expect(breaker.snapshot()).toMatchObject({ state: 'open', consecutiveFailures: 3 });
+    expect(breaker.tryAcquire()).toBe(false);
+  });
+
+  it('[NFR-REL-01] the threshold is configurable', () => {
+    const clock = new FakeClock();
+    const breaker = new CircuitBreaker({
+      name: 'azure-openai',
+      failureThreshold: 10,
+      configFaultThreshold: 2,
+      resetMs: 1_000,
+      clock,
+    });
+    breaker.recordConfigurationFault();
+    expect(breaker.state()).toBe('closed');
+    breaker.recordConfigurationFault();
+    expect(breaker.state()).toBe('open');
+  });
+
+  it('[NFR-REL-01] a success clears the configuration-fault streak', () => {
+    const { breaker } = breakerOf(5);
+    breaker.recordConfigurationFault();
+    breaker.recordConfigurationFault();
+    breaker.recordSuccess();
+    expect(breaker.configurationFaults()).toBe(0);
+    breaker.recordConfigurationFault();
+    breaker.recordConfigurationFault();
+    expect(breaker.state()).toBe('closed');
+  });
+
+  it('[NFR-REL-01] other failures do not clear the streak, and neutral outcomes do not extend it', () => {
+    const { breaker } = breakerOf(10);
+    breaker.recordConfigurationFault();
+    breaker.recordFailure();
+    breaker.recordNeutral();
+    breaker.recordConfigurationFault();
+    expect(breaker.configurationFaults()).toBe(2);
+    breaker.recordConfigurationFault();
+    expect(breaker.state()).toBe('open');
+  });
+
+  it('[NFR-REL-01] a configuration fault during the half-open probe reopens at once and stays "misconfigured"', () => {
+    const { breaker, clock } = breakerOf(5, 10_000);
+    for (let i = 0; i < 3; i++) breaker.recordConfigurationFault();
+    clock.advance(10_000);
+    expect(breaker.tryAcquire()).toBe(true);
+    breaker.recordConfigurationFault();
+    expect(breaker.state()).toBe('open');
+    expect(breaker.misconfigured).toBe(true);
+    clock.advance(10_000);
+    expect(breaker.tryAcquire()).toBe(true);
+    breaker.recordSuccess();
+    expect(breaker.state()).toBe('closed');
+    expect(breaker.misconfigured).toBe(false);
+  });
+
+  it('[NFR-OBS-01] the transition log says why the breaker opened', () => {
+    const configuration = breakerOf(5);
+    for (let i = 0; i < 3; i++) configuration.breaker.recordConfigurationFault();
+    const failures = breakerOf(2);
+    failures.breaker.recordFailure();
+    failures.breaker.recordFailure();
+    const reasonOf = (logger: ReturnType<typeof capturingLogger>) =>
+      logger.entries.find((e) => e.fields.event === 'ai.circuit.transition')?.fields.reason;
+    expect(reasonOf(configuration.logger)).toBe('configuration_faults');
+    expect(reasonOf(failures.logger)).toBe('failure_threshold');
+  });
 });
 
 describe('Bulkhead [NFR-REL-01]', () => {

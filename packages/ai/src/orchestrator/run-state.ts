@@ -1,6 +1,6 @@
 import type { AgentName, ExecutionStatus, ValidationOutcome } from '@caseguard/schemas';
 import type { AgentTask } from '../agents/tasks';
-import type { ProviderError } from '../errors';
+import type { ProviderError, ProviderErrorCode } from '../errors';
 import type { ModelResponse } from '../types';
 import type { CallFacts } from './records';
 import type { AgentRunRequest, ValidationRejection } from './types';
@@ -17,6 +17,15 @@ export interface RunState {
   usageId: string;
   requestId: string;
   startedMs: number;
+}
+
+/** What a failed provider call tells health reporting. Codes and numbers only: nothing free-form. */
+export interface CallFailure {
+  code: ProviderErrorCode;
+  status: number | null;
+  causeCode: string | null;
+  /** A persistent fault of our own configuration (credentials, deployment, endpoint). */
+  configuration: boolean;
 }
 
 /** Why the model result was not used and deterministic code answered instead. */

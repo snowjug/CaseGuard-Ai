@@ -4,6 +4,7 @@ import type {
   AdversarialResult,
   Agreement,
   AgentEvalSummary,
+  ControlResult,
   EvalMetrics,
   EvalSample,
   EvalThresholds,
@@ -76,10 +77,11 @@ const sumAgreement = (items: readonly (Agreement | null)[]): Agreement =>
     { matched: 0, total: 0 },
   );
 
-/** Aggregates samples and adversarial results into the evaluation metrics. */
+/** Aggregates samples, adversarial results and legitimate-wording controls into the metrics. */
 export function computeMetrics(
   samples: readonly EvalSample[],
   adversarial: readonly AdversarialResult[],
+  controls: readonly ControlResult[] = [],
 ): EvalMetrics {
   const n = samples.length;
   const claims = samples.reduce((s, x) => s + x.claims, 0);
@@ -115,6 +117,10 @@ export function computeMetrics(
     adversarialRejectionRate: ratio(
       adversarial.filter((a) => a.rejected).length,
       adversarial.length,
+    ),
+    legitimateWordingAcceptanceRate: ratio(
+      controls.filter((c) => c.accepted).length,
+      controls.length,
     ),
     meanLatencyMs: withUsage.length === 0 ? 0 : samples.reduce((s, x) => s + x.latencyMs, 0) / n,
     totalTokens: withUsage.reduce((s, x) => s + (x.usage?.totalTokens ?? 0), 0),
@@ -206,6 +212,13 @@ export function evaluateGates(metrics: EvalMetrics, thresholds: EvalThresholds):
       'Adversarial fixtures rejected',
       metrics.adversarialRejectionRate,
       thresholds.minAdversarialRejection,
+      '>=',
+    ),
+    gate(
+      'legitimate-wording-accepted',
+      'Legitimate negated wording accepted',
+      metrics.legitimateWordingAcceptanceRate,
+      thresholds.minLegitimateAcceptance,
       '>=',
     ),
   ];

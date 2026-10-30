@@ -29,7 +29,7 @@ import {
 import { createIdGenerator } from '../util/ids';
 import { validateAgentOutput } from '../validators';
 import { defaultInjectionScanner } from '../validators/injection';
-import { buildHealth } from './health';
+import { buildHealth, type LastCall } from './health';
 import { ModelPath, type ModelPathOutcome } from './model-path';
 import { prepareTask, type PrepareDeps, type PreparedTask } from './prepare';
 import { NOT_VALIDATED, buildExecutionRecord, type CallFacts, type ResultSource } from './records';
@@ -86,7 +86,7 @@ export class AiOrchestrator {
   private readonly createdBy: string;
   private readonly deps: PrepareDeps;
   private readonly modelPath: ModelPath;
-  private lastCall: { ok: boolean; atMs: number; latencyMs: number } | null = null;
+  private lastCall: LastCall | null = null;
   private lastFallback: { atMs: number; reason: string } | null = null;
 
   constructor(options: AiOrchestratorOptions) {
@@ -159,14 +159,15 @@ export class AiOrchestrator {
       bulkhead: this.bulkhead,
       clock: this.clock,
       logger: this.logger,
+      metrics: this.metrics,
       prepare: this.deps,
       maxRepairAttempts: Math.max(
         0,
         Math.min(options.maxRepairAttempts ?? 1, options.config.maxAnalysisDepth - 1),
       ),
       toRequest: (run, prepared, messages, model) => this.toRequest(run, prepared, messages, model),
-      onCallResult: (ok, latencyMs) => {
-        this.lastCall = { ok, atMs: this.clock.nowMs(), latencyMs };
+      onCallResult: (ok, latencyMs, failure) => {
+        this.lastCall = { ok, atMs: this.clock.nowMs(), latencyMs, failure: failure ?? null };
       },
     });
   }

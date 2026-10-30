@@ -2,6 +2,7 @@ import type { ZodError } from 'zod';
 import type { AgentName, ValidationOutcome } from '@caseguard/schemas';
 import { OUTPUT_SCHEMAS, type AgentOutputs, type IssueKind } from '../agents/outputs';
 import { checkCitations } from './citations';
+import { checkFacts } from './facts';
 import { checkGroundedness } from './grounding';
 import { checkOutputInjection } from './injection';
 import { checkPolicy } from './policy';
@@ -145,6 +146,7 @@ export function validateAgentOutput<A extends AgentName>(
     ...checkTemporal(parsed.data, vctx),
     ...checkPolicy(typed, vctx),
     ...grounding.issues,
+    ...checkFacts(typed, vctx),
     ...checkOutputInjection(parsed.data, vctx),
   ];
   return report(parsed.data, issues, {

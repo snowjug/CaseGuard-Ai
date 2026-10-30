@@ -56,6 +56,47 @@ export interface CitationCheck {
   valid: number;
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/**
+ * A proposal must answer the request it was written for: the same decision point and the same
+ * strategy. Both are checked against the context the model was given, so a proposal computed for
+ * another request (for example one served from a cache) is rejected however well it is formed.
+ */
+function checkRequestBinding(
+  output: unknown,
+  refs: readonly CitationRef[],
+  vctx: ValidationContext,
+): OutputIssue[] {
+  if (vctx.agent !== 'counterfactual_simulator') return [];
+  const { focus } = vctx.built.context;
+  const issues: OutputIssue[] = [];
+  const forkEvent = focus.forkEventId;
+  if (typeof forkEvent === 'string') {
+    for (const ref of refs.filter((r) => r.field === 'forkEventId')) {
+      if (ref.id !== forkEvent) {
+        issues.push({
+          kind: 'citation',
+          code: 'wrong_anchor',
+          path: ref.path,
+          message: 'The proposal is anchored on a different decision point than the one requested.',
+        });
+      }
+    }
+  }
+  const strategy = focus.strategy;
+  if (typeof strategy === 'string' && isRecord(output) && output.strategy !== strategy) {
+    issues.push({
+      kind: 'citation',
+      code: 'strategy_mismatch',
+      path: 'strategy',
+      message: 'The proposal was written for a different strategy than the one requested.',
+    });
+  }
+  return issues;
+}
+
 /** Every cited id must be one that was supplied in the prompt context. */
 export function checkCitations(output: unknown, vctx: ValidationContext): CitationCheck {
   const refs = collectCitations(output);
@@ -76,18 +117,6 @@ export function checkCitations(output: unknown, vctx: ValidationContext): Citati
       });
     }
   }
-  const forkEvent = vctx.built.context.focus.forkEventId;
-  if (vctx.agent === 'counterfactual_simulator' && typeof forkEvent === 'string') {
-    for (const ref of refs.filter((r) => r.field === 'forkEventId')) {
-      if (ref.id !== forkEvent) {
-        issues.push({
-          kind: 'citation',
-          code: 'wrong_anchor',
-          path: ref.path,
-          message: 'The proposal is anchored on a different decision point than the one requested.',
-        });
-      }
-    }
-  }
+  issues.push(...checkRequestBinding(output, refs, vctx));
   return { issues, total: refs.length, valid };
 }

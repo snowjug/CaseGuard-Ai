@@ -5,7 +5,9 @@ import { contentWords, jaccard } from '../util/text';
 /**
  * Everything that must match for a cached answer to be reusable. Tenant and case are part of the
  * key, so an entry can never be served to another tenant or case; the boundary key keeps an answer
- * computed with more information from being reused for an earlier point in time.
+ * computed with more information from being reused for an earlier point in time; the structure key
+ * keeps a proposal written for one request (strategy, fork, scenario, claim subset...) from being
+ * served to another.
  */
 export interface CacheScope {
   tenantId: string;
@@ -14,14 +16,16 @@ export interface CacheScope {
   /** Template hash of the prompt version used. */
   promptHash: string;
   packVersion: string;
-  /** `${mode}:${asOf}:${fingerprint}` of the temporal view. */
+  /** `${mode}:${asOf}:${fingerprint}` of the temporal view, plus the routed model. */
   boundaryKey: string;
+  /** Hash of everything in the context except the prose of events (see `contextStructureKey`). */
+  structureKey: string;
 }
 
 export interface CacheInput {
   /** Hash of the normalised input (exact-match key). */
   hash: string;
-  /** Normalised input text used for lexical near-match. */
+  /** Normalised prose (event text) used for lexical near-match; never ids, focus or knowledge. */
   text: string;
 }
 
@@ -73,15 +77,32 @@ interface Stored<T> {
   value: T;
   meta: CacheEntryMeta;
   expiresAtMs: number;
-  lastUsedMs: number;
 }
 
 const scopeKey = (s: CacheScope): string =>
-  [s.tenantId, s.caseId ?? '-', s.agent, s.promptHash, s.packVersion, s.boundaryKey].join('\u0000');
+  [
+    s.tenantId,
+    s.caseId ?? '-',
+    s.agent,
+    s.promptHash,
+    s.packVersion,
+    s.boundaryKey,
+    s.structureKey,
+  ].join('\u0000');
 
-/** Tenant-scoped, TTL-bound semantic cache with exact and lexical near-match lookup. */
+const entryId = (bucketKey: string, hash: string): string => `${bucketKey}\u0001${hash}`;
+
+/**
+ * Tenant-scoped, TTL-bound semantic cache with exact and lexical near-match lookup. Near-matching
+ * only ever compares entries of the same bucket, i.e. requests that agree on everything but prose.
+ * Upkeep is constant time per operation: a running entry count, an LRU order kept by the insertion
+ * order of a map, and buckets that are deleted the moment they empty.
+ */
 export class SemanticCache<T = unknown> {
   private readonly buckets = new Map<string, Map<string, Stored<T>>>();
+  /** Entries from least to most recently used. */
+  private readonly recency = new Map<string, { bucketKey: string; hash: string }>();
+  private entries = 0;
   private readonly counters = {
     hits: 0,
     exactHits: 0,
@@ -102,10 +123,9 @@ export class SemanticCache<T = unknown> {
     return this.options.enabled;
   }
 
-  private count(): number {
-    let n = 0;
-    for (const bucket of this.buckets.values()) n += bucket.size;
-    return n;
+  /** Number of buckets currently held (diagnostics: never more than the number of entries). */
+  bucketCount(): number {
+    return this.buckets.size;
   }
 
   private miss(agent: AgentName): null {
@@ -114,15 +134,30 @@ export class SemanticCache<T = unknown> {
     return null;
   }
 
+  private touch(bucketKey: string, hash: string): void {
+    const id = entryId(bucketKey, hash);
+    this.recency.delete(id);
+    this.recency.set(id, { bucketKey, hash });
+  }
+
+  /** Removes one entry, and its bucket when that was the last one. */
+  private drop(bucketKey: string, bucket: Map<string, Stored<T>>, hash: string): void {
+    if (!bucket.delete(hash)) return;
+    this.entries--;
+    this.recency.delete(entryId(bucketKey, hash));
+    if (bucket.size === 0) this.buckets.delete(bucketKey);
+  }
+
   /** Returns a cached, previously validated value or null. Expired entries are dropped on sight. */
   get(scope: CacheScope, input: CacheInput): CacheHit<T> | null {
     if (!this.options.enabled) return null;
     const now = this.options.clock.nowMs();
-    const bucket = this.buckets.get(scopeKey(scope));
+    const key = scopeKey(scope);
+    const bucket = this.buckets.get(key);
     if (!bucket) return this.miss(scope.agent);
     for (const [hash, stored] of bucket) {
       if (stored.expiresAtMs <= now) {
-        bucket.delete(hash);
+        this.drop(key, bucket, hash);
         this.counters.expirations++;
       }
     }
@@ -143,7 +178,7 @@ export class SemanticCache<T = unknown> {
       }
     }
     if (!chosen) return this.miss(scope.agent);
-    chosen.stored.lastUsedMs = now;
+    this.touch(key, chosen.stored.hash);
     this.counters.hits++;
     if (chosen.kind === 'exact') this.counters.exactHits++;
     else this.counters.nearHits++;
@@ -161,7 +196,12 @@ export class SemanticCache<T = unknown> {
     if (!this.options.enabled) return;
     const now = this.options.clock.nowMs();
     const key = scopeKey(scope);
-    const bucket = this.buckets.get(key) ?? new Map<string, Stored<T>>();
+    let bucket = this.buckets.get(key);
+    if (!bucket) {
+      bucket = new Map<string, Stored<T>>();
+      this.buckets.set(key, bucket);
+    }
+    if (!bucket.has(input.hash)) this.entries++;
     bucket.set(input.hash, {
       scope,
       hash: input.hash,
@@ -169,23 +209,23 @@ export class SemanticCache<T = unknown> {
       value: structuredClone(value),
       meta,
       expiresAtMs: now + this.options.ttlSeconds * 1000,
-      lastUsedMs: now,
     });
-    this.buckets.set(key, bucket);
-    while (this.count() > this.maxEntries) this.evictOldest();
+    this.touch(key, input.hash);
+    while (this.entries > this.maxEntries) {
+      if (!this.evictOldest()) break;
+    }
   }
 
-  private evictOldest(): void {
-    let oldest: { bucketKey: string; hash: string; usedMs: number } | null = null;
-    for (const [bucketKey, bucket] of this.buckets) {
-      for (const [hash, stored] of bucket) {
-        if (!oldest || stored.lastUsedMs < oldest.usedMs)
-          oldest = { bucketKey, hash, usedMs: stored.lastUsedMs };
-      }
-    }
-    if (!oldest) return;
-    this.buckets.get(oldest.bucketKey)?.delete(oldest.hash);
+  /** Drops the least recently used entry; false when there is nothing to drop. */
+  private evictOldest(): boolean {
+    const oldest = this.recency.values().next();
+    if (oldest.done) return false;
+    const { bucketKey, hash } = oldest.value;
+    const bucket = this.buckets.get(bucketKey);
+    if (bucket) this.drop(bucketKey, bucket, hash);
+    else this.recency.delete(entryId(bucketKey, hash));
     this.counters.evictions++;
+    return true;
   }
 
   /** Drops entries matching every given field; returns how many were removed. */
@@ -224,16 +264,15 @@ export class SemanticCache<T = unknown> {
     for (const [bucketKey, bucket] of this.buckets) {
       for (const [hash, stored] of bucket) {
         if (predicate(stored)) {
-          bucket.delete(hash);
+          this.drop(bucketKey, bucket, hash);
           removed++;
         }
       }
-      if (bucket.size === 0) this.buckets.delete(bucketKey);
     }
     return removed;
   }
 
   stats(): CacheStats {
-    return { ...this.counters, size: this.count() };
+    return { ...this.counters, size: this.entries };
   }
 }

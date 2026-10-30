@@ -16,7 +16,7 @@ import {
 import { toIso } from '../util/ids';
 import { validateAgentOutput } from '../validators';
 import { defaultInjectionScanner } from '../validators/injection';
-import { runAdversarialSuite } from './adversarial';
+import { runAdversarialSuite, runControlSuite } from './adversarial';
 import {
   classifierAgreement,
   computeMetrics,
@@ -30,6 +30,7 @@ import {
   DETERMINISTIC_THRESHOLDS,
   MODEL_THRESHOLDS,
   type AdversarialResult,
+  type ControlResult,
   type EvalCase,
   type EvalReport,
   type EvalSample,
@@ -208,7 +209,8 @@ export async function runEvaluation(options: EvalOptions): Promise<EvalReport> {
   const adversarial: AdversarialResult[] = options.cases.flatMap((c) =>
     runAdversarialSuite(c, deps),
   );
-  const metrics = computeMetrics(samples, adversarial);
+  const controls: ControlResult[] = options.cases.flatMap((c) => runControlSuite(c, deps));
+  const metrics = computeMetrics(samples, adversarial, controls);
   const gates = evaluateGates(metrics, thresholds);
   const notes = [
     descriptor.validationNote,
@@ -235,6 +237,7 @@ export async function runEvaluation(options: EvalOptions): Promise<EvalReport> {
     byAgent: summarizeByAgent(samples),
     samples,
     adversarial,
+    controls,
     gates,
     passed: gates.every((g) => g.passed),
     notes,

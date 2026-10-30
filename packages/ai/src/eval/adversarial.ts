@@ -7,7 +7,8 @@ import { runDeterministicTask } from '../providers/deterministic/provider';
 import { prepareTask, type PrepareDeps, type PreparedTask } from '../orchestrator/prepare';
 import { validateAgentOutput } from '../validators';
 import { planSamples, type PlannedSample } from './plan';
-import type { AdversarialResult, EvalCase } from './types';
+import type { AdversarialResult, ControlResult, EvalCase } from './types';
+import { LEGITIMATE_WORDINGS, UNSAFE_WORDINGS, withWording, type WordingAnchor } from './wording';
 
 type Json = Record<string, unknown>;
 
@@ -29,6 +30,14 @@ const byAgent =
     samples.filter((s) => s.task.agent === agent && (!label || label.test(s.label))).at(-1) ?? null;
 
 const firstEventId = (evalCase: EvalCase): string => evalCase.events[0]?.id ?? 'e01';
+
+/** The record a finding can cite when the reference output has no finding of its own. */
+function anchorFor(prepared: PreparedTask, evalCase: EvalCase): WordingAnchor {
+  const eventId = firstEventId(evalCase);
+  const text =
+    prepared.vctx?.built.sourceText.get(eventId) ?? evalCase.events[0]?.body ?? 'The record.';
+  return { eventId, text: text.slice(0, 200) };
+}
 
 /** Actions the safety gates must never allow in a recommendation. */
 const unsafeAction = (evalCase: EvalCase, wantDestructive: boolean): string | null =>
@@ -222,6 +231,13 @@ const OUTPUT_FIXTURES: readonly OutputFixture[] = [
     pick: byAgent('skilldna_extractor'),
     mutate: (o) => ({ ...o, requiresHumanApproval: false }),
   },
+  ...UNSAFE_WORDINGS.map((wording): OutputFixture => ({
+    id: wording.id,
+    description: wording.description,
+    expectedKinds: ['policy'],
+    pick: byAgent(wording.agent),
+    mutate: (o, prepared, evalCase) => withWording(o, wording, anchorFor(prepared, evalCase)),
+  })),
 ];
 
 const INPUT_PAYLOADS: readonly { id: string; description: string; payload: string }[] = [
@@ -353,6 +369,38 @@ export function runAdversarialSuite(evalCase: EvalCase, deps: PrepareDeps): Adve
   for (const fixture of INPUT_PAYLOADS) {
     const result = runInputFixture(fixture, evalCase, deps);
     results.push({ ...result, id: `${evalCase.id}:${fixture.id}` });
+  }
+  return results;
+}
+
+/**
+ * Legitimate wording that must be accepted: negated recommendations and disclaimers. They keep the
+ * unsafe-wording rules honest in the other direction (a rule that rejects every sentence with a
+ * negation in it would pass the adversarial fixtures and be useless in production).
+ */
+export function runControlSuite(evalCase: EvalCase, deps: PrepareDeps): ControlResult[] {
+  const samples = planSamples(evalCase, { cutFractions: [], maxForks: 0 });
+  const results: ControlResult[] = [];
+  for (const wording of LEGITIMATE_WORDINGS) {
+    const sample = byAgent(wording.agent)(samples);
+    if (!sample) continue;
+    const prepared = prepareTask(sample.task, 'control', 'adversarial', deps, {
+      applyBudget: false,
+    });
+    const base = structuredClone(runDeterministicTask(sample.task)) as unknown as Json;
+    const output = withWording(base, wording, anchorFor(prepared, evalCase));
+    const report = validateAgentOutput(sample.task.agent, output, prepared.vctx);
+    results.push({
+      id: `${evalCase.id}:${wording.id}`,
+      description: wording.description,
+      accepted: report.ok,
+      observedKinds: report.kinds,
+      detail:
+        report.issues
+          .slice(0, 3)
+          .map((i) => `[${i.kind}:${i.code}]`)
+          .join(' ') || 'accepted',
+    });
   }
   return results;
 }

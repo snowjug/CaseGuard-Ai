@@ -44,8 +44,7 @@ const isStatic = (task: AgentTask): boolean =>
 function cacheKeysFor(
   task: AgentTask,
   prompt: RegisteredPrompt,
-  contextHash: string,
-  text: string,
+  built: BuiltContext,
   model: string,
 ): { scope: CacheScope | null; input: CacheInput | null } {
   if (task.agent === 'token_governor' || task.agent === 'safety_policy_validator') {
@@ -60,8 +59,10 @@ function cacheKeysFor(
       promptHash: prompt.templateHash,
       packVersion: `${pack.pack.id}@${pack.pack.version}`,
       boundaryKey: `${view.mode}:${view.asOf}:${view.fingerprint}|${model}`,
+      // Everything but event prose is part of the exact key, so near-matching can only vary over text.
+      structureKey: built.structureKey,
     },
-    input: { hash: contextHash, text: normalizeText(text) },
+    input: { hash: built.contextHash, text: normalizeText(built.prose) },
   };
 }
 
@@ -100,7 +101,7 @@ export function prepareTask(
   });
   const nonce = deriveNonce(requestId, prompt.templateHash);
   const messages = renderMessages(prompt, fit.built.context, { nonce });
-  const keys = cacheKeysFor(task, prompt, fit.built.contextHash, fit.built.allText, model);
+  const keys = cacheKeysFor(task, prompt, fit.built, model);
   return {
     task,
     prompt,

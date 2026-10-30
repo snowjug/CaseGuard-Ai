@@ -53,6 +53,7 @@ export {
 
 // Context, validation
 export { buildContext, type ContextDeps } from './context/build';
+export { contextProse, contextStructure, contextStructureKey } from './context/fingerprint';
 export { scopeAnalysis, type ScopedAnalysis } from './context/scope';
 export type * from './context/types';
 export * from './validators';
@@ -80,8 +81,10 @@ export {
 } from './cache/semantic-cache';
 export {
   CircuitBreaker,
+  DEFAULT_CONFIG_FAULT_THRESHOLD,
   type BreakerSnapshot,
   type BreakerState,
+  type CircuitBreakerOptions,
 } from './resilience/circuit-breaker';
 export { Bulkhead, type BulkheadStats } from './resilience/bulkhead';
 
@@ -93,6 +96,7 @@ export type {
   AgentRunRequest,
   AgentRunResult,
   AiHealth,
+  AiHealthFailure,
   AiOrchestratorOptions,
   InputFlags,
   ValidationRejection,
@@ -104,7 +108,7 @@ export { redactSecrets, createSecretScrubber } from './util/redact';
 
 // Evaluation harness (spec 13)
 export { runEvaluation, type EvalOptions } from './eval/harness';
-export { runAdversarialSuite } from './eval/adversarial';
+export { runAdversarialSuite, runControlSuite } from './eval/adversarial';
 export { planSamples, type PlanOptions, type PlannedSample } from './eval/plan';
 export { evalReportToJson, evalReportToMarkdown } from './eval/report';
 export * from './eval/types';

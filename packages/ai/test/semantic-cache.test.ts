@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SemanticCache, type CacheScope } from '../src';
+import { countMapIteration } from './count-work';
 import { FakeClock, capturingMetrics } from './fakes';
 
 const usage = {
@@ -18,6 +19,7 @@ const scope = (patch: Partial<CacheScope> = {}): CacheScope => ({
   promptHash: 'a'.repeat(64),
   packVersion: 'kp.teams@1.0.0',
   boundaryKey: 'at:2026-03-09T09:12:00Z:fp1|gpt-test',
+  structureKey: 's'.repeat(64),
   ...patch,
 });
 
@@ -73,6 +75,7 @@ describe('SemanticCache [FR-TK-02]', () => {
       { promptHash: 'b'.repeat(64) },
       { packVersion: 'kp.teams@2.0.0' },
       { boundaryKey: 'at:2026-03-10T00:00:00Z:fp2|gpt-test' },
+      { structureKey: 't'.repeat(64) },
     ]) {
       expect(cache.get(scope(patch), input('same text')), JSON.stringify(patch)).toBeNull();
     }
@@ -161,5 +164,72 @@ describe('SemanticCache [FR-TK-02]', () => {
     cache.set(scope(), input('x y z'), { answer: 'x' }, meta);
     expect(cache.get(scope(), input('x y z'))).toBeNull();
     expect(cache.stats().size).toBe(0);
+  });
+
+  it('[FR-TK-02] near-matching never crosses the structure key, however similar the text', () => {
+    const { cache } = cacheOf({ similarityThreshold: 0.5 });
+    const text = 'customer reports intermittent teams sign in failures at two branch offices';
+    cache.set(scope(), input(text, 'hash-a'), { answer: 'a' }, meta);
+    expect(
+      cache.get(scope({ structureKey: 't'.repeat(64) }), input(`${text} today`, 'hash-b')),
+    ).toBeNull();
+    expect(cache.get(scope(), input(`${text} today`, 'hash-b'))?.kind).toBe('near');
+  });
+
+  it('[FR-TK-02] frees a bucket as soon as its last entry is gone (eviction, expiry, invalidation)', () => {
+    const { cache, clock } = cacheOf({ ttlSeconds: 60, maxEntries: 2 });
+    cache.set(scope({ caseId: 'case_a' }), input('alpha entry text'), { answer: 'a' }, meta);
+    clock.advance(1);
+    cache.set(scope({ caseId: 'case_b' }), input('bravo entry text'), { answer: 'b' }, meta);
+    expect(cache.bucketCount()).toBe(2);
+
+    clock.advance(1);
+    cache.set(scope({ caseId: 'case_c' }), input('charlie entry text'), { answer: 'c' }, meta);
+    expect(cache.stats()).toMatchObject({ size: 2, evictions: 1 });
+    expect(cache.bucketCount()).toBe(2);
+
+    clock.advance(70_000);
+    expect(cache.get(scope({ caseId: 'case_b' }), input('bravo entry text'))).toBeNull();
+    expect(cache.stats()).toMatchObject({ expirations: 1, size: 1 });
+    expect(cache.bucketCount()).toBe(1);
+
+    expect(cache.invalidate({ caseId: 'case_c' })).toBe(1);
+    expect(cache.bucketCount()).toBe(0);
+    expect(cache.stats().size).toBe(0);
+  });
+
+  it('[FR-TK-02] keeps an exact size when an entry is replaced, expired or removed', () => {
+    const { cache, clock } = cacheOf({ ttlSeconds: 60 });
+    cache.set(scope(), input('same entry text', 'h1'), { answer: '1' }, meta);
+    cache.set(scope(), input('same entry text', 'h1'), { answer: '2' }, meta);
+    expect(cache.stats().size).toBe(1);
+    expect(cache.get(scope(), input('same entry text', 'h1'))?.value).toEqual({ answer: '2' });
+    cache.set(scope(), input('another entry text', 'h2'), { answer: '3' }, meta);
+    expect(cache.stats().size).toBe(2);
+    clock.advance(61_000);
+    expect(cache.get(scope(), input('same entry text', 'h1'))).toBeNull();
+    expect(cache.stats()).toMatchObject({ size: 0, expirations: 2 });
+    expect(cache.bucketCount()).toBe(0);
+  });
+
+  it('[FR-TK-02] does a constant amount of work per insert and keeps one bucket per live entry, however many scopes pass through', () => {
+    const inserts = 2_000;
+    const capacity = 100;
+    const { cache } = cacheOf({ maxEntries: capacity });
+    const { visits } = countMapIteration(() => {
+      for (let i = 0; i < inserts; i++) {
+        cache.set(
+          scope({ caseId: `case_${i}` }),
+          input(`entry number ${i} with a few more words`),
+          { answer: String(i) },
+          meta,
+        );
+      }
+    });
+    expect(cache.stats()).toMatchObject({ size: capacity, evictions: inserts - capacity });
+    expect(cache.bucketCount()).toBe(capacity);
+    // Elements read out of Map iterators, not time: linear in the inserts (the former implementation
+    // rescanned every bucket it had ever created on every insert, millions of reads for this loop).
+    expect(visits).toBeLessThanOrEqual(inserts * 10);
   });
 });

@@ -19,9 +19,18 @@ export interface CircuitBreakerOptions {
   clock: Clock;
   /** Concurrent trial calls allowed while half-open. */
   halfOpenMaxProbes?: number;
+  /**
+   * Consecutive configuration faults (rejected credentials, a deployment that does not exist) that
+   * open the breaker even below `failureThreshold`: no retry cures them, so more calls are waste.
+   */
+  configFaultThreshold?: number;
   logger?: Logger;
   metrics?: Metrics;
 }
+
+export const DEFAULT_CONFIG_FAULT_THRESHOLD = 3;
+
+type OpenReason = 'failure_threshold' | 'configuration_faults' | 'probe_failed';
 
 /**
  * Classic closed / open / half-open breaker. Time comes from the injected clock, so transitions
@@ -30,16 +39,19 @@ export interface CircuitBreakerOptions {
 export class CircuitBreaker {
   private current: BreakerState = 'closed';
   private failures = 0;
+  private configFaults = 0;
   private openedAtMs: number | null = null;
   private probesInFlight = 0;
   private readonly logger: Logger;
   private readonly metrics: Metrics;
   private readonly halfOpenMaxProbes: number;
+  private readonly configFaultThreshold: number;
 
   constructor(private readonly options: CircuitBreakerOptions) {
     this.logger = options.logger ?? noopLogger;
     this.metrics = options.metrics ?? noopMetrics;
     this.halfOpenMaxProbes = options.halfOpenMaxProbes ?? 1;
+    this.configFaultThreshold = options.configFaultThreshold ?? DEFAULT_CONFIG_FAULT_THRESHOLD;
   }
 
   /** Current state; an open breaker becomes half-open once the reset time has elapsed. */
@@ -68,6 +80,7 @@ export class CircuitBreaker {
   recordSuccess(): void {
     if (this.current === 'half_open') this.probesInFlight = Math.max(0, this.probesInFlight - 1);
     this.failures = 0;
+    this.configFaults = 0;
     if (this.current !== 'closed') {
       this.openedAtMs = null;
       this.transition('closed');
@@ -77,11 +90,31 @@ export class CircuitBreaker {
   recordFailure(): void {
     if (this.current === 'half_open') {
       this.probesInFlight = Math.max(0, this.probesInFlight - 1);
-      this.open();
+      this.open('probe_failed');
       return;
     }
     this.failures++;
-    if (this.current === 'closed' && this.failures >= this.options.failureThreshold) this.open();
+    if (this.current === 'closed' && this.failures >= this.options.failureThreshold) {
+      this.open('failure_threshold');
+    }
+  }
+
+  /**
+   * A failure that says the provider is set up wrongly (rejected credentials, a deployment that does
+   * not exist). It counts as a failure and, after `configFaultThreshold` in a row, opens the breaker
+   * on its own; only a success clears the streak.
+   */
+  recordConfigurationFault(): void {
+    this.configFaults++;
+    if (this.current === 'half_open') {
+      this.probesInFlight = Math.max(0, this.probesInFlight - 1);
+      this.open('probe_failed');
+      return;
+    }
+    this.failures++;
+    if (this.current !== 'closed') return;
+    if (this.configFaults >= this.configFaultThreshold) this.open('configuration_faults');
+    else if (this.failures >= this.options.failureThreshold) this.open('failure_threshold');
   }
 
   /** Releases a reserved probe slot when a call ended without telling us about provider health. */
@@ -89,18 +122,34 @@ export class CircuitBreaker {
     if (this.current === 'half_open') this.probesInFlight = Math.max(0, this.probesInFlight - 1);
   }
 
-  private open(): void {
-    this.openedAtMs = this.options.clock.nowMs();
-    this.transition('open');
+  /** Consecutive configuration faults since the last success. */
+  configurationFaults(): number {
+    return this.configFaults;
   }
 
-  private transition(next: BreakerState): void {
+  /** True once enough configuration faults in a row were seen: calls are being held back for that reason. */
+  get misconfigured(): boolean {
+    return this.configFaults >= this.configFaultThreshold;
+  }
+
+  private open(reason: OpenReason): void {
+    this.openedAtMs = this.options.clock.nowMs();
+    this.transition('open', reason);
+  }
+
+  private transition(next: BreakerState, reason?: OpenReason): void {
     if (next === this.current) return;
     const previous = this.current;
     this.current = next;
     this.metrics.gauge('ai.circuit.open', next === 'open' ? 1 : 0, { breaker: this.options.name });
     this.logger.warn(
-      { event: 'ai.circuit.transition', breaker: this.options.name, from: previous, to: next },
+      {
+        event: 'ai.circuit.transition',
+        breaker: this.options.name,
+        from: previous,
+        to: next,
+        ...(reason ? { reason } : {}),
+      },
       `Circuit breaker ${this.options.name} changed state`,
     );
   }

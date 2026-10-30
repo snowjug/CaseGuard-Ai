@@ -43,6 +43,7 @@ export function evalReportToMarkdown(report: EvalReport): string {
     `| Counterfactual step safety | ${pct(m.counterfactualRealism)} |`,
     `| SkillDNA proposal completeness | ${pct(m.skillCompleteness)} |`,
     `| Adversarial fixtures rejected | ${pct(m.adversarialRejectionRate)} |`,
+    `| Legitimate wording accepted | ${pct(m.legitimateWordingAcceptanceRate)} |`,
     `| Mean latency | ${m.meanLatencyMs.toFixed(1)} ms |`,
     `| Tokens (${report.provider.simulated ? 'estimated' : 'as reported'}) | ${m.totalTokens} |`,
     '',
@@ -62,6 +63,14 @@ export function evalReportToMarkdown(report: EvalReport): string {
     ...report.adversarial.map(
       (a) =>
         `| ${a.id} | ${a.kind} | ${a.expectedKinds.join(', ') || '-'} | ${a.observedKinds.join(', ') || '-'} | ${a.rejected ? 'yes' : 'NO'} |`,
+    ),
+    '',
+    '## Legitimate wording that must be accepted',
+    '',
+    '| Control | Observed | Accepted |',
+    '| --- | --- | --- |',
+    ...report.controls.map(
+      (c) => `| ${c.id} | ${c.observedKinds.join(', ') || '-'} | ${c.accepted ? 'yes' : 'NO'} |`,
     ),
     '',
     '## Notes',

@@ -55,7 +55,7 @@ describe('adversarial fixtures are rejected [NFR-SEC-05]', () => {
   ] as const) {
     it(`[NFR-SEC-05] every adversarial fixture is rejected for the expected reason (${name})`, () => {
       const results = runAdversarialSuite(toEvalCase(p, name), deps);
-      expect(results.length).toBeGreaterThanOrEqual(name === 'case one' ? 18 : 10);
+      expect(results.length).toBeGreaterThanOrEqual(name === 'case one' ? 23 : 19);
       const accepted = results.filter((r) => !r.rejected);
       expect(accepted.map((r) => `${r.id}: ${r.detail}`)).toEqual([]);
       const ids = results.map((r) => r.id.split(':')[1]);
@@ -67,6 +67,11 @@ describe('adversarial fixtures are rejected [NFR-SEC-05]', () => {
         'ignore-previous-instructions',
         'delimiter-breaking',
         'tool-and-exfiltration',
+        'negation-baseline',
+        'negation-unrelated-not',
+        'negation-no-need-to-wait',
+        'negation-hides-second-match',
+        'negation-people-no-one',
       ]) {
         expect(ids).toContain(required);
       }

@@ -9,6 +9,7 @@ import type {
 import type { SemanticCache, CacheStats } from '../cache/semantic-cache';
 import type { AgentOutputs, IssueKind } from '../agents/outputs';
 import type { AgentTaskOf } from '../agents/tasks';
+import type { ProviderErrorCode } from '../errors';
 import type { GovernorLimits, TokenGovernor } from '../governor/token-governor';
 import type { HandlerOverrides } from '../providers/deterministic/provider';
 import type { PromptRegistry } from '../prompts/registry';
@@ -99,6 +100,17 @@ export interface AiOrchestratorOptions {
   validationLimits?: Partial<ValidationLimits>;
 }
 
+export interface AiHealthFailure {
+  code: ProviderErrorCode;
+  /** HTTP status of the answer, when there was one. */
+  status: number | null;
+  /** Sanitised reason (`ENOTFOUND`, `DeploymentNotFound`, `CredentialUnavailableError`); never free text. */
+  causeCode: string | null;
+  /** A persistent fault of the setup (credentials, deployment, endpoint) rather than of one request. */
+  configurationFault: boolean;
+  at: string;
+}
+
 export interface AiHealth {
   status: HealthStatus;
   /** Matches the `system.provider` route contract. */
@@ -108,8 +120,12 @@ export interface AiHealth {
   breakers: BreakerSnapshot[];
   bulkhead: BulkheadStats;
   cache: CacheStats & { enabled: boolean };
-  /** True while requests are being served by deterministic code because the model path is unavailable. */
+  /** True while the last provider call failed or the breaker holds calls back: deterministic code is serving. */
   degraded: boolean;
   degradedReason: string | null;
+  /** True once repeated calls were rejected as a configuration fault (404, 401, 403, unusable settings). */
+  misconfigured?: boolean;
+  /** The last provider call, when it failed; null after a success. */
+  lastFailure?: AiHealthFailure | null;
   notes: string[];
 }

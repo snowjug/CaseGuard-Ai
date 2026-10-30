@@ -1,4 +1,4 @@
-import { ProviderError } from '../../errors';
+import { ProviderError, causeCodeOf } from '../../errors';
 import {
   noopLogger,
   noopMetrics,
@@ -78,6 +78,7 @@ const withAttempts = (error: ProviderError, attempts: number): ProviderError =>
     status: error.status,
     retryAfterMs: error.retryAfterMs,
     attempts,
+    causeCode: error.causeCode,
   });
 
 /**
@@ -169,18 +170,20 @@ export class AzureOpenAiProvider implements ModelProvider {
       token = await this.auth.credential.getToken(this.auth.scope ?? AZURE_OPENAI_SCOPE, {
         abortSignal: signal,
       });
-    } catch {
+    } catch (error) {
       if (signal.aborted)
         throw new ProviderError('cancelled', 'The request was cancelled while acquiring a token.');
       throw new ProviderError(
         'unauthorized',
         'An Azure OpenAI access token could not be acquired.',
+        { causeCode: causeCodeOf(error) },
       );
     }
     if (!token || token.token.length === 0) {
       throw new ProviderError(
         'unauthorized',
         'An Azure OpenAI access token could not be acquired.',
+        { causeCode: 'EmptyToken' },
       );
     }
     this.cachedToken = { token: token.token, expiresAtMs: token.expiresOnTimestamp };
@@ -218,7 +221,11 @@ export class AzureOpenAiProvider implements ModelProvider {
   private errorForStatus(status: number, body: AzureErrorBody, headers: Headers): ProviderError {
     const code = body.code ?? body.innerCode;
     const suffix = code ? ` (${code})` : '';
-    const options = { status, retryAfterMs: retryAfterMs(headers, this.clock.nowMs()) };
+    const options = {
+      status,
+      retryAfterMs: retryAfterMs(headers, this.clock.nowMs()),
+      causeCode: code ?? null,
+    };
     if (
       status === 400 &&
       (body.code === 'content_filter' || body.innerCode === 'ResponsibleAIPolicyViolation')
@@ -300,6 +307,7 @@ export class AzureOpenAiProvider implements ModelProvider {
     return new ProviderError(
       'network',
       'The request to Azure OpenAI failed before a response was received.',
+      { causeCode: causeCodeOf(error) },
     );
   }
 
@@ -367,6 +375,7 @@ export class AzureOpenAiProvider implements ModelProvider {
               attempt: attempts,
               status: failure.status,
               code: failure.code,
+              causeCode: failure.causeCode,
               delayMs: delay,
             },
             'Retrying Azure OpenAI call',

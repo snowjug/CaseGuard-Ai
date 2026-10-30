@@ -13,6 +13,7 @@ import {
   normalizeText,
 } from '../util/text';
 import { buildFocus } from './focus';
+import { contextProse, contextStructureKey } from './fingerprint';
 import { scopeAnalysis, type ScopedAnalysis } from './scope';
 import type {
   AgentContext,
@@ -300,6 +301,8 @@ function finalize(
     sourceText,
     allText,
     contextHash: hashJson(context),
+    structureKey: contextStructureKey(context),
+    prose: contextProse(context),
     injection,
     stats: {
       level: context.trimming.level,

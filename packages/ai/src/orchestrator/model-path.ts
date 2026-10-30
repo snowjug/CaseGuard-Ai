@@ -4,14 +4,15 @@ import type { RouteDecision, TokenGovernor } from '../governor/token-governor';
 import { renderMessages } from '../prompts/render';
 import type { Bulkhead } from '../resilience/bulkhead';
 import type { CircuitBreaker } from '../resilience/circuit-breaker';
-import type { Clock, Logger, ModelMessage, ModelProvider, ModelRequest } from '../types';
+import type { Clock, Logger, Metrics, ModelMessage, ModelProvider, ModelRequest } from '../types';
 import { validateAgentOutput } from '../validators';
 import type { ValidationReport } from '../validators/types';
-import { prepareTask, type PrepareDeps, type PreparedTask } from './prepare';
+import { messageTokens, prepareTask, type PrepareDeps, type PreparedTask } from './prepare';
 import type { CallFacts } from './records';
 import {
   ZERO_USAGE,
   usageSample,
+  type CallFailure,
   type CallOutcome,
   type FallbackCause,
   type RunState,
@@ -57,6 +58,7 @@ export interface ModelPathDeps {
   bulkhead: Bulkhead;
   clock: Clock;
   logger: Logger;
+  metrics: Metrics;
   prepare: PrepareDeps;
   maxRepairAttempts: number;
   toRequest: (
@@ -65,7 +67,8 @@ export interface ModelPathDeps {
     messages: readonly ModelMessage[],
     model: string,
   ) => ModelRequest;
-  onCallResult: (ok: boolean, latencyMs: number) => void;
+  /** Reports the outcome of every provider call that was made, except one the caller cancelled. */
+  onCallResult: (ok: boolean, latencyMs: number, failure?: CallFailure) => void;
 }
 
 const fallbackCause = (
@@ -113,7 +116,7 @@ export class ModelPath {
       );
       breaker?.recordSuccess();
       this.deps.onCallResult(true, response.latencyMs);
-      calls.push({
+      this.finishCall(run, calls, {
         attempts: response.attempts,
         retries: response.retries,
         latencyMs: response.latencyMs,
@@ -131,13 +134,8 @@ export class ModelPath {
           'Unexpected provider failure',
         );
       }
-      if (failure.countsTowardBreaker) {
-        breaker?.recordFailure();
-        this.deps.onCallResult(false, 0);
-      } else {
-        breaker?.recordNeutral();
-      }
-      calls.push({
+      this.reportFailure(run, failure);
+      this.finishCall(run, calls, {
         attempts: failure.attempts,
         retries: Math.max(0, failure.attempts - 1),
         latencyMs: 0,
@@ -147,12 +145,66 @@ export class ModelPath {
     }
   }
 
-  private budgetFor(run: RunState, prepared: PreparedTask) {
+  /**
+   * Books a finished call right away: the budget checks that follow (the repair call, the next
+   * task of the same case) must see what this call used. Calls that failed outright used nothing.
+   */
+  private finishCall(run: RunState, calls: CallFacts[], facts: CallFacts): void {
+    calls.push(facts);
+    if (facts.usage.promptTokens + facts.usage.completionTokens > 0) {
+      this.deps.governor.record(usageSample(run, [facts]));
+    }
+  }
+
+  /**
+   * Tells the breaker, health and the logs about a failed call. Every failure except the caller
+   * leaving shows up in health as the last call having failed; configuration faults (404, 401,
+   * 403, unusable settings) are counted separately so a wrong deployment name stops costing calls.
+   * Only codes, numbers and the sanitised cause code are logged: no message, URL or header.
+   */
+  private reportFailure(run: RunState, failure: ProviderError): void {
+    const { breaker, logger, metrics, provider } = this.deps;
+    if (failure.isConfigurationFault) breaker?.recordConfigurationFault();
+    else if (failure.countsTowardBreaker) breaker?.recordFailure();
+    else breaker?.recordNeutral();
+    if (failure.code === 'cancelled') return;
+    const configuration = failure.isConfigurationFault;
+    this.deps.onCallResult(false, 0, {
+      code: failure.code,
+      status: failure.status,
+      causeCode: failure.causeCode,
+      configuration,
+    });
+    metrics.increment('ai.provider.failure', 1, {
+      provider: provider.kind,
+      code: failure.code,
+      configuration: String(configuration),
+    });
+    logger.warn(
+      {
+        event: 'ai.provider.failure',
+        agent: run.agent,
+        provider: provider.kind,
+        code: failure.code,
+        status: failure.status,
+        causeCode: failure.causeCode,
+        attempts: failure.attempts,
+        configurationFault: configuration,
+      },
+      'AI provider call failed',
+    );
+  }
+
+  private budgetFor(
+    run: RunState,
+    prepared: PreparedTask,
+    estimatedInputTokens = prepared.fit.tokensAfter,
+  ) {
     return this.deps.governor.checkBudget({
       tenantId: run.tenantId,
       caseId: run.caseId,
       agent: run.agent,
-      estimatedInputTokens: prepared.fit.tokensAfter,
+      estimatedInputTokens,
       maxOutputTokens: prepared.limits.maxOutputTokens,
     });
   }
@@ -202,12 +254,12 @@ export class ModelPath {
     const calls: CallFacts[] = [];
     let outcome = await this.call(run, prepared, prepared.messages, model, calls);
     let repairs = 0;
+    let repairSkipped: string | null = null;
     let report: ValidationReport<unknown> | null = null;
     let rawOutput: string | null = null;
     for (;;) {
       if ('error' in outcome) {
         const failure = outcome.error;
-        this.deps.governor.record(usageSample(run, calls));
         if (failure.code === 'cancelled')
           return { kind: 'cancelled', prepared, model, calls, repairs };
         return fallback({
@@ -225,30 +277,25 @@ export class ModelPath {
       rawOutput = response.outputText;
       report = validateAgentOutput(run.agent, response.output, prepared.vctx);
       if (report.ok) break;
-      if (
-        !report.repairable ||
-        repairs >= this.deps.maxRepairAttempts ||
-        !this.budgetFor(run, prepared).allowed
-      )
-        break;
+      if (!report.repairable || repairs >= this.deps.maxRepairAttempts) break;
       const feedback = [
         ...report.issues.slice(0, 8).map((i) => `${i.path}: ${i.message}`),
         ...(response.finishReason === 'length' ? ['The reply was cut off; keep it shorter.'] : []),
       ];
+      const repairMessages = renderMessages(prepared.prompt, prepared.fit.built.context, {
+        nonce: prepared.nonce,
+        repairFeedback: feedback,
+      });
+      // The first call is already booked, and the repair prompt is longer than the first one.
+      const allowance = this.budgetFor(run, prepared, messageTokens(repairMessages));
+      if (!allowance.allowed) {
+        repairSkipped = allowance.reason;
+        break;
+      }
       repairs++;
-      outcome = await this.call(
-        run,
-        prepared,
-        renderMessages(prepared.prompt, prepared.fit.built.context, {
-          nonce: prepared.nonce,
-          repairFeedback: feedback,
-        }),
-        model,
-        calls,
-      );
+      outcome = await this.call(run, prepared, repairMessages, model, calls);
     }
 
-    this.deps.governor.record(usageSample(run, calls));
     const last = calls[calls.length - 1];
     if (report.ok && last) {
       if (cache && prepared.cacheScope && prepared.cacheInput && report.output !== null) {
@@ -265,7 +312,7 @@ export class ModelPath {
       issues: report.issues,
       repairable: report.repairable,
       repairAttempted: repairs > 0,
-      summary: `The model proposal was rejected by validation (${report.kinds.join(', ') || 'unknown'}).`,
+      summary: `The model proposal was rejected by validation (${report.kinds.join(', ') || 'unknown'}).${repairSkipped === null ? '' : ` A repair attempt was not made: ${repairSkipped}`}`,
     };
     return fallback({
       status: 'rejected_by_validation',

@@ -1,4 +1,4 @@
-import type { AgentName, CounterfactualStrategy } from '@caseguard/schemas';
+import type { ActionValueConfig, AgentName, CounterfactualStrategy } from '@caseguard/schemas';
 import { createTemporalView, generateCounterfactuals, type TemporalView } from '@caseguard/domain';
 import {
   counterfactualTask,
@@ -86,6 +86,7 @@ export function cfTask(
   forkSuffix: string,
   strategy: CounterfactualStrategy = 'balanced',
   rolloutCount = 40,
+  config: ActionValueConfig = CONFIG,
 ): AgentTaskOf<'counterfactual_simulator'> {
   const fork = p.analysis.forks.find((f) => f.eventId === eventBySuffix(p, forkSuffix).id);
   if (!fork) throw new Error(`no fork at ${forkSuffix}`);
@@ -99,19 +100,23 @@ export function cfTask(
     events: p.normalized.events,
     resolution: p.normalized.resolution,
     pack: p.pack,
-    config: CONFIG,
+    config,
     ctx: p.ctx,
     rolloutCount,
   });
 }
 
-export function skillTask(p: Prepared, forkSuffix: string): AgentTaskOf<'skilldna_extractor'> {
+export function skillTask(
+  p: Prepared,
+  forkSuffix: string,
+  strategy: CounterfactualStrategy = 'balanced',
+): AgentTaskOf<'skilldna_extractor'> {
   const fork = p.analysis.forks.find((f) => f.eventId === eventBySuffix(p, forkSuffix).id);
   if (!fork) throw new Error(`no fork at ${forkSuffix}`);
   const scenario = generateCounterfactuals({
     analysis: p.analysis,
     fork,
-    strategies: ['balanced'],
+    strategies: [strategy],
     events: p.normalized.events,
     resolution: p.normalized.resolution,
     pack: p.pack,
