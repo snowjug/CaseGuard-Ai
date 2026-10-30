@@ -20,7 +20,8 @@ const MULTIPART_LIMITS = {
 /**
  * Cross-origin policy, request throttling and upload limits.
  *
- * - CORS is an explicit allow-list (empty by default: same-origin only) and never allows credentials;
+ * - CORS is an explicit allow-list (`CORS_ALLOWED_ORIGINS`: `http://localhost:3000` in a local run, required in a
+ *   deployed environment, no wildcard; no allowed origin means same-origin only) and never allows credentials;
  *   the API uses bearer tokens, not cookies.
  * - The general limit is per client address and covers every route, probes excepted, and 404s.
  * - Uploads are capped by `UPLOAD_MAX_BYTES`, one file per request.
