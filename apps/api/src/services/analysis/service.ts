@@ -1,4 +1,4 @@
-import type { StartAnalysisResponse } from '@caseguard/schemas';
+import type { ModelExecutionWithUsage, StartAnalysisResponse } from '@caseguard/schemas';
 import { sha256Hex } from '@caseguard/security';
 import type { RequestContext } from '../../http/request-context';
 import type { ServiceDeps } from '..';
@@ -135,6 +135,10 @@ export class AnalysisService implements AnalysisPort {
 
     const startedAt = ctx.now().toISOString();
     await ctx.repos.cases.setAnalysisState(caseId, 'running');
+    // The agents cost tokens whether or not the run completes. The snapshot stores their records with the
+    // run; when it never gets stored (cancelled, timed out, failed to save) they are stored on their own,
+    // so the daily budget and the efficiency monitor still count what was spent.
+    let unsaved: ModelExecutionWithUsage[] = [];
     try {
       const runId = ctx.newId('run');
       const engineCtx = engineContextFor({
@@ -154,6 +158,7 @@ export class AnalysisService implements AnalysisPort {
 
       await report('agents', 'Running agents and validating their proposals');
       const executions = await runAnalysisAgents(ctx, inputs, computation, engineCtx);
+      unsaved = executions;
       handle?.throwIfCancelled();
 
       await report('save', 'Saving the analysis');
@@ -215,6 +220,16 @@ export class AnalysisService implements AnalysisPort {
       });
       return { run: snapshot.run, reused: false };
     } catch (error) {
+      if (unsaved.length > 0) {
+        await ctx.repos.telemetry
+          .saveExecutions(unsaved)
+          .catch((saveError: unknown) =>
+            ctx.logger.warn(
+              { err: saveError },
+              'could not record the model executions of a run that did not complete',
+            ),
+          );
+      }
       // A cancelled or failed run leaves the previous results in place, so the case keeps showing them.
       const previous = await ctx.repos.analysis.getLatestRun(caseId).catch(() => null);
       await ctx.repos.cases

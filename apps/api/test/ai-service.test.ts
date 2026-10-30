@@ -10,7 +10,7 @@ import {
 import { DEFAULT_ACTION_VALUE_CONFIG, DEFAULT_MODEL_CONFIG } from '@caseguard/schemas';
 import type { Database } from '../src/db';
 import { TEST_DATABASE_STARTUP_TIMEOUT_MS } from '../src/db/testing';
-import { createAiService, effectiveModelConfig } from '../src/services/ai';
+import { PROVIDER_RETRY_AFTER_MS, createAiService, effectiveModelConfig } from '../src/services/ai';
 import {
   CONTOSO,
   PERSONAS,
@@ -140,6 +140,43 @@ describe('effectiveModelConfig', () => {
     const unpriced = effectiveModelConfig(DEFAULT_MODEL_CONFIG, env());
     expect(unpriced.unitPrices.inputPer1kUsd).toBeNull();
   });
+
+  it('keeps every model name on the operator deployment under Azure OpenAI', () => {
+    const azure = env({
+      AI_PROVIDER: 'azure-openai',
+      AZURE_OPENAI_ENDPOINT: 'https://contoso.openai.azure.com',
+      AZURE_OPENAI_DEPLOYMENT: 'gpt-operator',
+    });
+    const effective = effectiveModelConfig(
+      {
+        ...DEFAULT_MODEL_CONFIG,
+        azureDeployment: 'tenant-choice',
+        routing: {
+          defaultModel: 'someone-elses-deployment',
+          cheapModel: 'another-deployment',
+          rules: [{ agent: 'quality_judge', model: 'premium-deployment' }],
+        },
+      },
+      azure,
+    );
+    expect(effective.azureDeployment).toBe('gpt-operator');
+    expect(effective.routing).toEqual({
+      defaultModel: 'gpt-operator',
+      cheapModel: null,
+      rules: [],
+    });
+  });
+
+  it('leaves the routing the tenant chose when the deterministic provider is connected', () => {
+    const routing = {
+      defaultModel: 'deterministic-knowledge-pack',
+      cheapModel: null,
+      rules: [{ agent: 'quality_judge' as const, model: 'label-only' }],
+    };
+    expect(effectiveModelConfig({ ...DEFAULT_MODEL_CONFIG, routing }, env()).routing).toEqual(
+      routing,
+    );
+  });
 });
 
 describe('AiService', () => {
@@ -220,5 +257,72 @@ describe('AiService', () => {
     expect(created).toBe(1);
     expect(first).toMatchObject({ kind: 'azure-openai', simulated: false });
     expect(second.validationNote).toContain('mock');
+  });
+
+  describe('a configured provider that cannot be created', () => {
+    const remote = (): ModelProvider => ({
+      kind: 'azure-openai',
+      simulated: false,
+      defaultModel: 'gpt-test',
+      describe: () => ({
+        kind: 'azure-openai',
+        simulated: false,
+        model: 'gpt-test',
+        configured: true,
+        validationNote: 'Validated against a mock only.',
+      }),
+      complete: () => Promise.reject(new Error('not used in this test')),
+    });
+
+    it('does not take analysis down: deterministic code serves and the health says so', async () => {
+      let attempts = 0;
+      const service = createAiService(h.infra, {
+        providerFactory: async () => {
+          attempts += 1;
+          throw new Error('The Azure OpenAI endpoint must be a bare origin.');
+        },
+      });
+      const ctx = contextFor(h, PERSONAS.manager);
+
+      const health = await service.health(ctx);
+      expect(health).toMatchObject({ status: 'degraded', degraded: true });
+      expect(health.provider).toMatchObject({
+        kind: 'deterministic',
+        simulated: true,
+        healthy: false,
+      });
+      expect(health.provider.detail).toMatch(/could not be created/);
+      expect(health.dependency.status).toBe('degraded');
+      expect(health.notes[0]).toMatch(/could not be created/);
+
+      const result = await service.run(ctx, { task: timelineTask() }, { persist: false });
+      expect(result.source).toBe('deterministic');
+      expect(result.modelExecution.simulated).toBe(true);
+      expect((await service.status(ctx)).kind).toBe('deterministic');
+      expect(attempts).toBe(1);
+      expect(h.infra.metricsRegistry.renderPrometheus()).toContain('provider_unavailable');
+    });
+
+    it('tries again after the retry delay and serves from the provider once it works', async () => {
+      let attempts = 0;
+      const service = createAiService(h.infra, {
+        providerFactory: async () => {
+          attempts += 1;
+          if (attempts === 1) throw new Error('The credential chain is not ready yet.');
+          return remote();
+        },
+      });
+      const ctx = contextFor(h, PERSONAS.manager);
+      expect((await service.status(ctx)).kind).toBe('deterministic');
+
+      h.clock.advance(PROVIDER_RETRY_AFTER_MS - 1_000);
+      expect((await service.status(ctx)).kind).toBe('deterministic');
+      expect(attempts).toBe(1);
+
+      h.clock.advance(2_000);
+      expect(await service.status(ctx)).toMatchObject({ kind: 'azure-openai', simulated: false });
+      expect(attempts).toBe(2);
+      expect((await service.health(ctx)).degraded).toBe(false);
+    });
   });
 });

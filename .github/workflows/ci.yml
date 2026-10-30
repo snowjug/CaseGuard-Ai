@@ -86,6 +86,12 @@ jobs:
         run: node scripts/verify.mjs --only test:int --json-out "$RUNNER_TEMP/reports/integration-test-int.json" --no-md
       - name: Demo reset and seed replay
         if: ${{ !cancelled() }}
+        # The replay runs against the PostgreSQL service container, not the local PGlite default.
+        env:
+          APP_ENV: local
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+          DB_AUTO_MIGRATE: 'true'
+          LOG_LEVEL: warn
         run: node scripts/verify.mjs --only demo:replay --json-out "$RUNNER_TEMP/reports/integration-demo-replay.json" --no-md
       - name: Upload verification reports
         if: ${{ always() }}

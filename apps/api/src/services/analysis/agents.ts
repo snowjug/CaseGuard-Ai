@@ -1,4 +1,4 @@
-import type { AgentTask, TaskBase } from '@caseguard/ai';
+import { AiTaskError, type AgentTask, type TaskBase } from '@caseguard/ai';
 import { createFullView, createTemporalView, type EngineContext } from '@caseguard/domain';
 import type { ModelExecutionWithUsage } from '@caseguard/schemas';
 import type { RequestContext } from '../../http/request-context';
@@ -53,6 +53,9 @@ export async function runAnalysisAgents(
       const result = await ctx.services.ai.run(ctx, { task }, { persist: false });
       executions.push(result.modelExecution);
     } catch (error) {
+      // A failed or cancelled attempt still cost tokens and time: its record travels with the error.
+      if (error instanceof AiTaskError && error.execution !== null)
+        executions.push(error.execution);
       // The deterministic analysis is the product; a failed proposal must not block it.
       ctx.logger.warn({ err: error, agent: task.agent }, 'agent run failed; analysis continues');
     }

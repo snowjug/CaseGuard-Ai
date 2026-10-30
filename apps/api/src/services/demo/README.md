@@ -110,10 +110,13 @@ as the persona that acted.
 
 ## Command line and start-up (`demo-cli.ts`, `auto-seed.ts`)
 
-`pnpm demo:seed [-- --profile base|portfolio]` (default `portfolio`) and `pnpm demo:reset` run in **direct
-mode**: configuration from the environment (`DATABASE_URL`, default the local PGlite file), the infrastructure
+`pnpm demo:seed [--profile base|portfolio]` (default `portfolio`) and `pnpm demo:reset` run in **direct
+mode**: configuration from the environment and the repository's `.env` (`DATABASE_URL`, default the local PGlite
+file of the API, `apps/api/.data`; the commands start in the API's working directory so they name the same files
+`pnpm dev` does), the infrastructure
 created in the process, the work done by the same `DemoService` as the routes, as the seeded administrator
-(`user_alex_admin`) of the synthetic Contoso tenant. They print a short summary (never a connection string or a
+(`user_alex_admin`) of the synthetic Contoso tenant. A local PGlite database belongs to one process at a time: stop
+the API before running them against the same files. They print a short summary (never a connection string or a
 secret) and exit non-zero on failure (1; 2 for a usage error). CI's `demo:replay` runs reset then seed.
 
 When `DEMO_AUTO_SEED` is true (configuration only allows it in demo mode outside production) `main.ts` seeds

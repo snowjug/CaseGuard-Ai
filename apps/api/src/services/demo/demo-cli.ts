@@ -15,12 +15,14 @@ type Parsed =
 const PROFILES: readonly DemoProfile[] = ['base', 'portfolio'];
 
 const USAGE: Readonly<Record<DemoCommand, string>> = {
-  seed: 'Usage: pnpm demo:seed [-- --profile base|portfolio]   (default: portfolio)',
+  seed: 'Usage: pnpm demo:seed [--profile base|portfolio]   (default: portfolio)',
   reset: 'Usage: pnpm demo:reset',
 };
 
 /** `--profile base|portfolio` (or `--profile=base`) for the seed; nothing else is accepted. */
-function parse(command: DemoCommand, argv: readonly string[]): Parsed {
+function parse(command: DemoCommand, rawArgv: readonly string[]): Parsed {
+  // Some package-manager versions pass the separator through (`pnpm demo:seed -- --profile base`).
+  const argv = rawArgv.filter((argument) => argument !== '--');
   let profile: DemoProfile = 'portfolio';
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index] ?? '';

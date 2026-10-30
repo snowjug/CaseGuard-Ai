@@ -262,6 +262,63 @@ describe('analysis jobs', () => {
     }
   });
 
+  it('keeps the model executions of agents that ran when the analysis is cancelled', async () => {
+    const gate: { release: () => void } = { release: () => undefined };
+    const blocked = new Promise<void>((resolve) => {
+      gate.release = resolve;
+    });
+    let calls = 0;
+    let waiting = false;
+    // Five of the six agents finish; the sixth waits so the job can be cancelled while it is running.
+    const lateAi: AiPort = {
+      async run(ctx, request, options) {
+        calls += 1;
+        if (calls === 6) {
+          waiting = true;
+          await blocked;
+        }
+        return h.infra.services.ai.run(ctx, request, options);
+      },
+      status: (ctx) => h.infra.services.ai.status(ctx),
+      health: (ctx) => h.infra.services.ai.health(ctx),
+    };
+    const harness = await createHarness({ database, services: { ai: lateAi } });
+    try {
+      const repos = harness.repos(CONTOSO);
+      const known = new Set(
+        (await repos.telemetry.listExecutions({ caseId: TWO, limit: 100 })).items.map(
+          (item) => item.id,
+        ),
+      );
+      const res = await start(TWO, { force: true }, PERSONAS.engineer, harness);
+      expect(res.statusCode).toBe(202);
+      while (!waiting) await new Promise((resolve) => setTimeout(resolve, 20));
+
+      const cancel = await harness.call(PERSONAS.engineer, {
+        method: 'POST',
+        url: `/api/v1/jobs/${res.data.job.id}/cancel`,
+      });
+      expect(cancel.statusCode).toBe(200);
+      gate.release();
+      await harness.infra.services.jobs.idle();
+
+      const job = await harness.call(PERSONAS.engineer, {
+        method: 'GET',
+        url: `/api/v1/jobs/${res.data.job.id}`,
+      });
+      expect(job.data.status).toBe('cancelled');
+
+      // No run was stored, yet what the five finished agents spent is on record.
+      const kept = (await repos.telemetry.listExecutions({ caseId: TWO, limit: 100 })).items.filter(
+        (item) => !known.has(item.id),
+      );
+      expect(kept.length).toBeGreaterThanOrEqual(5);
+      expect(new Set(kept.map((item) => item.agent)).size).toBe(kept.length);
+    } finally {
+      await harness.close();
+    }
+  });
+
   it('lists jobs for a case with their stages', async () => {
     const res = await h.call(PERSONAS.engineer, {
       method: 'GET',

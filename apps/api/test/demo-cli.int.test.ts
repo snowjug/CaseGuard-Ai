@@ -43,6 +43,8 @@ describe('[FR-DEMO-16] demo command line: usage and configuration errors', () =>
     ['seed', ['--profile', 'everything'], /Unknown profile/],
     ['seed', ['--profile'], /Unknown profile/],
     ['seed', ['--profile=full'], /Unknown profile/],
+    ['seed', ['--', '--profile', 'everything'], /Unknown profile/],
+    ['seed', ['--', '--bogus'], /Usage: pnpm demo:seed/],
     ['seed', ['--bogus'], /Usage: pnpm demo:seed/],
     ['reset', ['--profile', 'base'], /Usage: pnpm demo:reset/],
   ] as const)('%s %j exits with 2 and prints the usage, opening nothing', async (...args) => {

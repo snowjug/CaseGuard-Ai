@@ -41,6 +41,28 @@ interface TenantOrchestrator {
   /** Version of the tenant's `model` governance setting this orchestrator was built from. */
   readonly settingsVersion: number;
   readonly orchestrator: AiOrchestrator;
+  /** True when the configured provider could not be created and deterministic code serves instead. */
+  readonly unavailable: boolean;
+  readonly builtAtMs: number;
+}
+
+/** After the configured provider could not be created, the next attempt waits this long. */
+export const PROVIDER_RETRY_AFTER_MS = 60_000;
+
+const PROVIDER_UNAVAILABLE =
+  'The configured Azure OpenAI provider could not be created, so analyses use the deterministic knowledge-pack provider (simulated values) until it can. See the server log.';
+
+/** Honest health while the configured provider is missing: deterministic code is serving, and it says so. */
+function withProviderUnavailable(health: AiHealth): AiHealth {
+  return {
+    ...health,
+    status: 'degraded',
+    degraded: true,
+    degradedReason: PROVIDER_UNAVAILABLE,
+    provider: { ...health.provider, healthy: false, detail: PROVIDER_UNAVAILABLE },
+    dependency: { ...health.dependency, status: 'degraded', detail: PROVIDER_UNAVAILABLE },
+    notes: [PROVIDER_UNAVAILABLE, ...health.notes],
+  };
 }
 
 function startOfUtcDay(date: Date): string {
@@ -59,9 +81,15 @@ export interface AiServiceOptions {
  * routing and cache limits follow governance. The provider is created once per process. Every run
  * persists its execution record (hashes and metadata only, never prompts or raw model output) and
  * feeds the product metrics, so the efficiency monitor reports what actually ran.
+ *
+ * A provider that cannot be created (a configuration fault, a missing credential chain) must not take
+ * the product down: the deterministic analysis is the product. The failure is logged and counted, the
+ * health says so, deterministic code serves, and creation is tried again after a minute rather than
+ * remembered for the life of the process.
  */
 export class AiService implements AiPort {
   private provider: Promise<ModelProvider | undefined> | null = null;
+  private providerFailedAtMs: number | null = null;
   private readonly tenants = new Map<string, Promise<TenantOrchestrator>>();
 
   constructor(
@@ -91,17 +119,46 @@ export class AiService implements AiPort {
   }
 
   async health(ctx: RequestContext): Promise<AiHealth> {
-    return (await this.orchestratorFor(ctx)).orchestrator.getHealth();
+    const entry = await this.orchestratorFor(ctx);
+    const health = entry.orchestrator.getHealth();
+    return entry.unavailable ? withProviderUnavailable(health) : health;
   }
 
   // ------------------------------------------------------------ internals
 
-  private providerOnce(): Promise<ModelProvider | undefined> {
-    this.provider ??= (this.options.providerFactory ?? createConfiguredProvider)(
+  /**
+   * The configured provider, or `undefined` for deterministic code. `unavailable` is true when a
+   * provider was configured but could not be created.
+   */
+  private async providerOnce(): Promise<{
+    provider: ModelProvider | undefined;
+    unavailable: boolean;
+  }> {
+    const nowMs = this.infra.now().getTime();
+    if (
+      this.providerFailedAtMs !== null &&
+      nowMs - this.providerFailedAtMs < PROVIDER_RETRY_AFTER_MS
+    ) {
+      return { provider: undefined, unavailable: true };
+    }
+    const attempt = (this.provider ??= (this.options.providerFactory ?? createConfiguredProvider)(
       this.infra.config,
       this.aiLogger(),
-    );
-    return this.provider;
+    ));
+    try {
+      const provider = await attempt;
+      this.providerFailedAtMs = null;
+      return { provider, unavailable: false };
+    } catch (error) {
+      if (this.provider === attempt) this.provider = null;
+      this.providerFailedAtMs = nowMs;
+      this.infra.logger.error(
+        { err: error },
+        'could not create the configured AI provider; deterministic code serves until it can',
+      );
+      this.infra.metrics.recordError('ai', 'provider_unavailable');
+      return { provider: undefined, unavailable: true };
+    }
   }
 
   private aiLogger(): AiLogger {
@@ -122,7 +179,12 @@ export class AiService implements AiPort {
     const existing = this.tenants.get(key);
     if (existing !== undefined) {
       const entry = await existing;
-      if (entry.settingsVersion === version) return entry;
+      // An orchestrator that serves without the configured provider is rebuilt once the retry delay has
+      // passed, so a provider that recovers is picked up without a restart.
+      const retryDue =
+        entry.unavailable &&
+        this.infra.now().getTime() - entry.builtAtMs >= PROVIDER_RETRY_AFTER_MS;
+      if (entry.settingsVersion === version && !retryDue) return entry;
     }
     const built = this.build(ctx, settings.model.value, version);
     this.tenants.set(key, built);
@@ -140,7 +202,7 @@ export class AiService implements AiPort {
     tenantConfig: Parameters<typeof effectiveModelConfig>[0],
     settingsVersion: number,
   ): Promise<TenantOrchestrator> {
-    const provider = await this.providerOnce();
+    const { provider, unavailable } = await this.providerOnce();
     const { infra } = this;
     const orchestrator = new AiOrchestrator({
       config: effectiveModelConfig(tenantConfig, infra.config),
@@ -160,7 +222,7 @@ export class AiService implements AiPort {
       promptTokens + completionTokens,
       estimatedCostUsd,
     );
-    return { settingsVersion, orchestrator };
+    return { settingsVersion, orchestrator, unavailable, builtAtMs: infra.now().getTime() };
   }
 
   private recordMetrics<A extends AgentName>(ctx: RequestContext, result: AgentRunResult<A>): void {
