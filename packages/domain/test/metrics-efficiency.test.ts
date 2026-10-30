@@ -312,6 +312,34 @@ describe('metric estimates (FR-ASE-01, FR-QI-02)', () => {
     }
   });
 
+  it('[FR-TK-01] token efficiency recorded on a synthetic case is labelled simulated telemetry, never measured', () => {
+    const synthetic = byKey(caseOne, 'token_efficiency');
+    expect(synthetic.display).toMatch(/bits per 1k tokens \(simulated telemetry\)$/);
+    expect(synthetic.display).not.toMatch(/measured/);
+
+    const ase = computeAvoidableEffort({
+      analysis: one.analysis,
+      pack: one.pack,
+      scenarios: scenariosFor(one),
+    });
+    const real = buildMetricEstimates({
+      analysis: one.analysis,
+      pack: one.pack,
+      ctx: one.ctx,
+      review: computeQualityReview({ analysis: one.analysis, pack: one.pack, ctx: one.ctx }),
+      avoidable: ase,
+      efficiency: computeEfficiency({
+        analysis: one.analysis,
+        pack: one.pack,
+        caseId: one.ctx.caseId,
+        synthetic: false,
+        avoidable: ase,
+      }),
+      synthetic: false,
+    }).find((metric) => metric.key === 'token_efficiency');
+    expect(real?.display).toMatch(/bits per 1k tokens \(measured\)$/);
+  });
+
   it('[FR-ASE-01] the avoidable-effort metric carries range, contributors, assumptions and the actual-vs-alternative comparison', () => {
     const metric = byKey(caseOne, 'avoidable_support_effort');
     expect(metric.value).toBeGreaterThan(30);

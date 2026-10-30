@@ -260,6 +260,9 @@ export function buildMetricEstimates(input: MetricEstimatesInput): MetricEstimat
     .slice(0, 5);
   const bits = efficiency.bitsPer1kTokens;
   const bitsMargin = bits.basis === 'measured' ? 0.1 : 0.3;
+  // Recorded token telemetry on a synthetic case is simulated, so it is never presented as measured.
+  const bitsBasisLabel =
+    bits.basis === 'measured' && synthetic ? 'simulated telemetry' : bits.basis;
   const fromReview = reviewMetrics(review);
 
   const parts: Record<MetricKey, Partial<MetricEstimate>> = {
@@ -311,7 +314,9 @@ export function buildMetricEstimates(input: MetricEstimatesInput): MetricEstimat
       low: bits.value === null ? null : round(bits.value * (1 - bitsMargin), 3),
       high: bits.value === null ? null : round(bits.value * (1 + bitsMargin), 3),
       display:
-        bits.value === null ? 'Not available' : `${bits.value} bits per 1k tokens (${bits.basis})`,
+        bits.value === null
+          ? 'Not available'
+          : `${bits.value} bits per 1k tokens (${bitsBasisLabel})`,
       confidence: bits.basis === 'measured' ? 'medium' : 'low',
       method: `${METRIC_DEFINITIONS.token_efficiency.formula}. ${bits.note}`,
       assumptions: [

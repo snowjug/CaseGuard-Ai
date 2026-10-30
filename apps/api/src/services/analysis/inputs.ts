@@ -25,8 +25,10 @@ import type { RequestContext } from '../../http/request-context';
  * 2026.2.0: a view's belief is one number (the analysis belief equals the last timeline step, so
  * decision-time rankings, fork posteriors and simulated start beliefs moved by a few thousandths) and
  * scenario summaries no longer compare with the real case.
+ * 2026.2.1: the token-efficiency figure of a synthetic case reads "simulated telemetry" instead of
+ * "measured" (text only; no number moved).
  */
-export const ENGINE_VERSION = '2026.2.0';
+export const ENGINE_VERSION = '2026.2.1';
 
 /** Everything an analysis reads. Loaded once per run and never mutated. */
 export interface AnalysisInputs {
