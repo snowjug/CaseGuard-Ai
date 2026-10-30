@@ -42,7 +42,7 @@ Covers the `migrate` Container Apps job (`node dist/db/migrate-cli.js`) failing,
    - **Locks** - another session holds locks (`pg_stat_activity`, `pg_locks`): a still-running old revision, a long query, or a stuck previous job execution.
    - **Timeout** - a long migration on a small SKU; raise `migrationTimeoutSeconds` or scale the database temporarily.
    - **Code and schema disagree** - the image runs migrations it does not contain (wrong tag) or an older image than the schema: compare the image tag of the job and the revision.
-4. **Is it safe to retry?** Only if the failure was transient and the migration is idempotent or fully rolled back. Retrying a half-applied non-transactional migration can make things worse.
+4. **Is it safe to retry?** Only if the failure was transient and the migration is idempotent or fully rolled back. Retrying a half-applied non-transactional migration can make things worse. The tenant provisioning that follows the migrations in the same job is different: it only inserts what is missing and never updates or deletes, so re-running it is always safe (see Recovery).
 
 ## Mitigation
 
@@ -57,6 +57,7 @@ Covers the `migrate` Container Apps job (`node dist/db/migrate-cli.js`) failing,
 ## Recovery
 
 - Apply the chosen fix, then re-run the job: `az containerapp job start --subscription $sub --resource-group $rg --name <migrate job>`.
+- Re-running the job also re-runs the tenant provisioning, which is idempotent and safe to repeat: a tenant that exists is reported `already provisioned` and left untouched, and one that an earlier run did not get to is created. If the job fails after the migrations, in the provisioning step, its message starts `Tenant provisioning failed (the migrations above were applied; re-running is safe)`; a refusal there (SQLSTATE 42501) means the job's role does not own the schema, which is the "Permissions" cause above. This is verified on PGlite only.
 - Wait for `Succeeded`; confirm the API readiness recovers on its own (probes), restarting the revision only if it does not.
 - If you rolled traffic back, shift it to the fixed revision only after verification.
 

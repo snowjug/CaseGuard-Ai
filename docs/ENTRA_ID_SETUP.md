@@ -124,6 +124,8 @@ Check: `iss` matches your configuration, `aud` equals `ENTRA_AUDIENCE`, `tid` is
 { "00000000-0000-0000-0000-000000000000": "tenant_contoso_support" }
 ```
 
+The map only names the tenant: the CaseGuard tenant row has to exist before the first sign-in, because the user sync cannot store a user for a tenant that is not there. After adding an entry (and running stage 2 again so the migration job receives the new `ENTRA_TENANT_MAP`), run the migration job: it provisions every mapped tenant that is missing, that is the tenant row and its default governance settings, prints `Tenants: <id> created` or `Tenants: <id> already provisioned`, never changes a tenant that exists, creates no user and is safe to repeat ([docs/DEPLOYMENT.md](DEPLOYMENT.md) section 5.5). The CaseGuard tenant id is yours to choose (letters, digits and `_ . : -`, up to 120 characters, starting with a letter or digit, for example `tenant_acme`); it is created as a real tenant unless it is one of the two reserved demo ids above. This is verified on PGlite only, not with a live Entra tenant or a deployed database.
+
 A multi-tenant app registration (accounts in any organizational directory) additionally needs one entry per allowed customer tenant and an admin-consent flow in each; keep the registration single-tenant unless you need this.
 
 ## 7. GitHub Actions OIDC for deployment
