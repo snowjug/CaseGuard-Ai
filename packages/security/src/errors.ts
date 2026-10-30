@@ -112,3 +112,37 @@ export class AuthConfigurationError extends Error {
     this.name = 'AuthConfigurationError';
   }
 }
+
+/** Why a payload could not be redacted completely: the patterns that were not applied, by label. */
+export interface RedactionFailureLike {
+  readonly code: string;
+  readonly label: string;
+  readonly message: string;
+}
+
+/**
+ * Redaction could not apply every custom pattern (HTTP 422). The payload must be refused: whatever the
+ * pattern was meant to catch may still be in it. The message names the patterns by label and never
+ * contains a pattern source or any input text.
+ */
+export class RedactionIncompleteError extends SecurityError {
+  readonly failures: readonly RedactionFailureLike[];
+
+  constructor(failures: readonly RedactionFailureLike[]) {
+    const labels = [...new Set(failures.map((item) => `"${item.label}"`))].slice(0, 5);
+    super(
+      'unsafe_content',
+      422,
+      `The content could not be redacted completely: custom redaction pattern ${labels.join(', ')} could not be applied`,
+    );
+    this.failures = failures;
+  }
+}
+
+/** Throws `RedactionIncompleteError` unless every custom pattern was applied. */
+export function assertRedactionComplete(result: {
+  readonly complete: boolean;
+  readonly failures: readonly RedactionFailureLike[];
+}): void {
+  if (!result.complete) throw new RedactionIncompleteError(result.failures);
+}

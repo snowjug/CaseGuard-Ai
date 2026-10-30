@@ -34,6 +34,8 @@ describe('@caseguard/security public surface', () => {
       'UnsafeUrlError',
       'IdentityProviderUnavailableError',
       'AuthConfigurationError',
+      'RedactionIncompleteError',
+      'assertRedactionComplete',
       // rbac and tenancy
       'ROLE_PERMISSIONS',
       'permissionsFor',
@@ -53,8 +55,11 @@ describe('@caseguard/security public surface', () => {
       'readSingleHeader',
       // redaction
       'redactText',
+      'redactTexts',
       'redactValue',
+      'redactValues',
       'createPseudonymState',
+      'createCustomPatternBudget',
       'DEFAULT_REDACTION_OPTIONS',
       'SECRET_REDACTION_CATEGORIES',
       'compileCustomPatterns',
@@ -63,6 +68,10 @@ describe('@caseguard/security public surface', () => {
       'isNonRoutableIpv4',
       'placeholderFor',
       'MAX_CUSTOM_PATTERN_LENGTH',
+      'MAX_CUSTOM_PATTERNS',
+      'MAX_MATCHES_PER_STRING',
+      'MAX_MATCHES_PER_PATTERN',
+      'DEFAULT_CUSTOM_PATTERN_BUDGET_MS',
       // injection
       'detectPromptInjection',
       'summarizeInjection',

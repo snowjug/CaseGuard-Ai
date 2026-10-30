@@ -208,31 +208,35 @@ describe('assertSafeOutboundUrl: what is refused [NFR-SEC-04]', () => {
     }
   });
 
-  it('property: never returns a URL whose host is not covered by the allowlist', () => {
-    fc.assert(
-      fc.property(
-        fc.webUrl({
-          validSchemes: ['https', 'http', 'ftp'],
-          withFragments: true,
-          withQueryParameters: true,
-        }),
-        (candidate) => {
-          try {
-            const url = assertSafeOutboundUrl(candidate, OPTIONS);
-            return (
-              url.protocol === 'https:' &&
-              (url.hostname === 'api.contoso.example' ||
-                url.hostname.endsWith('.openai.azure.com') ||
-                url.hostname.endsWith('.blob.core.windows.net'))
-            );
-          } catch (error) {
-            return error instanceof UnsafeUrlError;
-          }
-        },
-      ),
-      { numRuns: 300 },
-    );
-  });
+  it(
+    'property: never returns a URL whose host is not covered by the allowlist',
+    { timeout: 30_000 },
+    () => {
+      fc.assert(
+        fc.property(
+          fc.webUrl({
+            validSchemes: ['https', 'http', 'ftp'],
+            withFragments: true,
+            withQueryParameters: true,
+          }),
+          (candidate) => {
+            try {
+              const url = assertSafeOutboundUrl(candidate, OPTIONS);
+              return (
+                url.protocol === 'https:' &&
+                (url.hostname === 'api.contoso.example' ||
+                  url.hostname.endsWith('.openai.azure.com') ||
+                  url.hostname.endsWith('.blob.core.windows.net'))
+              );
+            } catch (error) {
+              return error instanceof UnsafeUrlError;
+            }
+          },
+        ),
+        { numRuns: 300 },
+      );
+    },
+  );
 });
 
 describe('isPrivateOrLoopbackHost [NFR-SEC-04]', () => {

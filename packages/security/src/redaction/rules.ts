@@ -1,5 +1,6 @@
 import type { RedactionCategory } from '@caseguard/schemas';
 import type { PseudonymCategory, PseudonymState } from './pseudonyms';
+import type { Rewriter } from './rewriter';
 import { isNonRoutableIpv4, isReservedEmailDomain } from './synthetic';
 
 /*
@@ -26,7 +27,8 @@ export interface RuleContext {
 
 export interface RedactionRule {
   readonly category: BuiltinCategory;
-  apply(text: string, context: RuleContext): string;
+  /** Rewrites `doc` (the detection view of one string) in place through `doc.replace`. */
+  apply(doc: Rewriter, context: RuleContext): void;
 }
 
 /** Stable placeholder written into redacted text. */
@@ -83,16 +85,14 @@ function wholeMatchRule(
   const placeholder = placeholderFor(category);
   return {
     category,
-    apply(text, context) {
-      let out = text;
+    apply(doc, context) {
       for (const pattern of patterns) {
-        out = out.replace(pattern, (match: string) => {
+        doc.replace(pattern, (match: string) => {
           if (accept && !accept(match)) return match;
           context.hit(category);
           return placeholder;
         });
       }
-      return out;
     },
   };
 }
@@ -129,18 +129,21 @@ const CONNECTION_PASSWORD =
 
 const connectionStringRule: RedactionRule = {
   category: 'connection_string',
-  apply(text, context) {
+  apply(doc, context) {
     const placeholder = placeholderFor('connection_string');
-    let out = text.replace(DSN_CREDENTIALS, (_match: string, scheme: string) => {
+    doc.replaceAfterPrefix(DSN_CREDENTIALS, (_match: string, scheme: string) => {
       context.hit('connection_string');
       return `${scheme}${placeholder}@`;
     });
-    out = out.replace(CONNECTION_SECRET_KEY, (match: string, prefix: string, value: string) => {
-      if (isStandIn(value)) return match;
-      context.hit('connection_string');
-      return `${prefix}${keepQuotes(value, placeholder)}`;
-    });
-    return out.replace(
+    doc.replaceAfterPrefix(
+      CONNECTION_SECRET_KEY,
+      (match: string, prefix: string, value: string) => {
+        if (isStandIn(value)) return match;
+        context.hit('connection_string');
+        return `${prefix}${keepQuotes(value, placeholder)}`;
+      },
+    );
+    doc.replaceAfterPrefix(
       CONNECTION_PASSWORD,
       (match: string, prefix: string, value: string, offset: number, whole: string) => {
         const before = whole.slice(Math.max(0, offset - 24), offset);
@@ -164,16 +167,15 @@ const COOKIE_HEADER = /\b((?:Set-)?Cookie[ \t]*:[ \t]*)(?!\[REDACTED:)[^\s][^\r\
 
 const bearerTokenRule: RedactionRule = {
   category: 'bearer_token',
-  apply(text, context) {
+  apply(doc, context) {
     const placeholder = placeholderFor('bearer_token');
     const withPrefix = (_match: string, prefix: string): string => {
       context.hit('bearer_token');
       return `${prefix}${placeholder}`;
     };
-    return text
-      .replace(BEARER, withPrefix)
-      .replace(AUTH_HEADER, withPrefix)
-      .replace(COOKIE_HEADER, withPrefix);
+    doc.replaceAfterPrefix(BEARER, withPrefix);
+    doc.replaceAfterPrefix(AUTH_HEADER, withPrefix);
+    doc.replaceAfterPrefix(COOKIE_HEADER, withPrefix);
   },
 };
 
@@ -189,17 +191,16 @@ const SAS_SIGNATURE = /([?&;]sig=)(?!\[REDACTED:)[A-Za-z0-9%+/=_-]{20,}/gi;
 
 const azureStorageKeyRule: RedactionRule = {
   category: 'azure_storage_key',
-  apply(text, context) {
+  apply(doc, context) {
     const placeholder = placeholderFor('azure_storage_key');
-    return text
-      .replace(STORAGE_KEY, () => {
-        context.hit('azure_storage_key');
-        return placeholder;
-      })
-      .replace(SAS_SIGNATURE, (_match: string, prefix: string) => {
-        context.hit('azure_storage_key');
-        return `${prefix}${placeholder}`;
-      });
+    doc.replace(STORAGE_KEY, () => {
+      context.hit('azure_storage_key');
+      return placeholder;
+    });
+    doc.replaceAfterPrefix(SAS_SIGNATURE, (_match: string, prefix: string) => {
+      context.hit('azure_storage_key');
+      return `${prefix}${placeholder}`;
+    });
   },
 };
 
@@ -237,18 +238,17 @@ function looksLikeKeyMaterial(value: string): boolean {
 
 const apiKeyRule: RedactionRule = {
   category: 'api_key',
-  apply(text, context) {
+  apply(doc, context) {
     const placeholder = placeholderFor('api_key');
-    let out = text;
     VENDOR_KEYS.forEach((pattern, index) => {
-      out = out.replace(pattern, (match: string) => {
+      doc.replace(pattern, (match: string) => {
         // Index 0 is the generic `sk-` shape; real keys always mix digits in.
         if (index === 0 && !/\d/.test(match)) return match;
         context.hit('api_key');
         return placeholder;
       });
     });
-    return out.replace(API_KEY_ASSIGNMENT, (match: string, prefix: string, value: string) => {
+    doc.replaceAfterPrefix(API_KEY_ASSIGNMENT, (match: string, prefix: string, value: string) => {
       if (!looksLikeKeyMaterial(value)) return match;
       context.hit('api_key');
       return `${prefix}${keepQuotes(value, placeholder)}`;
@@ -265,9 +265,9 @@ const PASSWORD_ASSIGNMENT = new RegExp(
 
 const passwordRule: RedactionRule = {
   category: 'password_assignment',
-  apply(text, context) {
+  apply(doc, context) {
     const placeholder = placeholderFor('password_assignment');
-    return text.replace(
+    doc.replaceAfterPrefix(
       PASSWORD_ASSIGNMENT,
       (match: string, prefix: string, separator: string, value: string) => {
         if (isStandIn(value)) return match;
@@ -289,8 +289,8 @@ const EMAIL =
 
 const emailRule: RedactionRule = {
   category: 'email_address',
-  apply(text, context) {
-    return text.replace(EMAIL, (match: string) => {
+  apply(doc, context) {
+    doc.replace(EMAIL, (match: string) => {
       const domain = match.slice(match.lastIndexOf('@') + 1);
       if (!context.redactReserved && isReservedEmailDomain(domain)) return match;
       context.hit('email_address');
@@ -304,8 +304,8 @@ const IPV4 = new RegExp(`(?<![\\w.])${OCTET}(?:\\.${OCTET}){3}(?!\\w|\\.\\d)`, '
 
 const ipv4Rule: RedactionRule = {
   category: 'ipv4_address',
-  apply(text, context) {
-    return text.replace(IPV4, (match: string) => {
+  apply(doc, context) {
+    doc.replace(IPV4, (match: string) => {
       const octets = match.split('.').map(Number);
       if (!context.redactReserved && isNonRoutableIpv4(octets)) return match;
       context.hit('ipv4_address');
@@ -336,8 +336,8 @@ function phoneKey(raw: string): string {
 
 const phoneRule: RedactionRule = {
   category: 'phone_number',
-  apply(text, context) {
-    return text.replace(PHONE, (match: string) => {
+  apply(doc, context) {
+    doc.replace(PHONE, (match: string) => {
       const digits = match.replace(/\D/g, '').length;
       if (digits < 8 || digits > 15) return match;
       context.hit('phone_number');

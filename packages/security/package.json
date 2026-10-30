@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "RBAC policy, identity strategies (dev persona, Entra JWT), tenant context, redaction, prompt-injection detection, file validation, URL safety, rate limiting.",
+  "description": "RBAC policy, identity strategies (dev persona, Entra JWT), tenant context, redaction, prompt-injection detection, file validation, URL safety, security headers and hashing.",
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",

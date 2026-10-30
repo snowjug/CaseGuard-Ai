@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createPseudonymState } from '../src/redaction/pseudonyms';
-import { redactValue } from '../src/redaction/redact-value';
+import { redactValue, redactValues } from '../src/redaction/redact-value';
 import { secrets } from './helpers/secrets';
 
 function deepFreeze<T>(value: T): T {
@@ -191,5 +191,84 @@ describe('redactValue', () => {
     const twice = redactValue(once);
     expect(twice.value).toEqual(once);
     expect(twice.totalReplacements).toBe(0);
+  });
+});
+
+describe('redactValues (batch)', () => {
+  const records = () => [
+    { title: 'first ava@customer.io', password: 'p1', tags: ['8.8.8.8', 'plain'], n: 1 },
+    { title: 'second bob@fabrikam.io and ava@customer.io', nested: { token: 'abcdef', note: 'x' } },
+    'bare string with 9.9.9.9',
+    42,
+    null,
+    ['ava@customer.io', { apiKey: 'k' }],
+  ];
+
+  it('gives every input its own result, in order, with the shape and key order of the input', () => {
+    const result = redactValues(records());
+    expect(result.items).toHaveLength(6);
+    expect(result.items[0]?.value).toEqual({
+      title: 'first [REDACTED:email_address#1]',
+      password: '[REDACTED:password_assignment]',
+      tags: ['[REDACTED:ipv4_address#1]', 'plain'],
+      n: 1,
+    });
+    expect(Object.keys(result.items[0]?.value as object)).toEqual([
+      'title',
+      'password',
+      'tags',
+      'n',
+    ]);
+    expect(result.items[2]?.value).toBe('bare string with [REDACTED:ipv4_address#2]');
+    expect(result.items[3]?.value).toBe(42);
+    expect(result.items[4]?.value).toBeNull();
+  });
+
+  it('reports findings per input and for the whole batch', () => {
+    const result = redactValues(records());
+    expect(result.items[3]?.findings).toEqual([]);
+    const summed = result.items.reduce((sum, item) => sum + item.totalReplacements, 0);
+    expect(summed).toBe(result.totalReplacements);
+    expect(result.totalReplacements).toBeGreaterThan(5);
+    expect(result.complete).toBe(true);
+  });
+
+  it('numbers pseudonyms exactly as redacting the inputs one by one with a shared state', () => {
+    const state = createPseudonymState();
+    const sequential = records().map((record) => redactValue(record, {}, state));
+    const batch = redactValues(records());
+    expect(batch.items.map((item) => item.value)).toEqual(sequential.map((item) => item.value));
+    expect(batch.items.map((item) => item.totalReplacements)).toEqual(
+      sequential.map((item) => item.totalReplacements),
+    );
+  });
+
+  it('never mutates its inputs and handles an empty batch', () => {
+    const input = records();
+    const copy = structuredClone(input);
+    redactValues(input);
+    expect(input).toEqual(copy);
+    const empty = redactValues([]);
+    expect(empty.items).toEqual([]);
+    expect(empty.complete).toBe(true);
+    expect(empty.totalReplacements).toBe(0);
+  });
+
+  it('keeps the circular-structure and depth guards', () => {
+    const loop: Record<string, unknown> = {};
+    loop.self = loop;
+    expect(() => redactValues([{ ok: 1 }, loop])).toThrow(TypeError);
+    let deep: unknown = 'x';
+    for (let i = 0; i < 150; i += 1) deep = { deep };
+    expect(() => redactValues([deep])).toThrow(RangeError);
+  });
+
+  it('reports a custom pattern that could not run for the whole batch', () => {
+    const result = redactValues([{ a: 'x' }, { b: 'y' }], {
+      customPatterns: [{ name: 'broken', pattern: '(' }],
+    });
+    expect(result.complete).toBe(false);
+    expect(result.failures).toMatchObject([{ code: 'invalid', index: 0, label: 'broken' }]);
+    expect(result.notes).toHaveLength(1);
   });
 });

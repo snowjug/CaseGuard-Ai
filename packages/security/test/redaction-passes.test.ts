@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  MAX_REDACTION_PASSES,
-  createTally,
-  findingsFrom,
-  redactInto,
-  redactText,
-  type RedactionEngine,
-} from '../src/redaction/redact-text';
+import { MAX_REDACTION_PASSES, redactBatchInto, type EngineConfig } from '../src/redaction/engine';
+import { createTally, findingsFrom, redactText } from '../src/redaction/redact-text';
 import { createPseudonymState } from '../src/redaction/pseudonyms';
 import type { RedactionRule } from '../src/redaction/rules';
 import { secrets } from './helpers/secrets';
@@ -71,17 +65,17 @@ describe('redactInto: pass loop', () => {
     replacement: (matched: string) => string,
   ): RedactionRule => ({
     category,
-    apply: (text, context) =>
-      text.replace(pattern, (matched) => {
+    apply: (doc, context) =>
+      doc.replace(pattern, (matched: string) => {
         context.hit(category);
         return replacement(matched);
       }),
   });
 
-  function run(text: string, engine: RedactionEngine) {
+  function run(text: string, engine: Partial<EngineConfig>) {
     const tally = createTally();
-    const out = redactInto(text, {}, createPseudonymState(), tally, engine);
-    return { out, tally };
+    const outcome = redactBatchInto([text], {}, createPseudonymState(), [tally], engine);
+    return { out: outcome.texts[0] ?? '', tally };
   }
 
   // `Y` becomes `!` only after the first rule has already looked at the text.
@@ -109,10 +103,9 @@ describe('redactInto: pass loop', () => {
   it('does not count what a confirming pass reported without changing the text', () => {
     const redetectsPlaceholder: RedactionRule = {
       category: 'jwt',
-      apply(text, context) {
-        const seen = [...text.matchAll(/\[REDACTED:api_key\]/g)].length;
+      apply(doc, context) {
+        const seen = [...doc.text.matchAll(/\[REDACTED:api_key\]/g)].length;
         for (let i = 0; i < seen; i += 1) context.hit('jwt');
-        return text;
       },
     };
     const engine = {
@@ -130,9 +123,8 @@ describe('redactInto: pass loop', () => {
     let calls = 0;
     const counting: RedactionRule = {
       category: 'api_key',
-      apply(text) {
+      apply() {
         calls += 1;
-        return text;
       },
     };
     run('plain text', { rules: [counting], maxPasses: MAX_REDACTION_PASSES });

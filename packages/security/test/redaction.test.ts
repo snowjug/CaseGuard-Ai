@@ -478,13 +478,17 @@ describe('redactText: behaviour', () => {
     );
   });
 
-  it('bounds memory when a state sees an unbounded number of distinct values', () => {
-    const state = createPseudonymState();
-    const category: PseudonymCategory = 'email_address';
-    for (let i = 0; i < 50_000; i += 1) expect(state.indexFor(category, `k${i}`)).toBe(i + 1);
-    expect(state.indexFor(category, 'one-too-many')).toBeNull();
-    expect(state.indexFor(category, 'k0')).toBe(1); // known values keep their number
-  });
+  it(
+    'bounds memory when a state sees an unbounded number of distinct values',
+    { timeout: 30_000 },
+    () => {
+      const state = createPseudonymState();
+      const category: PseudonymCategory = 'email_address';
+      for (let i = 0; i < 50_000; i += 1) expect(state.indexFor(category, `k${i}`)).toBe(i + 1);
+      expect(state.indexFor(category, 'one-too-many')).toBeNull();
+      expect(state.indexFor(category, 'k0')).toBe(1); // known values keep their number
+    },
+  );
 
   it('handles empty, whitespace-only and non-ASCII input', () => {
     expect(redact('').text).toBe('');

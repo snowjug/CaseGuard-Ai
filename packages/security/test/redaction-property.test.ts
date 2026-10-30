@@ -168,6 +168,19 @@ const KEYWORDS = [
   '%',
   '$',
   '!',
+  // Characters the folded view looks through: spaces, invisible controls, full-width punctuation.
+  '\u00a0',
+  '\u3000',
+  '\u200b',
+  '\u200d',
+  '\u2060',
+  '\ufeff',
+  '\u202e',
+  '\uff1a',
+  '\uff1d',
+  '\uff30',
+  '\u00e9',
+  '\ud83d\ude00',
 ];
 
 const richFragment: fc.Arbitrary<string> = fc.oneof(
