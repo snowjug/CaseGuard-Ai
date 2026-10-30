@@ -12,6 +12,7 @@ import { round } from '../util/math';
 import { compareIso, formatUtcStamp } from '../util/time';
 import { informationClass } from './actions';
 import { compareNullableIso, knownAt, lastStepAt } from './as-of';
+import { decisionTimeSummary } from './counterfactual';
 import type { DeterministicAnalysis } from './pipeline';
 import { ResponderIndex } from './responders';
 
@@ -44,8 +45,12 @@ const clip = (text: string, max: number): string =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
 
 export function buildInvestigationGraph(input: GraphInput): InvestigationGraph {
-  const { analysis, asOf, events, scenario } = input;
+  const { analysis, asOf, events } = input;
   const known = knownAt(asOf);
+  // A scenario is written from what was known at its decision instant, so inside an as-of window it
+  // exists only once that instant has been reached (a later one would reveal evidence recorded after
+  // the window).
+  const scenario = input.scenario && known(input.scenario.boundary.asOf) ? input.scenario : null;
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
   const ids = new Set<string>();
@@ -319,7 +324,7 @@ export function buildInvestigationGraph(input: GraphInput): InvestigationGraph {
       kind: 'outcome',
       lane: 'outcome',
       label: 'Simulated diagnosis',
-      detail: clip(scenario.summary, 600),
+      detail: clip(decisionTimeSummary(scenario), 600),
       order: 1,
       timestamp: scenario.steps[scenario.steps.length - 1]?.simulatedAt ?? null,
       status: 'uncertain',

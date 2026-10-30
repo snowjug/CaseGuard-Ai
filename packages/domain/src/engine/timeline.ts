@@ -41,8 +41,11 @@ export interface TimelineInput {
 }
 
 export function buildTimelineResponse(input: TimelineInput): TimelineResponse {
-  const { caseRecord, events, analysis, asOf, scenario } = input;
+  const { caseRecord, events, analysis, asOf } = input;
   const known = knownAt(asOf);
+  // A scenario is written from what was known at its decision instant, so inside an as-of window it
+  // exists only once that instant has been reached.
+  const scenario = input.scenario && known(input.scenario.boundary.asOf) ? input.scenario : null;
   const visible = events.filter((e) => known(e.timestamp));
   const offset = input.offset ?? 0;
   const limit = input.limit ?? 200;

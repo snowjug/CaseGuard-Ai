@@ -120,8 +120,10 @@ cheap. The tests that prove this are listed in [EVALUATION.md](EVALUATION.md#4-t
 warn: `DiagnosticAction.realizedInformationGainBits`, `informationGainClass`, the "Retrospectively produced little
 information" note in `lowValueReasons`, `DecisionFork.retrospective` and every `HindsightCheck`. Detection, warnings and
 counterfactual generation never read them. `lowValue`, `isRepeat` and `relativeValueAtDecision` are decision-time. The
-"Retrospectively" note is only produced when the analysed view covers the whole case (`coversWholeCase`), never for a
-prefix or as-of analysis, where the answer may simply not have arrived yet. A counterfactual scenario's `summary` is
+"Retrospectively" note is only produced for the complete case (`isCompleteCase`: every recorded event is in view and so
+is the recorded resolution, `TemporalView.resolution`, the same notion as `Case.hasResolution`). It is never produced for
+a prefix or as-of analysis, nor for an open case (no recorded resolution) analysed over everything recorded so far: in
+both, the last action may simply not have been answered yet. A counterfactual scenario's `summary` is
 decision-time as well (`decisionTimeSummary`: the decision instant, the simulated steps and the simulated time range);
 the comparison with the recorded outcome lives in the `HindsightCheck` and the scenario's explicit comparison fields
 (`actualMetrics`, `improvements`), and the investigation graph never prints a stored summary.

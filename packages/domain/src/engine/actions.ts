@@ -18,7 +18,7 @@ import { type EngineContext, metaOf } from './context';
 import { ResponderIndex } from './responders';
 import { eventText, firstDetectorMatch } from './signals';
 import { analyzeView, PrefixAnalyzer, type ViewAnalysis } from './state';
-import { createTemporalViewBeforeEvent, type TemporalView } from './temporal';
+import { createTemporalViewBeforeEvent, isCompleteCase, type TemporalView } from './temporal';
 
 export interface DecisionRanking {
   eventId: string;
@@ -214,6 +214,10 @@ export function buildDiagnosticActions(input: ActionsInput): ActionsOutput {
   }[] = [];
   const earlierActionByEvent = new Map<string, string>();
   const effortScale = config.effortScale;
+  // "Produced little information" is a hindsight judgement: it is only fair once every answer that
+  // will ever arrive is on record. In a prefix, or in an open case (no recorded resolution), the last
+  // action may simply not have been answered yet.
+  const hindsightAllowed = isCompleteCase(view);
 
   events.forEach((event, eventIndex) => {
     if (!isActionEvent(event, pack)) return;
@@ -282,7 +286,11 @@ export function buildDiagnosticActions(input: ActionsInput): ActionsOutput {
         `Scored ${Math.round((relative ?? 0) * 100)}% of the best safe action available at that moment (“${best?.label ?? 'n/a'}”).`,
       );
     }
-    if (diagnosticClass && gain < pack.pack.policies.lowValueInformationGainBits) {
+    if (
+      hindsightAllowed &&
+      diagnosticClass &&
+      gain < pack.pack.policies.lowValueInformationGainBits
+    ) {
       lowValueReasons.push(`Retrospectively produced little information (${round(gain, 2)} bits).`);
     }
     const stated = statedHypothesis(text, pack);

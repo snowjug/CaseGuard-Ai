@@ -1,11 +1,5 @@
 import type { CompiledPack } from '../knowledge/compile';
-import {
-  type Belief,
-  accumulateObservation,
-  posteriorFrom,
-  posteriorFromLogWeights,
-  startingLogWeights,
-} from './belief';
+import { type Belief, inEventOrder, posteriorFrom, priorBelief, updateBelief } from './belief';
 import type { RankingState } from './action-value';
 import { computeRequirementStates, satisfiedSetAt, type RequirementState } from './requirements';
 import { detectObservations, type Observation } from './signals';
@@ -15,6 +9,7 @@ export interface ViewAnalysis {
   view: TemporalView;
   observations: Observation[];
   requirementStates: RequirementState[];
+  /** Exactly the last step of this view's belief timeline (see `updateBelief`). */
   belief: Belief;
   rankingState: RankingState;
 }
@@ -25,7 +20,7 @@ function rankingStateFor(
   requirementStates: readonly RequirementState[],
   lastIndex: number,
 ): { belief: Belief; rankingState: RankingState } {
-  const belief = posteriorFrom(pack, observations);
+  const belief = posteriorFrom(pack, inEventOrder(observations));
   return {
     belief,
     rankingState: {
@@ -80,14 +75,12 @@ export function restrictRequirementStates(
 export class PrefixAnalyzer {
   private readonly observations: readonly Observation[];
   private readonly requirementStates: readonly RequirementState[];
-  /** True when observations are ordered by event, so the events before a boundary are a list prefix. */
-  private readonly ordered: boolean;
   /**
-   * Log-weights accumulated over the first `count` observations. Decisions are asked for in event
-   * order, so each call only adds the new observations (identical arithmetic to a one-shot posterior);
-   * asking for an earlier boundary restarts it.
+   * The belief after the first `count` observations. Decisions are asked for in event order, so each
+   * call only applies the new observations with the same one-observation update the timeline uses;
+   * asking for an earlier boundary restarts from the prior.
    */
-  private run: { count: number; logw: number[]; signals: Set<string> };
+  private run: { count: number; belief: Belief; signals: Set<string> };
 
   constructor(
     private readonly full: TemporalView,
@@ -98,18 +91,17 @@ export class PrefixAnalyzer {
       requirementStates: readonly RequirementState[];
     },
   ) {
-    this.observations = precomputed?.observations ?? detectObservations(full, pack, caseId);
+    this.observations = inEventOrder(
+      precomputed?.observations ?? detectObservations(full, pack, caseId),
+    );
     this.requirementStates =
       precomputed?.requirementStates ??
       computeRequirementStates(full, pack, [...this.observations]);
-    this.ordered = this.observations.every(
-      (o, i) => i === 0 || (this.observations[i - 1]?.eventIndex ?? 0) <= o.eventIndex,
-    );
     this.run = this.freshRun();
   }
 
-  private freshRun(): { count: number; logw: number[]; signals: Set<string> } {
-    return { count: 0, logw: startingLogWeights(this.pack), signals: new Set<string>() };
+  private freshRun(): { count: number; belief: Belief; signals: Set<string> } {
+    return { count: 0, belief: priorBelief(this.pack), signals: new Set<string>() };
   }
 
   /** Number of observations detected in events before `eventIndex` (binary search; list is ordered). */
@@ -127,32 +119,16 @@ export class PrefixAnalyzer {
   /** Analysis of the events strictly before the event at `eventIndex` (its decision moment). */
   at(eventIndex: number): ViewAnalysis {
     const requirementStates = restrictRequirementStates(this.requirementStates, eventIndex);
-    if (!this.ordered) {
-      const observations = this.observations.filter((o) => o.eventIndex < eventIndex);
-      const { belief, rankingState } = rankingStateFor(
-        this.pack,
-        observations,
-        requirementStates,
-        eventIndex - 1,
-      );
-      return {
-        view: createTemporalPrefixView(this.full, eventIndex),
-        observations,
-        requirementStates,
-        belief,
-        rankingState,
-      };
-    }
     const count = this.countBefore(eventIndex);
     if (count < this.run.count) this.run = this.freshRun();
     for (let i = this.run.count; i < count; i++) {
       const obs = this.observations[i];
       if (!obs) continue;
-      accumulateObservation(this.pack, this.run.logw, obs);
+      this.run.belief = updateBelief(this.pack, this.run.belief, obs);
       this.run.signals.add(obs.signalId);
     }
     this.run.count = count;
-    const belief = posteriorFromLogWeights(this.pack, this.run.logw);
+    const belief = { ...this.run.belief };
     return {
       view: createTemporalPrefixView(this.full, eventIndex),
       observations: this.observations.slice(0, count),

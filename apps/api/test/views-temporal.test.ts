@@ -498,8 +498,8 @@ describe('as-of views equal a fresh engine analysis of the same window', () => {
       expect(served('blocked')).toEqual(
         expected.blocked.map((entry) => [entry.actionKey, entry.rank, entry.score]),
       );
-      // The belief shown is the one-shot posterior the ranking was computed from; the timeline's
-      // step-by-step posterior (floored at each step) agrees on the leader and to within a point.
+      // The belief shown is the one the ranking was computed from, and it is exactly the last step of
+      // the same window's timeline (one update path), so a reader never sees two different numbers.
       const belief = analyzeView(view, pack, ONE).belief;
       const posterior = res.data.posterior as { key: string; confidence: number }[];
       for (const entry of posterior) {
@@ -507,7 +507,9 @@ describe('as-of views equal a fresh engine analysis of the same window', () => {
       }
       const fresh = freshAnalysis(asOf);
       const last = fresh.timeline.steps[fresh.timeline.steps.length - 1];
-      const leader = posterior[0];
+      for (const entry of posterior) {
+        expect(entry.confidence).toBe(round(last?.posterior[entry.key] ?? Number.NaN, 3));
+      }
       const top = Object.entries(last?.posterior ?? {}).sort((a, b) => b[1] - a[1])[0];
       expect(leader?.key).toBe(top?.[0]);
       expect(Math.abs((leader?.confidence ?? 0) - (top?.[1] ?? 0))).toBeLessThan(0.01);
@@ -648,7 +650,10 @@ describe('counterfactual overlays inside a window', () => {
     const outcome = simulated.find((node) => node.kind === 'outcome');
     expect(outcome?.detail).not.toMatch(/real case|versus/i);
     expect(outcome?.detail).toMatch(/Simulated estimate, not a measurement/);
-    expect(scenario.summary).toMatch(/real case/i);
+    // The engine writes the summary from the decision instant and the simulated path alone, so the
+    // stored text is what the window shows (the comparison with the real path is the hindsight check).
+    expect(scenario.summary).not.toMatch(/real case|versus/i);
+    expect(outcome?.detail).toBe(scenario.summary);
     const timeline = await get(`${base}/timeline?${at(boundary)}&scenarioId=${scenario.id}`);
     expect(timeline.data.simulatedEvents.length).toBe(scenario.steps.length);
     expect(

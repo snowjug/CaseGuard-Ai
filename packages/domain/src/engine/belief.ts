@@ -36,24 +36,8 @@ function floorAndNormalize(values: number[], floor: number): number[] {
   return normalize(floored);
 }
 
-/** Log-weights of a starting belief (the prior unless `start` is given). */
-export function startingLogWeights(pack: CompiledPack, start?: Belief): number[] {
-  const base = start ?? priorBelief(pack);
-  return pack.hypothesisIds.map((id) => Math.log(Math.max(base[id] ?? 1e-6, 1e-6)));
-}
-
-/** Adds one observation's dampened log-likelihoods to `logw` in place (nothing when it cannot move beliefs). */
-export function accumulateObservation(pack: CompiledPack, logw: number[], obs: Observation): void {
-  if (!obs.affectsBelief) return;
-  const w = observationWeight(pack, obs.signalId, obs.repeatIndex);
-  pack.hypothesisIds.forEach((id, i) => {
-    logw[i] =
-      (logw[i] ?? 0) + w * Math.log(clamp(likelihoodOf(pack, obs.signalId, id), 0.01, 0.99));
-  });
-}
-
-/** Turns accumulated log-weights into a floored, normalised belief. */
-export function posteriorFromLogWeights(pack: CompiledPack, logw: readonly number[]): Belief {
+/** Turns log-weights into a floored, normalised belief. */
+function posteriorFromLogWeights(pack: CompiledPack, logw: readonly number[]): Belief {
   const ids = pack.hypothesisIds;
   const max = Math.max(...logw);
   const probs = floorAndNormalize(
@@ -63,15 +47,45 @@ export function posteriorFromLogWeights(pack: CompiledPack, logw: readonly numbe
   return Object.fromEntries(ids.map((id, i) => [id, probs[i] ?? 0]));
 }
 
-/** Posterior after applying a list of observations to the prior (log-space, dampened). */
+/**
+ * Applies ONE observation to a belief: the dampened log-likelihood update, then the posterior floor
+ * and renormalisation. An observation that cannot move beliefs returns `belief` itself.
+ *
+ * This is the only place recorded evidence changes a belief. The timeline, `analyzeView` and the
+ * prefix analyser all fold it over the observations in event order, so the belief of a view is
+ * exactly the last step of that view's timeline (the floor is applied after every observation, never
+ * once at the end).
+ */
+export function updateBelief(pack: CompiledPack, belief: Belief, obs: Observation): Belief {
+  if (!obs.affectsBelief) return belief;
+  const w = observationWeight(pack, obs.signalId, obs.repeatIndex);
+  return posteriorFromLogWeights(
+    pack,
+    pack.hypothesisIds.map(
+      (id) =>
+        Math.log(Math.max(belief[id] ?? 1e-6, 1e-6)) +
+        w * Math.log(clamp(likelihoodOf(pack, obs.signalId, id), 0.01, 0.99)),
+    ),
+  );
+}
+
+/** Belief after applying `observations`, in the order given, to `start` (the prior unless given). */
 export function posteriorFrom(
   pack: CompiledPack,
   observations: readonly Observation[],
   start?: Belief,
 ): Belief {
-  const logw = startingLogWeights(pack, start);
-  for (const obs of observations) accumulateObservation(pack, logw, obs);
-  return posteriorFromLogWeights(pack, logw);
+  let belief: Belief = { ...(start ?? priorBelief(pack)) };
+  for (const obs of observations) belief = updateBelief(pack, belief, obs);
+  return belief;
+}
+
+/** The observations in the order a timeline applies them: by event, then as listed. */
+export function inEventOrder(observations: readonly Observation[]): readonly Observation[] {
+  const ordered = observations.every(
+    (o, i) => i === 0 || (observations[i - 1]?.eventIndex ?? 0) <= o.eventIndex,
+  );
+  return ordered ? observations : [...observations].sort((a, b) => a.eventIndex - b.eventIndex);
 }
 
 export const beliefToVector = (pack: CompiledPack, belief: Belief): number[] =>
@@ -166,7 +180,7 @@ export function buildBeliefTimeline(
     let running = current;
     for (const obs of byEvent.get(i) ?? []) {
       if (!obs.affectsBelief) continue;
-      const after = posteriorFrom(pack, [obs], running);
+      const after = updateBelief(pack, running, obs);
       const w = observationWeight(pack, obs.signalId, obs.repeatIndex);
       const delta: Record<string, number> = {};
       const logLr: Record<string, number> = {};

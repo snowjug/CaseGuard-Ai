@@ -12,6 +12,7 @@ import {
   type KnowledgeAction,
   type Level,
   type PathMetrics,
+  type Range,
 } from '@caseguard/schemas';
 import type { CompiledPack } from '../knowledge/compile';
 import { hypothesisRecordId, stableId } from '../util/ids';
@@ -515,6 +516,37 @@ export function computeImprovements(
 
 const uncertaintyOf = (p: number): Level => (p >= 0.75 ? 'low' : p >= 0.5 ? 'medium' : 'high');
 
+/** What a scenario's summary reads: the decision instant and the simulated path, nothing else. */
+export interface ScenarioSummarySource {
+  readonly label: string;
+  readonly boundary: { readonly asOf: string };
+  readonly steps: readonly { readonly label: string }[];
+  readonly counterfactualMetrics: { readonly timeToDiagnosisMinutes: Range };
+  readonly rollouts: { readonly diagnosisReachedShare: number };
+}
+
+/**
+ * One-sentence summary of a scenario, written ONLY from the pre-decision view (the boundary
+ * instant) and the simulated path. Comparing it with the real outcome is hindsight and belongs to the
+ * `HindsightCheck`, so this text is safe wherever a view is bounded by `asOf`. It is a pure function
+ * of stored scenario fields, so any renderer can rebuild exactly what generation stored.
+ */
+export function decisionTimeSummary(scenario: ScenarioSummarySource): string {
+  const from = formatUtcStamp(scenario.boundary.asOf);
+  const count = scenario.steps.length;
+  if (count === 0) return `No supported next step could be ranked from ${from}.`;
+  const names = scenario.steps.slice(0, 3).map((step) => step.label);
+  const time = scenario.counterfactualMetrics.timeToDiagnosisMinutes;
+  // The time shown is the median rollout, which reached a diagnosis exactly when most rollouts did.
+  const verb = scenario.rollouts.diagnosisReachedShare >= 0.5 ? 'reach' : 'approach';
+  return (
+    `From ${from}, the “${scenario.label}” strategy would take ${count} step${count === 1 ? '' : 's'} ` +
+    `(${names.join(' → ')}${count > 3 ? ' → …' : ''}) and is simulated to ${verb} a diagnosis in about ` +
+    `${formatDuration(time.mid)} (range ${formatDuration(time.low)}–${formatDuration(time.high)}). ` +
+    'Simulated estimate, not a measurement.'
+  );
+}
+
 export function assembleScenario(input: AssembleInput): CounterfactualScenario {
   const { sim, preView, fork, pack, config, ctx, evidence, actualMetrics } = input;
   const scenarioId = stableId('scn', ctx.caseId, fork.id, sim.strategy);
@@ -715,7 +747,6 @@ export function assembleScenario(input: AssembleInput): CounterfactualScenario {
   ];
   const valid = checks.every((c) => c.passed);
 
-  const actualT = actualMetrics.timeToDiagnosisMinutes.mid;
   const cfT = metrics.timeToDiagnosisMinutes.mid;
   const spread =
     cfT > 0 ? (metrics.timeToDiagnosisMinutes.high - metrics.timeToDiagnosisMinutes.low) / cfT : 1;
@@ -740,11 +771,13 @@ export function assembleScenario(input: AssembleInput): CounterfactualScenario {
           ? 'medium'
           : 'low';
 
-  const stepNames = steps.map((s) => s.label);
-  const summary =
-    steps.length === 0
-      ? `No supported next step could be ranked from ${formatUtcStamp(fork.timestamp)}.`
-      : `From ${formatUtcStamp(fork.timestamp)}, the “${profile.label}” strategy would take ${steps.length} step${steps.length === 1 ? '' : 's'} (${stepNames.slice(0, 3).join(' → ')}${steps.length > 3 ? ' → …' : ''}) and is simulated to ${sim.reachedDiagnosis ? 'reach' : 'approach'} a diagnosis in about ${formatDuration(cfT)} (range ${formatDuration(metrics.timeToDiagnosisMinutes.low)}–${formatDuration(metrics.timeToDiagnosisMinutes.high)}), versus ${formatDuration(actualT)} in the real case. Simulated estimate, not a measurement.`;
+  const summary = decisionTimeSummary({
+    label: profile.label,
+    boundary: { asOf: fork.timestamp },
+    steps,
+    counterfactualMetrics: metrics,
+    rollouts: sim.rollouts,
+  });
 
   return {
     ...metaOf(ctx),

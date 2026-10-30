@@ -72,7 +72,7 @@ describe('belief model (FR-HY-01)', () => {
     );
   });
 
-  it('property: evidence that favours a hypothesis never lowers it (monotonic support)', () => {
+  it('property: evidence that favours a hypothesis never lowers it beyond the floor (monotonic support)', () => {
     fc.assert(
       fc.property(
         observationsArb,
@@ -92,7 +92,10 @@ describe('belief model (FR-HY-01)', () => {
           ]);
           // A hypothesis at the floor is clamped, so only assert where the clamp cannot interfere.
           if ((before[best] ?? 0) < 0.03) return true;
-          expect(after[best] ?? 0).toBeGreaterThanOrEqual((before[best] ?? 0) - 1e-9);
+          // The floor is re-applied after every observation: lifting the smallest hypotheses back to
+          // it renormalises everything else, by at most this factor.
+          const floorLeak = 1 + (pack.hypothesisIds.length - 1) * pack.pack.policies.posteriorFloor;
+          expect(after[best] ?? 0).toBeGreaterThanOrEqual((before[best] ?? 0) / floorLeak - 1e-9);
           return true;
         },
       ),

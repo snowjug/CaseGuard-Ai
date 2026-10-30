@@ -571,7 +571,9 @@ describe('repeat detection compares each action with its predecessors cheaply', 
     const began = performance.now();
     const analysis = run(bundle);
     expect(analysis.actions).toHaveLength(600);
-    expect(performance.now() - began).toBeLessThan(12_000);
+    // The pre-fix run took ~30 s on a quiet machine; the margin absorbs a loaded shared host (the same
+    // analysis took 9-11 s there, before and after the follow-up belief change).
+    expect(performance.now() - began).toBeLessThan(25_000);
   }, 60_000);
 });
 

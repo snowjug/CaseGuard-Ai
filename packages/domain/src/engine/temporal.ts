@@ -136,6 +136,25 @@ export function assertPreResolution(view: TemporalView): asserts view is PreReso
 }
 
 /**
+ * True when the view holds every recorded event: an inclusive boundary with nothing withheld. A case
+ * that is still open can satisfy this too; whether hindsight is legitimate is `isCompleteCase`.
+ */
+export function coversWholeCase(view: TemporalView): boolean {
+  return view.mode === 'at' && view.withheldFutureEventCount === 0;
+}
+
+/**
+ * True when the view is the complete, closed case: it holds every recorded event AND the recorded
+ * resolution (`TemporalView.resolution`, which is `Case.hasResolution` as the engine sees it and what
+ * quality, metrics and the hindsight check read as "the case has a resolution"). Only then is a
+ * judgement made with hindsight legitimate. In a prefix, and in an open case analysed over everything
+ * recorded so far, the last action may simply not have been answered yet: the same artefact.
+ */
+export function isCompleteCase(view: TemporalView): boolean {
+  return coversWholeCase(view) && view.resolution !== null;
+}
+
+/**
  * Counts references that point outside the view (events, evidence ids). Used for the leak check
  * recorded on every counterfactual scenario.
  */
