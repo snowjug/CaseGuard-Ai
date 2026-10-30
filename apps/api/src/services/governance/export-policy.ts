@@ -80,6 +80,6 @@ export function recordCapRefusal(cap: number, recordCount: number): ExportRefusa
 
 export function refusalError(refusal: ExportRefusal): ForbiddenError | ConflictError {
   return refusal.status === 403
-    ? new ForbiddenError(refusal.message)
+    ? new ForbiddenError(refusal.message, { reason: refusal.reason })
     : new ConflictError(refusal.message, { reason: refusal.reason });
 }

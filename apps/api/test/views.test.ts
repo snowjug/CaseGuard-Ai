@@ -497,6 +497,7 @@ describe('a case that has not been analysed', () => {
       const res = await get(api(FRESH, path));
       expect(res.statusCode, path).toBe(409);
       expect(res.data.code).toBe('conflict');
+      expect(res.data.reason, path).toBe('not_analysed');
       expect(res.data.detail).toBe('This case has not been analysed yet. Start an analysis first.');
     }
     expect((await get(api(FRESH, '/timeline?asOf=2030-01-01T00:00:00Z'))).statusCode).toBe(409);

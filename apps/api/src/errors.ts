@@ -62,6 +62,13 @@ export class ConflictError extends AppError {
   }
 }
 
+/** The case has never been analysed (409). Its `not_analysed` reason tells a client that an analysis can be started. */
+export class NotAnalysedError extends ConflictError {
+  constructor(message = 'This case has not been analysed yet. Start an analysis first.') {
+    super(message, { reason: 'not_analysed' });
+  }
+}
+
 export class ValidationFailedError extends AppError {
   readonly issues: { path: string; message: string }[];
   constructor(message: string, issues: { path: string; message: string }[] = []) {

@@ -1,5 +1,5 @@
 import type { Problem } from '@caseguard/schemas';
-import { SecurityError } from '@caseguard/security';
+import { RedactionIncompleteError, SecurityError } from '@caseguard/security';
 import { hasZodFastifySchemaValidationErrors } from 'fastify-type-provider-zod';
 import { AppError, RateLimitedError, ValidationFailedError, type ErrorCode } from '../errors';
 
@@ -222,7 +222,11 @@ export function toProblem(error: unknown, options: ProblemOptions): ProblemResul
   }
 
   if (error instanceof SecurityError) {
-    return build(error.code, error.status, options, { detail: error.message });
+    return build(error.code, error.status, options, {
+      detail: error.message,
+      // A refused payload whose custom redaction could not be applied is not a refused file: say which.
+      ...(error instanceof RedactionIncompleteError ? { reason: 'redaction_incomplete' } : {}),
+    });
   }
 
   if (hasZodFastifySchemaValidationErrors(error)) {

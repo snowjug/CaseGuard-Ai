@@ -6,7 +6,7 @@ import {
 } from '@caseguard/domain';
 import type { AnalysisRun } from '@caseguard/schemas';
 import { canonicalJson, sha256Hex } from '@caseguard/security';
-import { ConflictError } from '../../errors';
+import { NotAnalysedError } from '../../errors';
 import type { RequestContext } from '../../http/request-context';
 import { engineContextForRun, loadAnalysisInputs, type AnalysisInputs } from '../analysis';
 import { LruCache } from './cache';
@@ -43,7 +43,7 @@ export class ReplayLoader {
     const inputs = await loadAnalysisInputs(ctx, caseId);
     const run = await ctx.repos.analysis.getLatestRun(caseId);
     if (run === null) {
-      throw new ConflictError('The case has not been analysed yet. Run the analysis first.');
+      throw new NotAnalysedError('The case has not been analysed yet. Run the analysis first.');
     }
     const engineCtx = engineContextForRun(run);
     const key = [

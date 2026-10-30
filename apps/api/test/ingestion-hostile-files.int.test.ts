@@ -95,6 +95,7 @@ describe('hostile uploads (FR-ING-05)', () => {
       const res = await upload(h, PERSONAS.engineer, CREATE_URL, name, content, type);
       expect(res.statusCode, `case ${index}`).toBe(422);
       expect(res.data.code, `case ${index}`).toBe('unsafe_content');
+      expect(res.data.reason, `case ${index}`).toBe('file_refused');
     }
     expect((await h.repos(CONTOSO).cases.list({ limit: 10 })).items).toEqual([]);
   });
@@ -119,6 +120,7 @@ describe('hostile uploads (FR-ING-05)', () => {
       const res = await upload(h, PERSONAS.engineer, url, 'notes.txt', content, 'text/plain');
       expect(res.statusCode, url).toBe(422);
       expect(res.data.code).toBe('unsafe_content');
+      expect(res.data.reason).toBe('file_refused');
       expect(res.data.detail).toContain('malware scanner');
       expect(res.body).not.toContain('EICAR-STANDARD');
     }

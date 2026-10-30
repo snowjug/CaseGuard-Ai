@@ -6,7 +6,7 @@ import {
   type SkillUsageRecord,
 } from '@caseguard/domain';
 import type { SkillDna, SkillMatch } from '@caseguard/schemas';
-import { ConflictError, NotFoundError, VersionConflictError } from '../../errors';
+import { ConflictError, NotAnalysedError, NotFoundError, VersionConflictError } from '../../errors';
 import type { RequestContext } from '../../http/request-context';
 import { LruCache } from '../counterfactuals/cache';
 import type { ReplayLoader } from '../counterfactuals/replay';
@@ -79,7 +79,7 @@ export class SkillApplier {
       );
     }
     if ((await loadMatchContext(ctx, caseId)) === null) {
-      throw new ConflictError('The case has not been analysed yet. Run the analysis first.');
+      throw new NotAnalysedError('The case has not been analysed yet. Run the analysis first.');
     }
 
     const matches = await this.matcher.compute(ctx, caseId, options);

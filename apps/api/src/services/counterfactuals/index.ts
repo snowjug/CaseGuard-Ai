@@ -8,7 +8,12 @@ import {
   type ReviewCounterfactualBody,
 } from '@caseguard/schemas';
 import { sha256Hex } from '@caseguard/security';
-import { ConflictError, NotFoundError, ValidationFailedError } from '../../errors';
+import {
+  ConflictError,
+  NotAnalysedError,
+  NotFoundError,
+  ValidationFailedError,
+} from '../../errors';
 import type { RequestContext } from '../../http/request-context';
 import type { ServiceDeps } from '..';
 import type { CounterfactualPort, JobHandle, JobSpec } from '../ports';
@@ -88,7 +93,7 @@ export class CounterfactualService implements CounterfactualPort {
     const ordered = this.requireStrategies(strategies);
     await this.requireEligibleFork(ctx, caseId, forkId);
     const run = await ctx.repos.analysis.getLatestRun(caseId);
-    if (run === null) throw new ConflictError('The case has not been analysed yet.');
+    if (run === null) throw new NotAnalysedError('The case has not been analysed yet.');
 
     // The same request on the same analysis is answered by the job that already ran or is running.
     const baseKey = jobKey(caseId, forkId, ordered, run.id);

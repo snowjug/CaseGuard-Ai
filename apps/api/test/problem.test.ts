@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { ProblemSchema } from '@caseguard/schemas';
-import { AuthenticationError, AuthorizationError, TenantIsolationError } from '@caseguard/security';
+import {
+  AuthenticationError,
+  AuthorizationError,
+  RedactionIncompleteError,
+  TenantIsolationError,
+} from '@caseguard/security';
 import {
   AppError,
   BudgetExceededError,
   ConflictError,
   ForbiddenError,
   IdempotencyConflictError,
+  NotAnalysedError,
   NotFoundError,
   NotImplementedError,
   PayloadTooLargeError,
@@ -222,6 +228,23 @@ describe('toProblem', () => {
         429,
         'rate_limited',
         'engine_budget',
+      ],
+      ['a case that was never analysed', new NotAnalysedError(), 409, 'conflict', 'not_analysed'],
+      [
+        'a refused file',
+        new UnsafeContentError('The file was refused.', { reason: 'file_refused' }),
+        422,
+        'unsafe_content',
+        'file_refused',
+      ],
+      [
+        'a redaction that could not be completed',
+        new RedactionIncompleteError([
+          { code: 'pattern_timeout', label: 'Order number', message: 'Timed out' },
+        ]),
+        422,
+        'unsafe_content',
+        'redaction_incomplete',
       ],
     ])('reports %s', (_name, error, status, code, reason) => {
       const result = convert(error);

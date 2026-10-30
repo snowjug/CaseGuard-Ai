@@ -1,9 +1,7 @@
 import type { AnalysisRun, Case } from '@caseguard/schemas';
-import { ConflictError, NotFoundError } from '../../errors';
+import { NotAnalysedError, NotFoundError } from '../../errors';
 import type { RequestContext } from '../../http/request-context';
 import { loadAnalysisInputs, type AnalysisInputs } from '../analysis/inputs';
-
-export const NOT_ANALYSED_MESSAGE = 'This case has not been analysed yet. Start an analysis first.';
 
 /** A case that exists in the caller's tenant together with its latest analysis run. */
 export interface CaseRun {
@@ -21,7 +19,7 @@ export async function loadCaseRun(ctx: RequestContext, caseId: string): Promise<
     ctx.repos.analysis.getLatestRun(caseId),
   ]);
   if (caseRecord === null) throw new NotFoundError('Case', caseId);
-  if (run === null) throw new ConflictError(NOT_ANALYSED_MESSAGE);
+  if (run === null) throw new NotAnalysedError();
   return { caseRecord, run };
 }
 
@@ -46,6 +44,6 @@ export async function loadViewState(ctx: RequestContext, caseId: string): Promis
 
 /** The run of an artefact view; 409 when the case has never been analysed. */
 export function requireRun(state: ViewState): AnalysisRun {
-  if (state.run === null) throw new ConflictError(NOT_ANALYSED_MESSAGE);
+  if (state.run === null) throw new NotAnalysedError();
   return state.run;
 }

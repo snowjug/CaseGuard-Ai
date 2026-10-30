@@ -100,7 +100,12 @@ describe('a payload that cannot be redacted completely goes nowhere (review H2)'
 
     const create = await createCase(h, engineer, source);
     expect(create.statusCode).toBe(422);
-    expect(create.data).toMatchObject({ code: 'unsafe_content', status: 422, detail: REFUSAL });
+    expect(create.data).toMatchObject({
+      code: 'unsafe_content',
+      reason: 'redaction_incomplete',
+      status: 422,
+      detail: REFUSAL,
+    });
 
     const csv = csvWith(tooMany);
     const previewFile = await uploadFile(
@@ -123,7 +128,11 @@ describe('a payload that cannot be redacted completely goes nowhere (review H2)'
       'text/csv',
     );
     expect(createFile.statusCode).toBe(422);
-    expect(createFile.data).toMatchObject({ code: 'unsafe_content', detail: REFUSAL });
+    expect(createFile.data).toMatchObject({
+      code: 'unsafe_content',
+      reason: 'redaction_incomplete',
+      detail: REFUSAL,
+    });
 
     // Nothing of it came back...
     for (const res of [preview, create, previewFile, createFile]) {

@@ -62,7 +62,7 @@ export function uploadRefusal(issues: readonly UploadIssue[], maxBytes: number):
       { path: 'file', message: 'Upload a file that contains a case' },
     ]);
   }
-  return new UnsafeContentError(`The file was refused: ${messages}.`);
+  return new UnsafeContentError(`The file was refused: ${messages}.`, { reason: 'file_refused' });
 }
 
 /**
@@ -87,14 +87,18 @@ export async function prepareUpload(file: IngestUpload, env: UploadEnv): Promise
   if (scan.status === 'infected') {
     const signature =
       scan.signature !== null && SIGNATURE_NAME.test(scan.signature) ? ` (${scan.signature})` : '';
-    throw new UnsafeContentError(`The file was refused by the malware scanner${signature}.`);
+    throw new UnsafeContentError(`The file was refused by the malware scanner${signature}.`, {
+      reason: 'file_refused',
+    });
   }
 
   let text: string;
   try {
     text = decodeUploadText(file.bytes);
   } catch {
-    throw new UnsafeContentError('The file was refused: the content is not valid UTF-8.');
+    throw new UnsafeContentError('The file was refused: the content is not valid UTF-8.', {
+      reason: 'file_refused',
+    });
   }
   return {
     kind: check.kind,

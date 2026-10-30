@@ -353,6 +353,7 @@ describe('[FR-GV-01] export controls', () => {
     const res = await exportCase();
     expect(res.statusCode).toBe(403);
     expect(res.data.code).toBe('forbidden');
+    expect(res.data.reason).toBe('case_export_disabled');
     expect(res.data.detail).toContain('disabled');
     expect(JSON.stringify(res.data)).not.toContain('case_alpha');
 
@@ -379,6 +380,7 @@ describe('[FR-GV-01] export controls', () => {
     expect((await setControls({ allowAuditExport: false })).statusCode).toBe(200);
     const res = await exportAudit();
     expect(res.statusCode).toBe(403);
+    expect(res.data.reason).toBe('audit_export_disabled');
     const denied = ofAction(await events(), 'export.created');
     expect(denied[0]).toMatchObject({
       outcome: 'denied',
