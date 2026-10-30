@@ -67,6 +67,12 @@ regression tests in `http-hardening.test.ts` (throttling before authentication, 
 malformed uploads, proxy trust, idempotency scoping) and the identity tests (`identity-sync.int`, `identity-users.int`) are cited in
 [SECURITY.md](SECURITY.md) as evidence but were **not run by me**.
 
+**Later `apps/api` runs.** For the data-tier changes (migrations 0010 to 0012) I ran `cursor`, `idempotency-link` and `db-units` (no
+database) and `case-reference.int`, `idempotency-erasure.int`, `cursor-forgery.int`, `migrations.int` and `review-target-type.int`
+(PGlite) in two Vitest calls: **8 files, 252 tests passed** (194 in 57 s, then 58 in 20 s, on a quieter machine). `cursor` and
+`migrations.int` also appear in the first run above; they have more tests now. Six database-free search files ran separately
+(105 tests passed). The demo commands and routes were run by hand, not through tests ([LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md#82-demo-data)).
+
 `packages/ui` first run and rerun: with two workers on the loaded machine, three `ConfirmDialog` tests in
 `src/primitives/primitives.test.tsx` failed (`is an alert dialog that restores focus to the opener on cancel`, `requires a reason of
 the minimum length before confirming and passes it on`, `stays open and shows the error when the action fails`), each timing out in

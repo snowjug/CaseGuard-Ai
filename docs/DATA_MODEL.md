@@ -1,7 +1,7 @@
 # Data model
 
 This document describes what is stored, how tenants are kept apart, and which rows can never change. It is
-written from the SQL migrations in `apps/api/src/db/migrations/` (0001 to 0009), the repositories in
+written from the SQL migrations in `apps/api/src/db/migrations/` (0001 to 0012), the repositories in
 `apps/api/src/db/repositories/`, and the Zod contracts in `packages/schemas/src/`. If a statement here disagrees
 with a migration, the migration wins.
 
@@ -65,7 +65,7 @@ erDiagram
     cases {
         text tenant_id PK
         text id PK
-        text reference
+        text reference "unique per tenant"
         text content_hash
         text analysis_state
         int event_count "0 to 2000"
@@ -118,6 +118,7 @@ erDiagram
     tenants ||--o{ jobs : runs
     cases ||--o{ jobs : "optional"
     tenants ||--o{ idempotency_keys : remembers
+    cases ||--o{ idempotency_keys : "response about the case"
     tenants ||--o{ demo_state : marks
     cases }o..o{ audit_events : "soft: case_id survives erasure"
 
@@ -142,6 +143,7 @@ erDiagram
         text key PK
         text request_hash
         text state "reserved completed"
+        text case_id FK "nullable"
     }
 ```
 
@@ -170,6 +172,30 @@ erDiagram
 | `audit_events.case_id`                       | Audit events outlive an erased case.                                              |
 | `skill_matches.version_id`, `jobs.target_id` | Point at rows whose lifetime differs from the referencing row.                    |
 
+### 3.3 Pagination cursors
+
+Lists use keyset pagination with an opaque cursor: `base64url(JSON [1, <kind>, ...sort-key values])`, a dot and the first 8 hex
+characters of `sha256("<kind>:<payload>")`, at most 400 characters (`apps/api/src/db/cursor.ts`). The kinds are `cases`, `events`,
+`claims`, `skills`, `audit`, `executions`, `reviews` and `jobs`. The checksum is an integrity check, not a secret: it rejects a
+corrupted or hand-edited cursor, and a cursor minted for one list cannot be replayed against another because the kind is part of the
+payload.
+
+Anyone can compute a valid checksum for values of their choosing, so decoding also range-checks every value, and a forged cursor
+is a **422**, never a database error:
+
+| Sort-key kind | Accepted                                                                                                    |
+| ------------- | ----------------------------------------------------------------------------------------------------------- |
+| `timestamp`   | A real UTC instant in millisecond ISO form, years 0001 to 9999, that survives a round trip (no 30 February) |
+| `text`        | An identifier under the rules of `IdSchema` (every textual sort key is a row id)                            |
+| `int`         | A non-negative integer that fits a PostgreSQL `integer` (at most 2,147,483,647)                             |
+
+Anything else raises `ValidationFailedError` ("The pagination cursor is invalid"). A forged but valid cursor can only move the
+caller's position inside data the caller may already read, because every list query is parameterised and filtered by tenant. As a
+last line of defence the error mapper (`db/errors.ts`) turns SQLSTATE 22003 (out of range), 22007 (invalid date or time text), 22008
+(date or time overflow) and 22P02 (malformed text for the type) into a 422 with the message "A value in the request is out of range or
+malformed", without copying the value or any SQL text into it. Evidence: `test/cursor.test.ts` and
+`test/cursor-forgery.int.test.ts` (both ran and passed, see [EVALUATION.md](EVALUATION.md#2-test-inventory)).
+
 ## 4. Table reference
 
 "App role" is the privilege list granted to `caseguard_app` by `caseguard_secure_tenant_table`. Where a table says
@@ -194,15 +220,36 @@ an in-memory fingerprint of name, e-mail and sorted roles, at most 5,000 remembe
 (`identity.sync_failed`) and the request falls back to the stored row, so a profile that cannot be saved does not lock a
 user out. This is implemented and tested against the repository only; it has not run against a live Entra tenant.
 
-### 4.2 The immutable case record (0003)
+### 4.2 The immutable case record (0003, 0010)
 
-| Table               | Key columns                                                                                                                       | App role                       | Notes                                                                                                                                                                                                                     |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cases`             | `(tenant_id, id)`, `reference`, `workload`, `status`, `synthetic`, `content_hash`, `analysis_state`, `event_count`, `tags text[]` | select, insert, update, delete | `CHECK (event_count BETWEEN 0 AND 2000)`. The only mutable case row (analysis state, last run id). Indexes: list `(tenant_id, opened_at DESC, id DESC)`, by status, by analysis state, by `content_hash`, by `reference`. |
-| `case_sources`      | `(tenant_id, case_id, id)`, `received_sha256`, `stored_sha256`, `storage_ref`, `payload`, `redaction_replacements`                | select, insert                 | Exactly one per case (`UNIQUE (tenant_id, case_id)`). `UNIQUE (tenant_id, received_sha256)` is the ingestion idempotency index. `payload` is the redacted text exactly as stored. Trigger rejects UPDATE and DELETE.      |
-| `case_participants` | `(tenant_id, case_id, id)`, `role`, `alias`, `event_count`                                                                        | select, insert                 | Aliases only. No mutation trigger; the application role simply has no UPDATE or DELETE privilege.                                                                                                                         |
-| `case_events`       | `(tenant_id, case_id, id)`, `source_id`, `sequence`, `event_ts`, `participant_id`, `type`                                         | select, insert                 | `sequence` is zero-based, gap-free, `< 2000`, unique per case. Timeline index `(tenant_id, case_id, event_ts, sequence)`. Trigger rejects UPDATE and DELETE.                                                              |
-| `case_resolutions`  | `(tenant_id, case_id)`, `resolved_at`                                                                                             | select, insert                 | At most one per case. Kept apart from events because the resolution is the one thing temporal analysis must not see early. Trigger rejects UPDATE and DELETE.                                                             |
+| Table               | Key columns                                                                                                                       | App role                       | Notes                                                                                                                                                                                                                                                                          |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cases`             | `(tenant_id, id)`, `reference`, `workload`, `status`, `synthetic`, `content_hash`, `analysis_state`, `event_count`, `tags text[]` | select, insert, update, delete | `CHECK (event_count BETWEEN 0 AND 2000)`. The only mutable case row (analysis state, last run id). Indexes: list `(tenant_id, opened_at DESC, id DESC)`, by status, by analysis state, by `content_hash`. `UNIQUE (tenant_id, reference)` (0010) is also the reference lookup. |
+| `case_sources`      | `(tenant_id, case_id, id)`, `received_sha256`, `stored_sha256`, `storage_ref`, `payload`, `redaction_replacements`                | select, insert                 | Exactly one per case (`UNIQUE (tenant_id, case_id)`). `UNIQUE (tenant_id, received_sha256)` is the ingestion idempotency index. `payload` is the redacted text exactly as stored. Trigger rejects UPDATE and DELETE.                                                           |
+| `case_participants` | `(tenant_id, case_id, id)`, `role`, `alias`, `event_count`                                                                        | select, insert                 | Aliases only. No mutation trigger; the application role simply has no UPDATE or DELETE privilege.                                                                                                                                                                              |
+| `case_events`       | `(tenant_id, case_id, id)`, `source_id`, `sequence`, `event_ts`, `participant_id`, `type`                                         | select, insert                 | `sequence` is zero-based, gap-free, `< 2000`, unique per case. Timeline index `(tenant_id, case_id, event_ts, sequence)`. Trigger rejects UPDATE and DELETE.                                                                                                                   |
+| `case_resolutions`  | `(tenant_id, case_id)`, `resolved_at`                                                                                             | select, insert                 | At most one per case. Kept apart from events because the resolution is the one thing temporal analysis must not see early. Trigger rejects UPDATE and DELETE.                                                                                                                  |
+
+**Case references (0010).** The reference (`CG-SYN-1001`) is what people quote, and it is **unique within a tenant**: the database
+enforces `UNIQUE (tenant_id, reference)` (constraint `cases_tenant_reference_uq`), which replaced the plain index of 0003. Until
+0010 only the ingest service guarded it, by reading a bounded page of recent cases, so a reference could be reused in a large
+workspace and two concurrent ingests could both pass the check; the service still checks first, so that a preview can predict the
+outcome, but the constraint is what settles it.
+
+- The comparison is exact and case-sensitive. Another tenant may use the same reference.
+- `CaseRepository.findByReference(reference)` is the exact, tenant-bound lookup (through the unique index). A string that cannot be
+  a reference (empty, longer than 200 characters, control characters) is a 422; anything else that matches nothing is `null`.
+- A case with different content under a used reference is refused: the unique violation (SQLSTATE 23505) becomes a **409** with
+  `details.reason: "duplicate"` and the message "A case with this reference already exists in this workspace". The ingest is one
+  transaction, so nothing of the refused case remains, and the audit record that shares the transaction rolls back with it. The
+  same content again is still the idempotent replay (the content hash), not a conflict.
+- Two concurrent ingests of one new reference: PostgreSQL's unique index lets one win. PGlite has one connection, so this race
+  cannot be exercised in the tests; it rests on the database's locking.
+- **Upgrade.** A database that already holds two cases with one reference in one tenant cannot take the constraint: migration
+  0010 fails with SQLSTATE 23505 on `cases_tenant_reference_uq`, nothing from it is applied (it runs in one transaction) and the
+  runner names the migration and the constraint. List the pairs with
+  `SELECT tenant_id, reference, count(*) FROM cases GROUP BY 1, 2 HAVING count(*) > 1;`, rename or erase all but one case of each (a
+  rename must update both the `reference` column and `data->'reference'`) and run `pnpm db:migrate` again.
 
 ### 4.3 Analysis artefacts (0004)
 
@@ -214,7 +261,9 @@ list (for example 10,000 evidence rows, 500 forks, 1,000 warnings).
 
 Two carry-forwards the repository cannot know about are done by the analysis service and saved in the same transaction
 as the snapshot. An applied skill match keeps who applied it and when, and its `conformance` is recomputed on the new
-analysis (never copied). A counterfactual scenario keeps its review decision when the regenerated simulation is the same
+analysis (never copied); when its skill is no longer matchable (deprecated or retired since) the stored match is kept
+as it was, with its `lifecycle` set to the skill's current state, because an application is a human decision and part
+of the case's history. A counterfactual scenario keeps its review decision when the regenerated simulation is the same
 one (same fork, strategy, steps, numbers and checks; the run, the model execution, the wording of the steps and the leak
 check time do not count). A scenario whose simulation changed comes back `pending`, and a `counterfactual.review_reset`
 audit event records it with ids and counters only. The engine seeds its rollouts from the analysis input hash, so any
@@ -247,22 +296,37 @@ the decisions at the next re-analysis.
 | `skill_approvals`          | `from_state`, `to_state`, `decision`, `approver`, `requested_by`, `decided_at`                                                        | select, insert                 | `CHECK (decision <> 'approved' OR approver <> requested_by)`: the four-eyes rule has a database backstop as well as the domain gate. Insert only.                |
 | `skill_matches`            | `(tenant_id, case_id, id)`, `skill_id`, `as_of`, `score`, `applicability`, `applied`                                                  | select, insert, update, delete | Matches are computed as of an instant; `applied` records that an engineer used it.                                                                               |
 
-### 4.5 Telemetry, audit and operations (0006, 0008, 0009)
+A skill validation's `scope` (`full`, or `case` for a run on one named case; absent means full) lives in its JSON
+`data`. Only a full-scope validation of the version's current content satisfies or fails a lifecycle gate; a case-scope
+run is stored as `inconclusive` with its real per-check results. `skill_matches` rows are written by the analysis
+snapshot and by an application, never by a read (matches are computed on demand with deterministic ids).
 
-| Table               | Key columns                                                                                                                                              | App role                       | Notes                                                                                                                                                |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `model_executions`  | `(tenant_id, id)`, `case_id` (nullable, cascades), `agent`, `prompt_version_id`, `provider`, `model`, `status`, `attempts`, `latency_ms`, `simulated`    | select, insert, update, delete | One row per agent task, including deterministic ones. Hashes and metadata only: prompts and raw model output are not stored unless a caller opts in. |
-| `token_usage`       | `model_execution_id` (unique), `prompt_tokens`, `completion_tokens`, `cached_tokens`, `estimated_cost_usd`, `cache_hit`, `simulated`                     | select, insert, update, delete | `estimated_cost_usd` is NULL when no unit prices are configured: cost is unknown, never guessed.                                                     |
-| `audit_events`      | `(tenant_id, id)`, `sequence`, `actor_id`, `actor_role`, `action`, `target_type`, `case_id`, `outcome`, `details`, `correlation_id`, `prev_hash`, `hash` | select, insert                 | Append-only hash chain. Section 7.                                                                                                                   |
-| `review_decisions`  | `target_type`, `target_id`, `decision`, `reviewer_id`, `reviewer_role`, `decided_at`                                                                     | select, insert, delete         | Reviewer decisions with the original and new value in `data`. Delete exists only for the erasure cascade.                                            |
-| `jobs`              | `(tenant_id, id)`, `kind`, `status`, `case_id`, `idempotency_key`, `created_at`, `cancellable`, `heartbeat_at` (0009)                                    | select, insert, update, delete | Unique `(tenant_id, kind, idempotency_key)` where the key is not null. Section 9.                                                                    |
-| `idempotency_keys`  | `(tenant_id, scope_name, key)`, `request_hash`, `state`, `response_status`, `response`, `expires_at`                                                     | select, insert, update, delete | Section 8.                                                                                                                                           |
-| `demo_state`        | `(tenant_id, key)`, `value`                                                                                                                              | select, insert, update, delete | Holds the demo seed marker.                                                                                                                          |
-| `schema_migrations` | `name`, `checksum`, `applied_at`                                                                                                                         | not granted                    | Created by the migration runner, not by a migration. No tenant column and no RLS; the application role has no privilege on it.                       |
+### 4.5 Telemetry, audit and operations (0006, 0008, 0009, 0011, 0012)
+
+| Table               | Key columns                                                                                                                                              | App role                       | Notes                                                                                                                                                                                                                                                                                      |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `model_executions`  | `(tenant_id, id)`, `case_id` (nullable, cascades), `agent`, `prompt_version_id`, `provider`, `model`, `status`, `attempts`, `latency_ms`, `simulated`    | select, insert, update, delete | One row per agent task, including deterministic ones. Hashes and metadata only: prompts and raw model output are not stored unless a caller opts in.                                                                                                                                       |
+| `token_usage`       | `model_execution_id` (unique), `prompt_tokens`, `completion_tokens`, `cached_tokens`, `estimated_cost_usd`, `cache_hit`, `simulated`                     | select, insert, update, delete | `estimated_cost_usd` is NULL when no unit prices are configured: cost is unknown, never guessed.                                                                                                                                                                                           |
+| `audit_events`      | `(tenant_id, id)`, `sequence`, `actor_id`, `actor_role`, `action`, `target_type`, `case_id`, `outcome`, `details`, `correlation_id`, `prev_hash`, `hash` | select, insert                 | Append-only hash chain. Section 7.                                                                                                                                                                                                                                                         |
+| `review_decisions`  | `target_type`, `target_id`, `decision`, `reviewer_id`, `reviewer_role`, `decided_at`                                                                     | select, insert, delete         | Reviewer decisions with the original and new value in `data`. Delete exists only for the erasure cascade. Indexes by target type (0012): `(tenant_id, target_type, decided_at DESC, id DESC)` and `(tenant_id, case_id, target_type, decided_at DESC, id DESC) WHERE case_id IS NOT NULL`. |
+| `jobs`              | `(tenant_id, id)`, `kind`, `status`, `case_id`, `idempotency_key`, `created_at`, `cancellable`, `heartbeat_at` (0009)                                    | select, insert, update, delete | Unique `(tenant_id, kind, idempotency_key)` where the key is not null. Section 9.                                                                                                                                                                                                          |
+| `idempotency_keys`  | `(tenant_id, scope_name, key)`, `request_hash`, `state`, `response_status`, `response`, `expires_at`, `case_id` (nullable, 0011)                         | select, insert, update, delete | Section 8. Composite foreign key `(tenant_id, case_id)` to `cases` with `ON DELETE CASCADE`; partial index on `(tenant_id, case_id) WHERE case_id IS NOT NULL` (0011).                                                                                                                     |
+| `demo_state`        | `(tenant_id, key)`, `value`                                                                                                                              | select, insert, update, delete | Holds the demo seed marker.                                                                                                                                                                                                                                                                |
+| `schema_migrations` | `name`, `checksum`, `applied_at`                                                                                                                         | not granted                    | Created by the migration runner, not by a migration. No tenant column and no RLS; the application role has no privilege on it.                                                                                                                                                             |
 
 0008 adds two partial indexes for the command center lists (`case_warnings ... WHERE state = 'open'` and
 `missing_evidence ... WHERE resolved_at IS NULL`). Their predicates use only leakproof operators, so they serve the
-application role under row-level security. 0009 adds the nullable column `jobs.heartbeat_at` (section 9).
+application role under row-level security. 0009 adds the nullable column `jobs.heartbeat_at` (section 9). 0011 adds
+`idempotency_keys.case_id` with its foreign key and partial index (section 8).
+
+0012 adds the two review-decision indexes above. `ReviewRepository.list` can be narrowed to one target type (`claim`, `fork`,
+`counterfactual`, `warning`, `skill`, `skill_version`, `action_value`, `hypothesis` or `twin_field`; any other value, including an
+empty string, is a 422), alone or within one case, newest first with keyset pagination. The older indexes could not serve that:
+the tenant-wide list read and sorted every decision of the type for every page, and the per-case list read all of a case's
+decisions to filter them. The migration's header comment records one measurement on PGlite as `caseguard_app` (30,000 decisions in a
+tenant, about 700 bytes each, 100 per case): tenant and type, 427 matches, 14.7 ms and 412 buffers with a sort, afterwards 0.4 ms and
+54 buffers without one; one type within a case, 103 buffers, afterwards 8. That is a single run on PGlite, not a PostgreSQL 16
+benchmark. `test/review-target-type.int.test.ts` also checks through `EXPLAIN` that the planner picks the indexes.
 
 ### 4.6 Seeded rows
 
@@ -352,18 +416,26 @@ anchor it later.
 `idempotency_keys` backs the `Idempotency-Key` header on the six routes marked `idempotent` in the route registry
 (`cases.create`, `cases.createFromFile`, `analysis.start`, `counterfactuals.run`, `skills.extract`, `skills.proposeMutation`).
 
-| Aspect              | Behaviour                                                                                                                                                                                                                                                                                                                                                      |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Key and scope       | Header value matching `[A-Za-z0-9][A-Za-z0-9._:-]{7,127}`. The scope name is `<routeId>:<first 24 hex characters of sha256(userId)>`, so a key is **private to the calling user** within the tenant: another user of the same tenant can neither replay a stored response nor block a key by registering it first. Primary key `(tenant_id, scope_name, key)`. |
-| Request fingerprint | `sha256(canonicalJson({ routeId, params, query, body, file hash and name }))` stored as `request_hash`.                                                                                                                                                                                                                                                        |
-| States              | `begin` returns `new` (reserved), `replay` (completed with the same hash: the stored response and status are returned and `Idempotent-Replayed: true` is set), `conflict` (same key, different hash: 422) or `in_progress` (409).                                                                                                                              |
-| Lifetimes           | A completed key lives 24 hours; a reservation older than 5 minutes is taken over (the first request crashed). Expired keys of a tenant are deleted opportunistically whenever a new key is reserved there.                                                                                                                                                     |
-| Failure             | A handler that throws releases the reservation so the client can retry; nothing is stored for a failed attempt.                                                                                                                                                                                                                                                |
-| Size                | A stored response may be at most 1 MiB, otherwise the call fails validation.                                                                                                                                                                                                                                                                                   |
-| Audit               | A replay still audits the request: the `api.<routeId>` success event carries `details.replayed: true`, and the response has the header `Idempotent-Replayed: true`.                                                                                                                                                                                            |
+| Aspect                    | Behaviour                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Key and scope             | Header value matching `[A-Za-z0-9][A-Za-z0-9._:-]{7,127}`. The scope name is `<routeId>:<first 24 hex characters of sha256(userId)>`, so a key is **private to the calling user** within the tenant: another user of the same tenant can neither replay a stored response nor block a key by registering it first. Primary key `(tenant_id, scope_name, key)`.                                                                                                                                                                                                                                                                                                                                                                       |
+| Request fingerprint       | `sha256(canonicalJson({ routeId, params, query, body, file hash and name }))` stored as `request_hash`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| States                    | `begin` returns `new` (reserved), `replay` (completed with the same hash: the stored response and status are returned and `Idempotent-Replayed: true` is set), `conflict` (same key, different hash: 422) or `in_progress` (409).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Lifetimes                 | A completed key lives 24 hours; a reservation older than 5 minutes is taken over (the first request crashed). Expired keys of a tenant are deleted opportunistically whenever a new key is reserved there, and by a sweep (below).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Failure                   | A handler that throws releases the reservation so the client can retry; nothing is stored for a failed attempt.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Size                      | A stored response may be at most 1 MiB, otherwise the call fails validation.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Audit                     | A replay still audits the request: the `api.<routeId>` success event carries `details.replayed: true`, and the response has the header `Idempotent-Replayed: true`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Link to a case (0011)     | A completed key can name the case its response is about, so that the response is erased with the case. The link is the `caseId` path parameter, else the case of an ingest result (`case.id`), else the case of a job (`job.caseId`), else a top-level `caseId` (`linkedCaseId` in `http/idempotency.ts`). The composite foreign key `(tenant_id, case_id)` to `cases` with `ON DELETE CASCADE` deletes the key in the same statement that deletes the case.                                                                                                                                                                                                                                                                         |
+| Storing a linked response | `complete(..., { caseId })` first takes `FOR KEY SHARE` on the case row, so an erasure cannot slip in before the transaction ends (the foreign key takes the same lock). If the case is already gone, the reservation is dropped and nothing is stored, because the response would describe erased data.                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Erasing a case            | `CaseRepository.delete` also runs `purgeCaseResponses`: the linked keys (an index lookup) plus the completed keys without a link whose stored response mentions the case id as a whole word (a pattern delimited by anything that cannot be part of an id, so `case_1` does not match `case_10`). A retry with the same `Idempotency-Key` therefore creates anew instead of replaying a case that no longer exists. `IdempotencyRepository.purgeForCase(caseId)` does the same on its own and returns the number removed.                                                                                                                                                                                                            |
+| Expiry sweep              | `purgeExpired(limit)` deletes the oldest expired keys first (1,000 per call by default, 10,000 at most) in one materialised batch with `FOR UPDATE SKIP LOCKED`, so two purges share the work. `main.ts` calls it for every known tenant at start-up and then every 10 minutes (`IDEMPOTENCY_PURGE_INTERVAL_MS`), on every replica and in local runs: at most 10 batches of 1,000 keys per tenant per sweep, and a tenant that fails is logged (`could not purge expired idempotency keys`) and skipped. It matters for tenants that stopped sending requests, because reserving a key already trims that tenant's expired keys. "Known" means the tenants of the dev personas in dev mode plus the tenants of the Entra tenant map. |
 
 Ingestion and analysis are additionally idempotent by content: `case_sources` is unique on the received hash, and an
 analysis run is found again by its input hash.
+
+The link, the purge and the sweep are covered by `test/idempotency-erasure.int.test.ts` and `test/idempotency-link.test.ts` (both
+ran and passed). The lock-based races (`FOR KEY SHARE` against an erasure, `SKIP LOCKED` between two purges) cannot be exercised on
+PGlite, which has one connection; they rest on PostgreSQL's locking by design and have not been run against it.
 
 ## 9. Jobs
 
@@ -373,7 +445,8 @@ analysis run is found again by its input hash.
   `queued`, `running`, `succeeded`, `failed` or `cancelled`. The stage list, progress and error live in `data`.
 - Jobs run on the API process's event loop with a concurrency of 2 (`JobService`). The queue itself is in memory;
   the table is the record. There is no external queue and no separate worker. A job still running after 10 minutes is
-  stopped and recorded as `failed` (`DEFAULT_JOB_TIMEOUT_MS`).
+  stopped and recorded as `failed` (`DEFAULT_JOB_TIMEOUT_MS`; a job may ask for another limit, and the `demo_seed` job asks for 20
+  minutes).
 - **Liveness (0009).** The process that owns running jobs writes `jobs.heartbeat_at` every 10 seconds
   (`JOB_HEARTBEAT_INTERVAL_MS`, only while it owns jobs); the same round trip tells the owner that its job was cancelled from
   another replica or failed as orphaned, and the owner then stops the work. A job's last sign of life is
@@ -405,19 +478,22 @@ analysis run is found again by its input hash.
 
 Run them with `pnpm db:migrate` (see [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md)).
 
-The nine released migrations (`apps/api/src/db/migrations/`), from their own header comments:
+The twelve released migrations (`apps/api/src/db/migrations/`), from their own header comments:
 
-| File                                  | What it adds                                                                                                                                                                    |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `0001_foundation.sql`                 | The `caseguard_app` role, the immutability trigger functions and the helper that switches on forced row-level security for every tenant table                                   |
-| `0002_tenancy.sql`                    | `tenants`, `users`, `governance_settings`, `prompt_versions`                                                                                                                    |
-| `0003_cases.sql`                      | `cases` and the immutable `case_sources`, `case_participants`, `case_events`, `case_resolutions`                                                                                |
-| `0004_analysis.sql`                   | `analysis_runs` and the artefacts of a run (digital twin, evidence, hypotheses and their links, claims, missing evidence, actions, forks, quality, metrics, warnings, coaching) |
-| `0005_counterfactuals_and_skills.sql` | Counterfactual scenarios and steps, and the SkillDNA library (skills, versions, validations, approvals, matches)                                                                |
-| `0006_telemetry_audit_and_ops.sql`    | `model_executions`, `token_usage`, the append-only `audit_events` chain, `review_decisions`, `jobs`, `idempotency_keys`, `demo_state`                                           |
-| `0007_search_and_identity_sync.sql`   | `search_tsv` generated columns and GIN indexes on six tables; the e-mail look-up index and the `INSERT` privilege on `users` for just-in-time Entra provisioning                |
-| `0008_dashboard_read_models.sql`      | Two partial indexes for the tenant-wide command-center lists (open warnings, unresolved missing evidence)                                                                       |
-| `0009_job_heartbeat.sql`              | The nullable `jobs.heartbeat_at` column used for job liveness and orphan recovery                                                                                               |
+| File                                  | What it adds                                                                                                                                                                            |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0001_foundation.sql`                 | The `caseguard_app` role, the immutability trigger functions and the helper that switches on forced row-level security for every tenant table                                           |
+| `0002_tenancy.sql`                    | `tenants`, `users`, `governance_settings`, `prompt_versions`                                                                                                                            |
+| `0003_cases.sql`                      | `cases` and the immutable `case_sources`, `case_participants`, `case_events`, `case_resolutions`                                                                                        |
+| `0004_analysis.sql`                   | `analysis_runs` and the artefacts of a run (digital twin, evidence, hypotheses and their links, claims, missing evidence, actions, forks, quality, metrics, warnings, coaching)         |
+| `0005_counterfactuals_and_skills.sql` | Counterfactual scenarios and steps, and the SkillDNA library (skills, versions, validations, approvals, matches)                                                                        |
+| `0006_telemetry_audit_and_ops.sql`    | `model_executions`, `token_usage`, the append-only `audit_events` chain, `review_decisions`, `jobs`, `idempotency_keys`, `demo_state`                                                   |
+| `0007_search_and_identity_sync.sql`   | `search_tsv` generated columns and GIN indexes on six tables; the e-mail look-up index and the `INSERT` privilege on `users` for just-in-time Entra provisioning                        |
+| `0008_dashboard_read_models.sql`      | Two partial indexes for the tenant-wide command-center lists (open warnings, unresolved missing evidence)                                                                               |
+| `0009_job_heartbeat.sql`              | The nullable `jobs.heartbeat_at` column used for job liveness and orphan recovery                                                                                                       |
+| `0010_case_reference_unique.sql`      | `UNIQUE (tenant_id, reference)` on `cases` (replacing the plain reference index): one case per reference within a tenant; fails, all or nothing, on data that already holds a duplicate |
+| `0011_idempotency_case_link.sql`      | `idempotency_keys.case_id` with a composite foreign key to `cases` (`ON DELETE CASCADE`) and a partial index, so erasing a case also erases the idempotent responses that describe it   |
+| `0012_review_target_type_idx.sql`     | Two indexes for listing review decisions of one target type, in the tenant or within one case, newest first                                                                             |
 
 ## 11. Immutability, erasure and retention: what exists
 
@@ -428,16 +504,20 @@ Content hashes are recorded at ingestion.
 **Erasure of a case (implemented).** `DELETE /api/v1/cases/:caseId` (permission `case:delete`, administrator only)
 sets `app.allow_erasure = on` for one statement; the triggers then allow the cascade from `cases` (DELETE only, never
 UPDATE). The cascade removes the source, participants, events, resolution, every analysis artefact, scenarios and
-steps, skill matches, jobs, model executions, token usage and review decisions of that case. The service also deletes
+steps, skill matches, jobs, model executions, token usage and review decisions of that case, and the idempotent responses linked to
+it (0011). The repository also purges completed responses without a link whose body mentions the case id (section 8), so a retry
+with the same `Idempotency-Key` cannot replay a case that was erased. The service also deletes
 the mirrored object, writes the audit event `case.deleted` (counts only) in the same transaction, and refuses with a
 409 while a job for the case is queued or running. A second call is a 404. The setting protects against accidents
 and application bugs, not against someone who can run arbitrary SQL as `caseguard_app`.
 
 **Demo reset (implemented).** `DemoRepository.resetTenantData` deletes `cases`, `skills`, `jobs`, `token_usage`,
-`model_executions`, `review_decisions`, `idempotency_keys` and `demo_state` for one tenant. Tenants, users,
-governance settings, prompt versions and audit events are kept.
+`model_executions`, `review_decisions`, `idempotency_keys` and `demo_state` for one tenant, and the demo service then removes the
+mirrored payloads from the object store. Tenants, users, governance settings, prompt versions and audit events are kept; the reset
+itself is audited. The counts before and after one reset are in [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md#82-demo-data).
 
-**Idempotency keys** expire after 24 hours (section 8).
+**Idempotency keys** expire after 24 hours; expired keys are deleted when a tenant reserves a new key and by a sweep every 10
+minutes, and the responses about an erased case are erased with it (section 8).
 
 **Retention windows (stored, not enforced).** The `retention` governance section holds `caseDataDays` (default 365),
 `auditDays` (730), `modelExecutionDays` (90), `analyticsDays` (365) and `legalHold`. They are validated, versioned and

@@ -47,7 +47,7 @@ CgApiLogs()
 | summarize refusals = count() by code, agent, bin(TimeGenerated, 1h)
 ```
 
-Application views (permission `telemetry:read`): `GET /api/v1/efficiency/overview` and `GET /api/v1/model-executions` are in the API contract. Their handlers landed late (uncommitted when I checked; they answered 200 in a smoke run); on an older checkout they answer 501, and then you use the log queries above and `GET /api/v1/system/metrics` (`modelExecutions`, since the process started). Azure side: Azure OpenAI metrics and Cost analysis filtered to the resource.
+Application views (permission `telemetry:read`): `GET /api/v1/efficiency/overview` and `GET /api/v1/model-executions` are in the API contract and answered 200 in a smoke run against an in-memory API; on an older checkout, from before these handlers were added, they answer 501, and then you use the log queries above and `GET /api/v1/system/metrics` (`modelExecutions`, since the process started). Azure side: Azure OpenAI metrics and Cost analysis filtered to the resource.
 
 ## Triage
 

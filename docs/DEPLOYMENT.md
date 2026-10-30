@@ -215,6 +215,15 @@ Run these in order. None of them has been run by the authors.
 
 This check has not been run by the authors.
 
+**Tenant provisioning (a gap found by reading the code, not observed).** The only code that creates the `tenants` row and the
+synthetic personas is `seedFoundation`, and the API calls it only when it migrates the database itself (`DB_AUTO_MIGRATE=true`) in
+demo mode or a local-like environment. The template sets `DB_AUTO_MIGRATE=false` and the migration job (`node dist/db/migrate-cli.js`)
+does not seed, so a freshly deployed environment has no tenant row for `ENTRA_TENANT_MAP` to point at and none of the four personas
+the demo story needs. Reading the checks above with that in mind: check 7 can still show the session (it is derived from the token),
+but the case writes of check 8 and the demo seed of check 10 (409 `personas_unavailable`) are not expected to succeed until the tenant
+and its users are provisioned out of band. Treat check 10 as a known gap and seed the demo data locally instead
+([LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md#82-demo-data)).
+
 Because the web app proxies `/livez`, `/healthz` and `/readyz` to the API, those three paths are reachable from the internet through the **web** URL even though the API has no external ingress. Read the bodies once after the first deployment. As observed locally, `/livez` and `/healthz` return the service name, version and uptime, and `/readyz` returns the service name and version plus, for each dependency (`database`, `migrations`, `storage`, `search`, `model_provider`), its name, kind, whether it is critical, its status and its latency. They contain no hostnames, connection details or error text (the readiness answer is built with `detail: 'minimal'`). If you consider dependency names, the version or latencies too revealing for an internet-reachable path, ask the API/web owners to trim the response or to stop proxying the readiness path, and keep the Container Apps probes pointed at the API container directly (as they are; the web app uses TCP probes because an HTTP probe on the web container would test the API, not the web app).
 
 ## 6. Production deployment with approvals

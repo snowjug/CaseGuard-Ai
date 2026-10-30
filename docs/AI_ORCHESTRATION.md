@@ -230,18 +230,35 @@ All of this state is in memory and per tenant orchestrator (section 8).
 ## 8. How the API binds it (`apps/api/src/services/ai`)
 
 - **One orchestrator per tenant**, rebuilt when that tenant's `model` governance setting changes version, so budgets,
-  routing and cache limits follow governance. The provider object is created once per process.
+  routing and cache limits follow governance. The provider object is created once per process, and created again after 60 seconds
+  when its creation failed (see "A provider that cannot be created" below).
 - **Effective limits** (`effectiveModelConfig`). The tenant's settings are tightened by the operator's environment: the
   provider kind comes from `AI_PROVIDER` (a tenant cannot select a provider that is not connected); token, retry and
   timeout limits are `min(tenant, operator)`; the daily cost cap is the smaller of the tenant's and
   `AI_COST_LIMIT_USD_PER_DAY`; unit prices fall back to the operator's when the tenant set none (so cost stays unknown
-  rather than invented).
+  rather than invented). **Under Azure OpenAI the tenant's routing is pinned to the operator's deployment**
+  (`AZURE_OPENAI_DEPLOYMENT`): the one resource is shared by every tenant and priced as one, so a tenant's routing names cannot
+  name another deployment on it, and there is no cheaper tier and no per-agent rule. Routing to a second deployment would need an
+  operator allow-list, which does not exist yet ([ROADMAP.md](ROADMAP.md)).
+- **A provider that cannot be created** (a configuration fault, a missing credential chain, a failed `@azure/identity`
+  import) does not take the product down, because the deterministic analysis is the product. `AiService` logs the error
+  (`could not create the configured AI provider; deterministic code serves until it can`), counts
+  `caseguard_errors_total{component="ai",code="provider_unavailable"}`, builds the tenant's orchestrator without a provider so that
+  deterministic code serves, and reports health `degraded` (`GET /api/v1/system/provider` and `/system/health` show
+  `healthy: false` and a reason that points to the server log). The next request that needs the orchestrator after 60 seconds
+  (`PROVIDER_RETRY_AFTER_MS`) tries to create the provider again, so a provider that recovers is picked up without a restart.
+  Tests: `apps/api/test/ai-service.test.ts` and `system.int.test.ts` (a failing provider factory); never exercised with a real
+  Azure credential failure.
 - **Redaction and injection scanning** use the security package (`redactText`, `detectPromptInjection`).
 - **Daily usage survives restarts.** On build, today's tokens and cost are re-seeded from the persisted `token_usage`
   aggregate; the rest of the state is not persisted.
 - **Execution records.** Every run persists a `model_executions` row plus its `token_usage` row (hashes and metadata
   only; `retainContent` is off) and feeds the product metrics (`caseguard_model_calls_total`, tokens by `source`
-  measured or estimated, duration, cache lookups, fallbacks, validation failures, injection flags). The seven validator
+  measured or estimated, duration, cache lookups, fallbacks, validation failures, injection flags). **The spend of an analysis
+  that does not complete is recorded too:** an agent attempt that was cancelled or failed still cost tokens and time, its record
+  travels with the error, and when the run is never stored (cancelled, timed out, failed to save) the executions are stored on
+  their own, so the daily budgets and the efficiency telemetry count them (`services/analysis/agents.ts`, `service.ts`).
+  The seven validator
   kinds are folded into four metric labels: `schema` (size, schema), `citation` (citation, groundedness), `policy`
   (policy, injection) and `temporal`. The AI package's own log line is `event: ai.model.execution` (see
   [OBSERVABILITY.md](OBSERVABILITY.md)).
@@ -311,8 +328,8 @@ every token figure in the efficiency views is labelled estimated. No network acc
 | Variable                                                    | Rule                                                                                                                                                                                                         |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `AI_PROVIDER=azure-openai`                                  | Switches the provider. Also turns on the `azureOpenAiProvider` feature flag.                                                                                                                                 |
-| `AZURE_OPENAI_ENDPOINT`                                     | Required. https URL, bare origin such as `https://<resource>.openai.azure.com`.                                                                                                                              |
-| `AZURE_OPENAI_DEPLOYMENT`                                   | Required. Letters, digits, `.`, `_`, `-`. Config accepts 1 to 128 characters, but the provider refuses names longer than 64 when it builds the request.                                                      |
+| `AZURE_OPENAI_ENDPOINT`                                     | Required. A bare https origin such as `https://<resource>.openai.azure.com` (a trailing slash is fine). A path, query, fragment or credentials stop start-up, as does plain http.                            |
+| `AZURE_OPENAI_DEPLOYMENT`                                   | Required. 1 to 64 letters, digits, `.`, `_` or `-`, starting with a letter or digit; the same rule the provider applies when it builds the request.                                                          |
 | `AZURE_OPENAI_API_VERSION`                                  | Default `2024-10-21`. Verify against the model you deploy; this value was not tested against a real service.                                                                                                 |
 | `AZURE_OPENAI_AUTH`                                         | `managed-identity` (default, and the only accepted value when `APP_ENV` is `staging` or `production`) or `api-key` (local experiments only).                                                                 |
 | `AZURE_OPENAI_API_KEY`                                      | Required with `api-key`. **Refused when `APP_ENV` is `staging` or `production`, even if `AZURE_OPENAI_AUTH=managed-identity`.** With managed identity locally it is ignored with a warning. Never commit it. |
@@ -345,16 +362,16 @@ Every execution record sets `simulated` when the returned result came from deter
 
 ## 11. Failure modes
 
-| Situation                                                                    | What happens                                                                                                                                                                                                        |
-| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Provider returns 5xx, 429, times out, network                                | Bounded retries inside the provider, then a deterministic fallback with a typed reason; the breaker opens after five consecutive health failures.                                                                   |
-| Breaker open                                                                 | No provider call; deterministic result; status `circuit_open`; health `degraded`.                                                                                                                                   |
-| Output invalid (schema, citation, grounding)                                 | One repair attempt, then fallback (`rejected_by_validation`).                                                                                                                                                       |
-| Output leaks the future, breaks policy, obeys injected text                  | Rejected at once, no repair, fallback.                                                                                                                                                                              |
-| Budget or cost limit refuses the call                                        | Fallback (`budget_exceeded`) with a user-safe reason. A cost limit without prices refuses every model call.                                                                                                         |
-| Provider cannot be built (failed `@azure/identity` import, refused endpoint) | The failed construction is cached for the life of the process. `system.provider` shows `healthy: false` with no error text, agent runs fail and are skipped, and the analysis still completes. A restart is needed. |
-| Caller disconnects or the job is cancelled                                   | The task throws `cancelled` with a record of the attempt; nothing is stored as a result.                                                                                                                            |
-| The deterministic result fails validation                                    | Internal defect: `AiTaskError internal_validation_failure`, logged at error level.                                                                                                                                  |
+| Situation                                                                    | What happens                                                                                                                                                                                                                                                                                                                                                  |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Provider returns 5xx, 429, times out, network                                | Bounded retries inside the provider, then a deterministic fallback with a typed reason; the breaker opens after five consecutive health failures.                                                                                                                                                                                                             |
+| Breaker open                                                                 | No provider call; deterministic result; status `circuit_open`; health `degraded`.                                                                                                                                                                                                                                                                             |
+| Output invalid (schema, citation, grounding)                                 | One repair attempt, then fallback (`rejected_by_validation`).                                                                                                                                                                                                                                                                                                 |
+| Output leaks the future, breaks policy, obeys injected text                  | Rejected at once, no repair, fallback.                                                                                                                                                                                                                                                                                                                        |
+| Budget or cost limit refuses the call                                        | Fallback (`budget_exceeded`) with a user-safe reason. A cost limit without prices refuses every model call.                                                                                                                                                                                                                                                   |
+| Provider cannot be built (failed `@azure/identity` import, refused endpoint) | Logged, counted as `caseguard_errors_total{component="ai",code="provider_unavailable"}`, and the tenant's orchestrator is built without a provider: deterministic code serves, health is `degraded` with a reason that points to the log, and analyses still complete. Creation is retried after 60 seconds, so no restart is needed once the cause is fixed. |
+| Caller disconnects or the job is cancelled                                   | The task throws `cancelled` with a record of the attempt; nothing is stored as a result.                                                                                                                                                                                                                                                                      |
+| The deterministic result fails validation                                    | Internal defect: `AiTaskError internal_validation_failure`, logged at error level.                                                                                                                                                                                                                                                                            |
 
 ## 12. Tests
 

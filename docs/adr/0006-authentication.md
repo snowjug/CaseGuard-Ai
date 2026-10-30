@@ -1,4 +1,4 @@
-# ADR 0006: Authentication with Microsoft Entra ID JWTs; dev personas only outside production
+# ADR 0006: Authentication with Microsoft Entra ID JWTs; dev personas for local and test only
 
 - Status: Accepted
 - Date: 2026-10-29
@@ -16,9 +16,10 @@ provider, but an accidentally enabled development login in production would be a
   issuer, audience and expiry (the `jose` library). The Entra tenant id maps to a CaseGuard tenant through
   `ENTRA_TENANT_MAP`; app roles map to RBAC roles through `ENTRA_ROLE_MAP`; permissions are deny-by-default.
 - **Development personas** (`AUTH_MODE=dev`, header `x-cg-persona: <userId>` over synthetic users) exist for
-  local, test and development only. Two independent switches must agree (`AUTH_MODE=dev` and `DEV_AUTH_ENABLED=true`), they
-  are allowed only when `APP_ENV` is `local`, `test` or `development` (A-14), and the authenticator and
-  start-up validation refuse to run otherwise. Production requires `entra` and `DEV_AUTH_ENABLED=false`.
+  local and test only. Two independent switches must agree (`AUTH_MODE=dev` and `DEV_AUTH_ENABLED=true`), they
+  are allowed only when `APP_ENV` is `local` or `test` (A-14), and the authenticator and start-up validation
+  refuse to run otherwise. The Azure `development` environment is internet-facing, so it, `staging` and
+  production require `entra` and `DEV_AUTH_ENABLED=false`.
 - **BFF-less SPA token flow.** The browser app uses MSAL (`@azure/msal-browser`, `@azure/msal-react`) to sign in
   and acquire access tokens, and sends them as `Authorization: Bearer` through the same-origin `/api` proxy
   (ADR 0012). There is no server-side session and no ambient cookie authentication for state changes, which
