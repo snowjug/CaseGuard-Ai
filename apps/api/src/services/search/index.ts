@@ -15,7 +15,8 @@ export {
   type SearchCredential,
   type SearchProviderFailure,
 } from './azure-ai-search';
-export { hrefFor, toSearchResult } from './results';
+export { hrefFor, toSearchResult, toValidResults, type ValidResults } from './results';
+export { cleanText, plainText, stripMarkup } from './plain-text';
 export {
   createSearchService,
   normalizeQuery,

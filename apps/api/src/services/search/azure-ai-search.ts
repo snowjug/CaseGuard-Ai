@@ -1,6 +1,8 @@
+import { IdSchema } from '@caseguard/schemas';
 import { assertSafeOutboundUrl } from '@caseguard/security';
 import { z } from 'zod';
 import type { SearchHit } from '../../db';
+import { plainText } from './plain-text';
 
 /*
  * Optional Azure AI Search adapter for `search.global`.
@@ -17,7 +19,10 @@ import type { SearchHit } from '../../db';
  *  - the tenant `filter` is always part of the request, and every returned document is checked against
  *    the tenant again, so a misconfigured index cannot leak another tenant's documents;
  *  - the token comes from Microsoft Entra (`DefaultAzureCredential`, scope below), never from a key;
- *  - 3 s overall deadline, bounded response size, no query text or token in errors or logs.
+ *  - 3 s overall deadline, bounded response size, no query text or token in errors or logs;
+ *  - a document that cannot be shown is dropped and counted, never allowed to fail the request: ids
+ *    must be valid CaseGuard ids (they become links), a case-scoped document needs the id of its case,
+ *    the title must not be empty, and text is reduced to plain text.
  */
 
 export const AZURE_SEARCH_API_VERSION = '2024-07-01';
@@ -86,7 +91,7 @@ export interface AzureSearchRequest {
 
 export interface AzureSearchOutcome {
   readonly hits: SearchHit[];
-  /** Documents discarded because they did not match the expected shape. */
+  /** Documents discarded because they could not be shown: wrong shape, invalid ids, empty title. */
   readonly droppedInvalid: number;
   /** Documents discarded because they belonged to another tenant (the index ignored the filter). */
   readonly droppedForeignTenant: number;
@@ -136,31 +141,61 @@ function normalizeScore(raw: number): number {
   return Math.round((raw / (1 + raw)) * 10_000) / 10_000;
 }
 
-/** Maps documents to hits, discarding malformed ones and anything of another tenant. */
+type IndexDocument = z.infer<typeof DocumentSchema>;
+
+const isCaseGuardId = (value: string): boolean => IdSchema.safeParse(value).success;
+
+/** The case a document belongs to: its own id for a case, none for a skill, else a valid `caseId`. */
+function caseLinkOf(doc: IndexDocument, id: string): { readonly caseId: string | null } | null {
+  if (doc.type === 'skill') return { caseId: null };
+  if (doc.type === 'case') return { caseId: id };
+  const caseId = doc.caseId ?? null;
+  return caseId !== null && isCaseGuardId(caseId) ? { caseId } : null;
+}
+
+/** One document as a hit, or null when it cannot be shown as a valid, linkable result. */
+function toHit(doc: IndexDocument): SearchHit | null {
+  const id = doc.entityId ?? doc.id;
+  const title = plainText(doc.title);
+  const link = caseLinkOf(doc, id);
+  if (!isCaseGuardId(id) || title === '' || link === null) return null;
+  return {
+    type: doc.type,
+    id,
+    caseId: link.caseId,
+    title,
+    snippet: plainText(doc.snippet ?? ''),
+    score: normalizeScore(doc['@search.score']),
+  };
+}
+
+/** The tenant a raw document names, when it names one at all (read before the shape is checked). */
+function claimedTenant(candidate: unknown): string | null {
+  if (typeof candidate !== 'object' || candidate === null) return null;
+  const { tenantId } = candidate as { tenantId?: unknown };
+  return typeof tenantId === 'string' ? tenantId : null;
+}
+
+/**
+ * Maps documents to hits. A document is dropped, and counted, when it belongs to another tenant (even
+ * if it is also malformed) or cannot be shown: wrong shape, an id that is not a valid CaseGuard id (ids
+ * become links), a case-scoped document without a valid case id, or an empty title. Text is reduced to
+ * plain text. One bad document never fails the call.
+ */
 export function mapDocuments(documents: readonly unknown[], tenantId: string): AzureSearchOutcome {
   const hits: SearchHit[] = [];
   let droppedInvalid = 0;
   let droppedForeignTenant = 0;
   for (const candidate of documents) {
-    const parsed = DocumentSchema.safeParse(candidate);
-    if (!parsed.success) {
-      droppedInvalid += 1;
-      continue;
-    }
-    const doc = parsed.data;
-    if (doc.tenantId !== tenantId) {
+    const claimed = claimedTenant(candidate);
+    if (claimed !== null && claimed !== tenantId) {
       droppedForeignTenant += 1;
       continue;
     }
-    const entityId = doc.entityId ?? doc.id;
-    hits.push({
-      type: doc.type,
-      id: entityId,
-      caseId: doc.type === 'skill' ? null : (doc.caseId ?? (doc.type === 'case' ? entityId : null)),
-      title: doc.title,
-      snippet: doc.snippet ?? '',
-      score: normalizeScore(doc['@search.score']),
-    });
+    const parsed = DocumentSchema.safeParse(candidate);
+    const hit = parsed.success ? toHit(parsed.data) : null;
+    if (hit === null) droppedInvalid += 1;
+    else hits.push(hit);
   }
   return { hits, droppedInvalid, droppedForeignTenant };
 }
@@ -276,7 +311,9 @@ export function createAzureSearchClient(options: AzureSearchOptions): AzureSearc
     }
     const body = ResponseSchema.safeParse(payload);
     if (!body.success) throw new SearchProviderError('invalid_response');
-    return mapDocuments(body.data.value, request.tenantId);
+    // The limit applies to the documents that can be shown, even when the index ignores `top`.
+    const outcome = mapDocuments(body.data.value, request.tenantId);
+    return { ...outcome, hits: outcome.hits.slice(0, request.limit) };
   }
 
   return {

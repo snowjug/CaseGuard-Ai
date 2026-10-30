@@ -147,6 +147,23 @@ describe('[NFR-SEC-04] Azure AI Search client (injected fake fetch and credentia
     expect(outcome).toMatchObject({ droppedForeignTenant: 1, droppedInvalid: 1 });
   });
 
+  it('returns at most the requested number of usable documents, even when the index ignores `top`', async () => {
+    const documents = [
+      { ...sampleDocument, id: 'bad id' },
+      ...['case_a', 'case_b', 'case_c', 'case_d'].map((id) => ({ ...sampleDocument, id })),
+    ];
+    const { fetch: fakeFetch } = recordingFetch(() => json({ value: documents }));
+    const client = createAzureSearchClient({
+      endpoint: ENDPOINT,
+      index: INDEX,
+      credential: credential().credential,
+      fetch: fakeFetch,
+    });
+    const outcome = await client.search({ ...request, limit: 2 });
+    expect(outcome.hits.map((entry) => entry.id)).toEqual(['case_a', 'case_b']);
+    expect(outcome).toMatchObject({ droppedInvalid: 1, droppedForeignTenant: 0 });
+  });
+
   it('refuses an unsafe endpoint before any credential or network use', async () => {
     const { fetch: fakeFetch, calls } = recordingFetch(() => json({ value: [] }));
     const { credential: fakeCredential, getToken } = credential();

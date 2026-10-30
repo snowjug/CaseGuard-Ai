@@ -7,9 +7,10 @@ import {
   SearchProviderError,
   createAzureSearchClient,
   type AzureSearchClient,
+  type AzureSearchOutcome,
   type AzureSearchSettings,
 } from './azure-ai-search';
-import { toSearchResult } from './results';
+import { toValidResults } from './results';
 
 export type SearchContext = Pick<
   RequestContext,
@@ -51,11 +52,39 @@ export function normalizeQuery(text: string): string {
   return cleaned;
 }
 
+/** One count per dropped document or hit, as `caseguard_errors_total{component="search",code=...}`. */
+function recordDiscarded(ctx: SearchContext, code: string, count: number): void {
+  for (let index = 0; index < count; index += 1) ctx.metrics.recordError('search', code);
+}
+
+/** Says, by count only, how many documents of the external index could not be used. */
+function reportDiscardedDocuments(ctx: SearchContext, outcome: AzureSearchOutcome): void {
+  if (outcome.droppedForeignTenant > 0) {
+    ctx.logger.error(
+      { discarded: outcome.droppedForeignTenant },
+      'Azure AI Search returned documents of another tenant; they were discarded',
+    );
+    recordDiscarded(ctx, 'foreign_tenant_document', outcome.droppedForeignTenant);
+  }
+  if (outcome.droppedInvalid > 0) {
+    ctx.logger.warn(
+      { discarded: outcome.droppedInvalid },
+      'Azure AI Search returned malformed documents; they were discarded',
+    );
+    recordDiscarded(ctx, 'invalid_document', outcome.droppedInvalid);
+  }
+}
+
 /**
  * Global search over the caller's tenant. The built-in lexical search is the default. When
  * `SEARCH_PROVIDER=azure-ai-search` the external index is tried first (3 s deadline) and any failure
  * falls back to the lexical search; the fallback is visible only in the retrieval metric
  * (`provider=azure-ai-search, outcome=fallback`), never in the response. The query text is never logged.
+ *
+ * Whatever the provider returns is checked against the result contract before it is answered: a hit that
+ * does not satisfy it is dropped (counted in a warning log and `caseguard_errors_total`), never allowed
+ * to fail the response, and the limit applies to the hits that are left. An index that answers with
+ * documents but none that can be used counts as a failure, so the caller gets the lexical results.
  */
 export function createSearchService(options: SearchServiceOptions = {}): SearchService {
   const monotonic = options.monotonicMs ?? (() => performance.now());
@@ -68,43 +97,45 @@ export function createSearchService(options: SearchServiceOptions = {}): SearchS
     return azure.client;
   }
 
+  function fallBack(ctx: SearchContext, started: number, failure: string, message: string): null {
+    ctx.metrics.recordRetrieval('azure-ai-search', 'fallback', monotonic() - started);
+    ctx.logger.warn({ failure }, message);
+    return null;
+  }
+
   async function tryAzure(
     ctx: SearchContext,
     settings: AzureSearchSettings,
     request: SearchRequest,
   ): Promise<SearchHit[] | null> {
     const started = monotonic();
+    let outcome: AzureSearchOutcome;
     try {
-      const outcome = await azureClient(settings).search({
+      outcome = await azureClient(settings).search({
         tenantId: ctx.auth.tenantId,
         text: request.text,
         limit: request.limit,
         signal: ctx.signal,
       });
-      ctx.metrics.recordRetrieval('azure-ai-search', 'ok', monotonic() - started);
-      if (outcome.droppedForeignTenant > 0) {
-        ctx.logger.error(
-          { discarded: outcome.droppedForeignTenant },
-          'Azure AI Search returned documents of another tenant; they were discarded',
-        );
-      }
-      if (outcome.droppedInvalid > 0) {
-        ctx.logger.warn(
-          { discarded: outcome.droppedInvalid },
-          'Azure AI Search returned malformed documents; they were discarded',
-        );
-      }
-      return outcome.hits;
     } catch (error) {
       // A client that has gone away needs no answer and no fallback; nothing is delivered either way.
       if (ctx.signal.aborted) return [];
-      ctx.metrics.recordRetrieval('azure-ai-search', 'fallback', monotonic() - started);
-      ctx.logger.warn(
-        { failure: error instanceof SearchProviderError ? error.failure : 'unexpected' },
-        'Azure AI Search failed; using lexical search',
-      );
-      return null;
+      const failure = error instanceof SearchProviderError ? error.failure : 'unexpected';
+      return fallBack(ctx, started, failure, 'Azure AI Search failed; using lexical search');
     }
+    reportDiscardedDocuments(ctx, outcome);
+    const unusable =
+      outcome.hits.length === 0 && outcome.droppedInvalid + outcome.droppedForeignTenant > 0;
+    if (unusable) {
+      return fallBack(
+        ctx,
+        started,
+        'no_usable_documents',
+        'Azure AI Search returned no usable documents; using lexical search',
+      );
+    }
+    ctx.metrics.recordRetrieval('azure-ai-search', 'ok', monotonic() - started);
+    return outcome.hits;
   }
 
   async function lexical(ctx: SearchContext, request: SearchRequest): Promise<SearchHit[]> {
@@ -129,7 +160,15 @@ export function createSearchService(options: SearchServiceOptions = {}): SearchS
           ? await tryAzure(ctx, { endpoint: configured.endpoint, index: configured.index }, bounded)
           : null;
       const hits = external ?? (await lexical(ctx, bounded));
-      return hits.slice(0, request.limit).map(toSearchResult);
+      const { results, discarded } = toValidResults(hits, request.limit);
+      if (discarded > 0) {
+        ctx.logger.warn(
+          { provider: external === null ? 'lexical' : 'azure-ai-search', discarded },
+          'Search hits that do not satisfy the result contract were discarded',
+        );
+        recordDiscarded(ctx, 'invalid_result', discarded);
+      }
+      return results;
     },
   };
 }
