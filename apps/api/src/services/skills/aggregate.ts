@@ -70,7 +70,9 @@ export async function persistChangeSet(
  * The data tier requires every recorded approval to come from someone other than the requester (the
  * creator of the skill). The domain allows a creator to take the first step out of `discovered`, so
  * this refuses such a change up front as a separation-of-duties denial, which is audited like any
- * other, instead of letting the storage rule fail it.
+ * other, instead of letting the storage rule fail it. Withdrawing a skill (deprecating or retiring it)
+ * is not an approval: the domain records it as a rejection, so the creator, like anyone who holds the
+ * permission, may do it and nothing is refused here.
  */
 export function guardSelfApproval(
   result: SkillResult<SkillChangeSet>,

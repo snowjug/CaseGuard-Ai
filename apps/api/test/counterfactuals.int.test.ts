@@ -663,6 +663,53 @@ describe('the counterfactual simulator task', () => {
     }
   });
 
+  it('still offers hindsight for a scenario whose steps carry validated model wording (200, not 409)', async () => {
+    const wording = 'Model wording for the review: start with the three scoping questions.';
+    const model = await createHarness({
+      database,
+      services: {
+        ai: delegating(h, (real) => ({
+          ...real,
+          source: 'model',
+          result: {
+            ...real.result,
+            steps: real.result.steps.map((s: Json, i: number) =>
+              i === 0 ? { ...s, rationale: wording } : s,
+            ),
+          },
+        })),
+      },
+    });
+    try {
+      const ctx = contextFor(model, PERSONAS.engineer);
+      const [saved] = await ctx.services.counterfactuals.runForFork(ctx, ONE, secondaryForkId, [
+        'balanced',
+      ]);
+      if (saved === undefined) throw new Error('no scenario was stored');
+      const stored = (await api.get(PERSONAS.engineer, scenarioUrl(saved.id))).data;
+      expect(stored.steps[0].rationale).toBe(wording);
+
+      // Hindsight compares the stored scenario with the engine's own regeneration. The wording a
+      // model contributed is not part of the simulation, so it must not make the scenario unmatched.
+      const res = await api.get(PERSONAS.reviewer, `${scenarioUrl(saved.id)}/hindsight`);
+      expect(res.statusCode, JSON.stringify(res.data)).toBe(200);
+      expect(res.data.scenarioId).toBe(saved.id);
+
+      // And it is exactly the comparison the engine gives for its own wording of the same scenario.
+      const engineCtx = contextFor(h, PERSONAS.engineer);
+      await engineCtx.services.counterfactuals.runForFork(engineCtx, ONE, secondaryForkId, [
+        'balanced',
+      ]);
+      const engineWorded = (await api.get(PERSONAS.engineer, scenarioUrl(saved.id))).data;
+      expect(engineWorded.steps[0].rationale).not.toBe(wording);
+      const same = await api.get(PERSONAS.reviewer, `${scenarioUrl(saved.id)}/hindsight`);
+      expect(same.statusCode).toBe(200);
+      expect({ ...same.data, computedAt: '' }).toEqual({ ...res.data, computedAt: '' });
+    } finally {
+      await model.close();
+    }
+  });
+
   it('never stores model wording that names something only known after the decision', async () => {
     const forks = await h.repos(CONTOSO).analysis.listForks(ONE);
     const fork = forks.find((f) => f.id === secondaryForkId);

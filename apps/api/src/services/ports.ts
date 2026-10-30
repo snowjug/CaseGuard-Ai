@@ -110,7 +110,13 @@ export interface AnalysisOutcome {
 }
 
 export interface AnalysisPort {
-  /** Runs the whole analysis pipeline for a case and persists the snapshot (idempotent on input hash). */
+  /**
+   * Runs the whole analysis pipeline for a case and persists the snapshot (idempotent on input hash).
+   * What people recorded about the previous run is carried onto the new one: claim, fork and warning
+   * decisions, and applied skill matches with their conformance, always; the review of a
+   * counterfactual scenario when the regenerated simulation is the same one, otherwise it is reset
+   * and audited (`counterfactual.review_reset`).
+   */
   analyzeCase(
     ctx: RequestContext,
     caseId: string,
@@ -137,7 +143,9 @@ export interface CounterfactualPort {
    * Generates, validates and persists scenarios for one eligible fork, waiting for the result (the
    * job-based route runs the same work in the background). Generation sees only the pre-decision
    * view; the engine's leak and validity checks decide each scenario's status and are stored as they
-   * are. Rejected scenarios are kept and shown as rejected.
+   * are. Rejected scenarios are kept and shown as rejected. A reviewer's decision on a scenario is
+   * kept when the regenerated simulation is the same one, and reset and audited
+   * (`counterfactual.review_reset`) when it is not.
    */
   runForFork(
     ctx: RequestContext,
@@ -184,6 +192,21 @@ export interface SkillExtractionOptions {
   readonly scenarioId?: string | undefined;
 }
 
+/**
+ * How the HTTP layer meters work that runs the engine. `beforeColdPass` is called just before a pass
+ * that no cache can serve (never on a hit), so a caller's engine budget can be spent there: it throws
+ * the 429 when the budget is empty, before the engine runs and before anything is written. Internal
+ * callers (the demo seeder, jobs) pass nothing and are not metered.
+ */
+export interface ColdPassOptions {
+  readonly beforeColdPass?: (() => void) | undefined;
+}
+
+export interface MatchOptions extends ColdPassOptions {
+  /** The instant the matcher may see evidence of (default: the whole case). */
+  readonly asOf?: string | undefined;
+}
+
 export type SkillMutationResult =
   | {
       readonly status: 'proposed';
@@ -203,17 +226,34 @@ export interface SkillsPort {
   // ------------------------------------------------------------ matching and application
   /**
    * Scores the matchable skills (pilot, validated, published) against the evidence known as of `asOf`
-   * (default: the whole case, which is also persisted; ad-hoc `asOf` matches never are).
+   * (default: the whole case). Nothing is written: whole-case matches are stored by the analysis and
+   * by an application. A match has a deterministic id (case and skill), so a listed match can be applied.
+   * As of an instant, the skill extracted from the case itself is never matched (its triggers were
+   * learned partly from what happened later), and every instant between two events shares one answer
+   * whose `asOf` is the moment of the last event it sees. The whole-case list also shows the
+   * applications of skills that were deprecated or retired since, flagged by their `lifecycle`.
+   * Answers computed before are cached by what the matcher can see; a pass that is not served from
+   * the cache is announced to `options.beforeColdPass` (the caller's engine budget).
    */
-  matchForCase(
+  matchForCase(ctx: RequestContext, caseId: string, options?: MatchOptions): Promise<SkillMatch[]>;
+  /**
+   * `skillMatches.apply`: records that the engineer adopted the guided plan of a match (idempotent). The
+   * match is addressed by the id a list returned, stored or not yet; the application stores it. An
+   * application that has to be measured announces that pass to `options.beforeColdPass` first.
+   */
+  applyMatch(
     ctx: RequestContext,
     caseId: string,
-    options?: { readonly asOf?: string | undefined },
-  ): Promise<SkillMatch[]>;
-  /** `skillMatches.apply`: records that the engineer adopted the guided plan of a stored match (idempotent). */
-  applyMatch(ctx: RequestContext, caseId: string, matchId: string): Promise<SkillMatch>;
-  /** `skills.apply`: applies a skill to a case (creates or updates the match; idempotent). */
-  applyToCase(ctx: RequestContext, caseId: string, skillId: string): Promise<SkillMatch>;
+    matchId: string,
+    options?: ColdPassOptions,
+  ): Promise<SkillMatch>;
+  /** `skills.apply`: applies a skill to a case (stores the match with its application; idempotent). */
+  applyToCase(
+    ctx: RequestContext,
+    caseId: string,
+    skillId: string,
+    options?: ColdPassOptions,
+  ): Promise<SkillMatch>;
 
   // ------------------------------------------------------------ library
   list(ctx: RequestContext, query: SkillListQuery): Promise<Page<SkillDna>>;

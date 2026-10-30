@@ -327,6 +327,42 @@ describe('the lifecycle gates, with the people the rules require', () => {
     expect(failure).toHaveLength(1);
   });
 
+  it('a simulation run on the origin case alone is informative only: it never opens the gate', async () => {
+    h.clock.advance(60_000);
+    const narrow = await runValidation(api, PERSONAS.reviewer, skillId, {
+      kind: 'simulation_test',
+      caseId: ONE,
+    });
+    expect(narrow.statusCode).toBe(200);
+    expect(narrow.data).toMatchObject({
+      kind: 'simulation_test',
+      scope: 'case',
+      outcome: 'inconclusive',
+      caseId: ONE,
+    });
+    // Its checks are the real ones: on the origin case the guided path did improve on the record.
+    expect((narrow.data.checks as Json[]).every((c) => c.passed === true)).toBe(true);
+    const recorded = (await audits()).find(
+      (e) => e.action === 'skill.validation_recorded' && e.details.validationId === narrow.data.id,
+    );
+    expect(recorded?.details).toMatchObject({ scope: 'case', outcome: 'inconclusive' });
+
+    h.clock.advance(60_000);
+    const refused = await moveSkill(
+      api,
+      PERSONAS.reviewer,
+      skillId,
+      'simulation_tested',
+      MARKERS.denied,
+    );
+    expect(refused.statusCode).toBe(412);
+    expect(refused.data.code).toBe('precondition_failed');
+    expect(refused.data.detail).toMatch(/A full simulation test has not been run/);
+    expect((await api.get(PERSONAS.engineer, `/skills/${skillId}`)).data.skill.lifecycle).toBe(
+      'draft',
+    );
+  });
+
   it('runs the simulation test and walks to the pilot', { timeout: 120_000 }, async () => {
     h.clock.advance(60_000);
     const test = await runValidation(api, PERSONAS.reviewer, skillId, { kind: 'simulation_test' });
@@ -355,6 +391,66 @@ describe('the lifecycle gates, with the people the rules require', () => {
     const noRegression = await moveSkill(api, PERSONAS.curator, skillId, 'validated');
     expect(noRegression.statusCode).toBe(412);
     expect(noRegression.data.detail).toMatch(/regression/i);
+  });
+
+  it('a regression run on one case never satisfies the gate, nor replaces the verdict of a full run', async () => {
+    const version = (await api.get(PERSONAS.engineer, `/skills/${skillId}`)).data.currentVersion;
+    const oneCase = async () => {
+      h.clock.advance(60_000);
+      const res = await runValidation(api, PERSONAS.reviewer, skillId, {
+        kind: 'regression',
+        caseId: TWO,
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.data).toMatchObject({ scope: 'case', outcome: 'inconclusive', caseId: TWO });
+      expect((res.data.checks as Json[]).every((c) => c.passed === true)).toBe(true);
+    };
+
+    // 1. Only a run on one case exists: the gate says a full regression has not been run.
+    await oneCase();
+    h.clock.advance(60_000);
+    const narrowOnly = await moveSkill(api, PERSONAS.reviewer, skillId, 'validated');
+    expect(narrowOnly.statusCode).toBe(412);
+    expect(narrowOnly.data.code).toBe('precondition_failed');
+    expect(narrowOnly.data.detail).toMatch(/A full regression has not been run/);
+
+    // 2. A full run failed (a failure of the whole suite cannot be produced from the samples, so the
+    // record is stored directly: it is what the gate reads). A later pass on one case does not undo it.
+    const at = h.clock.advance(60_000).toISOString();
+    await h.repos(CONTOSO).skills.addValidation({
+      tenantId: CONTOSO,
+      createdAt: at,
+      updatedAt: at,
+      createdBy: PERSONAS.reviewer,
+      version: 1,
+      id: 'skval_story_failed_full_run',
+      skillId,
+      versionId: version.id,
+      kind: 'regression',
+      outcome: 'failed',
+      caseId: null,
+      scope: 'full',
+      checks: [
+        {
+          id: 'CG-SYN-9001:does-not-match',
+          passed: false,
+          detail: 'It matched an irrelevant case.',
+        },
+      ],
+      executedBy: PERSONAS.reviewer,
+      executedAt: at,
+      synthetic: true,
+    });
+    await oneCase();
+    h.clock.advance(60_000);
+    const stillBlocked = await moveSkill(api, PERSONAS.reviewer, skillId, 'validated');
+    expect(stillBlocked.statusCode).toBe(412);
+    expect(stillBlocked.data.detail).toMatch(
+      /latest regression for version 1\.0\.0 did not pass \(failed\)/,
+    );
+    expect((await api.get(PERSONAS.engineer, `/skills/${skillId}`)).data.skill.lifecycle).toBe(
+      'pilot',
+    );
   });
 
   it(

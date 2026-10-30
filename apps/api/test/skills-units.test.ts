@@ -3,6 +3,7 @@ import {
   SKILL_ERROR_HTTP,
   buildSkillDetail,
   createFullView,
+  createTemporalView,
   extractSkillCandidates,
   generateCounterfactuals,
   getCompiledPack,
@@ -13,6 +14,7 @@ import {
   toMatchConformance,
   type EngineContext,
   type ExtractionRefusal,
+  type MatchableSkill,
   type SkillActor,
   type SkillChangeSet,
   type SkillDraft,
@@ -24,12 +26,14 @@ import {
   type CounterfactualScenario,
   type DecisionFork,
   type SkillApproval,
+  type SkillLifecycle,
   type SkillMatch,
   type SkillValidation,
 } from '@caseguard/schemas';
+import type { TenantRepositories } from '../src/db';
 import { toProblem } from '../src/http/problem';
 import type { AnalysisInputs } from '../src/services/analysis';
-import { carryApplications } from '../src/services/analysis/carry';
+import { carryApplications, withdrawnLifecycles } from '../src/services/analysis/carry';
 import type { CaseReplay } from '../src/services/counterfactuals/replay';
 import {
   SELF_APPROVAL_MESSAGE,
@@ -39,7 +43,7 @@ import {
 import { auditEventOf } from '../src/services/skills/audit';
 import { withSelfApprovalGuard } from '../src/services/skills/detail';
 import { refusalIssues, skillErrorToAppError } from '../src/services/skills/errors';
-import { clampAsOf } from '../src/services/skills/matching';
+import { clampAsOf, skillsForRead } from '../src/services/skills/matching';
 import { extractionPreflight, isAccepted } from '../src/services/skills/preflight';
 import {
   buildSkillUsage,
@@ -424,6 +428,68 @@ describe('matching by moment', () => {
   });
 });
 
+describe('the skills a read may match', () => {
+  const published = (id: string, sourceCaseIds: string[]): MatchableSkill => ({
+    skill: { ...draft.skill, id, lifecycle: 'published', sourceCaseIds },
+    version: { ...draft.version, skillId: id },
+  });
+  const fromOne = published('skl_from_one', [one.case.id]);
+  const fromTwo = published('skl_from_two', [two.case.id]);
+  const idsOf = (skills: readonly MatchableSkill[]) => skills.map((s) => s.skill.id);
+  const asOfMatches = (
+    normalized: typeof one,
+    ctx: EngineContext,
+    asOf: string,
+    skills: readonly MatchableSkill[],
+  ): SkillMatch[] =>
+    matchSkills({
+      skills,
+      analysisAsOf: { view: createTemporalView(normalized.events, asOf) },
+      asOf,
+      pack,
+      config: DEFAULT_ACTION_VALUE_CONFIG,
+      ctx,
+      caseInfo: { workload: normalized.case.workload, product: normalized.case.product },
+    }).matches;
+
+  it('relies on extraction recording the source case on the skill', () => {
+    expect(draft.skill.sourceCaseIds).toContain(one.case.id);
+  });
+
+  it('leaves out, while time-travelling, the skill that was extracted from the case being read', () => {
+    expect(idsOf(skillsForRead([fromOne, fromTwo], one.case.id, false))).toEqual(['skl_from_two']);
+    expect(idsOf(skillsForRead([fromOne, fromTwo], two.case.id, false))).toEqual(['skl_from_one']);
+    expect(idsOf(skillsForRead([fromOne, fromTwo], 'case_elsewhere', false))).toEqual([
+      'skl_from_one',
+      'skl_from_two',
+    ]);
+  });
+
+  it('matches every skill when the whole case is read', () => {
+    expect(idsOf(skillsForRead([fromOne, fromTwo], one.case.id, true))).toEqual([
+      'skl_from_one',
+      'skl_from_two',
+    ]);
+  });
+
+  it('is what keeps an early read of the source case free of what it only showed later', () => {
+    const early = one.events[2]?.timestamp ?? '';
+    // Without the exclusion the matcher lists conditions the skill learned from later events.
+    const unfiltered = asOfMatches(one, ctxOne, early, [fromOne]);
+    expect(JSON.stringify(unfiltered)).toMatch(/hindsight-informed/);
+    expect(asOfMatches(one, ctxOne, early, skillsForRead([fromOne], one.case.id, false))).toEqual(
+      [],
+    );
+  });
+
+  it('still matches the skill against another case as of its first email', () => {
+    const first = two.events[0]?.timestamp ?? '';
+    const [match] = asOfMatches(two, ctxTwo, first, skillsForRead([fromOne], two.case.id, false));
+    expect(match).toMatchObject({ skillId: 'skl_from_one', applicability: 'applies', asOf: first });
+    expect(match?.score).toBeGreaterThanOrEqual(0.7);
+  });
+});
+
 describe('what an application contributes to effectiveness', () => {
   const inputs: AnalysisInputs = {
     caseRecord: two.case,
@@ -583,8 +649,42 @@ describe('what an application contributes to effectiveness', () => {
       expect(carry([])).toEqual([freshMatch]);
     });
 
-    it('has nothing to carry onto when the skill is no longer matched or not in the library', () => {
-      expect(carry([stored], [])).toEqual([]);
+    it('keeps the application of a skill that is no longer matched, flagged with the skill’s state', () => {
+      // Nothing is known of the skill's state: the match stays exactly as it was stored.
+      expect(carry([stored], [])).toEqual([stored]);
+      const lifecycles = new Map<string, SkillLifecycle>([[stored.skillId, 'retired']]);
+      expect(
+        carryApplications({
+          fresh: [],
+          previous: [stored],
+          inputs: withSkill,
+          analysis: analysisTwo,
+          lifecycles,
+        }),
+      ).toEqual([{ ...stored, lifecycle: 'retired' }]);
+      // Only an application is a decision worth keeping; a match nobody applied is recomputed or gone.
+      const offered = { ...stored, applied: false, appliedAt: null, appliedBy: null };
+      expect(carry([offered], [])).toEqual([]);
+    });
+
+    it('keeps the carried application next to the new matches, and never twice', () => {
+      const other: SkillMatch = { ...stored, id: 'smt_other', skillId: 'skl_other' };
+      const lifecycles = new Map<string, SkillLifecycle>([['skl_other', 'deprecated']]);
+      const carried = carryApplications({
+        fresh: [freshMatch],
+        previous: [stored, other],
+        inputs: withSkill,
+        analysis: analysisTwo,
+        lifecycles,
+      });
+      expect(carried.map((m) => [m.id, m.lifecycle, m.applied])).toEqual([
+        [freshMatch.id, freshMatch.lifecycle, true],
+        ['smt_other', 'deprecated', true],
+      ]);
+      expect(carried[1]).toEqual({ ...other, lifecycle: 'deprecated' });
+    });
+
+    it('has nothing to recompute when the skill is not in the library any more but still has a match', () => {
       expect(
         carryApplications({
           fresh: [freshMatch],
@@ -593,6 +693,67 @@ describe('what an application contributes to effectiveness', () => {
           analysis: analysisTwo,
         }),
       ).toEqual([freshMatch]);
+    });
+  });
+
+  describe('the state of the skills behind applications that were not matched again', () => {
+    const stateOf = (known: Record<string, SkillLifecycle>) => {
+      const asked: string[] = [];
+      const skills: Pick<TenantRepositories['skills'], 'get'> = {
+        get: async (id) => {
+          asked.push(id);
+          const lifecycle = known[id];
+          return lifecycle === undefined ? null : { ...draft.skill, id, lifecycle };
+        },
+      };
+      return { skills, asked };
+    };
+    const base = matchSkills({
+      skills: [entry],
+      analysisAsOf: analysisTwo,
+      asOf: lastEventAtOf(replay),
+      pack,
+      config: DEFAULT_ACTION_VALUE_CONFIG,
+      ctx: ctxTwo,
+      caseInfo: { workload: two.case.workload, product: two.case.product },
+    }).matches[0];
+    if (base === undefined) throw new Error('the skill produced no match');
+    const applied = (id: string, skillId: string): SkillMatch => ({
+      ...base,
+      id,
+      skillId,
+      applied: true,
+      appliedAt: '2026-06-01T09:00:00.000Z',
+      appliedBy: 'user_ava_engineer',
+    });
+    const offered = (id: string, skillId: string): SkillMatch => ({ ...base, id, skillId });
+
+    it('reads each skill once, and only for applications that have no new match', async () => {
+      const { skills, asked } = stateOf({
+        skl_a: 'retired',
+        skl_b: 'deprecated',
+        skl_c: 'published',
+      });
+      const previous = [
+        applied('smt_1', 'skl_a'),
+        applied('smt_2', 'skl_a'),
+        applied('smt_3', 'skl_b'),
+        applied('smt_4', 'skl_c'),
+        offered('smt_5', 'skl_d'),
+      ];
+      const fresh = [offered('smt_4', 'skl_c')];
+      const lifecycles = await withdrawnLifecycles(skills, previous, fresh);
+      expect([...lifecycles]).toEqual([
+        ['skl_a', 'retired'],
+        ['skl_b', 'deprecated'],
+      ]);
+      expect(asked).toEqual(['skl_a', 'skl_b']);
+    });
+
+    it('says nothing about a skill that no longer exists', async () => {
+      const { skills } = stateOf({});
+      const lifecycles = await withdrawnLifecycles(skills, [applied('smt_1', 'skl_gone')], []);
+      expect(lifecycles.size).toBe(0);
     });
   });
 });

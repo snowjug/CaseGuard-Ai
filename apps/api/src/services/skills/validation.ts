@@ -61,7 +61,9 @@ export function toReplayCase(replay: CaseReplay): SkillReplayCase {
 /**
  * Simulation tests and regression suites. Both replay the skill on recorded cases at their original
  * decision points using only what was known then; every outcome is a labelled simulation, never a
- * measurement. The recorded validation is what the lifecycle gates check.
+ * measurement. The recorded validation is what the lifecycle gates check, and only a FULL run (the
+ * skill's source cases, plus the workload's other resolved cases for a regression) counts: a run on
+ * one named case is informative and is recorded as inconclusive.
  */
 export class SkillValidator {
   constructor(private readonly replays: ReplayLoader) {}
@@ -98,7 +100,15 @@ export class SkillValidator {
             ),
           });
 
-    const validation = toSkillValidation({ report, op: opOf(ctx), executedBy: ctx.auth.userId });
+    // A run that names a case covers that case only. It is recorded with its real checks but as
+    // inconclusive, so it can neither open a gate nor close one nor replace the verdict of a full run.
+    const scope = input.caseId === undefined ? 'full' : 'case';
+    const validation = toSkillValidation({
+      report,
+      op: opOf(ctx),
+      executedBy: ctx.auth.userId,
+      scope,
+    });
     await ctx.repos.transaction(async (tx) => {
       await tx.skills.addValidation(validation);
       await ctx.audit(
@@ -113,6 +123,7 @@ export class SkillValidator {
             versionId: version.id,
             skillVersion: version.version,
             kind,
+            scope,
             outcome: validation.outcome,
             cases: report.cases.length,
             casesPassed: report.cases.filter((c) => c.passed).length,

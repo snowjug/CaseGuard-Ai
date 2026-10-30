@@ -18,7 +18,13 @@ import { NotFoundError } from '../../errors';
 import type { RequestContext } from '../../http/request-context';
 import type { ServiceDeps } from '..';
 import { ReplayLoader } from '../counterfactuals/replay';
-import type { SkillExtractionOptions, SkillMutationResult, SkillsPort } from '../ports';
+import type {
+  ColdPassOptions,
+  MatchOptions,
+  SkillExtractionOptions,
+  SkillMutationResult,
+  SkillsPort,
+} from '../ports';
 import { SkillApplier } from './application';
 import { loadSkillDetail } from './detail';
 import { SkillExtractor } from './extraction';
@@ -47,17 +53,27 @@ export class SkillsService implements SkillsPort {
   matchForCase(
     ctx: RequestContext,
     caseId: string,
-    options: { readonly asOf?: string | undefined } = {},
+    options: MatchOptions = {},
   ): Promise<SkillMatch[]> {
-    return this.matcher.match(ctx, caseId, options);
+    return this.matcher.compute(ctx, caseId, options);
   }
 
-  applyMatch(ctx: RequestContext, caseId: string, matchId: string): Promise<SkillMatch> {
-    return this.applier.applyMatch(ctx, caseId, matchId);
+  applyMatch(
+    ctx: RequestContext,
+    caseId: string,
+    matchId: string,
+    options: ColdPassOptions = {},
+  ): Promise<SkillMatch> {
+    return this.applier.applyMatch(ctx, caseId, matchId, options);
   }
 
-  applyToCase(ctx: RequestContext, caseId: string, skillId: string): Promise<SkillMatch> {
-    return this.applier.apply(ctx, caseId, skillId);
+  applyToCase(
+    ctx: RequestContext,
+    caseId: string,
+    skillId: string,
+    options: ColdPassOptions = {},
+  ): Promise<SkillMatch> {
+    return this.applier.apply(ctx, caseId, skillId, options);
   }
 
   // ------------------------------------------------------------ library

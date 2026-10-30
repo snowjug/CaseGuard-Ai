@@ -10,6 +10,7 @@ import { ConflictError, NotFoundError, VersionConflictError } from '../../errors
 import type { RequestContext } from '../../http/request-context';
 import { LruCache } from '../counterfactuals/cache';
 import type { ReplayLoader } from '../counterfactuals/replay';
+import type { ColdPassOptions } from '../ports';
 import { loadMatchContext, type CaseMatcher } from './matching';
 import { buildSkillUsage, matchedOnlyRecord } from './usage';
 
@@ -23,8 +24,10 @@ const APPLY_ATTEMPTS = 3;
 /**
  * Applying a skill records that an engineer adopted its guided plan for a case. It is idempotent
  * (applying twice changes nothing and is audited once), refuses skills that are not yet in a pilot,
- * validated or published state and skills that do not apply to the case, and updates the skill's
- * effectiveness aggregate in the same transaction as the match and its audit event.
+ * validated or published state and skills that do not apply to the case, and stores the match and
+ * updates the skill's effectiveness aggregate in the same transaction as its audit event. The passes
+ * that are not served from a cache (matching, and measuring a first application) are announced to
+ * `options.beforeColdPass`, where the HTTP layer spends the caller's engine budget.
  */
 export class SkillApplier {
   private readonly usage = new LruCache<SkillUsageRecord>(USAGE_CACHE_ENTRIES);
@@ -34,14 +37,31 @@ export class SkillApplier {
     private readonly matcher: CaseMatcher,
   ) {}
 
-  /** `skillMatches.apply`: the match must exist for the case (404 otherwise, also across tenants). */
-  async applyMatch(ctx: RequestContext, caseId: string, matchId: string): Promise<SkillMatch> {
-    const stored = await ctx.repos.skills.getMatch(caseId, matchId);
-    if (stored === null) throw new NotFoundError('Skill match', matchId);
-    return this.apply(ctx, caseId, stored.skillId);
+  /**
+   * `skillMatches.apply`: a match is addressed by its deterministic id, which the list route returned:
+   * the match is computed now (nothing was stored by listing it) or was stored by an analysis or an
+   * earlier application. 404 when the case has no such match (also across tenants).
+   */
+  async applyMatch(
+    ctx: RequestContext,
+    caseId: string,
+    matchId: string,
+    options: ColdPassOptions = {},
+  ): Promise<SkillMatch> {
+    const listed = (await this.matcher.compute(ctx, caseId, options)).find(
+      (match) => match.id === matchId,
+    );
+    const found = listed ?? (await ctx.repos.skills.getMatch(caseId, matchId));
+    if (found === null) throw new NotFoundError('Skill match', matchId);
+    return this.apply(ctx, caseId, found.skillId, options);
   }
 
-  async apply(ctx: RequestContext, caseId: string, skillId: string): Promise<SkillMatch> {
+  async apply(
+    ctx: RequestContext,
+    caseId: string,
+    skillId: string,
+    options: ColdPassOptions = {},
+  ): Promise<SkillMatch> {
     const skill = await ctx.repos.skills.get(skillId);
     if (skill === null) throw new NotFoundError('Skill', skillId);
     if (!MATCHABLE_LIFECYCLES.includes(skill.lifecycle)) {
@@ -53,7 +73,7 @@ export class SkillApplier {
       throw new ConflictError('The case has not been analysed yet. Run the analysis first.');
     }
 
-    const matches = await this.matcher.match(ctx, caseId);
+    const matches = await this.matcher.compute(ctx, caseId, options);
     const match = matches.find((candidate) => candidate.skillId === skillId);
     if (match === undefined) {
       throw new ConflictError('This skill covers a different workload than the case.');
@@ -65,6 +85,8 @@ export class SkillApplier {
     }
     if (match.applied) return match;
 
+    // Measuring the application replays the case: announced once, however often it is retried.
+    options.beforeColdPass?.();
     for (let attempt = 1; ; attempt += 1) {
       try {
         return await this.record(ctx, caseId, skill, match);
@@ -93,14 +115,19 @@ export class SkillApplier {
     await ctx.repos.transaction(async (tx) => {
       const current = await tx.skills.get(skill.id);
       if (current === null) throw new NotFoundError('Skill', skill.id);
+      // The match may have been computed by the read that listed it and not stored yet: an application
+      // is what stores it (an analysis snapshot is the other way a whole-case match gets stored).
+      const existing = await tx.skills.getMatch(caseId, match.id);
       const applied: SkillMatch = {
         ...match,
         applied: true,
         appliedAt: now,
         appliedBy: ctx.auth.userId,
         conformance: toMatchConformance(usage.conformance),
+        createdAt: existing?.createdAt ?? match.createdAt,
+        createdBy: existing?.createdBy ?? match.createdBy,
         updatedAt: now,
-        version: match.version + 1,
+        version: existing === null ? 1 : existing.version + 1,
       };
       await tx.skills.upsertMatch(applied);
       await tx.skills.update(skill.id, { effectiveness }, current.version);

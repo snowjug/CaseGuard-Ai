@@ -17,6 +17,7 @@ import {
   apiOf,
   earliestForkScenarios,
   ingestAndAnalyse,
+  moveSkill,
   settledJob,
   walkToPilot,
   type TestApi,
@@ -41,6 +42,8 @@ let h: Harness;
 let api: TestApi;
 let earliestForkId = '';
 let skillId = '';
+// What the engineer's application of the skill to Case Two recorded (set by the application test).
+let application: { id: string; appliedAt: string; conformance: Json } | null = null;
 
 beforeAll(async () => {
   database = await openSharedDatabase();
@@ -255,6 +258,7 @@ describe('an applied skill keeps its application and its conformance', () => {
       const conformance = applied.data.conformance;
       expect(conformance.stepsTotal).toBeGreaterThan(0);
       expect(conformance.score).toBeGreaterThan(0);
+      application = { id: match.id, appliedAt: applied.data.appliedAt, conformance };
       const storedBefore = await repos().skills.getMatch(TWO, match.id);
 
       const forcedRun = await analyse(TWO, { force: true });
@@ -463,6 +467,78 @@ describe('a changed simulation comes back pending, and the reset is audited', ()
         (e) => e.action === 'counterfactual.generated' && e.targetId === earliestForkId,
       );
       expect(generated?.details).toMatchObject({ reviewsCarried: 0, reviewsReset: 2 });
+    },
+  );
+});
+
+describe('an application outlives the skill it was made with', () => {
+  it(
+    'is kept as it was, flagged with the skill’s state, when the skill is retired and the case is analysed again',
+    { timeout: 180_000 },
+    async () => {
+      if (application === null) throw new Error('the application test has not run');
+      const { id, appliedAt, conformance } = application;
+      const matchesUrl = `/cases/${TWO}/skill-matches`;
+      const kept = { applied: true, appliedAt, appliedBy: PERSONAS.engineer, conformance };
+
+      h.clock.advance(60_000);
+      const retired = await moveSkill(api, PERSONAS.curator, skillId, 'retired');
+      expect(retired.statusCode, JSON.stringify(retired.data)).toBe(200);
+
+      // The skill can no longer be matched, but the case still shows what the engineer did with it.
+      const listed = await api.get(PERSONAS.engineer, matchesUrl);
+      expect(listed.statusCode).toBe(200);
+      const shown = (listed.data.items as Json[]).filter((m) => m.skillId === skillId);
+      expect(shown).toHaveLength(1);
+      expect(shown[0]).toMatchObject({ ...kept, id, lifecycle: 'retired' });
+
+      // Time-travelling offers only what could be matched then: a retired skill is not one of them.
+      const events = await repos().cases.getAllEvents(TWO);
+      const last = events[events.length - 1]?.timestamp ?? '';
+      const earlier = await api.get(PERSONAS.engineer, `${matchesUrl}?asOf=${last}`);
+      expect(earlier.statusCode).toBe(200);
+      expect((earlier.data.items as Json[]).filter((m) => m.skillId === skillId)).toHaveLength(0);
+
+      // It cannot be adopted again, and refusing it changes nothing.
+      const stored = await repos().skills.getMatch(TWO, id);
+      const again = await api.post(PERSONAS.engineer, `${matchesUrl}/${id}/apply`);
+      expect(again.statusCode, JSON.stringify(again.data)).toBe(409);
+      expect(await repos().skills.getMatch(TWO, id)).toEqual(stored);
+
+      const runBefore = await latestRunId(TWO);
+      const runAfter = await analyse(TWO, { force: true });
+      expect(runAfter).not.toBe(runBefore);
+
+      // Straight from storage: the application survived the analysis, carrying the skill's state.
+      const survived = await repos().skills.getMatch(TWO, id);
+      expect(survived).toMatchObject({ ...kept, lifecycle: 'retired' });
+      expect(
+        (await repos().skills.listMatchesForCase(TWO)).filter((m) => m.skillId === skillId),
+      ).toHaveLength(1);
+
+      // Reading it through the API gives the stored match, and reading rewrites nothing.
+      const reread = await api.get(PERSONAS.engineer, matchesUrl);
+      expect((reread.data.items as Json[]).find((m) => m.id === id)).toEqual(survived);
+      expect(await repos().skills.getMatch(TWO, id)).toEqual(survived);
+
+      // The skill's own view agrees: the application is still counted, as an estimate.
+      const detail = await api.get(PERSONAS.engineer, `/skills/${skillId}`);
+      expect(detail.statusCode).toBe(200);
+      expect(detail.data.skill.lifecycle).toBe('retired');
+      expect((detail.data.matches as Json[]).find((m) => m.caseId === TWO)).toMatchObject({
+        applied: true,
+      });
+      expect(detail.data.skill.effectiveness).toMatchObject({
+        applications: 1,
+        estimated: true,
+        conformanceAvg: conformance.score,
+      });
+
+      // The analysis did not rewrite who applied the skill: no application was audited by it.
+      const applications = (await allAuditEvents(h)).filter(
+        (e) => e.action === 'skill.applied' && e.caseId === TWO,
+      );
+      expect(applications).toHaveLength(1);
     },
   );
 });

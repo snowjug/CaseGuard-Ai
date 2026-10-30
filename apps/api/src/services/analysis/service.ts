@@ -4,7 +4,7 @@ import type { RequestContext } from '../../http/request-context';
 import type { ServiceDeps } from '..';
 import { planReviewCarry, recordReviewResets } from '../counterfactuals/carry';
 import { runAnalysisAgents } from './agents';
-import { carryApplications } from './carry';
+import { carryApplications, withdrawnLifecycles } from './carry';
 import { computeAnalysis, type AnalysisComputation, type StageReporter } from './compute';
 import { ENGINE_VERSION, computeInputHash, engineContextFor, loadAnalysisInputs } from './inputs';
 import { buildSnapshot } from './snapshot';
@@ -173,6 +173,11 @@ export class AnalysisService implements AnalysisPort {
             previous: previousMatches,
             inputs,
             analysis: computation.analysis,
+            lifecycles: await withdrawnLifecycles(
+              ctx.repos.skills,
+              previousMatches,
+              computation.skillMatches.matches,
+            ),
           }),
         },
       };
