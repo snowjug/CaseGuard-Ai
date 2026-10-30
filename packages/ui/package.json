@@ -5,7 +5,9 @@
   "type": "module",
   "description": "Design tokens (Evidence Constellation), Fluent theme, accessible charts, investigation graph and shared components.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts",
+    "./styles.css": "./src/styles/globals.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",

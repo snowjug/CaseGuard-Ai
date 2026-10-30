@@ -1,0 +1,222 @@
+/*
+ * CaseGuard global design variables and utilities ("Evidence Constellation").
+ *
+ * Colour tokens are emitted per theme by FluentProvider (see src/tokens/themes.ts, `--cg*` variables).
+ * The block below only covers (1) static tokens (spacing, radius, motion, type), (2) the page canvas that renders
+ * outside the provider (html/body), and (3) shared utilities. `test/globals-css.test.ts` keeps it in sync with
+ * src/tokens.
+ */
+
+:root {
+  --cg-space-0: 0px;
+  --cg-space-1: 4px;
+  --cg-space-2: 8px;
+  --cg-space-3: 12px;
+  --cg-space-4: 16px;
+  --cg-space-6: 24px;
+  --cg-space-8: 32px;
+
+  --cg-radius-sm: 6px;
+  --cg-radius-md: 8px;
+  --cg-radius-lg: 12px;
+  --cg-radius-pill: 999px;
+
+  --cg-motion-fast: 150ms;
+  --cg-motion-base: 200ms;
+  --cg-motion-slow: 250ms;
+  --cg-motion-easing: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --cg-font-base:
+    'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial,
+    sans-serif;
+  --cg-font-mono: 'Cascadia Code', Consolas, 'SFMono-Regular', Menlo, monospace;
+  --cg-max-content: 1440px;
+  --cg-header-height: 56px;
+
+  /* Page chrome (light). */
+  --cg-canvas: #f5f6fb;
+  --cg-surface: #ffffff;
+  --cg-text: #12172b;
+  --cg-focus: #2b39b6;
+  color-scheme: light;
+}
+
+:root[data-cg-theme='dark'] {
+  --cg-canvas: #0b1020;
+  --cg-surface: #111830;
+  --cg-text: #eef1fb;
+  --cg-focus: #aeb6ff;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-cg-theme='system'] {
+    --cg-canvas: #0b1020;
+    --cg-surface: #111830;
+    --cg-text: #eef1fb;
+    --cg-focus: #aeb6ff;
+    color-scheme: dark;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  background: var(--cg-canvas);
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--cg-canvas);
+  color: var(--cg-text);
+  font-family: var(--cg-font-base);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Keyboard focus for plain elements; Fluent controls draw their own indicator (0 specificity here). */
+:where(a, button, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--cgFocus, var(--cg-focus));
+  outline-offset: 2px;
+}
+
+/* Visually hidden but available to assistive technology. */
+.cg-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Tabular numerals keep metric columns aligned. */
+.cg-tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+.cg-mono {
+  font-family: var(--cg-font-mono);
+}
+
+/* Skip link: first focusable element on every page. */
+.cg-skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 1000;
+  padding: 8px 16px;
+  border-radius: var(--cg-radius-md);
+  background: var(--cgToneBrandSolid, #4b55c9);
+  color: var(--cgToneBrandOnSolid, #ffffff);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+
+.cg-skip-link:focus {
+  transform: translateY(0);
+}
+
+/*
+ * Motion. Components opt in with `cg-motion-safe`; every transition and animation is suppressed when the OS asks for
+ * reduced motion, unless the user explicitly allowed motion in settings (`data-cg-reduced-motion="false"`),
+ * and always when the user turned reduced motion on (`data-cg-reduced-motion="true"`).
+ */
+.cg-motion-safe {
+  transition-property: background-color, border-color, color, box-shadow, opacity, transform;
+  transition-duration: var(--cg-motion-base);
+  transition-timing-function: var(--cg-motion-easing);
+}
+
+@keyframes cg-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+@keyframes cg-pulse-outline {
+  0%,
+  100% {
+    outline-offset: 2px;
+    outline-color: var(--cgToneBrandSolid, #4b55c9);
+  }
+  50% {
+    outline-offset: 5px;
+    outline-color: transparent;
+  }
+}
+
+@keyframes cg-reveal {
+  from {
+    stroke-dashoffset: var(--cg-path-length, 1);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.cg-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--cgSurfaceSunken, #eceef6) 25%,
+    var(--cgBorderSubtle, #dde1ee) 37%,
+    var(--cgSurfaceSunken, #eceef6) 63%
+  );
+  background-size: 400% 100%;
+  animation: cg-shimmer 1.6s ease-in-out infinite;
+}
+
+/* Highlight for the next suggested action in presentation mode. */
+.cg-presenter-target {
+  outline: 2px solid var(--cgToneBrandSolid, #4b55c9);
+  outline-offset: 2px;
+  animation: cg-pulse-outline 1.8s var(--cg-motion-easing) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-cg-reduced-motion='false']) *,
+  html:not([data-cg-reduced-motion='false']) *::before,
+  html:not([data-cg-reduced-motion='false']) *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+html[data-cg-reduced-motion='true'] *,
+html[data-cg-reduced-motion='true'] *::before,
+html[data-cg-reduced-motion='true'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
+}
+
+/* A pulsing outline is a loop; with motion reduced it becomes a steady, still highly visible outline. */
+html[data-cg-reduced-motion='true'] .cg-presenter-target {
+  animation: none !important;
+  outline-offset: 3px;
+}
