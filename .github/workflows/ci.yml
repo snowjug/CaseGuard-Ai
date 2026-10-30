@@ -44,6 +44,9 @@ jobs:
       - name: Generated files are current
         if: ${{ !cancelled() }}
         run: node scripts/verify.mjs --only generated:check --json-out "$RUNNER_TEMP/reports/quality-generated-check.json" --no-md
+      - name: Documentation links, anchors and diagrams
+        if: ${{ !cancelled() }}
+        run: node scripts/verify.mjs --only docs:check --json-out "$RUNNER_TEMP/reports/quality-docs-check.json" --no-md
       - name: Unit tests
         if: ${{ !cancelled() }}
         run: node scripts/verify.mjs --only test:unit --json-out "$RUNNER_TEMP/reports/quality-test-unit.json" --no-md

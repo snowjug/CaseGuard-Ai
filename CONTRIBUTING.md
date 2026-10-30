@@ -37,23 +37,26 @@ Everything in containers instead: `docker compose up --build` (PostgreSQL + API 
 
 ## Commands
 
-| Command                                                  | What it does                                                         |
-| -------------------------------------------------------- | -------------------------------------------------------------------- |
-| `pnpm dev` / `dev:api` / `dev:web`                       | Run the stack, or one app                                            |
-| `pnpm build` / `pnpm typecheck`                          | Build / type-check every workspace                                   |
-| `pnpm lint` / `pnpm lint:fix`                            | ESLint (type-aware)                                                  |
-| `pnpm format` / `pnpm format:check`                      | Prettier write / check                                               |
-| `pnpm test` / `test:unit` / `test:int` / `test:coverage` | Vitest: everything / without `*.int.test.ts` / only those / coverage |
-| `pnpm test:e2e` / `screenshots`                          | Playwright end-to-end (with axe accessibility checks) / screenshots  |
-| `pnpm demo:reset` / `pnpm demo:seed`                     | Reset and seed the synthetic demo data                               |
-| `pnpm db:migrate`                                        | Apply SQL migrations to `DATABASE_URL`                               |
-| `pnpm secrets:scan`                                      | Secret scan of tracked and untracked files                           |
-| `pnpm audit:deps`                                        | Lockfile hygiene and known-vulnerability gate                        |
-| `pnpm infra:validate`                                    | Bicep build, lint and parameter scan                                 |
-| `pnpm docker:build`                                      | Build both images and validate `docker-compose.yml`                  |
-| `pnpm verify`                                            | The whole loop above, with an honest PASSED / FAILED / NOT RUN table |
+| Command                                                  | What it does                                                                                                                                                        |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev` / `dev:api` / `dev:web`                       | Run the stack, or one app                                                                                                                                           |
+| `pnpm build` / `pnpm typecheck`                          | Build / type-check every workspace                                                                                                                                  |
+| `pnpm lint` / `pnpm lint:fix`                            | ESLint (type-aware)                                                                                                                                                 |
+| `pnpm format` / `pnpm format:check`                      | Prettier write / check                                                                                                                                              |
+| `pnpm test` / `test:unit` / `test:int` / `test:coverage` | Vitest: everything / without `*.int.test.ts` / only those / coverage                                                                                                |
+| `pnpm test:e2e` / `screenshots`                          | Playwright end-to-end (with axe accessibility checks) / screenshots                                                                                                 |
+| `pnpm demo:reset` / `pnpm demo:seed`                     | Reset and seed the synthetic demo data                                                                                                                              |
+| `pnpm db:migrate`                                        | Apply SQL migrations to `DATABASE_URL`                                                                                                                              |
+| `pnpm secrets:scan`                                      | Secret scan of tracked and untracked files                                                                                                                          |
+| `pnpm docs:api` / `pnpm docs:check`                      | Regenerate the route table in `docs/API.md` (`pnpm docs:api --check` fails when it drifted) / check Markdown links, anchors, Mermaid fences, badges and screenshots |
+| `pnpm audit:deps`                                        | Lockfile hygiene and known-vulnerability gate                                                                                                                       |
+| `pnpm infra:validate`                                    | Bicep build, lint and parameter scan                                                                                                                                |
+| `pnpm docker:build`                                      | Build both images and validate `docker-compose.yml`                                                                                                                 |
+| `pnpm verify`                                            | The whole loop above, with an honest PASSED / FAILED / NOT RUN table                                                                                                |
 
 `pnpm verify` runs every gate as its own step and never marks a step passed unless its command exited 0. Exit code 3 from a tool means **NOT RUN** (for example no Docker daemon, no Bicep CLI, no network for the audit): it is reported as such and is never a pass. `pnpm verify --only lint,typecheck` runs a subset; a full run writes `docs/assets/VALIDATION_REPORT.md` with the environment (OS, Node, pnpm, date, commit).
+
+Two steps keep the documentation honest. `generated:check` fails when the route table in `docs/API.md` no longer matches the `ROUTES` registry (run `pnpm docs:api` and commit). `docs:check` fails on a relative link or image whose file does not exist, a heading anchor that does not exist, an empty or unclosed Mermaid fence, a badge for a workflow that is not in `.github/workflows`, and a missing screenshot. Run both before you push a documentation change.
 
 ## Branches, pull requests and reviews
 

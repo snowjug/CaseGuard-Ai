@@ -35,6 +35,8 @@
     "docker:build": "node scripts/docker-build.mjs",
     "schemas:export": "tsx scripts/export-json-schemas.ts",
     "samples:export": "tsx scripts/export-samples.ts",
+    "docs:api": "tsx scripts/export-api-docs.ts",
+    "docs:check": "node scripts/check-docs.mjs",
     "screenshots": "playwright test --project=screenshots",
     "verify": "node scripts/verify.mjs",
     "prepare": "husky"

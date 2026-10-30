@@ -38,8 +38,17 @@ const STEPS = [
   },
   {
     id: 'generated:check',
-    title: 'Generated files are current (JSON schemas, built-in samples)',
-    commands: [pnpm('schemas:export', '--', '--check'), pnpm('samples:export', '--', '--check')],
+    title: 'Generated files are current (JSON schemas, built-in samples, API reference)',
+    commands: [
+      pnpm('schemas:export', '--', '--check'),
+      pnpm('samples:export', '--', '--check'),
+      pnpm('docs:api', '--', '--check'),
+    ],
+  },
+  {
+    id: 'docs:check',
+    title: 'Documentation links, anchors, diagrams and badges',
+    commands: [pnpm('docs:check')],
   },
   { id: 'test:unit', title: 'Unit tests (Vitest)', commands: [pnpm('test:unit')] },
   { id: 'test:int', title: 'Integration tests (Vitest)', commands: [pnpm('test:int')] },
