@@ -1,4 +1,5 @@
 import { GRAPH_LANES, type GraphEdge, type GraphLane, type GraphNode } from '@caseguard/schemas';
+import { columnsByTime } from './alignment';
 
 /**
  * Deterministic lane layout for the investigation graph. Pure (no DOM, no React) so it can be property-tested.
@@ -35,6 +36,12 @@ export interface LayoutOptions {
   maxNodes?: number;
   /** Keep lanes that have no nodes (default false). */
   includeEmptyLanes?: boolean;
+  /**
+   * How columns line up across lanes. `order` (default): by the dense rank of `order`, which assumes `order` is shared
+   * by every lane. `time`: by timestamp, anchored on the actual path (for graphs whose `order` restarts in every lane,
+   * as the API builds them); falls back to `order` when the actual path has no timestamps.
+   */
+  alignment?: 'order' | 'time';
 }
 
 export const DEFAULT_LAYOUT: Required<LayoutOptions> = {
@@ -47,6 +54,7 @@ export const DEFAULT_LAYOUT: Required<LayoutOptions> = {
   headerHeight: 0,
   maxNodes: 160,
   includeEmptyLanes: false,
+  alignment: 'order',
 };
 
 /** Vertical position of the shape centre inside a cell. */
@@ -166,6 +174,10 @@ export function layoutGraph(graph: GraphLayoutInput, options: LayoutOptions = {}
   const rank = new Map<number, number>(orders.map((order, index) => [order, index]));
 
   const lastColumn = new Map<string, number>();
+  // Time alignment may place nodes of one lane out of `order` (two outcomes that end different paths), so cells are
+  // kept distinct with a per-lane set instead of "strictly right of the previous node".
+  const timed = o.alignment === 'time' ? columnsByTime(kept, graph.edges) : null;
+  const usedColumns = new Map<string, Set<number>>();
   const placed: LayoutNode[] = [];
   const columnPitch = o.cellWidth + o.columnGap;
   const lanePitch = o.cellHeight + o.laneGap;
@@ -175,9 +187,18 @@ export function layoutGraph(graph: GraphLayoutInput, options: LayoutOptions = {}
 
   for (const node of kept) {
     const laneIndex = allLaneIds.indexOf(node.lane);
-    const wanted = rank.get(node.order) ?? 0;
-    const column = Math.max(wanted, (lastColumn.get(node.lane) ?? -1) + 1);
-    lastColumn.set(node.lane, column);
+    let column: number;
+    if (timed) {
+      const used = usedColumns.get(node.lane) ?? new Set<number>();
+      usedColumns.set(node.lane, used);
+      column = Math.max(0, timed.get(node.id) ?? 0);
+      while (used.has(column)) column += 1;
+      used.add(column);
+    } else {
+      const wanted = rank.get(node.order) ?? 0;
+      column = Math.max(wanted, (lastColumn.get(node.lane) ?? -1) + 1);
+      lastColumn.set(node.lane, column);
+    }
     maxColumn = Math.max(maxColumn, column);
     const x = originX + column * columnPitch;
     const y = originY + laneIndex * lanePitch;
@@ -336,9 +357,22 @@ export function firstNodeId(layout: Pick<GraphLayout, 'nodes'>): string | null {
 export type GraphMode = 'actual' | 'counterfactual' | 'compare';
 
 /**
- * Applies the view mode. `actual` hides simulated nodes and edges; `counterfactual` hides the actual path after the
- * first decision fork (the shared history up to the fork stays so the branch has a visible origin); `compare` keeps
- * everything.
+ * The decision fork where the simulated path starts: the source of the simulated `branches` edge. A graph holds one
+ * scenario, so this is the fork the page asked about, which is not necessarily the earliest fork of the case.
+ */
+export function scenarioForkId(graph: Pick<GraphLayoutInput, 'nodes' | 'edges'>): string | null {
+  for (const edge of graph.edges) {
+    if (edge.kind !== 'branches' || !edge.simulated) continue;
+    const from = graph.nodes.find((n) => n.id === edge.from);
+    if (from?.kind === 'fork') return from.id;
+  }
+  return null;
+}
+
+/**
+ * Applies the view mode. `actual` hides simulated nodes and edges; `counterfactual` hides what happened after the fork
+ * the simulated path starts from (the actual path, the evidence observed later and the actual outcome; the shared
+ * history up to the fork stays so the branch has a visible origin); `compare` keeps everything.
  */
 export function filterGraphByMode<T extends GraphLayoutInput>(
   graph: T,
@@ -350,10 +384,21 @@ export function filterGraphByMode<T extends GraphLayoutInput>(
   if (mode === 'actual') {
     nodes = graph.nodes.filter((n) => !n.simulated && n.kind !== 'counterfactual_step');
   } else {
-    const forkOrder = firstForkOrder(graph.nodes);
-    nodes = graph.nodes.filter(
-      (n) => !(n.lane === 'actual' && forkOrder !== null && n.order > forkOrder),
-    );
+    const branchId = scenarioForkId(graph);
+    const fork =
+      graph.nodes.find((n) => n.id === branchId) ??
+      graph.nodes.reduce<GraphNode | null>(
+        (earliest, n) =>
+          n.kind === 'fork' && (earliest === null || n.order < earliest.order) ? n : earliest,
+        null,
+      );
+    const forkTime = fork?.timestamp ? Date.parse(fork.timestamp) : Number.NaN;
+    nodes = graph.nodes.filter((n) => {
+      if (fork === null) return true;
+      if (n.lane === 'actual' && n.order > fork.order) return false;
+      if (n.kind === 'outcome' && !n.simulated) return false;
+      return !(n.kind === 'evidence' && n.timestamp && Date.parse(n.timestamp) > forkTime);
+    });
   }
   const ids = new Set(nodes.map((n) => n.id));
   const edges = graph.edges.filter(
@@ -371,7 +416,7 @@ export function firstForkOrder(nodes: readonly GraphNode[]): number | null {
   return order;
 }
 
-/** The earliest fork node in a layout (compare mode anchors the divergence marker on it). */
+/** The earliest fork node in a layout (the fallback anchor of the divergence marker). */
 export function firstFork(layout: Pick<GraphLayout, 'nodes'>): LayoutNode | null {
   let fork: LayoutNode | null = null;
   for (const node of layout.nodes) {
@@ -380,4 +425,13 @@ export function firstFork(layout: Pick<GraphLayout, 'nodes'>): LayoutNode | null
       fork = node;
   }
   return fork;
+}
+
+/** Where the paths diverge: the fork the simulated path starts from, else the earliest fork. */
+export function divergenceFork(layout: Pick<GraphLayout, 'nodes' | 'edges'>): LayoutNode | null {
+  const id = scenarioForkId({
+    nodes: layout.nodes.map((n) => n.node),
+    edges: layout.edges.map((e) => e.edge),
+  });
+  return (id ? layout.nodes.find((n) => n.id === id) : undefined) ?? firstFork(layout);
 }

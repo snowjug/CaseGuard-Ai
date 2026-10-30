@@ -6,6 +6,7 @@ import {
   SSRProvider,
   createDOMRenderer,
   type GriffelRenderer,
+  type SpinnerState,
 } from '@fluentui/react-components';
 import {
   createContext,
@@ -14,6 +15,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  type ComponentProps,
   type ReactNode,
 } from 'react';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -56,6 +58,26 @@ export interface CaseGuardThemeProviderProps {
 }
 
 const prefersDark = '(prefers-color-scheme: dark)';
+
+const isSpinnerState = (state: unknown): state is SpinnerState =>
+  typeof state === 'object' && state !== null && 'root' in state;
+
+/**
+ * A Spinner with no label and no name is a decorative "busy" icon (inside a pending button, beside a stage name). Left
+ * as a `progressbar` it has no accessible name, which axe reports as serious (`aria-progressbar-name`), and any name it
+ * was given would leak into the name of the button that holds it. So it is hidden from assistive technology; a Spinner
+ * with a `label` (or its own `aria-label`) is left alone.
+ */
+function hideUnnamedSpinner(state: unknown): void {
+  if (!isSpinnerState(state)) return;
+  const root = state.root;
+  if (state.label || root['aria-label'] || root['aria-labelledby']) return;
+  root['aria-hidden'] = true;
+}
+
+const CUSTOM_STYLE_HOOKS: NonNullable<
+  ComponentProps<typeof FluentProvider>['customStyleHooks_unstable']
+> = { useSpinnerStyles_unstable: hideUnnamedSpinner };
 
 function applyMotionAttribute(preference: ReducedMotionPreference): void {
   const root = document.documentElement;
@@ -113,6 +135,7 @@ export function CaseGuardThemeProvider({
         <ThemeModeContext.Provider value={value}>
           <FluentProvider
             theme={theme}
+            customStyleHooks_unstable={CUSTOM_STYLE_HOOKS}
             className={mode === 'system' ? 'cg-theme-system' : undefined}
             style={
               paintCanvas

@@ -11,7 +11,7 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useVisuallyHiddenClass } from '../a11y/VisuallyHidden';
 import { cg } from '../tokens/cg';
 
@@ -58,7 +58,13 @@ export interface DataTableProps<T> {
 }
 
 const useStyles = makeStyles({
-  wrap: { width: '100%', overflowX: 'auto' },
+  wrap: {
+    width: '100%',
+    overflowX: 'auto',
+    // The wrapper contains the visually hidden (absolutely positioned) text of a table that is wider than the screen.
+    position: 'relative',
+    ':focus-visible': { outline: `3px solid ${cg.focus}`, outlineOffset: '-3px' },
+  },
   table: { width: '100%', minWidth: 'max-content' },
   caption: {
     captionSide: 'top',
@@ -113,7 +119,9 @@ export function sortRows<T>(
 
 /**
  * Accessible data table: native `table` semantics, a caption, `aria-sort` on sortable headers (activated by
- * keyboard through a real button) and a horizontally scrollable wrapper so wide tables never break the layout.
+ * keyboard through a real button) and a horizontally scrollable wrapper so wide tables never break the layout. While a
+ * table is wider than its container the wrapper is a named, focusable region, so people who cannot use a pointer can
+ * scroll it (WCAG 2.1.1); a table that fits adds nothing to the tab order.
  */
 export function DataTable<T>({
   caption,
@@ -136,6 +144,20 @@ export function DataTable<T>({
 
   const sortedRows = useMemo(() => sortRows(rows, columns, sort), [rows, columns, sort]);
 
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [scrolls, setScrolls] = useState(false);
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return undefined;
+    const measure = (): void => setScrolls(wrap.scrollWidth > wrap.clientWidth + 1);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(wrap);
+    if (wrap.firstElementChild) observer.observe(wrap.firstElementChild);
+    return () => observer.disconnect();
+  }, [sortedRows.length, columns.length]);
+
   const toggleSort = (columnId: string): void => {
     let next: SortState | null;
     if (sort?.columnId !== columnId) next = { columnId, direction: 'ascending' };
@@ -149,7 +171,11 @@ export function DataTable<T>({
     align === 'end' ? styles.end : align === 'center' ? styles.center : undefined;
 
   return (
-    <div className={mergeClasses(styles.wrap, className)}>
+    <div
+      ref={wrapRef}
+      className={mergeClasses(styles.wrap, className)}
+      {...(scrolls ? { role: 'region', 'aria-label': `${caption}, scrollable`, tabIndex: 0 } : {})}
+    >
       <Table size={dense ? 'extra-small' : 'medium'} className={styles.table} sortable>
         <caption className={captionVisible ? styles.caption : hidden}>{caption}</caption>
         <TableHeader>

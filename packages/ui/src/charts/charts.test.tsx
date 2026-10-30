@@ -96,6 +96,15 @@ describe('[NFR-A11Y-01] Sparkline', () => {
     expect(within(table).getAllByRole('row')).toHaveLength(7);
   });
 
+  it('keeps the hidden table inside a clipped box, so a wide table cannot widen the page', () => {
+    renderWithTheme(<Sparkline label="CQI over six runs" values={[52, 55, 53, 58, 60, 61]} />);
+    const box = screen.getByRole('table').parentElement as HTMLElement;
+    const style = window.getComputedStyle(box);
+    expect(style.position).toBe('absolute');
+    expect(style.overflow).toBe('hidden');
+    expect(window.getComputedStyle(screen.getByRole('table')).position).not.toBe('absolute');
+  });
+
   it('is safe with no data and with a single point', () => {
     const { rerender, container } = renderWithTheme(<Sparkline label="Trend" values={[]} />);
     expect(screen.getByRole('img', { name: 'Trend: no data' })).toBeInTheDocument();

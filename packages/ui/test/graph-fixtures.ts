@@ -278,3 +278,66 @@ export function sampleGraph(): InvestigationGraph {
       'A support case where a client reinstall was chosen before checking the proxy. The simulated path checks the proxy first and resolves sooner.',
   });
 }
+
+const at = (hhmm: string): string => `2025-03-03T${hhmm}:00Z`;
+
+/**
+ * A graph shaped like a real `graph.get` response: every lane numbers its own nodes from 0, nodes carry timestamps, the
+ * real "decision point" link from an action to its fork is an unflagged `branches` edge, evidence hangs off the action
+ * that produced it, and one scenario branches from the SECOND fork. Modelled on the Case One response of the API.
+ */
+export function apiShapedGraph(): InvestigationGraph {
+  const nodes = [
+    makeNode({ id: 'problem:case', lane: 'problem', order: 0, timestamp: at('08:00') }),
+    makeNode({ id: 'hypothesis:h1', lane: 'hypothesis', order: 0, confidence: 0.7 }),
+    makeNode({ id: 'hypothesis:h2', lane: 'hypothesis', order: 1, confidence: 0.1 }),
+    makeNode({ id: 'evidence:ev1', lane: 'evidence', order: 0, timestamp: at('08:40') }),
+    makeNode({ id: 'evidence:ev2', lane: 'evidence', order: 1, timestamp: at('09:30') }),
+    makeNode({ id: 'evidence:ev3', lane: 'evidence', order: 2, timestamp: at('11:00') }),
+    makeNode({ id: 'evidence:ev4', lane: 'evidence', order: 3, timestamp: at('12:30') }),
+    makeNode({ id: 'action:a1', lane: 'actual', order: 0, timestamp: at('08:10') }),
+    makeNode({ id: 'action:a2', lane: 'actual', order: 1, timestamp: at('09:00') }),
+    makeNode({ id: 'fork:f1', lane: 'actual', order: 2, kind: 'fork', timestamp: at('09:00') }),
+    makeNode({ id: 'action:a3', lane: 'actual', order: 3, timestamp: at('10:30') }),
+    makeNode({ id: 'fork:f2', lane: 'actual', order: 4, kind: 'fork', timestamp: at('10:30') }),
+    makeNode({ id: 'action:a4', lane: 'actual', order: 5, timestamp: at('12:00') }),
+    makeNode({ id: 'step:s1', lane: 'counterfactual', order: 0, timestamp: at('10:50') }),
+    makeNode({ id: 'step:s2', lane: 'counterfactual', order: 1, timestamp: at('11:10') }),
+    makeNode({ id: 'step:s3', lane: 'counterfactual', order: 2, timestamp: at('11:30') }),
+    makeNode({ id: 'outcome:actual', lane: 'outcome', order: 0, timestamp: at('13:00') }),
+    makeNode({
+      id: 'outcome:sim:scn',
+      lane: 'outcome',
+      order: 1,
+      timestamp: at('11:30'),
+      simulated: true,
+    }),
+    makeNode({ id: 'skill:sk1', lane: 'skill', order: 0 }),
+  ];
+  const edges = [
+    makeEdge('problem:case', 'action:a1', { kind: 'actual' }),
+    makeEdge('action:a1', 'action:a2', { kind: 'actual' }),
+    makeEdge('action:a2', 'fork:f1', { kind: 'branches', label: 'decision point' }),
+    makeEdge('action:a2', 'action:a3', { kind: 'actual' }),
+    makeEdge('action:a3', 'fork:f2', { kind: 'branches', label: 'decision point' }),
+    makeEdge('action:a3', 'action:a4', { kind: 'actual' }),
+    makeEdge('action:a1', 'evidence:ev1', { kind: 'informs' }),
+    makeEdge('action:a2', 'evidence:ev2', { kind: 'informs' }),
+    makeEdge('action:a3', 'evidence:ev3', { kind: 'informs' }),
+    makeEdge('action:a4', 'evidence:ev4', { kind: 'informs' }),
+    makeEdge('evidence:ev1', 'hypothesis:h1', { kind: 'supports' }),
+    makeEdge('evidence:ev2', 'hypothesis:h2', { kind: 'contradicts' }),
+    makeEdge('evidence:ev4', 'hypothesis:h1', { kind: 'supports' }),
+    makeEdge('fork:f2', 'step:s1', { kind: 'branches', simulated: true, label: 'what if' }),
+    makeEdge('step:s1', 'step:s2', { kind: 'counterfactual', simulated: true }),
+    makeEdge('step:s2', 'step:s3', { kind: 'counterfactual', simulated: true }),
+    makeEdge('step:s3', 'outcome:sim:scn', { kind: 'counterfactual', simulated: true }),
+    makeEdge('action:a4', 'outcome:actual', { kind: 'actual' }),
+    makeEdge('hypothesis:h1', 'outcome:actual', { kind: 'informs' }),
+    makeEdge('fork:f2', 'skill:sk1', { kind: 'extracts', label: 'extracts' }),
+  ];
+  return makeGraph(nodes, edges, {
+    scenarioId: 'scn',
+    summary: 'A graph in the shape the API returns: lane-local order, timestamps, one scenario.',
+  });
+}

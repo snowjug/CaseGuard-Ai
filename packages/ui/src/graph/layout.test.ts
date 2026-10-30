@@ -1,6 +1,7 @@
 import { GRAPH_LANES } from '@caseguard/schemas';
 import { describe, expect, it } from 'vitest';
 import {
+  apiShapedGraph,
   makeEdge,
   makeGraph,
   makeNode,
@@ -8,14 +9,17 @@ import {
   sampleGraph,
   shuffled,
 } from '../../test/graph-fixtures';
+import { columnsByTime, isLaneLocalOrder, resolveAlignment } from './alignment';
 import {
   DEFAULT_LAYOUT,
+  divergenceFork,
   filterGraphByMode,
   findNeighbour,
   findOverlaps,
   firstFork,
   firstNodeId,
   layoutGraph,
+  scenarioForkId,
 } from './layout';
 
 const positions = (
@@ -238,5 +242,84 @@ describe('filterGraphByMode', () => {
     const view = filterGraphByMode(graph, 'compare');
     expect(view.nodes).toHaveLength(graph.nodes.length);
     expect(firstFork(layoutGraph(view))?.id).toBe('fork');
+  });
+});
+
+describe('graph from the API: lane-local order, time alignment and the scenario fork', () => {
+  const graph = apiShapedGraph();
+  const timed = layoutGraph(graph, { alignment: 'time' });
+  const column = (id: string): number => timed.nodeById.get(id)?.column ?? Number.NaN;
+
+  it('recognises lane-local numbering and keeps `order` for graphs that share one numbering', () => {
+    expect(isLaneLocalOrder(graph.nodes)).toBe(true);
+    expect(isLaneLocalOrder(sampleGraph().nodes)).toBe(false);
+    expect(resolveAlignment(graph.nodes, 'auto')).toBe('time');
+    expect(resolveAlignment(sampleGraph().nodes, 'auto')).toBe('order');
+    expect(resolveAlignment(sampleGraph().nodes, 'time')).toBe('time');
+    expect(resolveAlignment(graph.nodes, 'order')).toBe('order');
+    const untimed = graph.nodes.map((n) => ({ ...n, timestamp: null }));
+    expect(resolveAlignment(untimed, 'auto')).toBe('order');
+  });
+
+  it('never overlaps nodes and is independent of input order', () => {
+    expect(findOverlaps(timed)).toEqual([]);
+    const reference = positions(timed);
+    for (const seed of [1, 2, 3]) {
+      const mixed = {
+        ...graph,
+        nodes: shuffled(graph.nodes, seed),
+        edges: shuffled(graph.edges, seed + 10),
+      };
+      expect(positions(layoutGraph(mixed, { alignment: 'time' }))).toEqual(reference);
+    }
+  });
+
+  it('starts the simulated path under the fork it branches from and keeps it contiguous', () => {
+    const fork = column('fork:f2');
+    expect(column('step:s1')).toBeGreaterThan(fork);
+    expect(column('step:s2')).toBe(column('step:s1') + 1);
+    expect(column('step:s3')).toBe(column('step:s2') + 1);
+    expect(column('outcome:sim:scn')).toBeGreaterThan(column('step:s3'));
+    // Without time alignment the same path starts at the far left, nowhere near its fork: the problem this fixes.
+    const byOrder = layoutGraph(graph);
+    expect(byOrder.nodeById.get('step:s1')?.column).toBeLessThan(
+      byOrder.nodeById.get('fork:f2')?.column ?? 0,
+    );
+  });
+
+  it('puts outcomes after the path they end, the skill after its fork and evidence after its action', () => {
+    expect(column('outcome:actual')).toBeGreaterThan(column('action:a4'));
+    expect(column('skill:sk1')).toBeGreaterThan(column('fork:f2'));
+    expect(column('evidence:ev2')).toBeGreaterThan(column('action:a2'));
+    expect(column('evidence:ev4')).toBeGreaterThan(column('action:a4'));
+    // The actual path is the spine: consecutive columns in order.
+    const spine = ['action:a1', 'action:a2', 'fork:f1', 'action:a3', 'fork:f2', 'action:a4'];
+    expect(spine.map(column)).toEqual([0, 1, 2, 3, 4, 5]);
+  });
+
+  it('falls back to `order` when the actual path has no timestamps', () => {
+    const untimed = graph.nodes.map((n) => ({ ...n, timestamp: null }));
+    expect(columnsByTime(untimed, graph.edges)).toBeNull();
+    const layout = layoutGraph({ ...graph, nodes: untimed }, { alignment: 'time' });
+    expect(findOverlaps(layout)).toEqual([]);
+  });
+
+  it('draws the divergence at the fork of the scenario, not at the earliest fork', () => {
+    expect(scenarioForkId(graph)).toBe('fork:f2');
+    expect(divergenceFork(timed)?.id).toBe('fork:f2');
+    expect(firstFork(timed)?.id).toBe('fork:f1');
+    expect(scenarioForkId({ nodes: sampleGraph().nodes, edges: sampleGraph().edges })).toBe('fork');
+  });
+
+  it('counterfactual mode keeps the history up to the scenario fork and nothing that came later', () => {
+    const view = filterGraphByMode(graph, 'counterfactual');
+    const ids = view.nodes.map((n) => n.id);
+    expect(ids).toEqual(expect.arrayContaining(['fork:f1', 'fork:f2', 'step:s1', 'evidence:ev2']));
+    expect(ids).not.toContain('action:a4');
+    expect(ids).not.toContain('evidence:ev3');
+    expect(ids).not.toContain('evidence:ev4');
+    expect(ids).not.toContain('outcome:actual');
+    expect(ids).toContain('outcome:sim:scn');
+    expect(view.edges.every((e) => ids.includes(e.from) && ids.includes(e.to))).toBe(true);
   });
 });

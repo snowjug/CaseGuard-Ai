@@ -118,6 +118,13 @@ export function GraphLegend({
           </li>
           <li className={styles.item}>
             <svg width="40" height="14" viewBox="0 0 40 14" aria-hidden="true" focusable="false">
+              <path d="M2 7H31" stroke={cg.tone.fork.solid} strokeWidth={2} />
+              <path d="M30 3L38 7L30 11Z" fill={cg.tone.fork.solid} />
+            </svg>
+            Branch point
+          </li>
+          <li className={styles.item}>
+            <svg width="40" height="14" viewBox="0 0 40 14" aria-hidden="true" focusable="false">
               <path
                 d="M2 7H31"
                 stroke={patternUrl(idPrefix, 'hatch', 'simulated')}

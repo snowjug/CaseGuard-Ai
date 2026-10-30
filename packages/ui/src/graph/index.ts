@@ -1,4 +1,5 @@
 export * from './layout';
+export * from './alignment';
 export * from './geometry';
 export * from './viewport';
 export * from './node-meta';

@@ -109,9 +109,13 @@ export interface EdgeStyle {
   cap: 'arrow' | 'bar';
 }
 
-/** Solid for actual edges, dashed + hatch for simulated ones; relationship edges are thinner. */
+/**
+ * Solid for actual edges, dashed + hatch for simulated ones; relationship edges are thinner. An edge is simulated when
+ * the API says so or when it is a `counterfactual` edge. A `branches` edge is simulated only when flagged: the API also
+ * uses it, unflagged, for the real "decision point" link from an action to its fork, which must not read as a simulation.
+ */
 export function edgeStyleOf(edge: Pick<GraphEdge, 'kind' | 'simulated'>): EdgeStyle {
-  const simulated = edge.simulated || edge.kind === 'counterfactual' || edge.kind === 'branches';
+  const simulated = edge.simulated || edge.kind === 'counterfactual';
   if (simulated) {
     return {
       label: 'Simulated path',
@@ -154,6 +158,15 @@ export function edgeStyleOf(edge: Pick<GraphEdge, 'kind' | 'simulated'>): EdgeSt
       return {
         label: 'Extracts',
         tone: 'skill',
+        width: 2,
+        dash: undefined,
+        simulated: false,
+        cap: 'arrow',
+      };
+    case 'branches':
+      return {
+        label: 'Branch point',
+        tone: 'fork',
         width: 2,
         dash: undefined,
         simulated: false,

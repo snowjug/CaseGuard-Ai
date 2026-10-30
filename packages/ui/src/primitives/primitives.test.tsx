@@ -381,6 +381,49 @@ describe('DataTable', () => {
     );
     expect(screen.getByText('No hypotheses yet')).toBeInTheDocument();
   });
+
+  it('contains the visually hidden text of a wide table, so it cannot widen the page', () => {
+    renderWithTheme(
+      <DataTable caption="Contained" columns={columns} rows={rows} getRowId={(r) => r.id} />,
+    );
+    const wrapper = screen.getByRole('table', { name: 'Contained' }).parentElement;
+    if (!wrapper) throw new Error('the table has a wrapper');
+    const style = getComputedStyle(wrapper);
+    expect(style.position).toBe('relative');
+    expect(style.overflowX).toBe('auto');
+  });
+
+  it('is a named, keyboard-focusable scroll region only while the table is wider than its container', async () => {
+    const scrollWidth = vi.spyOn(Element.prototype, 'scrollWidth', 'get').mockReturnValue(900);
+    const clientWidth = vi.spyOn(Element.prototype, 'clientWidth', 'get').mockReturnValue(320);
+    try {
+      const { container, rerender } = renderWithTheme(
+        <DataTable caption="Wide table" columns={columns} rows={rows} getRowId={(r) => r.id} />,
+      );
+      const region = await screen.findByRole('region', { name: 'Wide table, scrollable' });
+      expect(region).toHaveAttribute('tabindex', '0');
+      expect(within(region).getByRole('table', { name: 'Wide table' })).toBeInTheDocument();
+      await expectNoAxeViolations(container);
+
+      // Once it fits, nothing is added to the tab order.
+      scrollWidth.mockReturnValue(300);
+      rerender(
+        <DataTable
+          caption="Wide table"
+          columns={columns}
+          rows={rows.slice(0, 2)}
+          getRowId={(r) => r.id}
+        />,
+      );
+      await waitFor(() =>
+        expect(screen.queryByRole('region', { name: 'Wide table, scrollable' })).toBeNull(),
+      );
+      expect(screen.getByRole('table', { name: 'Wide table' })).toBeInTheDocument();
+    } finally {
+      scrollWidth.mockRestore();
+      clientWidth.mockRestore();
+    }
+  });
 });
 
 describe('TimeCursor', () => {
@@ -449,6 +492,21 @@ describe('TimeCursor', () => {
   it('says so when there is no time range to scrub', () => {
     renderWithTheme(<TimeCursor min={min} max={min} value={null} onChange={vi.fn()} />);
     expect(screen.getByText(/no time range to scrub/)).toBeInTheDocument();
+  });
+
+  it('shows the boundary exactly, even between slider steps, so it never displays a later instant', () => {
+    renderWithTheme(
+      <TimeCursor
+        min={min}
+        max={max}
+        value="2025-03-11T07:59:59Z"
+        onChange={vi.fn()}
+        stepMinutes={5}
+        withheldCount={2}
+      />,
+    );
+    expect(screen.getAllByText('Known as of 11 Mar 2025, 07:59:59 UTC').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Known as of 11 Mar 2025, 08:00 UTC')).toBeNull();
   });
 });
 
@@ -520,6 +578,154 @@ describe('ConfirmDialog', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Confirm' }));
     expect(await within(dialog).findByText('Case is locked')).toBeInTheDocument();
     expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+  });
+
+  describe('while the action runs', () => {
+    /** A promise settled by hand: an action that takes a while. */
+    function deferred() {
+      let resolve: () => void = () => undefined;
+      let reject: (reason: unknown) => void = () => undefined;
+      const promise = new Promise<void>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    }
+
+    async function startAction(
+      onConfirm: () => Promise<void>,
+      onOpenChange: (open: boolean) => void = () => undefined,
+    ) {
+      const user = userEvent.setup();
+      const view = renderWithTheme(
+        <ConfirmDialog
+          trigger={<Button>Delete</Button>}
+          title="Delete case?"
+          onOpenChange={onOpenChange}
+          onConfirm={onConfirm}
+        >
+          This cannot be undone.
+        </ConfirmDialog>,
+      );
+      await user.click(screen.getByRole('button', { name: 'Delete' }));
+      const dialog = await screen.findByRole('alertdialog');
+      await user.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+      await waitFor(() =>
+        expect(within(dialog).getByRole('button', { name: 'Confirm' })).toBeDisabled(),
+      );
+      return { user, dialog, view };
+    }
+
+    it('ignores Escape, so the failure it ends with is shown in the dialog that is still open', async () => {
+      const action = deferred();
+      const onOpenChange = vi.fn();
+      const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+      const { dialog } = await startAction(() => action.promise, onOpenChange);
+      onOpenChange.mockClear();
+
+      fireEvent.keyDown(dialog, { key: 'Escape' });
+      expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+      expect(onOpenChange).not.toHaveBeenCalled();
+
+      const focusedBefore = focus.mock.calls.length;
+      await act(async () => {
+        action.reject(new Error('Case is locked'));
+        await action.promise.catch(() => undefined);
+      });
+      expect(await within(dialog).findByText('Case is locked')).toBeInTheDocument();
+      const confirm = within(dialog).getByRole('button', { name: 'Confirm' });
+      expect(confirm).toBeEnabled();
+      // A browser takes the focus away from the button that was disabled, and a dialog whose focus is outside it does
+      // not hear Escape: the focus is handed back to the button (jsdom keeps it, so what counts is the call).
+      await waitFor(() => expect(focus.mock.contexts.slice(focusedBefore)).toContain(confirm));
+      focus.mockRestore();
+
+      // Once it has settled the dialog can be dismissed again.
+      fireEvent.keyDown(dialog, { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+      expect(onOpenChange).toHaveBeenCalledWith(false);
+    });
+
+    it('cannot be cancelled or confirmed again, and closes by itself when the action succeeds', async () => {
+      const action = deferred();
+      const onConfirm = vi.fn(() => action.promise);
+      const { dialog } = await startAction(onConfirm);
+      expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled();
+      fireEvent.keyDown(dialog, { key: 'Escape' });
+      expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        action.resolve();
+        await action.promise;
+      });
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+    });
+
+    it('also ignores a close request when the open state is controlled by the owner', async () => {
+      const action = deferred();
+      const onOpenChange = vi.fn();
+      const user = userEvent.setup();
+      renderWithTheme(
+        <ConfirmDialog
+          open
+          onOpenChange={onOpenChange}
+          title="Reset the demo data?"
+          onConfirm={() => action.promise}
+        >
+          This removes all synthetic cases.
+        </ConfirmDialog>,
+      );
+      const dialog = await screen.findByRole('alertdialog');
+      await user.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+      await waitFor(() =>
+        expect(within(dialog).getByRole('button', { name: 'Confirm' })).toBeDisabled(),
+      );
+      fireEvent.keyDown(dialog, { key: 'Escape' });
+      expect(onOpenChange).not.toHaveBeenCalled();
+      expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+
+      await act(async () => {
+        action.resolve();
+        await action.promise;
+      });
+      await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    });
+
+    it('does not report to its owner or update anything once it has been removed', async () => {
+      const action = deferred();
+      const onOpenChange = vi.fn();
+      const { view } = await startAction(() => action.promise, onOpenChange);
+      view.unmount();
+      onOpenChange.mockClear();
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      await act(async () => {
+        action.resolve();
+        await action.promise;
+      });
+      expect(onOpenChange).not.toHaveBeenCalled();
+      expect(errors).not.toHaveBeenCalled();
+      errors.mockRestore();
+    });
+
+    it('starts the next opening without the message of the last failure', async () => {
+      const action = deferred();
+      const { user, dialog } = await startAction(() => action.promise);
+      await act(async () => {
+        action.reject(new Error('Case is locked'));
+        await action.promise.catch(() => undefined);
+      });
+      expect(await within(dialog).findByText('Case is locked')).toBeInTheDocument();
+      await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+
+      await user.click(await screen.findByRole('button', { name: 'Delete' }, { timeout: 5000 }));
+      const reopened = await screen.findByRole('alertdialog');
+      expect(within(reopened).queryByText('Case is locked')).toBeNull();
+      expect(within(reopened).getByRole('button', { name: 'Confirm' })).toBeEnabled();
+    });
   });
 });
 

@@ -101,6 +101,14 @@ export interface TimeCursorProps {
 
 const MINUTE = 60_000;
 
+/** `14 Mar 2025, 09:42 UTC`; seconds are added only when the instant has some, so `09:40:59` is never shown as `09:41`. */
+function formatBoundary(iso: string): string {
+  const ms = Date.parse(iso);
+  return formatDateTimeUtc(iso, {
+    seconds: Number.isFinite(ms) && new Date(ms).getUTCSeconds() !== 0,
+  });
+}
+
 /**
  * Time-cursor scrubber. It announces "Known as of <UTC time>" to assistive technology, is fully keyboard
  * operable (arrows, Home/End, PageUp/PageDown on the slider; buttons for previous/next event and "Latest") and
@@ -145,8 +153,10 @@ export function TimeCursor({
 
   const committedIndex = toIndex(value);
   const index = draft ?? committedIndex;
-  const shownIso = index >= steps ? null : toIso(index);
-  const shownText = formatDateTimeUtc(shownIso ?? max);
+  // The boundary is shown as it is, not as the nearest slider step: a time cursor that displays a later instant than
+  // the one in force would misstate what is known. While scrubbing, the draft position is shown.
+  const shownIso = index >= steps ? null : draft === null && value !== null ? value : toIso(index);
+  const shownText = formatBoundary(shownIso ?? max);
 
   const commit = (nextIndex: number): void => {
     onChange(nextIndex >= steps ? null : toIso(nextIndex));
@@ -271,7 +281,7 @@ export function TimeCursor({
       <VisuallyHidden role="status" aria-live="polite">
         {value === null
           ? `Showing everything up to ${formatDateTimeUtc(max)}`
-          : `Known as of ${formatDateTimeUtc(value)}`}
+          : `Known as of ${formatBoundary(value)}`}
       </VisuallyHidden>
     </div>
   );

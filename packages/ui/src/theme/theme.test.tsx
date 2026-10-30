@@ -2,7 +2,7 @@ import { act, renderHook, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { installMatchMedia } from '../../test/media';
-import { renderWithTheme } from '../../test/axe';
+import { renderWithTheme, expectNoAxeViolations } from '../../test/axe';
 import { createStyleFlusher } from './ssr';
 import {
   createReducedMotionStore,
@@ -20,7 +20,7 @@ import {
   writeThemeCookie,
 } from './theme-mode';
 import { useThemeMode } from './ThemeProvider';
-import { createDOMRenderer } from '@fluentui/react-components';
+import { Button, Spinner, createDOMRenderer } from '@fluentui/react-components';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
@@ -163,6 +163,32 @@ describe('CaseGuardThemeProvider', () => {
     window.localStorage.setItem('cg-reduced-motion', 'reduce');
     renderWithTheme(<p>content</p>);
     expect(document.documentElement.getAttribute('data-cg-reduced-motion')).toBe('true');
+  });
+});
+
+describe('unnamed spinners', () => {
+  it('hides a decorative busy icon, so it has no nameless progressbar and does not rename its button', async () => {
+    const { container } = renderWithTheme(
+      <Button disabled icon={<Spinner size="tiny" />}>
+        Save
+      </Button>,
+    );
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(container.querySelector('.fui-Spinner')).toHaveAttribute('aria-hidden', 'true');
+    await expectNoAxeViolations(container);
+  });
+
+  it('leaves a spinner with a label or a name exposed', async () => {
+    const { container } = renderWithTheme(
+      <div>
+        <Spinner label="Loading cases" />
+        <Spinner aria-label="Saving" size="tiny" />
+      </div>,
+    );
+    expect(screen.getByRole('progressbar', { name: 'Loading cases' })).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Saving' })).toBeInTheDocument();
+    await expectNoAxeViolations(container);
   });
 });
 

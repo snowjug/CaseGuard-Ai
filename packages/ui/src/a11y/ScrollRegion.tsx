@@ -4,7 +4,9 @@ import { makeStyles, mergeClasses } from '@fluentui/react-components';
 import type { CSSProperties, ReactNode } from 'react';
 
 const useStyles = makeStyles({
-  root: { overflowX: 'auto', maxWidth: '100%' },
+  // Positioned so that the visually hidden (absolutely positioned) text of a wide table stays inside the scroll area and
+  // cannot widen the page.
+  root: { overflowX: 'auto', maxWidth: '100%', position: 'relative' },
 });
 
 export interface ScrollRegionProps {

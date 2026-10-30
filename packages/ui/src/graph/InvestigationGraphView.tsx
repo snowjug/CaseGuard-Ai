@@ -16,7 +16,15 @@ import {
   ZoomOutRegular,
   TargetRegular,
 } from '@fluentui/react-icons';
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+} from 'react';
 import { useElementSize } from '../hooks/useElementSize';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useSafeId } from '../hooks/useSafeId';
@@ -28,11 +36,12 @@ import { cg } from '../tokens/cg';
 import { GraphLegend } from './GraphLegend';
 import { GraphNodeView } from './GraphNodeView';
 import { GraphTextAlternative } from './GraphTextAlternative';
+import { resolveAlignment } from './alignment';
 import { routeEdge } from './geometry';
 import {
+  divergenceFork,
   filterGraphByMode,
   findNeighbour,
-  firstFork,
   firstNodeId,
   layoutGraph,
   compareNodesForReading,
@@ -96,11 +105,19 @@ export interface InvestigationGraphViewProps {
    * `compare`: both, with the divergence at the fork highlighted.
    */
   mode?: GraphMode;
+  /**
+   * How columns line up across lanes. `auto` (default) uses timestamps when every lane numbers its own nodes from 0 and
+   * the actual path is timed (the shape of a `graph.get` response), so a simulated path starts under the fork it
+   * branches from; otherwise it uses `order`. `order` / `time` force one of them.
+   */
+  alignment?: 'auto' | 'order' | 'time';
   className?: string;
   /** Canvas height in px (default 560). */
   height?: number;
   /** Always show the accessible list instead of the canvas (it is also used below 640 px). */
   forceList?: boolean;
+  /** The page's details for the selected node; shown right under the canvas (or the list) so it stays next to it. */
+  detail?: ReactNode;
 }
 
 const LABEL = 'cg-graph';
@@ -115,9 +132,11 @@ export function InvestigationGraphView({
   selectedId = null,
   onSelect,
   mode = 'compare',
+  alignment = 'auto',
   className,
   height = 560,
   forceList = false,
+  detail,
 }: InvestigationGraphViewProps) {
   const styles = useStyles();
   const idPrefix = useSafeId(LABEL);
@@ -127,11 +146,20 @@ export function InvestigationGraphView({
 
   const visible = useMemo(() => filterGraphByMode(graph, mode), [graph, mode]);
   const hasFork = visible.nodes.some((n) => n.kind === 'fork');
-  const layout = useMemo(
-    () => layoutGraph(visible, { headerHeight: mode === 'compare' && hasFork ? 34 : 0 }),
-    [visible, mode, hasFork],
+  // Detected on the whole graph: a mode filter can remove the nodes that make the numbering recognisable.
+  const columnAlignment = useMemo(
+    () => resolveAlignment(graph.nodes, alignment),
+    [graph.nodes, alignment],
   );
-  const fork = useMemo(() => firstFork(layout), [layout]);
+  const layout = useMemo(
+    () =>
+      layoutGraph(visible, {
+        headerHeight: mode === 'compare' && hasFork ? 34 : 0,
+        alignment: columnAlignment,
+      }),
+    [visible, mode, hasFork, columnAlignment],
+  );
+  const fork = useMemo(() => divergenceFork(layout), [layout]);
 
   const layoutKey = `${mode}:${graph.caseId}:${graph.scenarioId ?? ''}:${layout.nodes.length}:${layout.edges.length}`;
   const [manual, setManual] = useState<{ key: string; transform: Transform } | null>(null);
@@ -322,12 +350,13 @@ export function InvestigationGraphView({
           The interactive canvas is available on wider screens. This list contains every node and
           connection.
         </Notice>
+        {detail}
         {textAlternative}
       </div>
     );
   }
 
-  const markerTones = ['actual', 'simulated', 'evidence', 'skill', 'neutral'] as const;
+  const markerTones = ['actual', 'simulated', 'evidence', 'skill', 'neutral', 'fork'] as const;
   const zoomPercent = `${Math.round(transform.k * 100)}%`;
 
   return (
@@ -575,6 +604,7 @@ export function InvestigationGraphView({
         </svg>
       </div>
 
+      {detail}
       <GraphLegend idPrefix={`${idPrefix}-legend`} />
       {textAlternative}
     </div>

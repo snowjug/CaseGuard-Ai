@@ -50,35 +50,41 @@ export interface ChartTableProps {
   rows: readonly (readonly (string | number)[])[];
 }
 
-/** Visually hidden data table: the accessible equivalent of the chart. */
+/**
+ * Visually hidden data table: the accessible equivalent of the chart. The table sits inside the hidden box instead of
+ * being hidden itself: a `table` ignores a 1 px width and does not clip, so on its own it widened the whole page
+ * (several thousand pixels of empty sideways scrolling).
+ */
 export function ChartTable({ caption, headers, rows }: ChartTableProps) {
   return (
-    <VisuallyHidden as="table">
-      <caption>{caption}</caption>
-      <thead>
-        <tr>
-          {headers.map((header, i) => (
-            <th key={`${header}-${i}`} scope="col">
-              {header}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, rowIndex) => (
-          <tr key={rowIndex}>
-            {row.map((cell, cellIndex) =>
-              cellIndex === 0 ? (
-                <th key={cellIndex} scope="row">
-                  {cell}
-                </th>
-              ) : (
-                <td key={cellIndex}>{cell}</td>
-              ),
-            )}
+    <VisuallyHidden as="div">
+      <table>
+        <caption>{caption}</caption>
+        <thead>
+          <tr>
+            {headers.map((header, i) => (
+              <th key={`${header}-${i}`} scope="col">
+                {header}
+              </th>
+            ))}
           </tr>
-        ))}
-      </tbody>
+        </thead>
+        <tbody>
+          {rows.map((row, rowIndex) => (
+            <tr key={rowIndex}>
+              {row.map((cell, cellIndex) =>
+                cellIndex === 0 ? (
+                  <th key={cellIndex} scope="row">
+                    {cell}
+                  </th>
+                ) : (
+                  <td key={cellIndex}>{cell}</td>
+                ),
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </VisuallyHidden>
   );
 }

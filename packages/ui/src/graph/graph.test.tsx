@@ -3,8 +3,9 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoAxeViolations, renderWithTheme } from '../../test/axe';
 import { installMatchMedia } from '../../test/media';
-import { makeGraph, makeNode, sampleGraph } from '../../test/graph-fixtures';
+import { makeGraph, makeNode, sampleGraph, apiShapedGraph } from '../../test/graph-fixtures';
 import { InvestigationGraphView } from './InvestigationGraphView';
+import { DEFAULT_LAYOUT } from './layout';
 import { PathComparison } from './PathComparison';
 
 const nodeButton = (name: RegExp | string): HTMLElement => screen.getByRole('button', { name });
@@ -228,6 +229,72 @@ describe('[FR-UX-02] InvestigationGraphView', () => {
       );
     });
     expect(onSelect).toHaveBeenCalledWith(null);
+  });
+});
+
+describe('InvestigationGraphView with a graph shaped like the API response', () => {
+  it('draws the real decision-point link solid and only the what-if branch as simulated', () => {
+    const { container } = renderWithTheme(<InvestigationGraphView graph={apiShapedGraph()} />);
+    const branches = [...container.querySelectorAll('g[data-edge-kind="branches"]')];
+    expect(branches).toHaveLength(3);
+    const real = branches.filter((g) => g.getAttribute('data-simulated') === 'false');
+    const whatIf = branches.filter((g) => g.getAttribute('data-simulated') === 'true');
+    expect(real).toHaveLength(2);
+    expect(whatIf).toHaveLength(1);
+    expect(real[0]?.querySelector('path[stroke-dasharray]')).toBeNull();
+    expect(whatIf[0]?.querySelector('path[stroke-dasharray]')).not.toBeNull();
+    const legend = screen.getByRole('group', { name: 'Graph legend' });
+    expect(within(legend).getByText('Branch point')).toBeInTheDocument();
+  });
+
+  it('anchors the divergence marker on the fork the simulated path starts from', () => {
+    const { container } = renderWithTheme(
+      <InvestigationGraphView graph={apiShapedGraph()} mode="compare" />,
+    );
+    const forkGroup = container.querySelector('[data-node-id="fork:f2"]')?.parentElement;
+    const translate = /translate\(([\d.]+) ([\d.]+)\)/.exec(
+      forkGroup?.getAttribute('transform') ?? '',
+    );
+    const line = container.querySelector('line[stroke-dasharray="2 5"]');
+    expect(translate).not.toBeNull();
+    expect(Number(line?.getAttribute('x1'))).toBeCloseTo(
+      Number(translate?.[1]) + DEFAULT_LAYOUT.cellWidth / 2,
+    );
+  });
+
+  it('shows the text alternative and passes axe', async () => {
+    const graph = apiShapedGraph();
+    const { container } = renderWithTheme(
+      <InvestigationGraphView graph={graph} selectedId="step:s2" />,
+    );
+    const details = screen.getByText(/Text alternative/).closest('details') as HTMLDetailsElement;
+    const [nodes] = within(details).getAllByRole('table');
+    expect(within(nodes as HTMLElement).getAllByRole('row')).toHaveLength(graph.nodes.length + 1);
+    await expectNoAxeViolations(container);
+  });
+
+  it('places the page’s detail for the selected node directly under the canvas, before the legend', () => {
+    renderWithTheme(
+      <InvestigationGraphView
+        graph={apiShapedGraph()}
+        selectedId="step:s2"
+        detail={<section aria-label="Selected node details">About the step</section>}
+      />,
+    );
+    const detail = screen.getByRole('region', { name: 'Selected node details' });
+    const legend = screen.getByRole('group', { name: 'Graph legend' });
+    expect(detail.compareDocumentPosition(legend) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('also shows the detail in the accessible list view', () => {
+    installMatchMedia((query) => query === '(max-width: 639px)');
+    renderWithTheme(
+      <InvestigationGraphView
+        graph={apiShapedGraph()}
+        detail={<section aria-label="Selected node details">About the step</section>}
+      />,
+    );
+    expect(screen.getByRole('region', { name: 'Selected node details' })).toBeInTheDocument();
   });
 });
 
