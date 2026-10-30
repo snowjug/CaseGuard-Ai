@@ -4,8 +4,11 @@ import type { FastifyRequest } from 'fastify';
 /** Set by the web tier; see `HttpConfig.trustClientIpHeader`. */
 export const CLIENT_IP_HEADER = 'x-cg-client-ip';
 
-/** The longest textual IPv6 address (with a zone-free mapped IPv4 tail) is 45 characters. */
+/** The longest textual IPv6 address (with a mapped IPv4 tail) is 45 characters. */
 const MAX_ADDRESS_LENGTH = 45;
+
+/** Digits, hex letters, colons and dots only: `net.isIP` also accepts an IPv6 zone id, which is free text and could mint endless buckets. */
+const IP_LITERAL = /^[\da-fA-F:.]+$/;
 
 /**
  * The address a request counts against for per-client limits.
@@ -20,8 +23,11 @@ const MAX_ADDRESS_LENGTH = 45;
 export function clientAddressOf(request: FastifyRequest, trustHeader: boolean): string {
   if (trustHeader) {
     const raw = request.headers[CLIENT_IP_HEADER];
-    if (typeof raw === 'string' && raw.length <= MAX_ADDRESS_LENGTH && isIP(raw.trim()) !== 0) {
-      return raw.trim().toLowerCase();
+    if (typeof raw === 'string') {
+      const value = raw.trim();
+      if (value.length <= MAX_ADDRESS_LENGTH && IP_LITERAL.test(value) && isIP(value) !== 0) {
+        return value.toLowerCase();
+      }
     }
   }
   return request.ip;

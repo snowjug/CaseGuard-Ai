@@ -449,6 +449,8 @@ describe('client address header (API behind the web tier)', () => {
     ['not an address', 'not-an-ip'],
     ['a list', '203.0.113.1, 203.0.113.2'],
     ['an address with a port', '203.0.113.1:443'],
+    ['an IPv6 address with a zone id', 'fe80::1%eth0'],
+    ['a bracketed IPv6 address', '[2001:db8::1]'],
     ['an overlong value', '1'.repeat(60)],
     ['an empty value', ''],
   ])('falls back to the peer address for %s', async (_label, value) => {
