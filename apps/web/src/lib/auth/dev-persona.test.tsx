@@ -162,6 +162,32 @@ describe('[AUTH-DEV-02] persona picker dialog', () => {
     await waitFor(() => expect(opener).toHaveFocus());
   });
 
+  it('keeps the muted lines of the chosen persona readable: they take the button colour, not the grey that fails on the filled button', async () => {
+    const user = userEvent.setup();
+    const api = fakeApi({
+      'dev.personas': () => ({ enabled: true, notice: '', items: personas }),
+    });
+    renderApp(
+      <>
+        <Opener />
+        <PersonaPickerDialog />
+      </>,
+      { api, persona: 'persona_reviewer' },
+    );
+    await user.click(screen.getByRole('button', { name: 'Open picker' }));
+    const list = await screen.findByRole('list', { name: 'Personas' });
+    const chosen = within(list).getByRole('button', { name: /Rae Reviewer/ });
+    const other = within(list).getByRole('button', { name: /Eli Engineer/ });
+    expect(chosen).toHaveAttribute('aria-pressed', 'true');
+    const mutedLine = (option: HTMLElement): HTMLElement => within(option).getByText(/^Tenant:/);
+    // The style sheet is updated after the render that marks the choice, so wait for the cascade instead of reading it once.
+    await waitFor(() =>
+      expect(getComputedStyle(mutedLine(chosen)).color).not.toBe(
+        getComputedStyle(mutedLine(other)).color,
+      ),
+    );
+  });
+
   it('explains when development identity is disabled', async () => {
     const user = userEvent.setup();
     const api = fakeApi({
