@@ -10,6 +10,15 @@ function casePath(caseFacts: CaseFacts | null, section?: string): string {
 const skillPath = (facts: DemoFacts): string =>
   facts.skill === null ? '/skills' : `/skills/${encodeURIComponent(facts.skill.id)}`;
 
+/**
+ * Where the two cases are compared: the "Compare cases" tab of Case Two's quality review, with Case One chosen as
+ * the case to compare with (`?tab=compare&with=`). Until both cases exist, the Efficiency Monitor is the nearest view.
+ */
+const comparePath = (facts: DemoFacts): string =>
+  facts.caseOne !== null && facts.caseTwo !== null
+    ? `${casePath(facts.caseTwo, 'quality')}?tab=compare&with=${encodeURIComponent(facts.caseOne.id)}`
+    : '/efficiency';
+
 const hasMetrics = (c: CaseFacts | null): boolean =>
   c !== null && c.analyzed && c.qualityAssessed && c.metricCount > 0;
 
@@ -176,7 +185,7 @@ export const STEP_SPECS: readonly StepSpec[] = [
     presenterNotes:
       'All figures are model estimates for two synthetic cases (n=2). They illustrate the pipeline and are not evidence of real-world effectiveness.',
     actionLabel: 'Compare the two cases',
-    route: () => '/efficiency',
+    route: comparePath,
     // The comparison is a view, not an action, so it can only be derived: it is available once both
     // cases have their metrics and the second investigation is recorded.
     done: (f) => hasMetrics(f.caseOne) && secondInvestigationDone(f),

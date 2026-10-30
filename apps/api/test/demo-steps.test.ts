@@ -217,6 +217,8 @@ describe('[FR-DEMO-03] deep links', () => {
     expect(done[9]?.route).toBe('/cases/case_two');
     expect(done[10]?.route).toBe('/cases/case_two');
     expect(done[11]?.route).toBe('/cases/case_two/quality');
+    // With both cases in place the last step opens their comparison, not a portfolio page.
+    expect(done[12]?.route).toBe('/cases/case_two/quality?tab=compare&with=case_one');
   });
 
   it('send the skill steps to the library before a skill exists, and encode odd ids', () => {
