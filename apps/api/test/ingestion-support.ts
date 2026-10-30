@@ -9,7 +9,7 @@ import {
   type ApiResponse,
   type Harness,
 } from './support/app-harness';
-import type { Database, SqlExecutor } from '../src/db';
+import type { Database, QueryResult, SqlExecutor } from '../src/db';
 import { resetTestDatabase } from '../src/db/testing';
 import { fakeAnalysis, type FakeAnalysis } from './ingestion-fixtures';
 import type { HarnessOptions } from './support/app-harness';
@@ -120,13 +120,25 @@ export interface StatementLog extends Database {
   clear(): void;
 }
 
-/** Decorates a database so a test can see which statements a request ran (to prove there is no N+1). */
-export function withStatementLog(database: Database): StatementLog {
+/**
+ * Decorates a database so a test can see which statements a request ran (to prove there is no N+1).
+ * `staleRead` may answer a SELECT with no rows instead of running it: what a request that checked
+ * before a concurrent one committed would have seen. The statement is still recorded.
+ */
+export function withStatementLog(
+  database: Database,
+  staleRead: (statement: RecordedStatement) => boolean = () => false,
+): StatementLog {
   const statements: RecordedStatement[] = [];
   const record = (executor: SqlExecutor): SqlExecutor => ({
-    query: (text, params) => {
-      statements.push({ sql: text, params: params ?? [] });
-      return executor.query(text, params);
+    query: <T = Record<string, unknown>>(
+      text: string,
+      params?: readonly unknown[],
+    ): Promise<QueryResult<T>> => {
+      const statement = { sql: text, params: params ?? [] };
+      statements.push(statement);
+      if (staleRead(statement)) return Promise.resolve({ rows: [], rowCount: 0 });
+      return executor.query<T>(text, params);
     },
   });
   return {

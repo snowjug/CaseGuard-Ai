@@ -5,7 +5,11 @@ import type {
   RedactionConfig,
   SourceKind,
 } from '@caseguard/schemas';
-import type { MalwareScanner } from '@caseguard/security';
+import type {
+  CustomPatternBudget,
+  MalwareScanner,
+  RedactionIncompleteError,
+} from '@caseguard/security';
 
 /** Everything the pipeline needs from its caller; the pipeline itself never touches the database. */
 export interface PipelineEnv {
@@ -16,6 +20,12 @@ export interface PipelineEnv {
   readonly redaction: RedactionConfig;
   readonly uploadMaxBytes: number;
   readonly scanner: MalwareScanner;
+  /**
+   * The request's allowance of custom-pattern evaluation time, shared by every redaction call of it.
+   * Omit it: the pipeline then makes one with the security package's default (3 s) for each request.
+   * Tests pass one that is already used up, or a fake, to make a pattern fail on purpose.
+   */
+  readonly customPatternBudget?: CustomPatternBudget;
 }
 
 /** Which categories of a redaction fired inside one event (counts and categories only, never text). */
@@ -44,6 +54,13 @@ export interface PipelineOutcome {
   readonly preview: IngestionPreview;
   /** Present exactly when `preview.ok`. */
   readonly prepared: PreparedPayload | null;
-  /** Operator-facing remarks of the redaction engine (never payload text). */
+  /** Operator-facing remarks (never payload text): why a custom redaction pattern could not be applied. */
   readonly notes: readonly string[];
+  /**
+   * Set when a tenant's custom redaction pattern could not be applied to the payload (a pattern that
+   * is unusable, too slow, too greedy, or starved by the request's time budget). The payload is then
+   * only partly redacted, so it is refused and no redacted content leaves the pipeline: the preview
+   * says so as an error issue and a create answers with this error (422).
+   */
+  readonly incomplete: RedactionIncompleteError | null;
 }

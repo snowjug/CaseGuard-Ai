@@ -40,9 +40,14 @@ async function runChecked(ctx: RequestContext, source: IngestSource): Promise<Pi
     throw error;
   }
   if (outcome.notes.length > 0) {
+    // Labels of the tenant's patterns and fixed reasons only: never a pattern source or payload text.
     ctx.logger.warn(
-      { event: 'ingest.redaction_notes', notes: outcome.notes },
-      'the redaction engine reported remarks',
+      {
+        event: 'ingest.redaction_notes',
+        notes: outcome.notes,
+        refused: outcome.incomplete !== null,
+      },
+      'a custom redaction pattern could not be applied',
     );
   }
   return outcome;
@@ -80,6 +85,8 @@ function refusal(issues: readonly ValidationIssue[]): ValidationFailedError {
 
 async function ingestSource(ctx: RequestContext, input: IngestInput): Promise<IngestResult> {
   const outcome = await runChecked(ctx, input.source);
+  // A tenant pattern could not be applied: refused as the security package words it (422).
+  if (outcome.incomplete !== null) throw outcome.incomplete;
   if (outcome.prepared === null) throw refusal(outcome.preview.issues);
   return persistCase(
     ctx,

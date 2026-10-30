@@ -5,12 +5,29 @@ import {
   type IngestSuccess,
 } from '@caseguard/domain';
 import type { InjectionSummary, RedactionSummary, ValidationIssue } from '@caseguard/schemas';
-import { canonicalJson, sha256Hex } from '@caseguard/security';
+import {
+  RedactionIncompleteError,
+  canonicalJson,
+  createCustomPatternBudget,
+  sha256Hex,
+  type CustomPatternBudget,
+} from '@caseguard/security';
 import type { IngestSource } from '../ports';
 import { resolveInput, type ResolvedInput } from './input';
-import { orderIssues, sanitizeIssues } from './issues';
+import {
+  REDACTION_PATH,
+  describeIncomplete,
+  errorIssue,
+  orderIssues,
+  sanitizeIssues,
+} from './issues';
 import { checkDataPolicy } from './policy';
-import { credentialLikeIdentifiers, redactBundle, redactionOptionsFor } from './redact';
+import {
+  credentialLikeIdentifiers,
+  redactBundle,
+  redactionOptionsFor,
+  type BundleRedaction,
+} from './redact';
 import { screenBundle } from './screen';
 import type { PipelineEnv, PipelineOutcome } from './types';
 import { redactedBundleIssues, semanticIssues } from './validate';
@@ -37,16 +54,15 @@ const emptyInjection = (): InjectionSummary => ({
   findings: [],
 });
 
-function failedOutcome(
+/**
+ * A preview that says "not ok" and shows nothing of the payload: no summary, no events, no counts.
+ * The content hash is that of the input as received (never of anything that was redacted).
+ */
+function refusedOutcome(
   resolved: ResolvedInput,
-  parse: IngestFailure,
-  env: PipelineEnv,
+  issues: readonly ValidationIssue[],
+  extra: { notes?: readonly string[]; incomplete?: RedactionIncompleteError } = {},
 ): PipelineOutcome {
-  const options = redactionOptionsFor(env.redaction, env.tenantSynthetic);
-  const issues = sanitizeIssues(
-    [...toValidationIssues(parse.errors, parse.warnings), ...resolved.notes],
-    options,
-  );
   return {
     preview: {
       ok: false,
@@ -62,20 +78,59 @@ function failedOutcome(
       alreadyIngestedCaseId: null,
     },
     prepared: null,
-    notes: [],
+    notes: extra.notes ?? [],
+    incomplete: extra.incomplete ?? null,
   };
+}
+
+function failedOutcome(
+  resolved: ResolvedInput,
+  parse: IngestFailure,
+  env: PipelineEnv,
+  budget: CustomPatternBudget,
+): PipelineOutcome {
+  const options = redactionOptionsFor(env.redaction, env.tenantSynthetic, budget);
+  const sanitized = sanitizeIssues(
+    [...toValidationIssues(parse.errors, parse.warnings), ...resolved.notes],
+    options,
+  );
+  if (sanitized.incomplete === null) return refusedOutcome(resolved, sanitized.issues);
+  // The texts of the issues were withheld; say why, so the list is not a riddle.
+  return refusedOutcome(
+    resolved,
+    [...sanitized.issues, errorIssue(REDACTION_PATH, sanitized.incomplete.message)],
+    { notes: describeIncomplete(sanitized.incomplete) },
+  );
+}
+
+/** A tenant pattern could not be applied: the payload is refused and nothing redacted leaves here. */
+function incompleteOutcome(
+  resolved: ResolvedInput,
+  error: RedactionIncompleteError,
+): PipelineOutcome {
+  return refusedOutcome(resolved, [errorIssue(REDACTION_PATH, error.message), ...resolved.notes], {
+    notes: describeIncomplete(error),
+    incomplete: error,
+  });
 }
 
 async function succeededOutcome(
   resolved: ResolvedInput,
   parse: IngestSuccess,
   env: PipelineEnv,
+  budget: CustomPatternBudget,
   pause: () => Promise<void>,
 ): Promise<PipelineOutcome> {
   const { bundle } = parse;
-  const options = redactionOptionsFor(env.redaction, bundle.synthetic);
+  const options = redactionOptionsFor(env.redaction, bundle.synthetic, budget);
 
-  const redaction = await redactBundle(bundle, options, pause);
+  let redaction: BundleRedaction;
+  try {
+    redaction = await redactBundle(bundle, options, pause);
+  } catch (error) {
+    if (error instanceof RedactionIncompleteError) return incompleteOutcome(resolved, error);
+    throw error;
+  }
   await pause();
   const injection = await screenBundle(redaction.bundle, pause);
   await pause();
@@ -102,7 +157,8 @@ async function succeededOutcome(
     ...draft.issues,
     ...resolved.notes,
   ];
-  const issues = sanitizeIssues(found, options);
+  const sanitized = sanitizeIssues(found, options);
+  const issues = sanitized.issues;
   const ok = issues.every((issue) => issue.severity !== 'error');
 
   return {
@@ -129,7 +185,8 @@ async function succeededOutcome(
           redactionByEventId: redaction.byEventId,
         }
       : null,
-    notes: redaction.notes,
+    notes: sanitized.incomplete === null ? [] : describeIncomplete(sanitized.incomplete),
+    incomplete: null,
   };
 }
 
@@ -138,6 +195,10 @@ async function succeededOutcome(
  * injection screening, semantic validation, content hash. It reads nothing from the database and
  * writes nothing anywhere, so a preview can never persist anything. Parse problems come back as a
  * failed preview with field-level issues; only unsafe or unsupported uploads throw.
+ *
+ * One custom-pattern time budget is created per call and shared by every redaction call of it (the
+ * bundle, the issue texts). A tenant pattern that cannot be applied fails the payload closed: the
+ * outcome carries `incomplete` and no redacted content (see `PipelineOutcome`).
  */
 export async function runPipeline(
   source: IngestSource,
@@ -146,8 +207,9 @@ export async function runPipeline(
   const resolved = await resolveInput(source, env);
   const pause = resolved.sizeBytes >= LARGE_INPUT_BYTES ? yieldToEventLoop : noPause;
   await pause();
+  const budget = env.customPatternBudget ?? createCustomPatternBudget();
   const { parse } = resolved;
   return parse.ok
-    ? succeededOutcome(resolved, parse, env, pause)
-    : failedOutcome(resolved, parse, env);
+    ? succeededOutcome(resolved, parse, env, budget, pause)
+    : failedOutcome(resolved, parse, env, budget);
 }

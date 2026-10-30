@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { DEFAULT_REDACTION_CONFIG, type RedactionConfig } from '@caseguard/schemas';
 import type { Database } from '../src/db';
 import { TEST_DATABASE_STARTUP_TIMEOUT_MS } from '../src/db/testing';
-import { bundleOf } from './ingestion-fixtures';
+import { bundleOf, transcriptOf } from './ingestion-fixtures';
 import {
   auditOf,
   createCase,
@@ -72,8 +73,19 @@ const IPS_IN_A_VALUE = Array.from({ length: 40 }, (_, index) => `8.8.${index}.${
 /** 2,857 short e-mail addresses: 19,999 characters in a body (limit 20,000). */
 const MAILS_IN_A_BODY = 'a@b.co '.repeat(2857);
 
+/** A tenant pattern for ticket ids, and a text with one match more than the engine allows in one text. */
+const withPatterns = (...patterns: { name: string; pattern: string }[]): RedactionConfig => ({
+  ...DEFAULT_REDACTION_CONFIG,
+  customPatterns: patterns,
+});
+const TICKET_PATTERNS = withPatterns({ name: 'ticket marks', pattern: 'TKT-[0-9]{6}' });
+const BROKEN_PATTERNS = withPatterns({ name: 'broken', pattern: '(' });
+const TOO_MANY_TICKETS = `${'TKT-123456 '.repeat(1_001)}and the end`;
+
 interface Row {
   readonly name: string;
+  /** Redaction settings of the workspace (tenant patterns); the default ones when omitted. */
+  readonly redaction?: RedactionConfig;
   /** Payloads created before the one under test. */
   readonly before?: readonly unknown[];
   /** Days the workspace clock moves after `before` was created. */
@@ -82,6 +94,12 @@ interface Row {
   readonly outcome: 'created' | 'replayed' | 'conflict' | 'refused';
   /** For `refused`: the field the error is about. */
   readonly field?: string;
+  /**
+   * For `refused`: how the create reports it. Validation failures list their fields in `errors`; a
+   * security refusal (a redaction that could not be completed) is a problem whose `detail` is the
+   * message of the preview's issue.
+   */
+  readonly reportedAs?: 'errors' | 'detail';
   /** Whether the created case must have another reference than the first one that was stored. */
   readonly newReference?: boolean;
 }
@@ -152,6 +170,36 @@ const rows: readonly Row[] = [
     source: { type: 'paste', text: 'just some words without any structure' },
     outcome: 'refused',
   },
+  {
+    name: 'a tenant pattern that works',
+    redaction: TICKET_PATTERNS,
+    source: bundleSource(bundleOf({ reference: 'CG-PAR-6001', body: 'Ticket TKT-123456 opened.' })),
+    outcome: 'created',
+  },
+  {
+    name: 'a tenant pattern that matches too often to be applied (bundle)',
+    redaction: TICKET_PATTERNS,
+    source: bundleSource(bundleOf({ reference: 'CG-PAR-6002', body: TOO_MANY_TICKETS })),
+    outcome: 'refused',
+    field: 'redaction',
+    reportedAs: 'detail',
+  },
+  {
+    name: 'a tenant pattern that matches too often to be applied (pasted text)',
+    redaction: TICKET_PATTERNS,
+    source: { type: 'paste', text: transcriptOf([TOO_MANY_TICKETS, 'Please send two times.']) },
+    outcome: 'refused',
+    field: 'redaction',
+    reportedAs: 'detail',
+  },
+  {
+    name: 'a tenant pattern that cannot be compiled',
+    redaction: BROKEN_PATTERNS,
+    source: bundleSource(bundleOf({ reference: 'CG-PAR-6003' })),
+    outcome: 'refused',
+    field: 'redaction',
+    reportedAs: 'detail',
+  },
 ];
 
 const engineer = PERSONAS.engineer;
@@ -159,6 +207,15 @@ const engineer = PERSONAS.engineer;
 describe('preview and create agree (review M2)', () => {
   it.each(rows)('$name', async (row) => {
     const { h } = await openHarness(database, harnesses);
+    if (row.redaction !== undefined) {
+      const repos = h.repos(CONTOSO);
+      await repos.governance.getSettings();
+      await repos.governance.updateSection('redaction', row.redaction, {
+        expectedVersion: 1,
+        changeNote: 'test configuration',
+        by: PERSONAS.admin,
+      });
+    }
     const stored: ApiResponse[] = [];
     for (const source of row.before ?? []) {
       const response = await createCase(h, engineer, source, { analyze: false });
@@ -209,9 +266,14 @@ describe('preview and create agree (review M2)', () => {
       case 'refused':
         expect(preview.data.ok).toBe(false);
         expect(create.statusCode).toBe(422);
-        if (row.field !== undefined) {
+        if (row.reportedAs === 'detail') {
+          const [first] = preview.data.issues as { message: string }[];
+          expect(create.data.code).toBe('unsafe_content');
+          expect(create.data.detail).toBe(first?.message);
+        }
+        if (row.field !== undefined) expect(issuePaths).toContain(row.field);
+        if (row.field !== undefined && row.reportedAs !== 'detail') {
           const reported = (create.data.errors as { path: string }[]).map((error) => error.path);
-          expect(issuePaths).toContain(row.field);
           expect(reported).toContain(row.field);
         }
         break;

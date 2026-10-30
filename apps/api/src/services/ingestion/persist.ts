@@ -92,6 +92,28 @@ async function discard(ctx: RequestContext, store: ObjectStore, key: string): Pr
 }
 
 /**
+ * Two requests can pass the checks of `commit` together; the unique indexes then let one insert win
+ * and report a duplicate (`ConflictError`, reason `duplicate`) to the other. The loser is told what
+ * the checks would have told it, found by looking at what is stored now: the same content is a repeat
+ * of the winner, a case that holds the reference is the reference conflict, and a duplicate of
+ * anything else (an id, say) is not the caller's doing and stays the error it was.
+ */
+async function settleDuplicate(
+  ctx: RequestContext,
+  accepted: AcceptedPayload,
+  duplicate: ConflictError,
+): Promise<IngestResult> {
+  const { prepared, preview } = accepted;
+  const identical = await ctx.repos.cases.findByContentHash(prepared.contentHash);
+  if (identical !== null) return replayResult(ctx, identical, preview);
+  const reference = prepared.bundle.case.reference;
+  if ((await findCaseByReference(ctx.repos, reference)) !== null) {
+    throw referenceConflict(reference);
+  }
+  throw duplicate;
+}
+
+/**
  * The case exists whatever happens to the analysis: a failure to start it (the port answering 5xx or
  * 501, a budget refusal) is logged without any payload and the UI offers to start it manually.
  */
@@ -115,10 +137,11 @@ async function startAnalysis(ctx: RequestContext, caseId: string): Promise<Job |
 
 /**
  * Stores an accepted payload as an immutable case. An identical payload (same content hash) returns
- * the existing case with `created: false`; a different payload under a used reference is a 409. The
- * redacted payload is written to the object store before the transaction commits and deleted again
- * when the transaction fails or turns out to be a repeat, so no object is left without a case. The
- * analysis is started afterwards (unless switched off) and never decides whether the ingest worked.
+ * the existing case with `created: false`; a different payload under a used reference is a 409, also
+ * when the database's unique index is what notices (two requests racing). The redacted payload is
+ * written to the object store before the transaction commits and deleted again when the transaction
+ * fails or turns out to be a repeat, so no object is left without a case. The analysis is started
+ * afterwards (unless switched off) and never decides whether the ingest worked.
  */
 export async function persistCase(
   ctx: RequestContext,
@@ -172,7 +195,7 @@ export async function persistCase(
   } catch (error) {
     await discard(ctx, store, key);
     if (error instanceof ConflictError && error.details?.reason === 'duplicate') {
-      throw referenceConflict(input.case.reference);
+      return settleDuplicate(ctx, accepted, error);
     }
     throw error;
   }
