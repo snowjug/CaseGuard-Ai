@@ -413,13 +413,20 @@ export function runSkillRegressionSuite(input: {
   );
 }
 
-/** The persistable validation record for a report. */
+/**
+ * The persistable validation record for a report. `scope` says what the run covered: a `full` run
+ * (the default) can satisfy or fail a lifecycle gate; a run on one `case` is recorded as inconclusive
+ * whatever it found, because one case cannot show that the skill is safe or unsafe in general. Its
+ * checks keep their real results.
+ */
 export function toSkillValidation(args: {
   report: SkillSimulationReport;
   op: SkillOpContext;
   executedBy: string;
+  scope?: 'full' | 'case';
 }): SkillValidation {
   const { report, op, executedBy } = args;
+  const scope = args.scope ?? 'full';
   const only = report.cases.length === 1 ? report.cases[0] : undefined;
   return {
     tenantId: op.tenantId,
@@ -431,8 +438,9 @@ export function toSkillValidation(args: {
     skillId: report.skillId,
     versionId: report.versionId,
     kind: report.kind,
-    outcome: report.outcome,
+    outcome: scope === 'case' ? 'inconclusive' : report.outcome,
     caseId: only?.caseId ?? null,
+    scope,
     checks: report.cases.flatMap((c) =>
       c.checks.map((check) => ({
         id: `${c.reference}:${check.id}`,

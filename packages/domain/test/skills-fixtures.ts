@@ -211,6 +211,7 @@ export function validationOf(
   kind: SkillValidation['kind'],
   outcome: SkillValidation['outcome'],
   executedAt = NOW,
+  scope?: SkillValidation['scope'],
 ): SkillValidation {
   return {
     tenantId: 'tenant_test',
@@ -218,12 +219,13 @@ export function validationOf(
     updatedAt: executedAt,
     createdBy: RILEY.id,
     version: 1,
-    id: `val_${kind}_${outcome}_${executedAt}`,
+    id: `val_${kind}_${outcome}_${executedAt}${scope === undefined ? '' : `_${scope}`}`,
     skillId: aggregate.skill.id,
     versionId: aggregate.skill.currentVersionId,
     kind,
     outcome,
-    caseId: null,
+    caseId: scope === 'case' ? 'case_fixture_one' : null,
+    ...(scope === undefined ? {} : { scope }),
     checks: [{ id: 'fixture', passed: outcome === 'passed', detail: 'Test fixture.' }],
     executedBy: RILEY.id,
     executedAt,

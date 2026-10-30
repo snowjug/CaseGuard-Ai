@@ -184,11 +184,30 @@ export interface RollbackRequest {
   expectedVersion: number;
 }
 
+/** True when `ancestorId` is on the line of parents that `versionId` was derived from. */
+function derivesFrom(
+  versions: readonly SkillVersion[],
+  versionId: string,
+  ancestorId: string,
+): boolean {
+  const byId = new Map(versions.map((v) => [v.id, v]));
+  const seen = new Set<string>();
+  let cursor = byId.get(versionId)?.parentVersionId ?? null;
+  while (cursor !== null && !seen.has(cursor)) {
+    if (cursor === ancestorId) return true;
+    seen.add(cursor);
+    cursor = byId.get(cursor)?.parentVersionId ?? null;
+  }
+  return false;
+}
+
 /**
  * Rolls back by creating a NEW version whose content equals an earlier, once-approved version. History
  * is never rewritten: the replaced version becomes `superseded`. The restored content must hold the
  * validations the skill's lifecycle requires, so a rollback cannot slip unvalidated content into a
- * published skill.
+ * published skill. Only a version the current one was derived from can be restored: a version that a
+ * rollback withdrew is not part of that line any more, and bringing it back takes a new proposal with
+ * its own approval, not a second rollback (a rollback has no second approver).
  */
 export function rollbackSkill(args: {
   aggregate: SkillAggregate;
@@ -238,6 +257,12 @@ export function rollbackSkill(args: {
     return refuse(
       'gate_failed',
       `A ${target.state} version was never approved and cannot be restored.`,
+    );
+  }
+  if (!derivesFrom(aggregate.versions, current.id, target.id)) {
+    return refuse(
+      'gate_failed',
+      `Version ${target.version} is not an earlier version of the current one (a rollback withdrew it), so it cannot be restored. Propose its content again as a new version.`,
     );
   }
   const shortfall = validationShortfall(aggregate, target, requiredValidationsFor(skill.lifecycle));

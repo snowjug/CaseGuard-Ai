@@ -13,6 +13,7 @@ import {
   advanceSkillGovernance,
   applySkillChangeSet,
   describeSkillTransitions,
+  isFullScopeValidation,
   runSkillRegressionSuite,
   runSkillSimulationTest,
   toSkillValidation,
@@ -31,6 +32,7 @@ import {
   RILEY,
   SYSTEM_BOT,
   ONE,
+  TWO,
   draftAggregate,
   makeOp,
   publishedAggregate,
@@ -273,6 +275,96 @@ describe('lifecycle state machine [FR-SK-02, FR-SK-03]', () => {
     ).toBe(true);
   });
 
+  it('[FR-SK-03] a run on one case is informative only: it never satisfies a gate', () => {
+    const draft = at('draft');
+    const onlyOneCase = {
+      ...draft,
+      validations: [validationOf(draft, 'simulation_test', 'passed', undefined, 'case')],
+    };
+    const refused = errorOf(move(onlyOneCase, 'simulation_tested', RILEY));
+    expect(refused.code).toBe('gate_failed');
+    expect(refused.message).toMatch(/A full simulation test has not been run/);
+
+    const pilot = withValidations(at('pilot'), 'simulation_test');
+    const narrow = {
+      ...pilot,
+      validations: [
+        ...pilot.validations,
+        validationOf(pilot, 'regression', 'passed', undefined, 'case'),
+      ],
+    };
+    const noFullSuite = errorOf(move(narrow, 'validated', RILEY));
+    expect(noFullSuite.code).toBe('gate_failed');
+    expect(noFullSuite.message).toMatch(/A full regression has not been run/);
+    expect(SKILL_ERROR_HTTP.gate_failed.status).toBe(412);
+
+    // The same verdict as a full run (or a record from before scopes existed) does open the gate.
+    for (const scope of ['full', undefined] as const) {
+      const full = {
+        ...pilot,
+        validations: [
+          ...pilot.validations,
+          validationOf(pilot, 'regression', 'passed', undefined, scope),
+        ],
+      };
+      expect(move(full, 'validated', RILEY).ok, String(scope)).toBe(true);
+    }
+  });
+
+  it('[FR-SK-03] a run on one case never replaces the verdict of a full run, in either direction', () => {
+    const pilot = withValidations(at('pilot'), 'simulation_test');
+    const day = (n: number) => `2026-10-${String(20 + n)}T00:00:00.000Z`;
+    const failedFull = validationOf(pilot, 'regression', 'failed', day(1), 'full');
+    const passingOne = validationOf(pilot, 'regression', 'passed', day(2), 'case');
+    const blocked = { ...pilot, validations: [...pilot.validations, failedFull, passingOne] };
+    expect(errorOf(move(blocked, 'validated', RILEY)).message).toMatch(
+      /latest regression for version .* did not pass \(failed\)/,
+    );
+
+    const passedFull = validationOf(pilot, 'regression', 'passed', day(1), 'full');
+    const failingOne = validationOf(pilot, 'regression', 'failed', day(2), 'case');
+    const open = { ...pilot, validations: [...pilot.validations, passedFull, failingOne] };
+    expect(move(open, 'validated', RILEY).ok).toBe(true);
+  });
+
+  it('[FR-SK-03] a run on one case is recorded as inconclusive with its real checks; a full run keeps its verdict', () => {
+    const a = draftAggregate();
+    const simulation = (cases: Parameters<typeof runSkillSimulationTest>[0]['cases']) =>
+      runSkillSimulationTest({ skill: a.skill, version: versionOf(a), cases });
+    const report = simulation([toReplayCase(ONE)]);
+    expect(report.outcome).toBe('passed');
+    const op = makeOp('scope');
+    const full = toSkillValidation({ report, op, executedBy: RILEY.id });
+    expect(full).toMatchObject({ outcome: 'passed', scope: 'full', caseId: ONE.ctx.caseId });
+    const narrow = toSkillValidation({ report, op, executedBy: RILEY.id, scope: 'case' });
+    expect(narrow).toMatchObject({
+      outcome: 'inconclusive',
+      scope: 'case',
+      caseId: ONE.ctx.caseId,
+    });
+    expect(narrow.checks).toEqual(full.checks);
+    expect(() => SkillValidationSchema.parse(narrow)).not.toThrow();
+
+    // A failure on one case keeps its failing checks, and is still not a verdict.
+    const failing = runSkillRegressionSuite({
+      skill: a.skill,
+      version: versionOf(a),
+      cases: [{ replayCase: toReplayCase(TWO), expectation: 'improves' }],
+    });
+    expect(failing.outcome).toBe('failed');
+    const failedOnOne = toSkillValidation({
+      report: failing,
+      op,
+      executedBy: RILEY.id,
+      scope: 'case',
+    });
+    expect(failedOnOne.outcome).toBe('inconclusive');
+    expect(failedOnOne.checks.some((check) => !check.passed)).toBe(true);
+    expect(isFullScopeValidation(failedOnOne)).toBe(false);
+    expect(isFullScopeValidation(full)).toBe(true);
+    expect(isFullScopeValidation({ ...full, scope: undefined })).toBe(true);
+  });
+
   it('[FR-SK-03] the reviewer and the pilot approver must differ from the creator', () => {
     const own = (p: SkillActor) => ({ createdBy: p.id });
     const review = withValidations(at('simulation_tested', own(RILEY)), 'simulation_test');
@@ -366,6 +458,44 @@ describe('lifecycle state machine [FR-SK-02, FR-SK-03]', () => {
     expect(retired.skill.lifecycle).toBe('retired');
     const rejected = move(at('simulation_tested'), 'retired', CASEY);
     expect(rejected.ok && rejected.value.approvals[0]?.decision).toBe('rejected');
+  });
+
+  it('[FR-SK-03] withdrawing a skill is not an approval: even its creator may deprecate and retire it', () => {
+    const published = publishedAggregate();
+    const creator: SkillActor = { id: published.skill.createdBy, permissions: CASEY.permissions };
+    const deprecated = move(published, 'deprecated', creator);
+    expect(deprecated.ok).toBe(true);
+    if (!deprecated.ok) return;
+    // Recorded as a rejection of the skill's continued use, the decision the data tier accepts from
+    // the person who requested the skill; the audit event says the same.
+    expect(deprecated.value.approvals[0]).toMatchObject({
+      toState: 'deprecated',
+      decision: 'rejected',
+      approver: creator.id,
+      requestedBy: creator.id,
+    });
+    expect(deprecated.value.audit[0]).toMatchObject({
+      action: 'skill.deprecated',
+      details: { decision: 'rejected' },
+    });
+    const retired = move(apply(published, deprecated), 'retired', creator);
+    expect(retired.ok && retired.value.approvals[0]).toMatchObject({
+      toState: 'retired',
+      decision: 'rejected',
+    });
+    const options = describeSkillTransitions(published, creator);
+    expect(options.find((option) => option.toState === 'deprecated')).toMatchObject({
+      allowed: true,
+      requiredPermission: 'skill:retire',
+      requiresDistinctApprover: false,
+    });
+    // Approving stays with other people: the creator cannot approve the pilot of their own skill.
+    const ownPilot = withValidations(
+      at('expert_reviewed', { createdBy: creator.id }),
+      'simulation_test',
+    );
+    const asCreator: SkillActor = { id: creator.id, permissions: ALEX.permissions };
+    expect(errorOf(move(ownPilot, 'pilot', asCreator)).code).toBe('separation_of_duties');
   });
 
   it('[FR-SK-03] the detail view lists each legal next state with why it is or is not available', () => {

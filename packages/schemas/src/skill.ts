@@ -242,6 +242,14 @@ export const SkillValidationSchema = RecordMetaSchema.extend({
   kind: z.enum(['simulation_test', 'expert_review', 'pilot_application', 'regression']),
   outcome: z.enum(['passed', 'failed', 'inconclusive']),
   caseId: IdSchema.nullable(),
+  /**
+   * What the run covered. `full` replays the whole set for its kind (the version's source cases and,
+   * for a regression, the workload's other analysed cases); `case` replays only the case named in
+   * `caseId`. Only a full run can satisfy or fail a lifecycle gate, so a run on one case is recorded
+   * as inconclusive (its checks keep their real results). Records written before the field existed
+   * have none and count as full.
+   */
+  scope: z.enum(['full', 'case']).optional(),
   checks: z.array(z.object({ id: z.string(), passed: z.boolean(), detail: z.string() })),
   executedBy: z.string(),
   executedAt: IsoTimestampSchema,
@@ -376,7 +384,10 @@ export type ApplySkillBody = z.infer<typeof ApplySkillBodySchema>;
 /** Additive: body for `skills.simulationTest` (the route currently declares no body). */
 export const SimulateSkillBodySchema = z.object({
   kind: z.enum(['simulation_test', 'regression']).default('simulation_test'),
-  /** Restricts the run to one case; omitted means every case the skill was derived from or validated on. */
+  /**
+   * Restricts the run to one case; omitted means every case the skill was derived from or validated
+   * on. A run on one case is informative only: it never satisfies, fails or replaces a gate.
+   */
   caseId: IdSchema.optional(),
   /** Defaults to the current version; set it to test a proposed mutation before it is approved. */
   versionId: IdSchema.optional(),

@@ -31,6 +31,7 @@ export { deriveSeedSkills, type SeedCase, type SeedSkills, type SeedSkillsInput 
 export {
   SKILL_TRANSITIONS,
   describeSkillTransitions,
+  isFullScopeValidation,
   latestValidation,
   pilotApproversOf,
   requiredValidationsFor,

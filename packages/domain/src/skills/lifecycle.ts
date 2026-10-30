@@ -42,19 +42,10 @@ interface TransitionRule {
   distinctFromCreator: boolean;
   /** Actor must also differ from every approver of the pilot stage (four-eyes on publication). */
   distinctFromApprovers: boolean;
-  /** Passed validations required for the current version. */
+  /** Passed FULL validations required for the current version (a run on one case never counts). */
   validations: readonly ValidationKind[];
   gate: string | null;
 }
-
-const PRE_PUBLICATION: readonly SkillLifecycle[] = [
-  'discovered',
-  'draft',
-  'simulation_tested',
-  'expert_reviewed',
-  'pilot',
-  'validated',
-];
 
 /** The rule that governs one legal move, or null when the move is not in the graph. */
 export function transitionRule(from: SkillLifecycle, to: SkillLifecycle): TransitionRule | null {
@@ -81,7 +72,7 @@ export function transitionRule(from: SkillLifecycle, to: SkillLifecycle): Transi
         permission: 'skill:validate',
         decision: 'approved',
         validations: ['simulation_test'],
-        gate: 'A passed simulation test exists for the current version.',
+        gate: 'A passed full simulation test exists for the current version.',
       };
     case 'expert_reviewed':
       return {
@@ -90,7 +81,7 @@ export function transitionRule(from: SkillLifecycle, to: SkillLifecycle): Transi
         decision: 'approved',
         distinctFromCreator: true,
         validations: ['simulation_test'],
-        gate: 'The reviewer differs from the creator and a passed simulation test exists for the current version.',
+        gate: 'The reviewer differs from the creator and a passed full simulation test exists for the current version.',
       };
     case 'pilot':
       return {
@@ -99,7 +90,7 @@ export function transitionRule(from: SkillLifecycle, to: SkillLifecycle): Transi
         decision: 'approved',
         distinctFromCreator: true,
         validations: ['simulation_test'],
-        gate: 'The approver differs from the creator and a passed simulation test exists for the current version.',
+        gate: 'The approver differs from the creator and a passed full simulation test exists for the current version.',
       };
     case 'validated':
       return {
@@ -107,7 +98,7 @@ export function transitionRule(from: SkillLifecycle, to: SkillLifecycle): Transi
         permission: 'skill:validate',
         decision: 'approved',
         validations: ['simulation_test', 'regression'],
-        gate: 'Passed simulation and regression validations exist for the current version.',
+        gate: 'Passed full simulation and regression validations exist for the current version.',
       };
     case 'published':
       return {
@@ -117,16 +108,14 @@ export function transitionRule(from: SkillLifecycle, to: SkillLifecycle): Transi
         distinctFromCreator: true,
         distinctFromApprovers: true,
         validations: ['simulation_test', 'regression'],
-        gate: 'The publisher differs from the creator and the approver, a pilot approval is on record, and passed simulation and regression validations exist. Publication is always a human action.',
+        gate: 'The publisher differs from the creator and the approver, a pilot approval is on record, and passed full simulation and regression validations exist. Publication is always a human action.',
       };
     case 'deprecated':
-      return { ...base, permission: 'skill:retire', decision: 'approved' };
     case 'retired':
-      return {
-        ...base,
-        permission: 'skill:retire',
-        decision: PRE_PUBLICATION.includes(from) ? 'rejected' : 'approved',
-      };
+      // Withdrawing a skill only reduces what it can do. It is not an approval, so it needs no second
+      // person: it is recorded as a rejection of the skill's continued use, the one decision the data
+      // tier accepts from the person who requested the skill (its creator).
+      return { ...base, permission: 'skill:retire', decision: 'rejected' };
     case 'discovered':
       return null;
   }
@@ -142,9 +131,22 @@ export function requiredValidationsFor(lifecycle: SkillLifecycle): readonly Vali
   return [];
 }
 
+/** A run that covered the whole set for its kind, not just one case. Only these can move a gate. */
+export const isFullScopeValidation = (validation: SkillValidation): boolean =>
+  validation.scope !== 'case';
+
+const coversVersion = (
+  hashOf: ReadonlyMap<string, string>,
+  validation: SkillValidation,
+  version: SkillVersion,
+): boolean =>
+  validation.versionId === version.id || hashOf.get(validation.versionId) === version.contentHash;
+
 /**
- * The latest validation of a kind that covers a version, directly or because an identical content hash
- * was validated (rollbacks restore validated content). A later failed run supersedes an earlier pass.
+ * The latest FULL validation of a kind that covers a version, directly or because an identical content
+ * hash was validated (rollbacks restore validated content). A later failed run supersedes an earlier
+ * pass. A run on one case is never considered: it can neither satisfy a gate nor replace the verdict
+ * of a full run.
  */
 export function latestValidation(
   aggregate: Pick<SkillAggregate, 'versions' | 'validations'>,
@@ -153,11 +155,7 @@ export function latestValidation(
 ): SkillValidation | undefined {
   const hashOf = new Map(aggregate.versions.map((v) => [v.id, v.contentHash]));
   const covering = aggregate.validations
-    .filter(
-      (v) =>
-        v.kind === kind &&
-        (v.versionId === version.id || hashOf.get(v.versionId) === version.contentHash),
-    )
+    .filter((v) => v.kind === kind && isFullScopeValidation(v) && coversVersion(hashOf, v, version))
     .sort((a, b) => (a.executedAt < b.executedAt ? -1 : a.executedAt > b.executedAt ? 1 : 0));
   return covering[covering.length - 1];
 }
@@ -168,10 +166,18 @@ export function validationShortfall(
   version: SkillVersion,
   kinds: readonly ValidationKind[],
 ): string | null {
+  const hashOf = new Map(aggregate.versions.map((v) => [v.id, v.contentHash]));
   for (const kind of kinds) {
     const latest = latestValidation(aggregate, version, kind);
     const label = kind === 'simulation_test' ? 'simulation test' : kind.replace('_', ' ');
-    if (!latest) return `No ${label} has been run for version ${version.version}.`;
+    if (!latest) {
+      const onlyOneCase = aggregate.validations.some(
+        (v) => v.kind === kind && !isFullScopeValidation(v) && coversVersion(hashOf, v, version),
+      );
+      return onlyOneCase
+        ? `A full ${label} has not been run for version ${version.version}: a run on a single case does not satisfy the gate.`
+        : `No ${label} has been run for version ${version.version}.`;
+    }
     if (latest.outcome !== 'passed') {
       return `The latest ${label} for version ${version.version} did not pass (${latest.outcome}).`;
     }
@@ -363,6 +369,7 @@ export function transitionSkill(args: {
       kind: 'expert_review',
       outcome: 'passed',
       caseId: null,
+      scope: 'full',
       checks: [
         {
           id: 'reviewer-distinct-from-creator',

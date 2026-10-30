@@ -258,6 +258,23 @@ describe('rollback', () => {
     );
   });
 
+  it('[FR-SK-03] a version that a rollback withdrew cannot be restored by another rollback; an earlier one can', () => {
+    // 1.1.0 was approved and validated, then withdrawn by the rollback: its content is still validated.
+    expect(rolledBack.validations.some((v) => v.versionId === proposal.version.id)).toBe(true);
+    const refused = errorOf(rollback(rolledBack, proposal.version.id));
+    expect(refused.code).toBe('gate_failed');
+    expect(refused.message).toMatch(
+      /Version 1\.1\.0 is not an earlier version of the current one \(a rollback withdrew it\)/,
+    );
+    expect(refused.message).toMatch(/Propose its content again as a new version/);
+    expect(refused.audit).toMatchObject({ action: 'skill.rollback_denied' });
+
+    // The line the current version was derived from stays restorable.
+    expect(rollback(rolledBack, v1.id).ok).toBe(true);
+    // And a version is restorable straight after the approval that replaced it, as before.
+    expect(rollback(approved, v1.id).ok).toBe(true);
+  });
+
   it('[FR-SK-04] refuses the current version, a proposed or rejected one, an unknown one and a stale lock', () => {
     expect(errorOf(rollback(approved, proposal.version.id)).code).toBe('conflict');
     expect(errorOf(rollback(proposed, proposal.version.id)).code).toBe('gate_failed');
