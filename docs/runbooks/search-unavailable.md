@@ -1,22 +1,27 @@
 # Runbook: search unavailable
 
-Applies when `SEARCH_PROVIDER=azure-ai-search` (that is, `deploySearch=true`). With the default `lexical` provider there is no external search dependency.
+Applies when `SEARCH_PROVIDER=azure-ai-search` (that is, `deploySearch=true`). With the default `lexical` provider (PostgreSQL full-text search) there is no external search dependency.
+
+The API treats Azure AI Search as an optional accelerator: the external index is tried first with a 3 s deadline and **any failure falls back to the PostgreSQL full-text search** (`apps/api/src/services/search/search-service.ts`). Users therefore see slower or differently ranked results, not errors; the failure is visible only in a warning log and an in-process metric. Only global search (`GET /api/v1/search`) uses the provider; analysis does not.
 
 > Not exercised against a live deployment. See the [honesty note](README.md).
 
 ## Symptoms
 
-- Global search and retrieval-backed features return errors or empty results; the API logs mention 401/403, 404 on the index, 429/503, timeouts or DNS errors for `<service>.search.windows.net`.
-- After a new deployment, search worked locally (lexical) but not in Azure.
+- Global search answers, but up to 3 s slower than usual (the external call times out before the fallback) and ranked by the PostgreSQL full-text search instead of the index. Results that exist only in the index are missing.
+- The API logs a warning `Azure AI Search failed; using lexical search` with a `failure` field: `auth` (no token), `http_error` (the status is in the exception, for example 401/403/404/429/503), `timeout`, `network` (DNS or connection), `unsafe_endpoint`, `invalid_index`, `invalid_tenant`, `too_large`, `invalid_response` or `aborted`. The query text is never logged.
+- After a new deployment, search worked locally (lexical) but the Azure index is never used.
 
 ## Impact
 
-- Search and retrieval-grounded features degrade or fail. Case data, the evidence ledger and analysis math live in PostgreSQL and are unaffected.
+- Search keeps working through the fallback; ranking and recall differ. Case data, the evidence ledger and analysis math live in PostgreSQL and are unaffected.
 - No data is lost: the index is derived data that can be rebuilt from the database.
 
 ## Detection
 
-- Console logs: `CgApiLogs() | where TimeGenerated > ago(1h) and (route has 'search' or event startswith 'retrieval') and (level >= 50 or status >= 500)`, and OBSERVABILITY 4.6 (retrieval latency).
+- Console logs (the base function is defined in [OBSERVABILITY.md](../OBSERVABILITY.md) section 2): `CgApiLogs() | where TimeGenerated > ago(1h) and msg == 'Azure AI Search failed; using lexical search' | summarize failures = count() by failure`. A document of another tenant returned by the index is logged at `error` (`Azure AI Search returned documents of another tenant; they were discarded`): treat any occurrence as a security incident.
+- The in-process metric `caseguard_retrieval_duration_seconds{provider="azure-ai-search",outcome="fallback"}` counts the fallbacks, but nothing exports it today (OBSERVABILITY.md section 8), so rely on the log line.
+- `/readyz` does not test Azure AI Search: the `search` health check is a local stand-in.
 - Search resource logs: `AzureDiagnostics | where ResourceProvider == 'MICROSOFT.SEARCH' and Category == 'OperationLogs'` (check `ResultSignature`, `DurationMs`).
 - Search service metrics in the portal (search latency, throttled queries).
 
@@ -39,11 +44,11 @@ Applies when `SEARCH_PROVIDER=azure-ai-search` (that is, `deploySearch=true`). W
 
 4. **Throttling and capacity.** 429/503 under load: more replicas (queries) or partitions (storage), or lower concurrency. **Free tier:** hard limits on index count, storage and documents, no scaling, no private endpoints, no SLA; writes start failing when a limit is reached.
 5. **Network.** Private networking: the private endpoint must be approved and `privatelink.search.windows.net` linked to the VNet; check resolution from the API container (`az containerapp exec ... --command "nslookup <search>.search.windows.net"`). `publicNetworkAccess` is `disabled` when private networking is enabled.
-6. **Content.** Index exists but results are empty or stale: the index was never populated or an indexing job failed; check the application's indexing logs.
+6. **Content.** Index exists but results are empty or stale: the index was never populated or the external process that fills it failed. This repository ships no indexer (index population is out of scope, see `apps/api/src/services/search/README.md`), so check whatever the operator set up.
 
 ## Mitigation
 
-1. **Fall back to lexical search** (in-process BM25; results and ranking will differ and any index-only content is unavailable):
+1. **Use the PostgreSQL full-text search only** (results and ranking will differ and any index-only content is unavailable). This also removes the up-to-3 s wait on every search while the index is failing:
 
    ```powershell
    az containerapp update --subscription $sub --resource-group $rg --name <api app> --set-env-vars SEARCH_PROVIDER=lexical
@@ -56,18 +61,18 @@ Applies when `SEARCH_PROVIDER=azure-ai-search` (that is, `deploySearch=true`). W
 
 ## Recovery
 
-- Re-create and re-populate the index from PostgreSQL using the application's indexing procedure; verify document counts against the database.
+- Re-create and re-populate the index from PostgreSQL with the operator's own indexing process (this repository has none); verify document counts against the database, and verify that every document carries the right `tenantId`.
 - Switch back: `SEARCH_PROVIDER=azure-ai-search` (redeploy to restore the template state).
 
 ## Verification
 
-- A search through the UI (or `GET /api/v1/search?q=<term>`, permission `case:read`) returns results for a known synthetic case.
+- A search through the UI (or `GET /api/v1/search?q=<term>`, permission `case:read`) returns results for a known synthetic case. Because the fallback is invisible in the response, a result alone does not prove the index works: also confirm that no `Azure AI Search failed; using lexical search` warning is logged while you search.
 - Query 4.6 shows normal latency; no 401/403/404/429 in the last 30 minutes.
 - Search service metrics show no throttling.
 
 ## Follow-ups
 
-- Document who owns the index schema and how it is rebuilt; automate index creation in the application or a deployment step with an operator identity.
-- Alert on throttled queries and on 4xx from search.
+- Document who owns the index schema and how it is rebuilt; build the indexer (none exists in this repository) and automate index creation in a deployment step with an operator identity.
+- Alert on throttled queries and on 4xx from search, and export the in-process fallback counter (`caseguard_retrieval_duration_seconds` with `outcome="fallback"`) so a silent fallback becomes visible without log parsing.
 - Re-evaluate the tier: the free tier is for smoke tests only.
 - Remember the cost of replicas and partitions (docs/COST_GUIDE.md); delete the service when not needed.

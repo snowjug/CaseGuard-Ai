@@ -17,17 +17,19 @@ Azure environments always run with `AUTH_MODE=entra` and `DEV_AUTH_ENABLED=false
 
 Create these five app roles on the **API** registration (allowed member type: Users/Groups; value is what appears in the token). The values must match `ENTRA_ROLE_MAP`.
 
-| App role value            | CaseGuard role  | What it grants (from `packages/security` `ROLE_PERMISSIONS`, as specified in the build contract)                                         |
+| App role value            | CaseGuard role  | What it grants (`ROLE_PERMISSIONS` in `packages/security/src/rbac.ts`; the full matrix is in [SECURITY.md](SECURITY.md#4-rbac-matrix))   |
 | ------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `CaseGuard.Engineer`      | `engineer`      | case read/ingest/analyze, counterfactual run, skill read/apply/extract, warning dismiss, quality and telemetry read                      |
 | `CaseGuard.Reviewer`      | `reviewer`      | the engineer read set plus evidence/fork/counterfactual review, quality review, action-value override, skill review/validate, audit read |
 | `CaseGuard.Manager`       | `manager`       | case read, quality read, analytics read, telemetry read, skill read                                                                      |
-| `CaseGuard.SkillCurator`  | `skill_curator` | the skill lifecycle (extract, mutate, validate, review, approve, publish, retire, rollback) and case read                                |
+| `CaseGuard.SkillCurator`  | `skill_curator` | the skill lifecycle (extract, mutate, validate, review, approve, publish, retire, rollback), skill read and apply, and case read         |
 | `CaseGuard.Administrator` | `administrator` | everything, including governance, role management, audit read, demo management, data export and case deletion                            |
 
 Skill approval requires a **distinct approver** from the creator/requester, so assign skill-approving roles to at least two different people.
 
 A signed-in user with no app role gets no permission (deny by default). Set **Assignment required = Yes** on the enterprise application so unassigned users cannot even obtain a token.
+
+**First sign-in.** The API provisions the user into the tenant's user list just in time from the validated token (object id, display name, e-mail and the mapped roles) and refreshes that profile at most every 5 minutes. A token with no mapped role is refused (403) before anything is written. The roles used for authorisation always come from the token, so removing an app role in Entra takes effect when the user's current access token expires, and the roles cannot be changed through the API in Entra mode (409 `entra_managed`). A user whose stored status is `disabled` is refused with 401 even with a valid token, but no API route sets that status: it has to be set in the database. This provisioning is implemented and tested against the repository only; it has not been tried with a live tenant.
 
 Default `ENTRA_ROLE_MAP` (also the default of the Bicep parameter `entraRoleMap`):
 
@@ -74,8 +76,8 @@ Portal: Microsoft Entra ID > App registrations > New registration.
 
 1. **Name** `CaseGuard Web`, single tenant, platform **Single-page application** (not _Web_): the app signs in with the authorization-code flow with PKCE and has **no client secret**. Do not enable implicit grant.
 2. **Redirect URIs** (SPA platform):
-   - the deployed web URL, `https://<web app name>.<environment default domain>/` (the `webUrl` output of the deployment; it exists only after stage 2 of [docs/DEPLOYMENT.md](DEPLOYMENT.md)). _Assumption:_ the web app uses the site root as the redirect target; confirm the exact path in the web app's MSAL configuration and register that path.
-   - for local development against a real tenant only: `http://localhost:3000/` on a **separate dev registration**, never on the production one.
+   - the deployed web URL, `https://<web app name>.<environment default domain>` (the `webUrl` output of the deployment; it exists only after stage 2 of [docs/DEPLOYMENT.md](DEPLOYMENT.md)). The web app sends the page origin (`window.location.origin`: no path, no trailing slash) as both `redirectUri` and `postLogoutRedirectUri` (`apps/web/src/lib/auth/entra.tsx`), so register the origin itself. Sign-in uses the redirect flow (`loginRedirect`, `acquireTokenRedirect`) and tokens are cached in `sessionStorage`.
+   - for local development against a real tenant only: `http://localhost:3000` on a **separate dev registration**, never on the production one.
 3. **API permissions** > Add > My APIs > `CaseGuard API` > delegated `access_as_user`. Grant admin consent if your tenant requires it.
 4. Optionally add the front-channel logout URL of the web app.
 
@@ -170,14 +172,15 @@ The application itself uses **managed identity** at runtime; the only secrets in
 
 ## 8. Troubleshooting sign-in
 
-| Symptom                                  | Likely cause                                                                            | Check                                                                                                                       |
-| ---------------------------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `AADSTS50011` (reply URL mismatch)       | The web URL is not registered as a **SPA** redirect URI                                 | App registration > Authentication                                                                                           |
-| `AADSTS65001` (consent required)         | The SPA lacks admin consent or the pre-authorization                                    | API permissions, "Authorized client applications"                                                                           |
-| `AADSTS50105` (user not assigned)        | Assignment required and the user/group has no app role                                  | Enterprise application > Users and groups                                                                                   |
-| API answers 401 to a valid-looking token | `iss` or `aud` mismatch (v1 vs v2 token), expired token, clock skew, JWKS not reachable | decode the token locally; compare with `ENTRA_ISSUER`/`ENTRA_AUDIENCE`                                                      |
-| 401 only for one tenant                  | `tid` missing from `ENTRA_TENANT_MAP`                                                   | API log lines with `event` = `auth.failure` and `reason` = `unknown_tenant` (see [docs/OBSERVABILITY.md](OBSERVABILITY.md)) |
-| 403 after sign-in                        | No app role in the token, or the role is not in `ENTRA_ROLE_MAP`                        | the `roles` claim                                                                                                           |
-| Works locally, fails in Azure            | Local runs use persona login; Azure never does                                          | `AUTH_MODE` of the running revision                                                                                         |
+| Symptom                                  | Likely cause                                                                                             | Check                                                                                                                       |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `AADSTS50011` (reply URL mismatch)       | The web URL is not registered as a **SPA** redirect URI                                                  | App registration > Authentication                                                                                           |
+| `AADSTS65001` (consent required)         | The SPA lacks admin consent or the pre-authorization                                                     | API permissions, "Authorized client applications"                                                                           |
+| `AADSTS50105` (user not assigned)        | Assignment required and the user/group has no app role                                                   | Enterprise application > Users and groups                                                                                   |
+| API answers 401 to a valid-looking token | `iss` or `aud` mismatch (v1 vs v2 token), expired token, clock skew, or the user is stored as `disabled` | decode the token locally; compare with `ENTRA_ISSUER`/`ENTRA_AUDIENCE`; the log reason (`auth.failure`)                     |
+| API answers 503 while signing in         | The JWKS endpoint is unreachable and the signing key is not cached (an outage is a 503, not a 401)       | `login.microsoftonline.com` reachability from the API container; cached keys last 10 minutes                                |
+| 401 only for one tenant                  | `tid` missing from `ENTRA_TENANT_MAP`                                                                    | API log lines with `event` = `auth.failure` and `reason` = `unknown_tenant` (see [docs/OBSERVABILITY.md](OBSERVABILITY.md)) |
+| 403 after sign-in                        | No app role in the token, or the role is not in `ENTRA_ROLE_MAP`                                         | the `roles` claim                                                                                                           |
+| Works locally, fails in Azure            | Local runs use persona login; Azure never does                                                           | `AUTH_MODE` of the running revision                                                                                         |
 
 See also: [docs/DEPLOYMENT.md](DEPLOYMENT.md), [docs/THREAT_MODEL.md](THREAT_MODEL.md), [docs/runbooks/secret-exposure-response.md](runbooks/secret-exposure-response.md).

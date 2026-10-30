@@ -14,12 +14,15 @@ filtered to what was known at the decision time).
 
 ## Decision
 
-- Define a **`SearchProvider`** interface; callers never know which engine is behind it.
-- **Local and test default: in-process lexical search (BM25)** over the already tenant- and case-scoped evidence
-  set (`SEARCH_PROVIDER=lexical`).
-- **Azure: Azure AI Search** (`SEARCH_PROVIDER=azure-ai-search`), authenticated with managed identity, with
-  tenant filters added to every query. Creating the index is a documented operator step, not part of the Bicep
-  deployment.
+- Route all search through one **`SearchService`** (`apps/api/src/services/search`); `SEARCH_PROVIDER` selects the
+  engine and callers never see which one answered.
+- **Local and test default: PostgreSQL full-text search** (`search_tsv` generated columns with GIN indexes,
+  `websearch_to_tsquery` and `ts_rank`; see [DATA_MODEL.md](../DATA_MODEL.md)), tenant-scoped by row-level security
+  (`SEARCH_PROVIDER=lexical`). It is not BM25 and not in-process.
+- **Azure: Azure AI Search** (`SEARCH_PROVIDER=azure-ai-search`), authenticated with managed identity, with a
+  `tenantId` filter added to every query. The index is tried first with a 3 s deadline and any failure falls back
+  to the lexical search. Creating and populating the index is an operator step, not part of the Bicep deployment
+  and not implemented in this repository.
 - **pgvector is deliberately deferred.** It would couple retrieval to an embedding model and to database
   extensions on managed PostgreSQL before there is evidence that lexical recall is insufficient.
 
@@ -30,6 +33,9 @@ filtered to what was known at the decision time).
 - Bad: lexical search misses paraphrases; quality on large, real corpora is unproven. The Azure AI Search
   provider has not been exercised against a live service from this repository, and results from the two
   engines will differ.
+- Scope today: only global search (`GET /api/v1/search`, `search.global`) goes through the provider. The analysis
+  engine and the AI context builder read the case's temporally filtered evidence directly and do no retrieval, so
+  the temporal and case-scoping guarantees do not depend on the search engine.
 - Follow-up: measure recall on realistic data before adding vectors; if added, keep the same interface and
   filter by tenant, case and as-of time before ranking.
 

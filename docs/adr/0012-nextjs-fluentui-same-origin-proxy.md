@@ -17,26 +17,31 @@ Content Security Policy should stay strict. The audience works in a Microsoft-ce
 - **Fluent UI React Components v9** (`@fluentui/react-components`) for primitives, theming and accessibility,
   with the project's design tokens layered on top (`packages/ui`). Data fetching uses TanStack Query; forms use
   React Hook Form with the shared Zod schemas.
-- **Same-origin API proxy.** The browser only calls `/api/*` on the web origin; a Next.js rewrite forwards it to
-  the API at `API_INTERNAL_URL`. In Azure the API keeps internal ingress; locally and in compose the target is
-  `http://localhost:4000` or `http://api:4000`. Sign-in uses MSAL and sends bearer tokens (ADR 0006).
+- **Same-origin API proxy.** The browser only calls `/api/*` on the web origin; the web server's `src/proxy.ts`
+  (the Next.js 16 "proxy", formerly middleware) forwards `/api/*` and the health endpoints (`/livez`, `/healthz`,
+  `/readyz`) at request time to the API at `API_INTERNAL_URL` (`lib/api-forward.ts`, `NextResponse.rewrite`). In Azure
+  the API keeps internal ingress; locally and in compose the target is `http://localhost:4000` or `http://api:4000`.
+  Sign-in uses MSAL and sends bearer tokens (ADR 0006).
 
 ## Consequences
 
 - Good: no CORS surface for the browser, a tight `connect-src` in the CSP (the web origin plus the Entra
   authority), the API is not publicly reachable, and one URL for users; Fluent gives accessible components and a
   recognisable look; server-rendered shell with a small client bundle.
-- Bad: rewrites are evaluated at build time, so `API_INTERNAL_URL` and every `NEXT_PUBLIC_*` value are baked
-  into the image (an image is specific to its environment; the Dockerfile takes them as build arguments and
-  `docs/CI_CD.md` explains it). The proxy adds a hop and a timeout, so long operations should be asynchronous.
+- Bad: `NEXT_PUBLIC_*` values are inlined at build time (an image is specific to its Entra registration; the
+  Dockerfile takes them as build arguments and `docs/CI_CD.md` explains it). `API_INTERNAL_URL` is different: it
+  is read on every request, so the API address is a runtime setting (a missing or invalid value is a 502
+  `upstream_not_configured` problem in production). The proxy adds a hop and a timeout, so long operations should
+  be asynchronous. The unauthenticated probes are reachable on the public web origin as a consequence.
 - Bad: Next.js and Fluent move quickly; majors are handled through Dependabot pull requests and the end-to-end
   and accessibility suite.
 
 ## Alternatives considered
 
 - **Browser calls the API directly:** needs CORS, public API ingress and a wider CSP.
-- **A runtime proxy (route handler or sidecar reading the environment at start-up):** would allow one image for
-  all environments; not chosen because rewrites are simpler and keep streaming behaviour of the framework.
+- **`rewrites()` in `next.config.ts`:** simpler, but evaluated at build time, so `API_INTERNAL_URL` would be baked
+  into the image and one image could not serve several environments. This was the first design and was replaced by
+  the runtime `proxy.ts` forwarding.
 - **Another UI kit (MUI, Chakra, shadcn/ui) or a SPA without Next.js:** weaker fit with the Microsoft design
   language, or more assembly for routing, rendering and accessibility.
 - **Pages Router:** the App Router is the supported direction for new Next.js apps.

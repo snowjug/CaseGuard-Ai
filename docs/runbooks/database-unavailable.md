@@ -10,19 +10,27 @@
 
 ## Impact
 
-- **Every data-dependent route fails.** The web UI loads, but cases, ledgers, skills, audit and analytics are unavailable. Severity 1 in production.
+- **Every data-dependent route fails** with a 503 `provider_unavailable` problem. The web UI loads, but cases, ledgers, skills, audit and analytics are unavailable. Severity 1 in production.
 - No data is lost by an outage itself. Data loss risk exists only when storage is exhausted, a bad migration ran, or a restore is needed.
 - Writes in flight when the failure began may have failed; clients should retry (writes are designed to be idempotent).
 
 ## Detection
 
 - API 5xx alert; readiness failures on the latest revision (`ContainerAppSystemLogs`, OBSERVABILITY 4.10); PostgreSQL metrics query in OBSERVABILITY 4.10; Azure Service Health.
-- Logs:
+- Logs. A database outage reaches clients as a 503 problem with code `provider_unavailable` (the API's generic "a required service is unavailable" answer for connection errors, PostgreSQL class 08, 57P01-03 and 53300), logged as an `http.error` line at `error` level whose `msg` is `unhandled error` and whose `err` object carries the underlying cause:
 
   ```kusto
   CgApiLogs()
-  | where TimeGenerated > ago(30m) and level >= 50 and (msg has_any ('ECONN', 'ETIMEDOUT', 'ENOTFOUND', 'password authentication', 'too many connections', 'read-only transaction', 'SSL', 'readyz'))
-  | summarize occurrences = count(), sampleCorrelationId = take_any(correlationId) by msg
+  | where TimeGenerated > ago(30m) and event == 'http.error' and code == 'provider_unavailable'
+  | summarize occurrences = count(), sampleRequestId = take_any(requestId) by routeId
+  | order by occurrences desc
+  ```
+
+  ```kusto
+  // The underlying cause is inside the raw line (err), not in msg
+  CgApiLogs()
+  | where TimeGenerated > ago(30m) and level in ('error', 'fatal') and Raw has_any ('ECONN', 'ETIMEDOUT', 'ENOTFOUND', 'password authentication', 'too many connections', 'read-only transaction', 'SSL')
+  | summarize occurrences = count(), sampleRequestId = take_any(requestId) by msg
   | order by occurrences desc
   ```
 
