@@ -8,6 +8,8 @@ export interface ApiIssue {
 export interface ApiErrorInit {
   status: number;
   code: string;
+  /** A stable token that refines `code` (for example `separation_of_duties`); never free text. */
+  reason?: string | undefined;
   title: string;
   message?: string | undefined;
   correlationId?: string | undefined;
@@ -24,6 +26,8 @@ export interface ApiErrorInit {
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
+  /** Switch on this, never on the message, to handle a specific condition (for example a four-eyes refusal). */
+  readonly reason: string | undefined;
   readonly title: string;
   readonly correlationId: string | undefined;
   readonly issues: readonly ApiIssue[];
@@ -34,6 +38,7 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.status = init.status;
     this.code = init.code;
+    this.reason = init.reason;
     this.title = init.title;
     this.correlationId = init.correlationId;
     this.issues = init.issues ?? [];
@@ -91,6 +96,7 @@ export function apiErrorFromProblem(
   return new ApiError({
     status: problem.status,
     code: problem.code,
+    reason: problem.reason,
     title: problem.title,
     message: problem.detail ?? problem.title,
     correlationId: problem.correlationId ?? fallbackCorrelationId,

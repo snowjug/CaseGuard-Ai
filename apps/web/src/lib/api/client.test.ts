@@ -130,6 +130,37 @@ describe('[FR-API-02] callApi: failures', () => {
     expect(apiError.issues).toEqual([{ path: 'reason', message: 'Must be at least 5 characters' }]);
   });
 
+  it('exposes the stable reason of a problem, so callers never switch on its wording', async () => {
+    const fetchMock = vi.fn(async () =>
+      problem(403, 'forbidden', {
+        reason: 'separation_of_duties',
+        detail: 'The publisher must differ from the creator',
+      }),
+    );
+    const client = createApiClient({ fetch: fetchMock });
+    const error = await client
+      .call('warnings.dismiss', {
+        params: { caseId: 'c', warningId: 'w' },
+        body: { reason: 'okay then', expectedVersion: 1 },
+      })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).reason).toBe('separation_of_duties');
+    expect((error as ApiError).code).toBe('forbidden');
+  });
+
+  it('has no reason when the problem carries none', async () => {
+    const fetchMock = vi.fn(async () => problem(409, 'conflict', { detail: 'Already there' }));
+    const client = createApiClient({ fetch: fetchMock });
+    const error = await client
+      .call('warnings.dismiss', {
+        params: { caseId: 'c', warningId: 'w' },
+        body: { reason: 'okay then', expectedVersion: 1 },
+      })
+      .catch((e: unknown) => e);
+    expect((error as ApiError).reason).toBeUndefined();
+  });
+
   it('falls back to the request correlation id and a safe message when the body is not Problem Details', async () => {
     const fetchMock = vi.fn(
       async () =>
@@ -223,6 +254,39 @@ describe('[FR-API-03] callApi: retries', () => {
       }),
     ).rejects.toMatchObject({ status: 404 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets a call opt out of retries, so a rate-limited request reports its Retry-After at once', async () => {
+    const limited = (): Response =>
+      new Response(
+        JSON.stringify({
+          type: 'urn:x',
+          title: 'Too many requests',
+          status: 429,
+          code: 'rate_limited',
+        }),
+        {
+          status: 429,
+          headers: { 'content-type': 'application/problem+json', 'retry-after': '4' },
+        },
+      );
+    const eager = vi.fn(async () => limited());
+    const eagerSleep = vi.fn(noSleep);
+    const error = (await createApiClient({ fetch: eager, sleep: eagerSleep })
+      .call('cases.list', { maxRetries: 0 })
+      .catch((e: unknown) => e)) as ApiError;
+    expect(eager).toHaveBeenCalledTimes(1);
+    expect(eagerSleep).not.toHaveBeenCalled();
+    expect(error).toMatchObject({ status: 429, retryAfterMs: 4000 });
+
+    // By default a read waits for the Retry-After the server asked for, and tries again (twice).
+    const patient = vi.fn(async () => limited());
+    const patientSleep = vi.fn(noSleep);
+    await createApiClient({ fetch: patient, sleep: patientSleep })
+      .call('cases.list')
+      .catch(() => undefined);
+    expect(patient).toHaveBeenCalledTimes(3);
+    expect(patientSleep).toHaveBeenCalledWith(4000, undefined);
   });
 
   it('does not retry the web server reporting that it is not configured to reach the API', async () => {

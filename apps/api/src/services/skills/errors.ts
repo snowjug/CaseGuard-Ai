@@ -51,15 +51,17 @@ function isRefusal(value: unknown): value is ExtractionRefusal {
 export function skillErrorToAppError(error: SkillError): AppError {
   switch (error.code) {
     case 'forbidden':
-    case 'separation_of_duties':
       return new ForbiddenError(error.message);
+    case 'separation_of_duties':
+      return new ForbiddenError(error.message, { reason: 'separation_of_duties' });
     case 'version_conflict':
       return new AppError('version_conflict', 409, error.message);
     case 'illegal_transition':
+      return new ConflictError(error.message, { reason: 'illegal_transition' });
     case 'conflict':
       return new ConflictError(error.message);
     case 'gate_failed':
-      return new PreconditionFailedError(error.message);
+      return new PreconditionFailedError(error.message, { reason: 'gate_failed' });
     case 'not_found':
       return new AppError('not_found', 404, error.message);
     case 'validation_failed':

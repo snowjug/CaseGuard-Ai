@@ -829,9 +829,11 @@ describe('Case Two also teaches the skill: a mutation is only ever proposed', ()
     // The curator proposed it, so the curator cannot approve it (separation of duties).
     const byProposer = await decide(PERSONAS.curator, 'approve');
     expect(byProposer.statusCode).toBe(403);
+    expect(byProposer.data.reason).toBe('separation_of_duties');
     // A distinct approver still needs simulation and regression runs on the proposed content.
     const unvalidated = await decide(PERSONAS.admin, 'approve');
     expect(unvalidated.statusCode).toBe(412);
+    expect(unvalidated.data.reason).toBe('gate_failed');
     expect(unvalidated.data.detail).toMatch(/simulation test/i);
 
     const after = (await api.get(PERSONAS.engineer, `/skills/${skillId}`)).data;

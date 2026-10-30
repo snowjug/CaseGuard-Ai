@@ -83,6 +83,7 @@ export class EngineBudget {
     throw new RateLimitedError(
       Math.max(1, seconds),
       'Too many views were recomputed in a short time. Views already computed stay available; retry shortly.',
+      'engine_budget',
     );
   }
 

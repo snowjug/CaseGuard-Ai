@@ -81,6 +81,15 @@ interface Extra {
   detail?: string;
   errors?: { path: string; message: string }[];
   headers?: Record<string, string>;
+  reason?: string;
+}
+
+/** Only a short snake_case token can travel as a reason: it is a code a client switches on, never text. */
+const REASON = /^[a-z][a-z0-9_]{2,39}$/;
+
+function reasonOf(error: AppError): string | undefined {
+  const value = error.details?.reason;
+  return typeof value === 'string' && REASON.test(value) ? value : undefined;
 }
 
 function build(
@@ -96,6 +105,7 @@ function build(
     title: TITLES[code],
     status,
     code,
+    ...(extra.reason !== undefined ? { reason: extra.reason } : {}),
     correlationId: options.requestId,
     ...(detail !== undefined ? { detail: clip(detail, 1000) } : {}),
     ...(extra.errors && extra.errors.length > 0
@@ -200,8 +210,10 @@ function validationIssues(error: FastifyLikeError): { path: string; message: str
 export function toProblem(error: unknown, options: ProblemOptions): ProblemResult {
   if (error instanceof AppError) {
     const issues = error instanceof ValidationFailedError ? error.issues : undefined;
+    const reason = reasonOf(error);
     return build(error.code, error.status, options, {
       detail: error.message,
+      ...(reason !== undefined ? { reason } : {}),
       ...(issues ? { errors: issues } : {}),
       ...(error instanceof RateLimitedError
         ? { headers: { 'retry-after': String(Math.max(1, Math.ceil(error.retryAfterSeconds))) } }

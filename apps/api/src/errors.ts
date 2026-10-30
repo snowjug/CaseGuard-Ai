@@ -78,8 +78,11 @@ export class MalformedRequestError extends AppError {
 }
 
 export class ForbiddenError extends AppError {
-  constructor(message = 'You do not have permission to perform this action') {
-    super('forbidden', 403, message);
+  constructor(
+    message = 'You do not have permission to perform this action',
+    details?: Record<string, unknown>,
+  ) {
+    super('forbidden', 403, message, details);
   }
 }
 
@@ -117,8 +120,15 @@ export class UnsupportedMediaTypeError extends AppError {
 
 export class RateLimitedError extends AppError {
   readonly retryAfterSeconds: number;
-  constructor(retryAfterSeconds: number, message = 'Too many requests; slow down and retry') {
-    super('rate_limited', 429, message, { retryAfterSeconds });
+  constructor(
+    retryAfterSeconds: number,
+    message = 'Too many requests; slow down and retry',
+    reason?: string,
+  ) {
+    super('rate_limited', 429, message, {
+      retryAfterSeconds,
+      ...(reason === undefined ? {} : { reason }),
+    });
     this.retryAfterSeconds = retryAfterSeconds;
   }
 }

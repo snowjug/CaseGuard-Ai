@@ -197,4 +197,55 @@ describe('toProblem', () => {
     const result = convert(error);
     expect(JSON.stringify(result.problem)).not.toContain('/srv/data');
   });
+
+  describe('reason: a stable token for conditions a client may handle on purpose', () => {
+    it.each([
+      [
+        'a four-eyes refusal',
+        new ForbiddenError('The publisher must differ from the creator', {
+          reason: 'separation_of_duties',
+        }),
+        403,
+        'forbidden',
+        'separation_of_duties',
+      ],
+      [
+        'a reference already in use',
+        new ConflictError('Reference taken', { reason: 'reference_in_use' }),
+        409,
+        'conflict',
+        'reference_in_use',
+      ],
+      [
+        'the engine budget',
+        new RateLimitedError(4, 'Too many views', 'engine_budget'),
+        429,
+        'rate_limited',
+        'engine_budget',
+      ],
+    ])('reports %s', (_name, error, status, code, reason) => {
+      const result = convert(error);
+      expect(result.status).toBe(status);
+      expect(result.problem).toMatchObject({ code, reason });
+      expect(ProblemSchema.safeParse(result.problem).success).toBe(true);
+    });
+
+    it('keeps the retry delay of the engine budget while naming it', () => {
+      const result = convert(new RateLimitedError(4.2, 'Too many views', 'engine_budget'));
+      expect(result.headers['retry-after']).toBe('5');
+      expect(result.problem.reason).toBe('engine_budget');
+    });
+
+    it.each([
+      ['no reason at all', new ConflictError('Plain')],
+      ['a reason that is free text', new ConflictError('Text', { reason: 'Not a token at all' })],
+      ['a reason that is too long', new ConflictError('Long', { reason: 'a'.repeat(60) })],
+      ['a reason that is not a string', new ConflictError('Number', { reason: 42 })],
+      ['a reason with an upper-case letter', new ConflictError('Case', { reason: 'Reference' })],
+    ])('leaves %s out of the body', (_name, error) => {
+      const result = convert(error);
+      expect(result.problem).not.toHaveProperty('reason');
+      expect(ProblemSchema.safeParse(result.problem).success).toBe(true);
+    });
+  });
 });

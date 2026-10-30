@@ -80,6 +80,15 @@ export const ProblemSchema = z.object({
   status: z.number().int().min(400).max(599),
   detail: z.string().max(1000).optional(),
   code: z.string().max(80),
+  /**
+   * A stable, machine-readable refinement of `code` for conditions a client may handle on purpose (for
+   * example `separation_of_duties`, `reference_in_use`, `job_active`). Never free text: clients may switch on it,
+   * `detail` stays the only thing to show.
+   */
+  reason: z
+    .string()
+    .regex(/^[a-z][a-z0-9_]{2,39}$/)
+    .optional(),
   correlationId: z.string().max(80).optional(),
   errors: z
     .array(z.object({ path: z.string().max(300), message: z.string().max(500) }))

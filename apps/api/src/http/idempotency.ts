@@ -123,7 +123,9 @@ export async function runIdempotent(
     case 'conflict':
       throw new IdempotencyConflictError();
     case 'in_progress':
-      throw new ConflictError('A request with this Idempotency-Key is still being processed');
+      throw new ConflictError('A request with this Idempotency-Key is still being processed', {
+        reason: 'request_in_progress',
+      });
     case 'new':
       break;
   }

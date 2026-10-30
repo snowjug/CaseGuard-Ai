@@ -336,6 +336,7 @@ describe('skills.transition', () => {
     const res = await moveSkill(api, PERSONAS.curator, skillB, 'draft', REASON);
     expect(res.statusCode).toBe(403);
     expect(res.data.code).toBe('forbidden');
+    expect(res.data.reason).toBe('separation_of_duties');
     expect(res.data.detail).toMatch(/created the skill cannot record an approval/);
     const denied = (await audits()).filter(
       (e) => e.action === 'skill.transition_denied' && e.targetId === skillB,
