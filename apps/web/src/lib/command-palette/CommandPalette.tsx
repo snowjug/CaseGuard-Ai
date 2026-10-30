@@ -25,6 +25,7 @@ import { queryKeys } from '../api/query-keys';
 import { useApiQuery } from '../api/hooks';
 import { useAuth } from '../auth/context';
 import { useShortcut } from '../shortcuts';
+import { useSingleKeyToggle } from '../shortcuts/use-single-key-toggle';
 import { navContext } from '../nav';
 import { usePresentation } from '../presentation';
 import { useShellUi } from '../shell-ui';
@@ -33,6 +34,7 @@ import {
   COMMAND_GROUP_ORDER,
   buildCaseCommands,
   buildNavigationCommands,
+  buildPageCommands,
   buildPersonaCommands,
   type PaletteCommand,
 } from './commands';
@@ -192,6 +194,7 @@ export function CommandPalette() {
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const { paletteOpen, setPaletteOpen, setShortcutsOpen, focusSearch } = useShellUi();
+  const singleKey = useSingleKeyToggle();
   const { caseId, pathCaseId, setActiveCase } = useActiveCase();
   const auth = useAuth();
   const presentation = usePresentation();
@@ -222,7 +225,12 @@ export function CommandPalette() {
   const commands = useMemo<PaletteCommand[]>(() => {
     const go = (href: string): void => router.push(href);
     const list: PaletteCommand[] = [
-      ...buildNavigationCommands({ context: navContext(pathname, caseId), navigate: go }),
+      ...buildNavigationCommands({
+        context: navContext(pathname, caseId),
+        navigate: go,
+        showShortcuts: singleKey.enabled,
+      }),
+      ...buildPageCommands({ context: navContext(pathname, caseId), navigate: go }),
     ];
     list.push(
       ...buildCaseCommands({
@@ -281,15 +289,22 @@ export function CommandPalette() {
         id: 'shortcuts',
         label: 'Show keyboard shortcuts',
         group: 'Actions',
-        hint: '?',
+        ...(singleKey.enabled ? { hint: '?' } : {}),
         keywords: 'help keys',
         run: () => setShortcutsOpen(true),
+      },
+      {
+        id: 'single-key-shortcuts',
+        label: singleKey.enabled ? 'Turn single-key shortcuts off' : 'Turn single-key shortcuts on',
+        group: 'Actions',
+        keywords: 'keyboard accessibility shortcuts keys letters characters speech input',
+        run: singleKey.toggle,
       },
       {
         id: 'search',
         label: 'Search cases, claims and skills',
         group: 'Actions',
-        hint: '/',
+        ...(singleKey.enabled ? { hint: '/' } : {}),
         keywords: 'find global search',
         run: () => window.setTimeout(focusSearch, 0),
       },
@@ -317,6 +332,7 @@ export function CommandPalette() {
     personaQuery.data,
     setActiveCase,
     setShortcutsOpen,
+    singleKey,
     focusSearch,
     queryClient,
   ]);

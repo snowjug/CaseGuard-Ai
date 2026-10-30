@@ -1,7 +1,7 @@
 'use client';
 
 import { ROLE_LABELS } from '@caseguard/schemas';
-import { ConfirmDialog, UiLink, cg } from '@caseguard/ui';
+import { ConfirmDialog, UiLink, cg, useElementSize } from '@caseguard/ui';
 import {
   Button,
   Popover,
@@ -21,14 +21,21 @@ import {
   PersonSwapRegular,
 } from '@fluentui/react-icons';
 import { useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { describeError } from '../../lib/api/errors';
 import { useApiMutation } from '../../lib/api/hooks';
 import { invalidateAll } from '../../lib/api/query-keys';
 import { useAuth } from '../../lib/auth/context';
 import { GatedAction, useSession } from '../../lib/auth/session';
 import { usePresentation, usePresenterStep } from '../../lib/presentation';
+import { explainDemoError } from '../../lib/presentation/demo-errors';
+import { PRESENTER_HEIGHT_VAR } from '../../lib/presentation/presenter-height';
+import { useRoleSwitch } from '../../lib/presentation/use-role-switch';
 import { safeInternalHref } from '../../lib/safe-href';
 import { useToast } from '../../lib/toast';
+
+export { PRESENTER_HEIGHT_VAR };
 
 const useStyles = makeStyles({
   strip: {
@@ -82,6 +89,7 @@ const useStyles = makeStyles({
   goDisabled: { backgroundColor: cg.surfaceSunken, color: cg.textMuted, pointerEvents: 'none' },
   notes: {
     maxWidth: '420px',
+    margin: 0,
     fontSize: tokens.fontSizeBase300,
     lineHeight: tokens.lineHeightBase300,
     whiteSpace: 'pre-wrap',
@@ -96,24 +104,39 @@ const useStyles = makeStyles({
 });
 
 /**
- * Presenter strip (presentation mode only): where the guided demo is, what to do next, the presenter notes, the role to
- * present as, and a guarded reset. It reads `demo.state`, which the API derives from real data; nothing is invented here.
+ * Presenter strip (presentation mode only): where the guided demo is, what to do next, the role to present as, the
+ * presenter notes, and a guarded reset. It reads `demo.state`, which the API derives from stored data; nothing is
+ * invented here. The next action is outlined with the pulsing (reduced-motion safe) presenter outline, a persona of the
+ * right role is one click away, and after a reset the presenter lands on the Demo Guide because every case page is gone.
  */
 export function PresenterStrip() {
   const styles = useStyles();
+  const router = useRouter();
   const { enabled, setEnabled } = usePresentation();
   const { query, steps, current, completed } = usePresenterStep();
-  const { session, can } = useSession();
+  const { can } = useSession();
   const auth = useAuth();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const roleSwitch = useRoleSwitch({ enabled });
   const reset = useApiMutation('demo.reset');
+  const [measure, size] = useElementSize<HTMLElement>({ width: 0, height: 104 });
+
+  // The strip is fixed to the bottom, so tell the page how tall it is (content padding and toasts follow).
+  useEffect(() => {
+    if (!enabled) return undefined;
+    document.documentElement.style.setProperty(PRESENTER_HEIGHT_VAR, `${size.height + 3}px`);
+    return () => {
+      document.documentElement.style.removeProperty(PRESENTER_HEIGHT_VAR);
+    };
+  }, [enabled, size.height]);
 
   if (!enabled) return null;
 
   const total = steps.length;
   const role = current ? ROLE_LABELS[current.persona] : null;
-  const roleMatches = current ? (session?.user.roles ?? []).includes(current.persona) : true;
+  const needsSwitch = current ? !roleSwitch.actingAs(current.persona) : false;
+  const persona = current ? roleSwitch.personaFor(current.persona) : null;
   const href = current ? safeInternalHref(current.route) : null;
 
   const resetButton = (
@@ -123,7 +146,7 @@ export function PresenterStrip() {
   );
 
   return (
-    <section className={styles.strip} aria-label="Presenter strip">
+    <section ref={measure} className={styles.strip} aria-label="Presenter strip">
       {query.isError ? (
         <p className={styles.status} role="status">
           The demo guide could not be loaded: {describeError(query.error)}
@@ -151,29 +174,34 @@ export function PresenterStrip() {
             <>
               <div className={styles.step}>
                 <span className={styles.stepTitle}>
-                  Next: {current.title}
+                  {completed === total ? 'Last step' : 'Next'}: {current.title}
                   {role ? <span className={styles.persona}> · present as {role}</span> : null}
                 </span>
                 <span className={styles.stepText}>{current.description}</span>
               </div>
               <div className={styles.actions}>
-                {!roleMatches && auth.dev ? (
+                {needsSwitch && auth.dev ? (
                   <Tooltip
-                    content={`This step is best shown as ${role}. Switch the development persona.`}
+                    content={`This step is shown as ${role}. Switch the synthetic persona to match.`}
                     relationship="description"
                     withArrow
                   >
                     <Button
                       appearance="outline"
                       icon={<PersonSwapRegular />}
-                      onClick={() => auth.dev?.openPicker()}
+                      {...(persona ? { 'aria-label': `Switch to ${persona.displayName}` } : {})}
+                      onClick={() =>
+                        persona ? roleSwitch.switchTo(persona) : auth.dev?.openPicker()
+                      }
                     >
-                      Switch persona
+                      {persona
+                        ? `Switch to ${persona.displayName.replace(/\s*\(synthetic\)\s*$/i, '')}`
+                        : 'Switch persona'}
                     </Button>
                   </Tooltip>
                 ) : null}
                 {href ? (
-                  <UiLink href={href} className={styles.go}>
+                  <UiLink href={href} className={mergeClasses(styles.go, 'cg-presenter-target')}>
                     {current.actionLabel}
                     <ArrowRightRegular aria-hidden="true" />
                   </UiLink>
@@ -209,13 +237,19 @@ export function PresenterStrip() {
             tone="danger"
             confirmLabel="Reset demo"
             onConfirm={async () => {
-              await reset.mutateAsync({});
+              try {
+                await reset.mutateAsync({});
+              } catch (error) {
+                throw explainDemoError(error, 'The reset failed.');
+              }
               await invalidateAll(queryClient, auth.identityKey);
               toast.success('Demo data reset');
+              // Every case page of the story is gone now; the guide is where the presenter starts again.
+              router.push('/demo');
             }}
           >
-            This restores the synthetic sample to its starting state and clears demo progress. Cases
-            you created yourself are not affected.
+            This erases the cases, analysis results and skills of the synthetic demo tenant and
+            clears demo progress. Users, settings and the audit trail are kept.
           </ConfirmDialog>
         ) : (
           <GatedAction permission="demo:manage">{resetButton}</GatedAction>

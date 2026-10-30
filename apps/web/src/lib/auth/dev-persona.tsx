@@ -22,9 +22,10 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import { DismissRegular, PersonWarningRegular } from '@fluentui/react-icons';
-import { useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useCallback, useMemo, useSyncExternalStore, type ReactNode } from 'react';
 import { describeError } from '../api/errors';
 import { useApiQuery } from '../api/hooks';
+import { useOverlayState } from '../use-overlay-state';
 import { AuthContext, useAuth, type AuthContextValue } from './context';
 
 export const PERSONA_STORAGE_KEY = 'cg-persona';
@@ -75,7 +76,7 @@ export function DevPersonaAuthProvider({
   writeCookie = writePersonaCookie,
 }: DevPersonaAuthProviderProps) {
   const personaId = useSyncExternalStore(store.subscribe, store.get, () => null);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useOverlayState();
 
   const selectPersona = useCallback(
     (next: string | null) => {
@@ -83,14 +84,14 @@ export function DevPersonaAuthProvider({
       writeCookie(next);
       setPickerOpen(false);
     },
-    [store, writeCookie],
+    [store, writeCookie, setPickerOpen],
   );
   const getAuthHeaders = useCallback(
     async (): Promise<Record<string, string>> => (personaId ? { 'x-cg-persona': personaId } : {}),
     [personaId],
   );
-  const openPicker = useCallback(() => setPickerOpen(true), []);
-  const closePicker = useCallback(() => setPickerOpen(false), []);
+  const openPicker = useCallback(() => setPickerOpen(true), [setPickerOpen]);
+  const closePicker = useCallback(() => setPickerOpen(false), [setPickerOpen]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

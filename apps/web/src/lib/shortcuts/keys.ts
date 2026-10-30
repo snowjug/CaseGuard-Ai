@@ -24,6 +24,15 @@ export function parseKeys(keys: string): string[] {
   return keys.trim().toLowerCase().split(/\s+/).filter(Boolean);
 }
 
+/**
+ * True for a shortcut typed with a letter, digit or symbol on its own (`/`, `?`, `n`, `g c`): the kind WCAG 2.1.4
+ * (Character Key Shortcuts) says a person must be able to turn off. A chord with Ctrl, Cmd or Alt (`mod+k`) and a
+ * named key (`escape`) are not.
+ */
+export function isSingleKeyShortcut(keys: string): boolean {
+  return parseKeys(keys).some((token) => token.length === 1);
+}
+
 export type SequenceMatch = 'none' | 'prefix' | 'exact';
 
 /** Compares what was typed so far with a shortcut definition. */

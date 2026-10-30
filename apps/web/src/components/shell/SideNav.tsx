@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useActiveCase } from '../../lib/active-case';
 import { NAV_ITEMS, navContext, type NavItem } from '../../lib/nav';
+import { useNavBadges, type NavBadge } from '../../lib/nav-badges';
 import { usePresenterHighlight } from '../../lib/presentation';
 import { useShellUi } from '../../lib/shell-ui';
 import { useSwitchCase } from '../../lib/use-switch-case';
@@ -125,6 +126,45 @@ const useStyles = makeStyles({
     color: cg.textMuted,
   },
   drawerCase: { marginBottom: cg.space[4] },
+  badge: {
+    flexShrink: 0,
+    minWidth: '22px',
+    padding: '0 6px',
+    borderRadius: cg.radius.pill,
+    border: `1px solid ${cg.tone.neutral.border}`,
+    backgroundColor: cg.tone.neutral.tint,
+    color: cg.tone.neutral.fg,
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: '18px',
+    fontWeight: tokens.fontWeightSemibold,
+    fontVariantNumeric: 'tabular-nums',
+    textAlign: 'center',
+  },
+  badgeWarning: {
+    border: `1px solid ${cg.tone.uncertain.border}`,
+    backgroundColor: cg.tone.uncertain.tint,
+    color: cg.tone.uncertain.fg,
+  },
+  badgeDanger: {
+    border: `1px solid ${cg.tone.unsupported.border}`,
+    backgroundColor: cg.tone.unsupported.tint,
+    color: cg.tone.unsupported.fg,
+  },
+  badgeRail: { [`@media (max-width: ${layout.railBreakpoint - 1}px)`]: { display: 'none' } },
+  // In the icon rail there is no room for the figure, so a warning is a dot on the icon (the sentence is still read).
+  dot: {
+    display: 'none',
+    position: 'absolute',
+    top: '6px',
+    right: '12px',
+    width: '10px',
+    height: '10px',
+    borderRadius: cg.radius.pill,
+    border: `2px solid ${cg.surface}`,
+    [`@media (max-width: ${layout.railBreakpoint - 1}px)`]: { display: 'block' },
+  },
+  dotWarning: { backgroundColor: cg.tone.uncertain.solid },
+  dotDanger: { backgroundColor: cg.tone.unsupported.solid },
 });
 
 interface NavLinkProps {
@@ -133,9 +173,20 @@ interface NavLinkProps {
   context: ReturnType<typeof navContext>;
   inDrawer: boolean;
   onNavigate?: () => void;
+  badge?: NavBadge | undefined;
+  /** True once the case list loaded and is empty. */
+  noCases?: boolean;
 }
 
-function NavLink({ item, pathname, context, inDrawer, onNavigate }: NavLinkProps) {
+function NavLink({
+  item,
+  pathname,
+  context,
+  inDrawer,
+  onNavigate,
+  badge,
+  noCases = false,
+}: NavLinkProps) {
   const styles = useStyles();
   const href = item.href(context);
   const active = item.isActive(pathname);
@@ -164,11 +215,38 @@ function NavLink({ item, pathname, context, inDrawer, onNavigate }: NavLinkProps
           <span className={styles.label}>{item.label}</span>
           {needsCase ? (
             <span className={styles.note}>
-              <VisuallyHidden>(choose a case first)</VisuallyHidden>
-              <span aria-hidden="true">Needs a case</span>
+              <VisuallyHidden>
+                {noCases ? '(no cases yet: ingest one first)' : '(choose a case first)'}
+              </VisuallyHidden>
+              <span aria-hidden="true">{noCases ? 'No cases yet' : 'Needs a case'}</span>
             </span>
           ) : null}
         </span>
+        {badge ? (
+          <>
+            <span
+              aria-hidden="true"
+              className={mergeClasses(
+                styles.badge,
+                badge.tone === 'warning' && styles.badgeWarning,
+                badge.tone === 'danger' && styles.badgeDanger,
+                !inDrawer && styles.badgeRail,
+              )}
+            >
+              {badge.text}
+            </span>
+            <VisuallyHidden>({badge.description})</VisuallyHidden>
+            {!inDrawer && badge.tone !== 'neutral' ? (
+              <span
+                aria-hidden="true"
+                className={mergeClasses(
+                  styles.dot,
+                  badge.tone === 'danger' ? styles.dotDanger : styles.dotWarning,
+                )}
+              />
+            ) : null}
+          </>
+        ) : null}
       </Link>
     </li>
   );
@@ -178,6 +256,7 @@ function NavList({ inDrawer, onNavigate }: { inDrawer: boolean; onNavigate?: () 
   const styles = useStyles();
   const pathname = usePathname();
   const { caseId } = useActiveCase();
+  const { badges, noCases } = useNavBadges();
   const context = navContext(pathname, caseId);
   return (
     <div className={styles.groups}>
@@ -200,6 +279,8 @@ function NavList({ inDrawer, onNavigate }: { inDrawer: boolean; onNavigate?: () 
                   pathname={pathname}
                   context={context}
                   inDrawer={inDrawer}
+                  badge={badges[id]}
+                  noCases={noCases}
                   {...(onNavigate ? { onNavigate } : {})}
                 />
               ) : null;

@@ -11,6 +11,7 @@ import { useApiQuery } from '../api/hooks';
 import { useAuth } from '../auth/context';
 import { safeInternalHref } from '../safe-href';
 import { useShellUi } from '../shell-ui';
+import { useSingleKeyShortcuts } from '../shortcuts';
 import { useDebouncedValue } from '../use-debounced-value';
 
 const TYPE_LABELS: Record<SearchResult['type'], string> = {
@@ -128,6 +129,7 @@ export function GlobalSearch() {
   const router = useRouter();
   const auth = useAuth();
   const { registerSearchInput } = useShellUi();
+  const { enabled: singleKey } = useSingleKeyShortcuts();
   const listId = useId();
   const wrapper = useRef<HTMLDivElement | null>(null);
   const [query, setQuery] = useState('');
@@ -226,9 +228,11 @@ export function GlobalSearch() {
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
         />
-        <kbd className={styles.key} aria-hidden="true">
-          /
-        </kbd>
+        {singleKey ? (
+          <kbd className={styles.key} aria-hidden="true">
+            /
+          </kbd>
+        ) : null}
       </div>
       {showPopup ? (
         <div className={styles.popup}>

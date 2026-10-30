@@ -16,10 +16,12 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useState,
   type ReactElement,
   type ReactNode,
 } from 'react';
 import { usePresentation } from '../presentation';
+import { usePresenterHeight } from '../presentation/presenter-height';
 
 export interface ToastOptions {
   /** Secondary line under the title. */
@@ -46,11 +48,17 @@ export interface ToastApi {
 
 const ToastContext = createContext<ToastApi | null>(null);
 
-/** Toasts for the result of actions. Fluent renders them in a polite live region. */
+/**
+ * Toasts for the result of actions. Fluent announces them in its own polite (assertive for errors) live regions, and
+ * the visible toasts are mounted inside a named "Notifications" landmark: left in the default portal they would sit
+ * outside every landmark, which axe reports (`region`) while one is on screen.
+ */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const toasterId = useId('toaster');
   const { dispatchToast } = useToastController(toasterId);
   const { enabled: presenting } = usePresentation();
+  const presenterHeight = usePresenterHeight(presenting);
+  const [host, setHost] = useState<HTMLElement | null>(null);
 
   const show = useCallback(
     (intent: ToastIntent, title: string, options: ToastOptions = {}, action?: ReactElement) => {
@@ -91,12 +99,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      {/* Toasts stay clear of the presenter strip, which is fixed to the bottom while presenting. */}
+      <div ref={setHost} role="region" aria-label="Notifications" />
+      {/* While presenting, toasts sit above the presenter strip (it is fixed to the bottom and publishes its height). */}
       <Toaster
         toasterId={toasterId}
+        mountNode={host}
         position="bottom-end"
         limit={4}
-        offset={{ vertical: presenting ? 104 : 16 }}
+        offset={{ vertical: presenting ? presenterHeight + 12 : 16 }}
       />
     </ToastContext.Provider>
   );

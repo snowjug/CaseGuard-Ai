@@ -1,8 +1,21 @@
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { eventToken, formatKeys, isTypingTarget, matchSequence, parseKeys } from './keys';
-import { KeyboardShortcutsProvider, useShortcut } from './index';
+import {
+  eventToken,
+  formatKeys,
+  isSingleKeyShortcut,
+  isTypingTarget,
+  matchSequence,
+  parseKeys,
+} from './keys';
+import {
+  KeyboardShortcutsProvider,
+  SINGLE_KEY_STORAGE_KEY,
+  createSingleKeyStore,
+  useShortcut,
+  useSingleKeyShortcuts,
+} from './index';
 
 describe('[UX-KEYS-01] key matching', () => {
   it('normalises events to tokens', () => {
@@ -178,5 +191,84 @@ describe('[UX-KEYS-02] KeyboardShortcutsProvider', () => {
     unmount();
     await user.keyboard('gc');
     expect(second).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('[UX-KEYS-05] shortcuts typed with one character can be turned off', () => {
+  it('tells character shortcuts from chords and named keys', () => {
+    for (const keys of ['/', '?', 'n', '[', 'g c', 'g p'])
+      expect(isSingleKeyShortcut(keys), keys).toBe(true);
+    for (const keys of ['mod+k', 'alt+g', 'escape', 'f1', 'arrowdown'])
+      expect(isSingleKeyShortcut(keys), keys).toBe(false);
+  });
+
+  /** Offers the setting as a button, the way the shortcut help does. */
+  function Setting() {
+    const { enabled, setEnabled } = useSingleKeyShortcuts();
+    return (
+      <button type="button" onClick={() => setEnabled(!enabled)}>
+        {enabled ? 'Turn off' : 'Turn on'}
+      </button>
+    );
+  }
+
+  function withSetting(props: Partial<Parameters<typeof Probe>[0]> = {}) {
+    const handlers = { onGoCases: vi.fn(), onSearch: vi.fn(), onPalette: vi.fn() };
+    const view = render(
+      <KeyboardShortcutsProvider sequenceTimeoutMs={500}>
+        <Setting />
+        <Probe {...handlers} {...props} />
+      </KeyboardShortcutsProvider>,
+    );
+    return { handlers, view };
+  }
+
+  it('is on until the person turns it off: then / and g c do nothing and Ctrl+K still works', async () => {
+    const user = userEvent.setup();
+    const { handlers } = withSetting();
+    await user.keyboard('gc/');
+    expect(handlers.onGoCases).toHaveBeenCalledTimes(1);
+    expect(handlers.onSearch).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: 'Turn off' }));
+    // Focus is on the button now, which is not a field.
+    await user.keyboard('gc/');
+    expect(handlers.onGoCases).toHaveBeenCalledTimes(1);
+    expect(handlers.onSearch).toHaveBeenCalledTimes(1);
+    await user.keyboard('{Control>}k{/Control}');
+    expect(handlers.onPalette).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: 'Turn on' }));
+    await user.keyboard('gc/');
+    expect(handlers.onGoCases).toHaveBeenCalledTimes(2);
+    expect(handlers.onSearch).toHaveBeenCalledTimes(2);
+  });
+
+  it('is remembered in the browser under cg-single-key-shortcuts and read again on the next visit', async () => {
+    const user = userEvent.setup();
+    const first = withSetting();
+    expect(window.localStorage.getItem(SINGLE_KEY_STORAGE_KEY)).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Turn off' }));
+    expect(SINGLE_KEY_STORAGE_KEY).toBe('cg-single-key-shortcuts');
+    expect(window.localStorage.getItem(SINGLE_KEY_STORAGE_KEY)).toBe('off');
+    first.view.unmount();
+
+    const second = withSetting();
+    expect(screen.getByRole('button', { name: 'Turn on' })).toBeInTheDocument();
+    await userEvent.setup().keyboard('gc/');
+    expect(second.handlers.onGoCases).not.toHaveBeenCalled();
+    expect(second.handlers.onSearch).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Turn on' }));
+    expect(window.localStorage.getItem(SINGLE_KEY_STORAGE_KEY)).toBe('on');
+  });
+
+  it('treats anything but an explicit "off" as on', () => {
+    for (const raw of [null, 'on', 'true', 'garbage']) {
+      const store = createSingleKeyStore(() => ({ getItem: () => raw }) as unknown as Storage);
+      expect(store.get(), String(raw)).toBe(true);
+    }
+    const off = createSingleKeyStore(() => ({ getItem: () => 'off' }) as unknown as Storage);
+    expect(off.get()).toBe(false);
   });
 });

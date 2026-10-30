@@ -1,6 +1,6 @@
 'use client';
 
-import { cg } from '@caseguard/ui';
+import { ScrollRegion, cg } from '@caseguard/ui';
 import {
   Button,
   Dialog,
@@ -8,20 +8,35 @@ import {
   DialogContent,
   DialogSurface,
   DialogTitle,
+  Switch,
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
 import { DismissRegular } from '@fluentui/react-icons';
-import { useMemo } from 'react';
-import { formatKeys, useShortcutList, type ShortcutDef } from '../../lib/shortcuts';
+import { useId, useMemo } from 'react';
+import {
+  formatKeys,
+  isSingleKeyShortcut,
+  useShortcutList,
+  type ShortcutDef,
+} from '../../lib/shortcuts';
+import { useSingleKeyToggle } from '../../lib/shortcuts/use-single-key-toggle';
 import { useShellUi } from '../../lib/shell-ui';
 
 const useStyles = makeStyles({
+  frame: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
+  setting: { display: 'flex', flexDirection: 'column', gap: cg.space[1] },
+  settingText: {
+    margin: 0,
+    paddingLeft: '44px',
+    fontSize: tokens.fontSizeBase200,
+    color: cg.textSecondary,
+  },
   content: {
     display: 'flex',
     flexDirection: 'column',
     gap: cg.space[4],
-    maxHeight: '60vh',
+    maxHeight: '50vh',
     overflowY: 'auto',
   },
   group: { display: 'flex', flexDirection: 'column', gap: cg.space[1] },
@@ -54,19 +69,25 @@ const useStyles = makeStyles({
 const isMac = (): boolean =>
   typeof navigator !== 'undefined' && /mac|iphone|ipad/i.test(navigator.platform);
 
-/** Lists the registered shortcuts, grouped. Opened with `?`. */
+/** Lists the registered shortcuts, grouped, and holds the setting that turns the single-key ones off. Opened with `?`. */
 export function ShortcutsDialog() {
   const styles = useStyles();
   const { shortcutsOpen, setShortcutsOpen } = useShellUi();
   const list = useShortcutList();
-  // Read the registry when the dialog opens so it reflects the shortcuts of the current page.
+  const singleKey = useSingleKeyToggle();
+  const textId = useId();
+  const mod = isMac() ? '⌘' : 'Ctrl';
+  // Read the registry when the dialog opens so it reflects the shortcuts of the current page. With the single-key
+  // shortcuts off, only what still works is listed.
   const groups = useMemo(() => {
     if (!shortcutsOpen) return [] as [string, ShortcutDef[]][];
     const byGroup = new Map<string, ShortcutDef[]>();
-    for (const shortcut of list())
+    for (const shortcut of list()) {
+      if (!singleKey.enabled && isSingleKeyShortcut(shortcut.keys)) continue;
       byGroup.set(shortcut.group, [...(byGroup.get(shortcut.group) ?? []), shortcut]);
+    }
     return [...byGroup.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [shortcutsOpen, list]);
+  }, [shortcutsOpen, list, singleKey.enabled]);
 
   return (
     <Dialog open={shortcutsOpen} onOpenChange={(_event, data) => setShortcutsOpen(data.open)}>
@@ -84,31 +105,52 @@ export function ShortcutsDialog() {
           >
             Keyboard shortcuts
           </DialogTitle>
-          <DialogContent
-            className={styles.content}
-            // The list can outgrow the dialog, so it is a focusable scroll region: keyboard users can scroll it.
-            tabIndex={0}
-            role="region"
-            aria-label="Keyboard shortcut list"
-          >
-            {groups.map(([group, shortcuts]) => (
-              <section key={group} className={styles.group} aria-label={group}>
-                <h3 className={styles.heading}>{group}</h3>
-                <dl className={styles.list}>
-                  {shortcuts.map((shortcut) => (
-                    <div key={shortcut.id} style={{ display: 'contents' }}>
-                      <dt className={styles.term}>{shortcut.description}</dt>
-                      <dd className={styles.keys}>
-                        <kbd className={styles.kbd}>{formatKeys(shortcut.keys, isMac())}</kbd>
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </section>
-            ))}
-            <p className={styles.note}>
-              Shortcuts do not fire while you are typing in a field or while a dialog is open.
-            </p>
+          <DialogContent className={styles.frame}>
+            <div className={styles.setting}>
+              <Switch
+                label="Single-key shortcuts"
+                checked={singleKey.enabled}
+                aria-describedby={textId}
+                onChange={(_event, data) => singleKey.set(data.checked)}
+              />
+              <p id={textId} className={styles.settingText}>
+                Shortcuts made of one key, such as / or G then C. Turn them off if they get in the
+                way of speech input or of keys you press by accident; shortcuts that use {mod}, such
+                as {formatKeys('mod+k', isMac())}, keep working.
+                {singleKey.enabled
+                  ? ''
+                  : ` Single-key shortcuts are off now, so only shortcuts that use ${mod} work and only those are listed.`}
+              </p>
+            </div>
+            {/* The list can outgrow the dialog, so it is a focusable scroll region: keyboard users can scroll it. */}
+            <ScrollRegion label="Keyboard shortcut list" className={styles.content}>
+              {groups.map(([group, shortcuts]) => (
+                <section key={group} className={styles.group} aria-label={group}>
+                  <h3 className={styles.heading}>{group}</h3>
+                  <dl className={styles.list}>
+                    {shortcuts.map((shortcut) => (
+                      <div key={shortcut.id} style={{ display: 'contents' }}>
+                        <dt className={styles.term}>{shortcut.description}</dt>
+                        <dd className={styles.keys}>
+                          <kbd className={styles.kbd}>{formatKeys(shortcut.keys, isMac())}</kbd>
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              ))}
+              <p className={styles.note}>
+                Shortcuts do not fire while you are typing in a field or while a dialog is open.
+                {singleKey.enabled
+                  ? ' Each page adds its own while you are on it, such as N for the next step on the Demo Guide.'
+                  : ''}
+              </p>
+              <p className={styles.note}>
+                {singleKey.enabled
+                  ? 'Presenting? Open the Demo Guide (G then P) and choose Start presentation mode, or add ?present=1 to any address.'
+                  : 'Presenting? Open the Demo Guide from the navigation and choose Start presentation mode, or add ?present=1 to any address.'}
+              </p>
+            </ScrollRegion>
           </DialogContent>
         </DialogBody>
       </DialogSurface>

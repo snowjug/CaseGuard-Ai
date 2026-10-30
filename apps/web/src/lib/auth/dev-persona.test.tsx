@@ -142,6 +142,26 @@ describe('[AUTH-DEV-02] persona picker dialog', () => {
     expect(window.localStorage.getItem('cg-persona')).toBe('persona_reviewer');
   });
 
+  it('gives focus back to the control that opened it when it is closed with Escape, so a keyboard user keeps their place', async () => {
+    const user = userEvent.setup();
+    const api = fakeApi({
+      'dev.personas': () => ({ enabled: true, notice: '', items: personas }),
+    });
+    renderApp(
+      <>
+        <Opener />
+        <PersonaPickerDialog />
+      </>,
+      { api, persona: null },
+    );
+    const opener = screen.getByRole('button', { name: 'Open picker' });
+    await user.click(opener);
+    await screen.findByRole('dialog', { name: 'Choose a development identity' });
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
   it('explains when development identity is disabled', async () => {
     const user = userEvent.setup();
     const api = fakeApi({

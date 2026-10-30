@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { useApiQuery } from '../api/hooks';
 import { useAuth } from '../auth/context';
+import { useSession } from '../auth/session';
 
 export const PRESENT_STORAGE_KEY = 'cg-present';
 
@@ -83,15 +84,18 @@ export function usePresentation(): PresentationState {
 }
 
 /**
- * The guided-demo state from `demo.state` while presenting (nothing is fetched otherwise). `current` is the step the
- * presenter should do next; its `route` is highlighted in the navigation.
+ * The guided-demo state from `demo.state` while presenting (nothing is fetched otherwise, nor for a role that may not
+ * read cases, which is what the route needs). It is re-read every 15 s, but not while the tab is hidden. `current` is
+ * the step the presenter should do next; its `route` is highlighted in the navigation.
  */
 export function usePresenterStep() {
   const { enabled } = usePresentation();
   const auth = useAuth();
+  const { can } = useSession();
   const query = useApiQuery('demo.state', undefined, {
-    enabled: enabled && auth.status === 'ready',
+    enabled: enabled && auth.status === 'ready' && can('case:read'),
     refetchInterval: enabled ? 15_000 : false,
+    refetchIntervalInBackground: false,
   });
   const steps = query.data?.steps ?? [];
   const current =

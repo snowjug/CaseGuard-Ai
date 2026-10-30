@@ -46,7 +46,7 @@ const useStyles = makeStyles({
     },
   },
   content: { width: '100%', maxWidth: `${layout.maxContentWidth}px`, marginInline: 'auto' },
-  presenting: { paddingBottom: '104px' },
+  presenting: { paddingBottom: 'var(--cg-presenter-height, 104px)' },
 });
 
 /** `g` then the destination's key (for example `g c` for Cases). One component per item because hooks cannot run in a loop. */
@@ -112,7 +112,7 @@ function ShellFrame({ children }: { children: ReactNode }) {
 
   return (
     <div
-      className={styles.root}
+      className={mergeClasses(styles.root, presentation.enabled && styles.presenting)}
       style={{ '--cg-shell-top': `${topSize.height}px` } as CSSProperties}
     >
       <a className="cg-skip-link" href="#main-content">
@@ -123,12 +123,7 @@ function ShellFrame({ children }: { children: ReactNode }) {
       </div>
       <div className={styles.body}>
         <SideNav />
-        <main
-          id="main-content"
-          ref={main}
-          tabIndex={-1}
-          className={mergeClasses(styles.main, presentation.enabled && styles.presenting)}
-        >
+        <main id="main-content" ref={main} tabIndex={-1} className={styles.main}>
           <div className={styles.content}>
             <Breadcrumbs />
             {children}

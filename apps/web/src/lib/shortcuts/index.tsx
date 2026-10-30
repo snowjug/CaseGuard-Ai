@@ -1,7 +1,16 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
-import { eventToken, isTypingTarget, matchSequence, parseKeys } from './keys';
+import { createPersistedStore, type PersistedStore } from '@caseguard/ui';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
+import { eventToken, isSingleKeyShortcut, isTypingTarget, matchSequence, parseKeys } from './keys';
 
 export interface ShortcutDef {
   /** Unique id; re-registering the same id replaces the definition. */
@@ -27,20 +36,59 @@ interface Registry {
 
 const RegistryContext = createContext<Registry | null>(null);
 
+export const SINGLE_KEY_STORAGE_KEY = 'cg-single-key-shortcuts';
+
+/** Whether shortcuts typed with one character (`/`, `?`, `n`, `g c`) are on: on until the person turns them off. */
+export function createSingleKeyStore(
+  getStorage?: () => Storage | undefined,
+): PersistedStore<boolean> {
+  return createPersistedStore<boolean>({
+    key: SINGLE_KEY_STORAGE_KEY,
+    parse: (raw) => raw !== 'off',
+    serialize: (value) => (value ? 'on' : 'off'),
+    ...(getStorage ? { getStorage } : {}),
+  });
+}
+
+const defaultSingleKeyStore = createSingleKeyStore();
+
+export interface SingleKeyShortcutsState {
+  enabled: boolean;
+  setEnabled: (enabled: boolean) => void;
+}
+
+const SingleKeyContext = createContext<SingleKeyShortcutsState>({
+  enabled: true,
+  setEnabled: () => undefined,
+});
+
+/** The "single-key shortcuts" setting (WCAG 2.1.4): when off, only shortcuts with Ctrl, Cmd or Alt work. */
+export function useSingleKeyShortcuts(): SingleKeyShortcutsState {
+  return useContext(SingleKeyContext);
+}
+
 const MODAL_SELECTOR = '[role="dialog"][aria-modal="true"], [role="alertdialog"]';
 
 /**
  * Global keyboard shortcuts: single keys (`/`, `?`), modifier chords (`mod+k`) and Gmail-style sequences (`g` then `c`).
- * Shortcuts never fire while typing in a field or while a modal dialog is open, unless they opt in.
+ * Shortcuts never fire while typing in a field or while a modal dialog is open, unless they opt in. Shortcuts made of
+ * a character on its own can be turned off (`useSingleKeyShortcuts`, remembered in the browser); chords keep working.
  */
 export function KeyboardShortcutsProvider({
   children,
   sequenceTimeoutMs = 1000,
+  singleKeyStore = defaultSingleKeyStore,
 }: {
   children: ReactNode;
   sequenceTimeoutMs?: number;
+  singleKeyStore?: PersistedStore<boolean>;
 }) {
   const definitions = useRef(new Map<string, ShortcutDef>());
+  const singleKey = useSyncExternalStore(singleKeyStore.subscribe, singleKeyStore.get, () => true);
+  const singleKeyState = useMemo<SingleKeyShortcutsState>(
+    () => ({ enabled: singleKey, setEnabled: singleKeyStore.set }),
+    [singleKey, singleKeyStore],
+  );
   const registry = useMemo<Registry>(
     () => ({
       register: (definition) => {
@@ -55,6 +103,7 @@ export function KeyboardShortcutsProvider({
     [],
   );
 
+  // Rebuilt when the setting changes, which also drops a half-typed sequence such as a `g` waiting for its second key.
   useEffect(() => {
     let buffer: string[] = [];
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -73,6 +122,7 @@ export function KeyboardShortcutsProvider({
       const candidates = [...definitions.current.values()].filter(
         (d) =>
           d.enabled !== false &&
+          (singleKey || !isSingleKeyShortcut(d.keys)) &&
           (!typing || d.allowInInput === true) &&
           (!modal || d.allowInModal === true),
       );
@@ -114,9 +164,13 @@ export function KeyboardShortcutsProvider({
       document.removeEventListener('keydown', onKeyDown);
       reset();
     };
-  }, [sequenceTimeoutMs]);
+  }, [sequenceTimeoutMs, singleKey]);
 
-  return <RegistryContext.Provider value={registry}>{children}</RegistryContext.Provider>;
+  return (
+    <RegistryContext.Provider value={registry}>
+      <SingleKeyContext.Provider value={singleKeyState}>{children}</SingleKeyContext.Provider>
+    </RegistryContext.Provider>
+  );
 }
 
 /** Registers a shortcut for the lifetime of the component. The latest `handler` is always the one called. */
@@ -148,4 +202,4 @@ export function useShortcutList(): () => ShortcutDef[] {
   return useMemo(() => () => registry?.list() ?? [], [registry]);
 }
 
-export { formatKeys } from './keys';
+export { formatKeys, isSingleKeyShortcut } from './keys';
