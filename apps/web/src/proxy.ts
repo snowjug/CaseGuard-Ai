@@ -7,6 +7,8 @@ import { buildCsp, generateNonce } from './lib/csp';
  *
  * 1. `/api/*` and the health endpoints (`/livez`, `/healthz`, `/readyz`) are forwarded to the API at RUNTIME, from
  *    `API_INTERNAL_URL` (see `lib/api-forward.ts`). These responses never get a CSP or nonce: they are not documents.
+ *    The forwarded request carries `x-cg-client-ip`, the address our ingress reported for the caller, so the API can
+ *    rate-limit visitors individually instead of all of them as one web replica.
  * 2. Page requests get a per-request CSP nonce. Next.js reads the nonce from the request's Content-Security-Policy
  *    header and applies it to its own scripts, which is why every page renders dynamically.
  */

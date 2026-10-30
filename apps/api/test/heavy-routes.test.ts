@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ROUTES, type RouteId } from '@caseguard/schemas';
+import { ROUTES, type RouteId, type RouteSpec } from '@caseguard/schemas';
 import { ConflictError } from '../src/errors';
 import type { Database } from '../src/db';
 import { TEST_DATABASE_STARTUP_TIMEOUT_MS } from '../src/db/testing';
@@ -26,6 +26,8 @@ describe('the heavy-route table', () => {
       'skills.extract',
       'skills.simulationTest',
       'skills.proposeMutation',
+      'skills.apply',
+      'skillMatches.apply',
       'governance.export',
       'governance.auditVerify',
       'demo.seed',
@@ -35,7 +37,7 @@ describe('the heavy-route table', () => {
 
   it('covers every upload route and every route that answers 202 (work queued in the background)', () => {
     const missing = routeIds.filter((id) => {
-      const spec: { multipart?: boolean; status?: number } = ROUTES[id];
+      const spec: RouteSpec = ROUTES[id];
       return (spec.multipart === true || spec.status === 202) && !HEAVY_ROUTES.has(id);
     });
     expect(missing).toEqual([]);

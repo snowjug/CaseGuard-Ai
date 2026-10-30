@@ -98,6 +98,7 @@ export function buildHttp(ctx: BuildContext): HttpConfig {
     port: raw.API_PORT ?? 4000,
     corsAllowedOrigins: parseOrigins(ctx),
     trustProxy: parseTrustProxy(ctx),
+    trustClientIpHeader: raw.TRUST_CLIENT_IP_HEADER ?? false,
     bodyLimitBytes: raw.BODY_LIMIT_BYTES ?? 1_048_576,
     uploadMaxBytes: raw.UPLOAD_MAX_BYTES ?? 2_097_152,
   };

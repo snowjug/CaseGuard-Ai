@@ -1,9 +1,10 @@
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
-import rateLimit from '@fastify/rate-limit';
+import rateLimit, { normalizeIP } from '@fastify/rate-limit';
 import type { FastifyInstance } from 'fastify';
 import { RateLimitedError } from '../errors';
 import type { Infrastructure } from '../infrastructure';
+import { clientAddressOf } from './client-address';
 import './fastify-types';
 
 /** Parts a legitimate upload needs: one file plus a couple of small text fields. */
@@ -46,6 +47,9 @@ export async function registerSecurity(
     global: true,
     max: config.limits.rateLimitMax,
     timeWindow: config.limits.rateLimitWindowMs,
+    // One bucket per client address (an IPv6 client counts by its /64, as the plugin's default does).
+    keyGenerator: (request) =>
+      normalizeIP(clientAddressOf(request, config.http.trustClientIpHeader)),
     errorResponseBuilder: (_request, context) =>
       new RateLimitedError(Math.ceil(context.ttl / 1000)),
     onExceeded: () => metrics.recordRateLimitHit('general'),

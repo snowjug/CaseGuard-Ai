@@ -17,6 +17,7 @@ export interface ConfigSummary {
     readonly port: number;
     readonly corsOrigins: readonly string[];
     readonly trustProxy: string;
+    readonly trustClientIpHeader: boolean;
   };
   readonly auth: {
     readonly mode: string;
@@ -80,6 +81,7 @@ export function describeConfig(config: AppConfig): ConfigSummary {
       port: config.http.port,
       corsOrigins: config.http.corsAllowedOrigins,
       trustProxy: describeTrustProxy(config.http.trustProxy),
+      trustClientIpHeader: config.http.trustClientIpHeader,
     },
     auth: {
       mode: config.auth.mode,

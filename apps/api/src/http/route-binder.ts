@@ -10,6 +10,7 @@ import { NotImplementedError, RateLimitedError } from '../errors';
 import type { Infrastructure } from '../infrastructure';
 import { buildRequestContext } from './context-factory';
 import { DenialAuditThrottle } from './denial-throttle';
+import { clientAddressOf } from './client-address';
 import './fastify-types';
 import { hashRequest, idempotencyScope, readIdempotencyKey, runIdempotent } from './idempotency';
 import type { RequestContext } from './request-context';
@@ -116,6 +117,9 @@ export const HEAVY_ROUTES: ReadonlySet<RouteId> = new Set<RouteId>([
   'skills.proposeMutation',
   'cases.create',
   'cases.createFromFile',
+  // Applying a skill matches it against the case (a full engine pass when nothing is cached).
+  'skills.apply',
+  'skillMatches.apply',
   // A preview runs the whole ingestion pipeline (parse, redact, screen) without storing anything.
   'ingestion.preview',
   'ingestion.previewFile',
@@ -206,7 +210,9 @@ export function registerRoutes(app: FastifyInstance, options: BindOptions): void
     timeWindow: windowMs,
     keyGenerator: (request) => {
       const auth = request.cg.auth;
-      return auth === null ? `ip:${request.ip}` : `user:${auth.tenantId}:${auth.userId}`;
+      return auth === null
+        ? `ip:${clientAddressOf(request, config.http.trustClientIpHeader)}`
+        : `user:${auth.tenantId}:${auth.userId}`;
     },
   });
   const denialThrottle = new DenialAuditThrottle(windowMs, () => infra.now().getTime());

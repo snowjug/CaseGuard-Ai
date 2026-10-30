@@ -34,6 +34,9 @@ async function harness(...args: Parameters<typeof createHarness>): Promise<Harne
 
 beforeAll(async () => {
   database = await openSharedDatabase();
+  // The first harness of a file pays for loading every module of the application, which can exceed the
+  // per-test timeout on a busy machine: take that cost here, where the startup timeout applies.
+  await harness();
 }, TEST_DATABASE_STARTUP_TIMEOUT_MS);
 
 afterAll(async () => {
@@ -404,6 +407,87 @@ describe('proxy trust', () => {
       statuses.push((await asClient(h, '198.51.100.1', `203.0.113.${attempt}`)).statusCode);
     }
     expect(statuses).toEqual([200, 200, 429, 429]);
+  });
+});
+
+describe('client address header (API behind the web tier)', () => {
+  const asClient = (h: Harness, address: string | null, extra: Record<string, string> = {}) =>
+    h.call(PERSONAS.engineer, {
+      method: 'GET',
+      url: '/api/v1/me',
+      headers: { ...(address === null ? {} : { 'x-cg-client-ip': address }), ...extra },
+    });
+
+  it('counts each address the web tier reports separately when the header is trusted', async () => {
+    const h = await harness({
+      env: {
+        TRUST_CLIENT_IP_HEADER: 'true',
+        RATE_LIMIT_MAX: '2',
+        RATE_LIMIT_WINDOW_MS: '60000',
+      },
+    });
+    const first = [];
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      first.push((await asClient(h, '203.0.113.7')).statusCode);
+    }
+    expect(first).toEqual([200, 200, 429, 429]);
+    // Another visitor behind the same web replica has their own allowance.
+    expect((await asClient(h, '203.0.113.8')).statusCode).toBe(200);
+    expect((await asClient(h, '2001:db8::1')).statusCode).toBe(200);
+  });
+
+  it('ignores the header unless it is trusted: a client cannot pick its own bucket', async () => {
+    const h = await harness({ env: { RATE_LIMIT_MAX: '2', RATE_LIMIT_WINDOW_MS: '60000' } });
+    const statuses: number[] = [];
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      statuses.push((await asClient(h, `203.0.113.${attempt}`)).statusCode);
+    }
+    expect(statuses).toEqual([200, 200, 429, 429]);
+  });
+
+  it.each([
+    ['not an address', 'not-an-ip'],
+    ['a list', '203.0.113.1, 203.0.113.2'],
+    ['an address with a port', '203.0.113.1:443'],
+    ['an overlong value', '1'.repeat(60)],
+    ['an empty value', ''],
+  ])('falls back to the peer address for %s', async (_label, value) => {
+    const h = await harness({
+      env: {
+        TRUST_CLIENT_IP_HEADER: 'true',
+        RATE_LIMIT_MAX: '2',
+        RATE_LIMIT_WINDOW_MS: '60000',
+      },
+    });
+    // Different malformed values all land in the peer's single bucket.
+    const statuses = [
+      (await asClient(h, value)).statusCode,
+      (await asClient(h, `${value} `)).statusCode,
+      (await asClient(h, null)).statusCode,
+    ];
+    expect(statuses).toEqual([200, 200, 429]);
+  });
+
+  it('limits unauthenticated attempts per reported address as well', async () => {
+    const h = await harness({
+      env: {
+        TRUST_CLIENT_IP_HEADER: 'true',
+        RATE_LIMIT_MAX: '2',
+        RATE_LIMIT_WINDOW_MS: '60000',
+      },
+    });
+    const attempt = (address: string) =>
+      h.call('user_does_not_exist', {
+        method: 'GET',
+        url: '/api/v1/me',
+        headers: { 'x-cg-client-ip': address },
+      });
+    expect([
+      (await attempt('198.51.100.5')).statusCode,
+      (await attempt('198.51.100.5')).statusCode,
+      (await attempt('198.51.100.5')).statusCode,
+    ]).toEqual([401, 401, 429]);
+    expect((await attempt('198.51.100.6')).statusCode).toBe(401);
   });
 });
 

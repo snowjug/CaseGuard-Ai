@@ -49,6 +49,15 @@ describe('value parsing', () => {
     },
   );
 
+  it('does not believe the client address header unless it is switched on', () => {
+    expect(parsed({}).http.trustClientIpHeader).toBe(false);
+    expect(parsed({ TRUST_CLIENT_IP_HEADER: 'true' }).http.trustClientIpHeader).toBe(true);
+    expect(parsed({ TRUST_CLIENT_IP_HEADER: 'off' }).http.trustClientIpHeader).toBe(false);
+    expect(variablesOf({ TRUST_CLIENT_IP_HEADER: 'sometimes' })).toEqual([
+      'TRUST_CLIENT_IP_HEADER',
+    ]);
+  });
+
   it.each([
     ['4000', 4000],
     [' 4001 ', 4001],

@@ -231,6 +231,10 @@ var plainEnv = filter(
     { name: 'APP_VERSION', value: config.appVersion }
     { name: 'GIT_COMMIT', value: config.gitCommit }
     { name: 'LOG_LEVEL', value: config.logLevel }
+    // The API has INTERNAL ingress: its only caller is the web app, which sets x-cg-client-ip from the address
+    // its own ingress reported and removes any copy a client sent. Believing that header keeps per-client rate
+    // limits per visitor; without it every visitor behind one web replica would share a bucket.
+    { name: 'TRUST_CLIENT_IP_HEADER', value: 'true' }
     // The Container Apps ingress is the one proxy in front of the API: believe the address it appended to
     // X-Forwarded-For and ignore anything a client put before it (a hop count, never `true`).
     { name: 'TRUST_PROXY', value: '1' }

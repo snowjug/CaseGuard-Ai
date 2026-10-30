@@ -27,6 +27,13 @@ export interface HttpConfig {
   readonly port: number;
   readonly corsAllowedOrigins: readonly string[];
   readonly trustProxy: TrustProxySetting;
+  /**
+   * Believe the `x-cg-client-ip` header as the caller's address. The web tier (the only caller of an API
+   * with internal ingress) sets it from the address its own ingress reported and strips anything a client
+   * sent, which gives per-client rate limits behind a chain of proxies whose hop count is hard to pin down.
+   * Never enable it on an API that browsers or other untrusted callers can reach directly.
+   */
+  readonly trustClientIpHeader: boolean;
   readonly bodyLimitBytes: number;
   readonly uploadMaxBytes: number;
 }
