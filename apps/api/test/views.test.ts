@@ -16,27 +16,31 @@ import {
   EVIDENCE_CATEGORIES,
   METRIC_KEYS,
   TWIN_SECTIONS,
+  ActionRankingSchema,
   type AnalysisRun,
   type CaseEvent,
   type CaseResolution,
+  type ReviewDecision,
 } from '@caseguard/schemas';
 import type { Database } from '../src/db';
 import { TEST_DATABASE_STARTUP_TIMEOUT_MS } from '../src/db/testing';
 import { ENGINE_BUDGET_WINDOW_MS } from '../src/services/engine-budget';
 import { ViewCache, compareCases, overrideAction, reviewClaim } from '../src/services/views';
-import { buildIngestInput } from './builders';
+import { buildIngestInput, buildReviewDecision } from './builders';
 import {
   CONTOSO,
   FABRIKAM,
   PERSONAS,
   createHarness,
   openSharedDatabase,
+  type ApiResponse,
   type Harness,
   type Json,
 } from './support/app-harness';
 import { contextFor } from './support/context';
-import { SAMPLE_FILES, ingestSample } from './support/samples';
+import { SAMPLE_FILES, ingestSample, loadSampleBundle } from './support/samples';
 import { eventBySuffix, ingestOpenCase } from './views-support';
+import { ingestBundle } from './views-rewrite';
 
 const ONE = 'case_views_one';
 const TWO = 'case_views_two';
@@ -138,6 +142,8 @@ afterAll(async () => {
 });
 
 const api = (caseId: string, path = ''): string => `/api/v1/cases/${caseId}${path}`;
+/** The millisecond-precision UTC form of an instant, the form an override is recorded under. */
+const canonical = (iso: string): string => new Date(Date.parse(iso)).toISOString();
 /**
  * Every request starts with a full engine budget (the clock jumps a window), so the instants these
  * tests scan are never throttled; the metering is tested in views-temporal.test.ts.
@@ -1379,6 +1385,19 @@ describe('action value', () => {
       instant.candidates.map((entry: Json) => entry.actionKey),
     );
     expect(res.data.candidates.filter((entry: Json) => entry.override !== null)).toHaveLength(1);
+    // The same decision is listed with the ranking, apart from the candidate it is on.
+    expect(res.data.reviewerOverrides).toEqual([
+      {
+        instant: canonical(instant.asOf),
+        actionKey: target.actionKey,
+        actionName: target.label,
+        rank: 1,
+        reason,
+        by: PERSONAS.reviewer,
+        at: served.override.at,
+      },
+    ]);
+    expect(res.data.withheldOverrides).toBe(0);
 
     // It persists, and a newer decision for the same action replaces it.
     h.clock.advance(60_000);
@@ -1392,10 +1411,17 @@ describe('action value', () => {
     const again = (await get(api(ONE, `/action-values?asOf=${instant.asOf}`))).data;
     const current = again.candidates.find((entry: Json) => entry.actionKey === target.actionKey);
     expect(current.override.rank).toBe(2);
-    // Another instant is untouched.
+    // The newer decision replaced the older one in the list: one entry per instant and action.
+    expect(again.reviewerOverrides).toMatchObject([
+      { instant: canonical(instant.asOf), actionKey: target.actionKey, rank: 2 },
+    ]);
+    expect(again.withheldOverrides).toBe(0);
+    // Another instant is untouched: the override is about a later instant, so the window only counts it.
     const elsewhere = eventBySuffix(oneEvents, 'e07').timestamp;
     const other = (await get(api(ONE, `/action-values?asOf=${elsewhere}`))).data;
     expect(other.candidates.every((entry: Json) => entry.override === null)).toBe(true);
+    expect(other.reviewerOverrides).toEqual([]);
+    expect(other.withheldOverrides).toBe(1);
 
     const reviews = (await h.repos(CONTOSO).reviews.list({ caseId: ONE, limit: 100 })).items;
     const decisions = reviews.filter((item) => item.targetType === 'action_value');
@@ -1691,6 +1717,465 @@ describe('reviewer corrections survive a forced re-analysis', () => {
       expect(view.data.candidates.every((entry: Json) => entry.override === null)).toBe(true);
       expect(view.body).not.toContain('Reason-token-4b2a');
       expect(view.body).not.toContain('2026-07-02');
+    }
+  });
+});
+
+// ------------------------------------------------------------------------------------------
+// reviewer overrides listed with the ranking
+
+/** An override as the test recorded it; what a view may show is worked out from these alone. */
+interface Decided {
+  /** The canonical ranking instant it is about. */
+  readonly instant: string;
+  readonly actionKey: string;
+  readonly actionName: string;
+  readonly rank: number;
+  readonly reason: string;
+  /** The canonical instant it was decided: the harness clock when it was recorded. */
+  readonly at: string;
+}
+
+interface Picked {
+  /** The `asOf` the reviewer looked at. */
+  readonly instant: string;
+  readonly actionKey: string;
+  readonly label: string;
+}
+
+const pairOf = (entry: Decided): string => `${entry.instant}|${entry.actionKey}`;
+const shift = (iso: string, ms: number): string => new Date(Date.parse(iso) + ms).toISOString();
+
+/**
+ * What the policy lets a view that ends at `end` (null: the whole record) show: only what was decided
+ * by then AND is about an instant at or before it; per (instant, action) the latest such decision,
+ * newest first. What it cannot show it only counts, once per (instant, action).
+ */
+function visibleOverrides(decisions: readonly Decided[], end: string | null) {
+  const limit = end === null ? Number.POSITIVE_INFINITY : Date.parse(end);
+  const current = new Map<string, Decided>();
+  const newestFirst = [...decisions].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+  for (const entry of newestFirst) {
+    if (Date.parse(entry.at) > limit || Date.parse(entry.instant) > limit) continue;
+    if (!current.has(pairOf(entry))) current.set(pairOf(entry), entry);
+  }
+  const shown = [...current.values()];
+  return { shown, withheld: new Set(decisions.map(pairOf)).size - shown.length };
+}
+
+describe('reviewer overrides listed with the ranking', () => {
+  // Case One again under its own id, so these are the only decisions of the case while ONE (the same
+  // instants, the same actions) holds others, and the same id in the other tenant holds theirs.
+  const OVR = 'case_views_ovr';
+  let g: Harness;
+  let events: CaseEvent[];
+  let eventInstants: Set<string>;
+  let times: Record<'first' | 'fork' | 't07' | 't15' | 't24' | 't31', string>;
+  /** Every decision recorded so far, in the order recorded, and the answer to each. */
+  const decisions: Decided[] = [];
+  const answers: ApiResponse[] = [];
+  let dFuture: Decided;
+  let dFork: Decided;
+  let d1: Decided;
+  let d2: Decided;
+  let d3: Decided;
+  let d4: Decided;
+
+  const ask = (path: string, persona: string = PERSONAS.reviewer) => {
+    g.clock.advance(ENGINE_BUDGET_WINDOW_MS);
+    return g.call(persona, { method: 'GET', url: api(OVR, path) });
+  };
+  const rankedAt = (asOf: string) => ask(`/action-values?asOf=${asOf}`);
+  const reasonsOf = (list: Json[]): string[] => list.map((entry) => entry.reason);
+
+  const record = async (
+    about: Picked,
+    rank: number,
+    reason: string,
+    decidedAt: string,
+  ): Promise<Decided> => {
+    g.clock.set(decidedAt);
+    const res = await g.call(PERSONAS.reviewer, {
+      method: 'POST',
+      url: api(OVR, '/action-values/override'),
+      payload: { asOf: about.instant, actionKey: about.actionKey, rank, reason },
+    });
+    expect(res.statusCode, JSON.stringify(res.data)).toBe(200);
+    const decided: Decided = {
+      instant: canonical(about.instant),
+      actionKey: about.actionKey,
+      actionName: about.label,
+      rank,
+      reason,
+      at: canonical(decidedAt),
+    };
+    decisions.push(decided);
+    answers.push(res);
+    return decided;
+  };
+
+  const pick = async (asOf: string, index: number): Promise<Picked> => {
+    const candidate = (await rankedAt(asOf)).data.candidates[index];
+    return { instant: asOf, actionKey: candidate.actionKey, label: candidate.label };
+  };
+
+  /** One ranking response against what the policy allows it to show (see `visibleOverrides`). */
+  const expectOverrides = (
+    res: ApiResponse,
+    end: string | null,
+    recorded: readonly Decided[] = decisions,
+  ): void => {
+    expect(res.statusCode, res.body).toBe(200);
+    const body = res.data;
+    ActionRankingSchema.parse(body);
+    const { shown, withheld } = visibleOverrides(recorded, end);
+    expect(body.reviewerOverrides).toEqual(
+      shown.map((entry) => ({
+        instant: entry.instant,
+        actionKey: entry.actionKey,
+        actionName: entry.actionName,
+        rank: entry.rank,
+        reason: entry.reason,
+        by: PERSONAS.reviewer,
+        at: entry.at,
+      })),
+    );
+    expect(body.withheldOverrides).toBe(withheld);
+    // On a candidate only the override about the ranking's own instant is shown, as it always was.
+    const own = canonical(body.asOf);
+    const inline = Object.fromEntries(
+      body.candidates
+        .filter((entry: Json) => entry.override !== null)
+        .map((entry: Json) => [entry.actionKey, entry.override]),
+    );
+    expect(inline).toEqual(
+      Object.fromEntries(
+        shown
+          .filter((entry) => entry.instant === own)
+          .map((entry) => [
+            entry.actionKey,
+            { rank: entry.rank, reason: entry.reason, by: PERSONAS.reviewer, at: entry.at },
+          ]),
+      ),
+    );
+    // Nothing of a decision the view cannot show: not its reason, and not its time (unless that is
+    // also the instant of an event of the case, which the view knows by then).
+    for (const entry of recorded.filter((item) => !shown.includes(item))) {
+      expect(res.body, entry.reason).not.toContain(entry.reason);
+      if (!eventInstants.has(entry.at)) expect(res.body, entry.at).not.toContain(entry.at);
+    }
+  };
+
+  beforeAll(async () => {
+    g = await createHarness({ database });
+    const bundle = loadSampleBundle(SAMPLE_FILES.caseOne);
+    bundle.case.reference = 'CG-SYN-1902';
+    events = (await ingestBundle(g.repos(CONTOSO), CONTOSO, OVR, bundle)).events;
+    // The same case under the same id in the other tenant: its decisions must never reach this tenant.
+    await ingestBundle(g.repos(FABRIKAM), FABRIKAM, OVR, bundle);
+    await g.infra.services.analysis.analyzeCase(contextFor(g, PERSONAS.engineer), OVR);
+    await g.infra.services.analysis.analyzeCase(contextFor(g, PERSONAS.otherTenantEngineer), OVR);
+    eventInstants = new Set(events.map((event) => canonical(event.timestamp)));
+
+    const forks = (await ask('/forks')).data;
+    const earliest = forks.items.find((item: Json) => item.isEarliestMeaningful);
+    times = {
+      first: eventBySuffix(events, 'e01').timestamp,
+      fork: earliest.timestamp,
+      t07: eventBySuffix(events, 'e07').timestamp,
+      t15: eventBySuffix(events, 'e15').timestamp,
+      t24: eventBySuffix(events, 'e24').timestamp,
+      t31: eventBySuffix(events, 'e31').timestamp,
+    };
+    const ms = (iso: string): number => Date.parse(iso);
+    const d1At = shift(times.t07, 317_000);
+    // The decisions below are placed between these instants; the test is only as good as that order.
+    expect(ms(times.first)).toBeLessThan(ms(times.fork));
+    expect(ms(times.fork)).toBeLessThan(ms(times.t07));
+    expect(ms(d1At)).toBeLessThan(ms(times.t15));
+    expect(ms(times.t15)).toBeLessThan(ms(times.t24));
+    expect(ms(times.t24)).toBeLessThan(ms(times.t31));
+    expect(eventInstants.has(d1At)).toBe(false);
+
+    // An action that is a candidate both just before the earliest fork decision and at it.
+    const before = (await ask(`/action-values?forkId=${earliest.id}`)).data;
+    const atFork = (await rankedAt(times.fork)).data;
+    const shared = before.candidates.find((entry: Json) =>
+      atFork.candidates.some((other: Json) => other.actionKey === entry.actionKey),
+    );
+    if (shared === undefined)
+      throw new Error('The earliest fork has no candidate before and at it');
+    const aFork: Picked = { instant: times.fork, actionKey: shared.actionKey, label: shared.label };
+    const a1 = await pick(times.t07, 1);
+    const a2 = await pick(times.t15, 0);
+    const a3 = await pick(times.t31, 2);
+
+    // Recorded in the order of the wall clock, which only moves forward. The clock of the test is
+    // not the case's: one decision predates the instant it is about, one is made at an event's instant.
+    dFuture = await record(
+      a3,
+      1,
+      'Reason-token-ovr-future: decided before the case',
+      '2026-01-20T00:00:00.000Z',
+    );
+    dFork = await record(
+      aFork,
+      1,
+      'Reason-token-ovr-fork: the first fork',
+      '2026-01-25T00:00:00.000Z',
+    );
+    d1 = await record(a1, 2, 'Reason-token-ovr-first: while the case ran', d1At);
+    d2 = await record(a2, 1, 'Reason-token-ovr-second: at an event', canonical(times.t24));
+    d3 = await record(a1, 1, 'Reason-token-ovr-third: with hindsight', '2026-07-01T00:00:00.000Z');
+    d4 = await record(
+      a3,
+      2,
+      'Reason-token-ovr-fourth: with more hindsight',
+      '2026-07-02T00:00:00.000Z',
+    );
+  }, TEST_DATABASE_STARTUP_TIMEOUT_MS * 2);
+
+  afterAll(async () => {
+    await g.close();
+  });
+
+  it('[FR-AV-02] lists every override of the case with the whole-record ranking, newest decision first, one per instant and action', async () => {
+    const res = await ask('/action-values');
+    expectOverrides(res, null);
+    const body = res.data;
+    // The latest decision of each (instant, action) is listed; the two it replaced are not.
+    expect(reasonsOf(body.reviewerOverrides)).toEqual(
+      [d4, d3, d2, dFork].map((entry) => entry.reason),
+    );
+    expect(body.withheldOverrides).toBe(0);
+    // The ranking is the one at the last event: only the override about that instant is on a candidate,
+    // and the three about earlier instants are in the list alone.
+    expect(body.asOf).toBe(times.t31);
+    const inline = body.candidates.filter((entry: Json) => entry.override !== null);
+    expect(inline.map((entry: Json) => entry.actionKey)).toEqual([d4.actionKey]);
+    expect(inline[0].override).toEqual({
+      rank: 2,
+      reason: d4.reason,
+      by: PERSONAS.reviewer,
+      at: d4.at,
+    });
+    expect(body.reviewerOverrides[1]).toEqual({
+      instant: canonical(times.t07),
+      actionKey: d3.actionKey,
+      actionName: d3.actionName,
+      rank: 1,
+      reason: d3.reason,
+      by: PERSONAS.reviewer,
+      at: d3.at,
+    });
+    // The pack's name for the action, not its key.
+    for (const entry of body.reviewerOverrides as Json[]) {
+      expect(entry.actionName).not.toBe(entry.actionKey);
+    }
+  });
+
+  it('[FR-AV-02] answers the reviewer who just decided with the whole record, their own decision included', () => {
+    expect(answers).toHaveLength(decisions.length);
+    answers.forEach((res, index) => expectOverrides(res, null, decisions.slice(0, index + 1)));
+    // Deciding again about the same instant and action replaced its entry instead of adding one.
+    const afterThird = answers[decisions.indexOf(d3)]?.data;
+    expect(afterThird.reviewerOverrides).toHaveLength(4);
+    expect(
+      reasonsOf(
+        afterThird.reviewerOverrides.filter(
+          (entry: Json) => entry.instant === d3.instant && entry.actionKey === d3.actionKey,
+        ),
+      ),
+    ).toEqual([d3.reason]);
+  });
+
+  it('[FR-AV-02] shows a window neither the overrides decided after it nor their content, only how many it cannot show', async () => {
+    const window = async (end: string, shown: readonly Decided[], withheld: number) => {
+      const res = await rankedAt(end);
+      expectOverrides(res, end);
+      expect(reasonsOf(res.data.reviewerOverrides)).toEqual(shown.map((entry) => entry.reason));
+      expect(res.data.withheldOverrides).toBe(withheld);
+      return res;
+    };
+    // Four (instant, action) overrides exist. Before the first fork nothing is about an instant it knows.
+    await window(times.first, [], 4);
+    // The one decided before the case, about the fork's own instant, is in its window and on its candidate.
+    const atFork = await window(times.fork, [dFork], 3);
+    const onCandidate = atFork.data.candidates.find(
+      (entry: Json) => entry.actionKey === dFork.actionKey,
+    );
+    expect(onCandidate.override).toMatchObject({ rank: 1, reason: dFork.reason });
+    await window(times.t07, [dFork], 3);
+    // A decision is part of the window from its own instant on (the boundary is inclusive).
+    await window(shift(d1.at, -1), [dFork], 3);
+    await window(d1.at, [d1, dFork], 2);
+    await window(shift(d2.at, -1), [d1, dFork], 2);
+    await window(d2.at, [d2, d1, dFork], 1);
+    // The override about the last instant, decided long before it, is in no earlier window.
+    await window(shift(times.t31, -1), [d2, d1, dFork], 1);
+    const atLast = await window(times.t31, [d2, d1, dFork, dFuture], 0);
+    const lastInline = atLast.data.candidates.filter((entry: Json) => entry.override !== null);
+    expect(lastInline.map((entry: Json) => entry.override.reason)).toEqual([dFuture.reason]);
+    // Later decisions replace earlier ones from their own instant on, and not before.
+    await window('2026-06-30T23:59:59.999Z', [d2, d1, dFork, dFuture], 0);
+    await window(d3.at, [d3, d2, dFork, dFuture], 0);
+    await window(d4.at, [d4, d3, d2, dFork], 0);
+    await window('2026-12-31T00:00:00Z', [d4, d3, d2, dFork], 0);
+  });
+
+  it('[FR-AV-02] applies the same rule to the ranking just before a fork decision', async () => {
+    const forks = (await ask('/forks')).data.items as Json[];
+    expect(forks.length).toBeGreaterThan(3);
+    let listed = 0;
+    let withheld = 0;
+    for (const fork of forks) {
+      const res = await ask(`/action-values?forkId=${fork.id}`);
+      expect(res.data.asOf).toBe(fork.timestamp);
+      expectOverrides(res, fork.timestamp);
+      listed += res.data.reviewerOverrides.length;
+      withheld += res.data.withheldOverrides;
+    }
+    // Not vacuous: some windows list overrides and some withhold some.
+    expect(listed).toBeGreaterThan(0);
+    expect(withheld).toBeGreaterThan(0);
+    // The earliest fork: the decision about its own instant is on the candidate it concerns.
+    const earliest = forks.find((fork) => fork.isEarliestMeaningful);
+    const res = await ask(`/action-values?forkId=${earliest?.id}`);
+    expect(reasonsOf(res.data.reviewerOverrides)).toEqual([dFork.reason]);
+    expect(res.data.withheldOverrides).toBe(3);
+    const onCandidate = res.data.candidates.find(
+      (entry: Json) => entry.actionKey === dFork.actionKey,
+    );
+    expect(onCandidate.override).toMatchObject({ rank: 1, reason: dFork.reason });
+  });
+
+  it('[FR-AV-02] never shows a window more than it knew, at every instant of the case', async () => {
+    const instants = [
+      shift(times.first, -3_600_000),
+      ...events.map((event) => event.timestamp),
+      '2026-12-31T00:00:00Z',
+    ];
+    for (const instant of instants) expectOverrides(await rankedAt(instant), instant);
+  }, 600_000);
+
+  it('[NFR-SEC-01] never lists another tenant’s or another case’s overrides', async () => {
+    const theirs = 'Reason-token-ovr-fabrikam';
+    const sibling = 'Reason-token-ovr-sibling';
+    const about = `${canonical(times.t31)}|${d4.actionKey}`;
+    // The other tenant decides about the same instant and action of its own copy of the case,
+    // and another case of this tenant (ONE has the same instants and actions) does too.
+    await g.repos(FABRIKAM).reviews.record(
+      buildReviewDecision({
+        id: 'rev_ovr_fabrikam_1',
+        tenantId: FABRIKAM,
+        caseId: OVR,
+        targetType: 'action_value',
+        targetId: about,
+        decision: 'override',
+        newValue: { rank: 3 },
+        reason: theirs,
+        reviewerId: 'user_fabi_reviewer',
+        reviewerRole: 'reviewer',
+        decidedAt: '2026-08-01T00:00:00.000Z',
+      }),
+    );
+    await g.repos(CONTOSO).reviews.record(
+      buildReviewDecision({
+        id: 'rev_ovr_sibling_1',
+        tenantId: CONTOSO,
+        caseId: ONE,
+        targetType: 'action_value',
+        targetId: about,
+        decision: 'override',
+        newValue: { rank: 3 },
+        reason: sibling,
+        reviewerId: PERSONAS.reviewer,
+        reviewerRole: 'reviewer',
+        decidedAt: '2026-08-02T00:00:00.000Z',
+      }),
+    );
+
+    const fabrikam = await ask('/action-values', PERSONAS.otherTenantEngineer);
+    expect(fabrikam.statusCode, fabrikam.body).toBe(200);
+    expect(fabrikam.data.reviewerOverrides).toMatchObject([
+      { reason: theirs, by: 'user_fabi_reviewer', rank: 3 },
+    ]);
+    for (const entry of [...decisions, { reason: sibling }]) {
+      expect(fabrikam.body).not.toContain(entry.reason);
+    }
+
+    // This tenant's lists are what was decided here, whole record and windows alike.
+    for (const end of [null, times.t31, '2026-12-31T00:00:00Z']) {
+      const mine = await ask(end === null ? '/action-values' : `/action-values?asOf=${end}`);
+      expectOverrides(mine, end);
+      expect(mine.body).not.toContain(theirs);
+      expect(mine.body).not.toContain(sibling);
+    }
+
+    // The other case lists its own decisions and none of this case's, though the pairs coincide.
+    const other = await g.call(PERSONAS.reviewer, {
+      method: 'GET',
+      url: api(ONE, '/action-values'),
+    });
+    expect(other.statusCode, other.body).toBe(200);
+    const stored = (
+      await g.repos(CONTOSO).reviews.list({ caseId: ONE, targetType: 'action_value', limit: 200 })
+    ).items;
+    expect(reasonsOf(other.data.reviewerOverrides)).toContain(sibling);
+    expect(other.data.reviewerOverrides).toHaveLength(
+      new Set(stored.map((item) => item.targetId)).size,
+    );
+    for (const entry of decisions) expect(other.body).not.toContain(entry.reason);
+    expect(other.body).not.toContain(theirs);
+  });
+
+  it('[FR-AV-02] ignores stored decisions whose target id, value or kind is malformed, without failing', async () => {
+    const t31 = canonical(times.t31);
+    const key = d4.actionKey;
+    // Each would replace the current decision about the last instant if it were taken for an override.
+    const forged: Partial<ReviewDecision>[] = [
+      { targetId: 'garbage' },
+      { targetId: `${t31}|` },
+      { targetId: `${t31.replace('.000Z', 'Z')}|${key}` },
+      { targetId: `${t31}|${key}|more` },
+      { targetId: `${t31}|${'x'.repeat(81)}` },
+      { targetId: `${t31}|${key}`, newValue: { rank: 'first' } },
+      { targetId: `${t31}|${key}`, newValue: { rank: 0 } },
+      { targetId: `${t31}|${key}`, newValue: null },
+      { targetId: `${t31}|${key}`, decision: 'reject' },
+    ];
+    const paths = [
+      '/action-values',
+      `/action-values?asOf=${times.t24}`,
+      `/action-values?asOf=${times.t31}`,
+      '/action-values?asOf=2026-12-31T00:00:00Z',
+    ];
+    const before: string[] = [];
+    for (const path of paths) before.push((await ask(path)).body);
+
+    for (const [index, fields] of forged.entries()) {
+      await g.repos(CONTOSO).reviews.record(
+        buildReviewDecision({
+          id: `rev_ovr_forged_${index}`,
+          tenantId: CONTOSO,
+          caseId: OVR,
+          targetType: 'action_value',
+          decision: 'override',
+          newValue: { rank: 1 },
+          reason: 'Reason-token-ovr-forged',
+          reviewerId: PERSONAS.reviewer,
+          reviewerRole: 'reviewer',
+          decidedAt: '2026-09-01T00:00:00.000Z',
+          ...fields,
+        }),
+      );
+    }
+    for (const [index, path] of paths.entries()) {
+      const res = await ask(path);
+      expect(res.statusCode, res.body).toBe(200);
+      // Neither listed nor counted: the answer did not change at all.
+      expect(res.body, path).toBe(before[index]);
+      expect(res.body).not.toContain('Reason-token-ovr-forged');
     }
   });
 });

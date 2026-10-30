@@ -263,6 +263,28 @@ export const ActionValueBreakdownSchema = z.object({
 });
 export type ActionValueBreakdown = z.infer<typeof ActionValueBreakdownSchema>;
 
+/** The most reviewer overrides one action ranking lists. */
+export const ACTION_OVERRIDES_LISTED_MAX = 200;
+
+/**
+ * A reviewer's override of the action ranking as the ranking lists it, apart from the candidate it
+ * concerns: which ranking it was recorded about (`instant`), the rank the reviewer preferred, why, who
+ * decided and when. The machine rank and score of the action are never changed by it.
+ */
+export const ActionOverrideRecordSchema = z.object({
+  /** The ranking instant the reviewer looked at (UTC, millisecond precision). */
+  instant: IsoTimestampSchema,
+  actionKey: z.string(),
+  /** The knowledge pack's name for the action when it can be resolved, otherwise its key. */
+  actionName: z.string(),
+  rank: z.number().int().min(1),
+  reason: z.string(),
+  by: z.string(),
+  /** When the reviewer decided. */
+  at: IsoTimestampSchema,
+});
+export type ActionOverrideRecord = z.infer<typeof ActionOverrideRecordSchema>;
+
 export const ActionRankingSchema = z.object({
   caseId: IdSchema,
   asOf: IsoTimestampSchema,
@@ -280,6 +302,21 @@ export const ActionRankingSchema = z.object({
   ),
   candidates: z.array(ActionValueBreakdownSchema),
   blocked: z.array(ActionValueBreakdownSchema),
+  /**
+   * The reviewer overrides of the case this view may show, newest decision first, the latest decision
+   * per (instant, action) only. The whole record lists every override of the case; a window (`asOf` or
+   * `forkId`) lists only those decided, and about an instant, at or before its end. A candidate shows
+   * inline (`override`) only the one about this ranking's own instant. Absent from servers that predate it.
+   */
+  reviewerOverrides: z
+    .array(ActionOverrideRecordSchema)
+    .max(ACTION_OVERRIDES_LISTED_MAX)
+    .optional(),
+  /**
+   * How many (instant, action) overrides the window cannot show: a count, never content. 0 for the whole
+   * record. Absent from servers that predate it.
+   */
+  withheldOverrides: z.number().int().min(0).optional(),
 });
 export type ActionRanking = z.infer<typeof ActionRankingSchema>;
 

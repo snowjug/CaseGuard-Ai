@@ -456,7 +456,7 @@ export const ROUTES = {
   'actionValue.rank': {
     method: 'GET',
     path: `${API_PREFIX}/cases/:caseId/action-values`,
-    summary: 'Rank candidate next actions with transparent calculation and sensitivity',
+    summary: 'Rank next actions: transparent calculation, sensitivity, reviewer overrides',
     tags: ['Case analysis'],
     permission: 'case:read',
     params: CaseParams,

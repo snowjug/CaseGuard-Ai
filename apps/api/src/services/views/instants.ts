@@ -18,6 +18,16 @@ export function canonicalInstant(iso: string): string {
   return new Date(ms).toISOString();
 }
 
+const CANONICAL_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+/** The time (ms) of text written exactly the way `canonicalInstant` writes an instant; null for any other text. */
+export function parseCanonicalInstant(text: string): number | null {
+  if (!CANONICAL_INSTANT.test(text)) return null;
+  const ms = Date.parse(text);
+  // The round trip refuses dates the parser would silently roll over, such as February 30th.
+  return !Number.isNaN(ms) && new Date(ms).toISOString() === text ? ms : null;
+}
+
 /** Orders two ISO timestamps as instants. */
 export function compareInstants(a: string, b: string): number {
   return Date.parse(a) - Date.parse(b);

@@ -20,6 +20,7 @@ import {
   compareInstants,
   compareText,
   knownBy,
+  parseCanonicalInstant,
 } from '../src/services/views/instants';
 import { LruCache } from '../src/services/views/lru';
 import {
@@ -124,6 +125,28 @@ describe('instants', () => {
     expect(compareText('a', 'b')).toBe(-1);
     expect(compareText('b', 'a')).toBe(1);
     expect(compareText('a', 'a')).toBe(0);
+  });
+
+  it('[FR-AV-02] reads only the exact canonical form of an instant', () => {
+    const canonical = '2026-03-09T09:41:00.000Z';
+    expect(parseCanonicalInstant(canonical)).toBe(Date.parse(canonical));
+    expect(parseCanonicalInstant(canonicalInstant('2026-03-09T09:41:00.5Z'))).toBe(
+      Date.parse('2026-03-09T09:41:00.500Z'),
+    );
+    for (const text of [
+      '',
+      'nope',
+      '2026-03-09T09:41:00Z',
+      '2026-03-09T09:41:00.0000Z',
+      '2026-03-09T09:41:00.000+00:00',
+      '2026-03-09 09:41:00.000Z',
+      '2026-13-09T09:41:00.000Z',
+      // The parser would roll these over to the next month, which is not the instant the text names.
+      '2026-02-30T00:00:00.000Z',
+      '2026-04-31T00:00:00.000Z',
+    ]) {
+      expect(parseCanonicalInstant(text), text).toBeNull();
+    }
   });
 });
 

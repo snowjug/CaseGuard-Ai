@@ -51,12 +51,12 @@ seeded by it would show confidence ranges that change with text recorded after t
 A decision made by a person takes part in a view only from the moment it was made. An as-of response is
 a function of the record and of the human input made up to the instant, nothing else.
 
-| Input                                        | In a window ending at `asOf`                                                                                                                                                  | In the whole record (no `asOf`) |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| Claim review (label, state, note, who, when) | Shown only if `reviewedAt <= asOf`. Otherwise the machine classification, `pending`, no note, no reviewer.                                                                    | Always                          |
-| Action-value override                        | Shown only if `decidedAt <= asOf`; the latest decision made by then wins. A later one leaves no trace (no reason, rank, `by`, `at`). Also for a decision-time view of a fork. | The latest decision             |
-| Warning dismissal                            | Applied by the replay only if `at <= asOf`                                                                                                                                    | Applied                         |
-| Fork review                                  | Shown only if the fork was not updated after `asOf` (a fork records no review time)                                                                                           | Always                          |
+| Input                                        | In a window ending at `asOf`                                                                                                                                                                                                                                                                                                                                                     | In the whole record (no `asOf`)                                                                   |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Claim review (label, state, note, who, when) | Shown only if `reviewedAt <= asOf`. Otherwise the machine classification, `pending`, no note, no reviewer.                                                                                                                                                                                                                                                                       | Always                                                                                            |
+| Action-value override                        | Listed in `reviewerOverrides` only if it was decided by `asOf` AND is about an instant at or before it; the latest decision made by then wins per (instant, action). On a candidate (`override`) only for the ranking's own instant. Everything else leaves no trace but its count in `withheldOverrides`: no reason, rank, `by`, `at`. Also for a decision-time view of a fork. | Every override of the case: the latest decision per (instant, action), newest first (200 at most) |
+| Warning dismissal                            | Applied by the replay only if `at <= asOf`                                                                                                                                                                                                                                                                                                                                       | Applied                                                                                           |
+| Fork review                                  | Shown only if the fork was not updated after `asOf` (a fork records no review time)                                                                                                                                                                                                                                                                                              | Always                                                                                            |
 
 Why labels too, not only notes: a reviewer who knows the root cause upgrades an assumption to a
 confirmed fact; shown in an earlier window that label would be hindsight even with no note. The metamorphic
@@ -65,6 +65,20 @@ test (`views-metamorphic.int.test.ts`) fails if any of this input is visible in 
 The one exception is the stored `version` (claims, forks, warnings): a review started from a window
 needs it for the optimistic lock. It tells that something was edited, not what or when. `updatedAt`,
 which a later decision moves, stays out of a window.
+
+**Overrides in the ranking.** An override is recorded about one ranking instant and one action (review
+target id `<canonical instant>|<action key>`) and decided at the wall-clock time of the review, normally
+long after that instant. So it can never be part of a window that ends at the instant it is about, and
+showing it only on a candidate would make it visible on the ranking of the case's last event alone. The
+ranking therefore carries `reviewerOverrides` next to its candidates: one entry per (instant, action),
+the latest decision, newest first, with `instant`, `actionKey`, `actionName` (the pack's name, else the
+key), `rank`, `reason`, `by` and `at`. The candidates keep `override` exactly as before (only the
+override about the ranking's own instant). A window lists only what was both decided and is about an
+instant by its end. `withheldOverrides` is how many (instant, action) overrides of the case it cannot
+list: a count, never content, like `withheldFutureEventCount` for events; it does tell that later
+reviewer input exists. One bounded pass over the case's `action_value` decisions (25 pages of 200)
+builds both views; reaching that bound, or listing more than 200 entries, is logged with counts only,
+and a decision whose target id or value is malformed is ignored and counted nowhere.
 
 The response to the person who just decided (`claims.review`, `actionValue.override`) shows the whole
 record, their own decision included. Reasons go to the review record only: never to audit details or
@@ -91,4 +105,5 @@ did not know.
 | `views-metamorphic.int.test.ts` | Byte-identical as-of responses between the real cases and copies with everything after the cut rewritten                                  |
 | `views-cache.test.ts`           | One pass per window, the budget, the size-bounded cache, seeds (no database)                                                              |
 | `views-units.test.ts`           | Overlays, paging, filters, LRU, helpers                                                                                                   |
+| `views-overrides.test.ts`       | The override scan (no database): list, window and withheld count, latest per pair, malformed decisions, the 200 and 25-page bounds        |
 | `engine-budget.test.ts`         | The token bucket                                                                                                                          |
