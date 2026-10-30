@@ -25,24 +25,42 @@ function parseJson(text: string): JsonResult {
   }
 }
 
-function parseTenantMap(ctx: BuildContext, text: string | undefined): Record<string, string> {
-  if (text === undefined) {
-    ctx.fail(
-      'ENTRA_TENANT_MAP',
-      'is required when AUTH_MODE=entra: a JSON object mapping Entra tenant ids to CaseGuard tenant ids',
-    );
-    return {};
-  }
-  const json = parseJson(text);
+export type EntraTenantMapResult =
+  | { readonly ok: true; readonly map: Readonly<Record<string, string>> }
+  | { readonly ok: false; readonly reason: 'missing' | 'invalid' };
+
+/** Same limit as the raw environment value (`ENTRA_TENANT_MAP: envString(4_000)`). */
+const MAX_TENANT_MAP_CHARS = 4_000;
+
+/**
+ * Parses the text of `ENTRA_TENANT_MAP`: a non-empty JSON object that maps Entra tenant ids (GUIDs)
+ * to CaseGuard tenant ids, in the order written. Pure and free of the rest of the configuration, so
+ * tooling that only has a few variables (the database migration job, which provisions the mapped
+ * tenants) can read the map without `loadConfig`. The result never contains the text, so a caller
+ * can report `missing`/`invalid` without echoing it.
+ */
+export function parseEntraTenantMap(text: string | undefined): EntraTenantMapResult {
+  const trimmed = text?.trim() ?? '';
+  if (trimmed === '') return { ok: false, reason: 'missing' };
+  if (trimmed.length > MAX_TENANT_MAP_CHARS) return { ok: false, reason: 'invalid' };
+  const json = parseJson(trimmed);
   const parsed = json.ok ? TenantMapSchema.safeParse(json.value) : null;
   if (!parsed?.success || Object.keys(parsed.data).length === 0) {
-    ctx.fail(
-      'ENTRA_TENANT_MAP',
-      'must be a non-empty JSON object mapping Entra tenant ids (GUIDs) to CaseGuard tenant ids',
-    );
-    return {};
+    return { ok: false, reason: 'invalid' };
   }
-  return parsed.data;
+  return { ok: true, map: parsed.data };
+}
+
+function parseTenantMap(ctx: BuildContext, text: string | undefined): Record<string, string> {
+  const result = parseEntraTenantMap(text);
+  if (result.ok) return { ...result.map };
+  ctx.fail(
+    'ENTRA_TENANT_MAP',
+    result.reason === 'missing'
+      ? 'is required when AUTH_MODE=entra: a JSON object mapping Entra tenant ids to CaseGuard tenant ids'
+      : 'must be a non-empty JSON object mapping Entra tenant ids (GUIDs) to CaseGuard tenant ids',
+  );
+  return {};
 }
 
 function parseRoleMap(ctx: BuildContext, text: string | undefined): Record<string, Role> {

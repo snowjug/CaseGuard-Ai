@@ -7,6 +7,9 @@ development and tests) and on **PostgreSQL 16** (production).
 ```
 client.ts            createDatabase({ url, auth?, poolMax? }) -> Database (pg pool or PGlite)
 migrate.ts           migrate(db), getMigrationStatus(db); migrate-cli.ts is `pnpm db:migrate`
+                     (the logic is migrate-command.ts: arguments, migrations, tenant provisioning)
+provision.ts         provisionTenants(db, tenants), findMissingTenants(db, ids): the tenant rows a
+                     deployed environment needs before the first sign-in
 migrations/*.sql     the full schema (tables, indexes, triggers, RLS, grants)
 repositories/        one class per interface in types.ts; createRepositories(db, deps?)
                      (specs-*.ts hold the entity <-> table projections, re-exported by table-specs.ts;
@@ -252,6 +255,54 @@ that fails is rolled back whole and reported with its name, the SQLSTATE and the
 for example `Migration 0010_case_reference_unique failed and was rolled back (database error 23505 (table
 cases, constraint cases_tenant_reference_uq))`. Application code needs the schema it was written for: run the
 migrations before starting a new version (`DB_AUTO_MIGRATE` does).
+
+## Tenant provisioning (OP-7)
+
+A deployed environment (`DB_AUTO_MIGRATE=false`, Entra sign-in) never runs `seedFoundation`, so nothing created
+the `tenants` row that the first sign-in of an `ENTRA_TENANT_MAP` tenant needs: the just-in-time user insert
+failed its foreign key. The migration job (`dist/db/migrate-cli.js`, also `pnpm db:migrate`) now provisions it:
+
+```
+pnpm db:migrate [--status] [--tenant <id>]...
+```
+
+- Without `--status`: applies pending migrations, then `provisionTenants` for the values of `ENTRA_TENANT_MAP`
+  (in the order written; read with `parseEntraTenantMap` from `@caseguard/config`, no other configuration is
+  loaded, so the `DATABASE_*` variables are enough) and for every `--tenant <id>` (repeatable; `--tenant=<id>`
+  works too). It prints one line per tenant: `Tenants: <id> created` or `Tenants: <id> already provisioned`.
+- With `--status`: writes nothing and adds `Tenants: <id> provisioned` or `Tenants: <id> missing`; exit code 1
+  when a requested tenant is missing (as when migrations are pending).
+- Exit codes: 0 success, 1 failure (including an invalid tenant id or map, which is rejected before the
+  database is opened and reported by name, never by value), 2 usage. Nothing printed holds a connection string,
+  a secret or a token; an error of unknown origin is reduced to its class name or code.
+
+`provisionTenants(db, tenants, { now? })` returns `{ created, existing }` and is idempotent and additive:
+
+- It inserts the tenant row (name defaults to the id, `synthetic` to `false`, slug to a lower-case hyphenated
+  derivation of the id that gets `-2`, `-3` ... when another tenant already has it) and every governance
+  section that is missing at version 1 (`updated_by` `system:provision`, note "Default configuration").
+- It never updates or deletes. An existing tenant (name, slug, `synthetic`, edited settings, users) is left as it
+  is and reported as `existing`. The two reserved fixture ids `tenant_contoso_support` and `tenant_fabrikam_lab`
+  are provisioned as exactly the synthetic rows `seedFoundation` creates, so a later seed changes nothing.
+- It validates before touching the database and rejects instead of cleaning: ids by `IdSchema`, explicit slugs
+  `^[a-z0-9]+(-[a-z0-9]+)*$` up to 60 characters (stricter than the schema), names of 1-120 characters without
+  control characters or surrounding spaces, at most 200 tenants per call. Messages name the entry
+  (`tenants.2.id`) and never echo the value.
+- All tenants go in one transaction, in id order (concurrent runs lock in the same order).
+- It writes no user, no personal data and **no audit event** (recording who ran the job is not implemented).
+
+**Why there is no migration for it.** `tenants` and `governance_settings` have forced row-level security
+(migration 0002) and the runtime role `caseguard_app` may only read tenants, by design. The role that applies the
+migrations owns the tables and is subject to the same forced policy, so, as `seedFoundation` does,
+`provisionTenants` sets `app.tenant_id` to the tenant it writes and the policy admits exactly that tenant's rows:
+no new policy, no `SECURITY DEFINER` function and no extra privilege for the runtime role. It must therefore run
+on the owner (migration) connection; when the database refuses (SQLSTATE 42501) the error says so.
+`test/provision.int.test.ts` runs it as a non-superuser owner and shows that a raw insert without a tenant context,
+or for another tenant, is refused, that `caseguard_app` still cannot create a tenant, and that two provisioned
+tenants stay isolated. A superuser bypasses row-level security and the same statements work.
+
+Verified on PGlite only (including the non-superuser owner above). It has not been run against PostgreSQL 16 or
+Azure Database for PostgreSQL, and concurrent runs cannot be exercised on PGlite's single connection.
 
 ## Conventions
 

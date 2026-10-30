@@ -19,7 +19,8 @@ export const FABRIKAM_TENANT_ID = 'tenant_fabrikam_lab';
 
 const SEED_ACTOR = 'system:seed';
 
-const TENANT_DEFINITIONS: readonly Omit<Tenant, 'createdAt'>[] = [
+/** The reserved synthetic fixture tenants; provisioning creates exactly these rows for these ids. */
+export const SYNTHETIC_TENANT_DEFINITIONS: readonly Omit<Tenant, 'createdAt'>[] = [
   {
     id: CONTOSO_TENANT_ID,
     name: 'Contoso Support (synthetic)',
@@ -125,7 +126,7 @@ export async function seedFoundation(
   const stamp = (options.now ?? (() => new Date()))().toISOString();
   return db.transaction(async (tx) => {
     const summary: SeedSummary = { tenantsCreated: 0, usersCreated: 0, settingsCreated: 0 };
-    for (const definition of TENANT_DEFINITIONS) {
+    for (const definition of SYNTHETIC_TENANT_DEFINITIONS) {
       await tx.query("SELECT set_config('app.tenant_id', $1, true)", [definition.id]);
       const tenant = TenantSchema.parse({ ...definition, createdAt: stamp });
       summary.tenantsCreated += await insertRows(tx, TENANTS, [tenant], 'ignore');

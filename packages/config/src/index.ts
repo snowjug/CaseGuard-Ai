@@ -8,7 +8,11 @@ export {
   type EnvSource,
   type LoadConfigOptions,
 } from './load';
-export { DEFAULT_ENTRA_ROLE_MAP } from './sections/auth';
+export {
+  DEFAULT_ENTRA_ROLE_MAP,
+  parseEntraTenantMap,
+  type EntraTenantMapResult,
+} from './sections/auth';
 export { APP_ENVS, LOG_LEVELS } from './raw-env';
 export type {
   AiConfig,

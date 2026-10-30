@@ -19,6 +19,16 @@ export {
   seedFoundation,
   type SeedSummary,
 } from './seed';
+export {
+  MAX_PROVISIONED_TENANTS,
+  PROVISIONING_ACTOR,
+  findMissingTenants,
+  isValidTenantId,
+  provisionTenants,
+  type ProvisionOptions,
+  type TenantProvisioningRequest,
+  type TenantProvisioningResult,
+} from './provision';
 export { createIdGenerator, isGeneratedId, type IdGenerator } from './ids';
 export { canonicalJson, sha256Hex } from './hash';
 export { AUDIT_GENESIS_HASH, computeAuditHash } from './repositories/audit-repository';
