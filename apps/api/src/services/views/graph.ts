@@ -46,7 +46,7 @@ export async function getGraph(
 ): Promise<InvestigationGraph> {
   const asOf = query.asOf ?? null;
   const state = await loadViewState(ctx, caseId);
-  const computation = computationFor(deps, state, asOf);
+  const computation = computationFor(ctx, deps, state, asOf);
   const [analysis, scenario, skills] = await Promise.all([
     computation.analysis(),
     query.scenarioId === undefined ? null : loadScenario(ctx, caseId, query.scenarioId),

@@ -6,59 +6,86 @@ import {
   createFullView,
   createTemporalView,
   replayWarnings,
-  runDeterministicAnalysis,
+  type AnalysisInput,
   type DeterministicAnalysis,
   type EngineContext,
   type TemporalView,
   type WarningDismissal,
   type WarningReplay,
 } from '@caseguard/domain';
-import type {
-  ActionRanking,
-  AnalysisRun,
-  CaseEvent,
-  MetricEstimate,
-  QualityAssessment,
-} from '@caseguard/schemas';
-import { canonicalJson, sha256Hex } from '@caseguard/security';
-import { engineContextForRun, type AnalysisInputs } from '../analysis/inputs';
+import type { AnalysisRun, CaseEvent, MetricEstimate, QualityAssessment } from '@caseguard/schemas';
+import type { AnalysisInputs } from '../analysis/inputs';
+import type { EngineBudget, EngineBudgetCaller } from '../engine-budget';
+import { canonicalInstant } from './instants';
 import { LruCache } from './lru';
+import {
+  PassCache,
+  inputsFingerprint,
+  passContext,
+  passKey,
+  passView,
+  type PassCacheOptions,
+  type PassEntry,
+  type RankingCore,
+} from './passes';
 import { requireRun, type ViewState } from './state';
 
-/** About sixteen recomputed views stay warm: a time scrubber revisits a handful of instants. */
-export const VIEW_CACHE_CAPACITY = 16;
-
-/** The part of an action ranking that does not depend on reviewer overrides. */
-export type RankingCore = Pick<ActionRanking, 'posterior' | 'candidates' | 'blocked'>;
-
-/** Each engine pass is synchronous: let queued I/O run first so a heavy case cannot starve requests. */
-const yieldToEventLoop = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+export type { RankingCore } from './passes';
 
 /**
- * One analysis of one temporal view of a case, computed lazily and at most once. `asOf: null` is the
- * whole record (exactly the stored analysis: same context, so the same artefact ids); an instant is
- * the engine run on only what was known then. Nothing here is ever a filtered copy of the final
- * analysis, so no later event can reach a response through it.
+ * Boundaries kept warm. A boundary holds only the small results that depend on the exact instant
+ * (quality, metrics, warning replays), never events or a pass, so a larger LRU than the pass cache's
+ * is cheap: a few tens of KiB each.
+ */
+export const VIEW_BOUNDARY_CAPACITY = 128;
+
+/** What is memoised for one boundary (one instant of one run), shared by everyone who asks for it. */
+class BoundaryMemo {
+  quality: QualityAssessment | undefined;
+  metrics: MetricEstimate[] | undefined;
+  readonly warnings = new Map<string, WarningReplay>();
+  /** True once some request has paid the engine budget for cold work at this boundary. */
+  paid = false;
+}
+
+/**
+ * One request's view of one temporal boundary of a case, computed lazily. `asOf: null` is the whole
+ * record (exactly the stored analysis: same context, so the same artefact ids and bands); an instant is
+ * the engine run on only what was known then. Nothing here is a filtered copy of the final analysis, so
+ * no later event can reach a response through it.
+ *
+ * COST. The expensive engine pass is shared by every boundary of the same window (see `passes.ts`).
+ * The results that depend on the exact instant (quality, metrics, the warning replay, a ranking) are
+ * memoised per boundary. Only cold work is charged to the engine budget, and a request is charged at
+ * most once: a cold pass always costs a unit; the per-instant work costs one when nobody has paid for
+ * this boundary yet. So a fresh instant costs one unit however many views of it are asked for, and a
+ * flood of instants one millisecond apart is bounded by the budget like any other.
  */
 export class ViewComputation {
   readonly view: TemporalView;
   readonly engineCtx: EngineContext;
-  private analysisMemo: DeterministicAnalysis | undefined;
-  private qualityMemo: QualityAssessment | undefined;
-  private metricsMemo: MetricEstimate[] | undefined;
-  private readonly warningMemo = new Map<string, WarningReplay>();
-  private readonly rankingMemo = new Map<string, RankingCore>();
+  private readonly entry: PassEntry;
+  private analysisMemo: Promise<DeterministicAnalysis> | undefined;
+  private charged = false;
 
   constructor(
     readonly inputs: AnalysisInputs,
     readonly run: AnalysisRun,
+    /** The boundary as the client wrote it, for echoing; null is the whole record. */
     readonly asOf: string | null,
+    private readonly memo: BoundaryMemo,
+    private readonly passes: PassCache,
+    private readonly fingerprint: string,
+    private readonly charge: (() => void) | undefined,
   ) {
-    this.engineCtx = engineContextForRun(run);
     this.view =
       asOf === null
         ? createFullView(inputs.events, inputs.resolution)
-        : createTemporalView(inputs.events, asOf, { resolution: inputs.resolution });
+        : createTemporalView(inputs.events, canonicalInstant(asOf), {
+            resolution: inputs.resolution,
+          });
+    this.engineCtx = passContext(run, inputs, this.view);
+    this.entry = passes.entry(passKey(run, this.view, fingerprint), this.view.events.length);
   }
 
   /** The events inside the boundary, in record order. */
@@ -71,43 +98,74 @@ export class ViewComputation {
     return this.view.withheldFutureEventCount;
   }
 
+  /**
+   * Spends this request's one unit of the engine budget on the first cold computation it needs. A pass
+   * (`'pass'`) is always charged; per-instant work (`'instant'`) is free when someone has already paid
+   * for this boundary. Whoever pays marks the boundary paid. It throws, before any work, when the
+   * budget is empty.
+   */
+  private chargeOnce(scope: 'pass' | 'instant'): void {
+    if (this.charged || (scope === 'instant' && this.memo.paid)) return;
+    this.charge?.();
+    this.charged = true;
+    this.memo.paid = true;
+  }
+
+  /**
+   * The analysis of this boundary: the window's shared pass, carrying the exact boundary view. It
+   * always answers with a promise, also when the engine budget refuses (a 429) before any work starts.
+   */
   async analysis(): Promise<DeterministicAnalysis> {
     if (this.analysisMemo === undefined) {
-      await yieldToEventLoop();
-      this.analysisMemo ??= runDeterministicAnalysis({
-        view: this.view,
+      // The pass runs on the window's own boundary view, which is only built if the pass is cold.
+      const makeInput = (): AnalysisInput => ({
+        view: passView(this.inputs, this.view),
         pack: this.inputs.pack,
         config: this.inputs.actionConfig,
         ctx: this.engineCtx,
       });
+      this.analysisMemo = this.passes
+        .analysis(this.entry, makeInput, () => this.chargeOnce('pass'))
+        .then((pass) => ({ ...pass, view: this.view }));
     }
     return this.analysisMemo;
   }
 
-  /** The Case Quality Index of this view, scored on the view's own analysis. */
+  /** The Case Quality Index of this boundary, scored on its own analysis. */
   async quality(): Promise<QualityAssessment> {
+    const memo = await this.canonicalQuality();
+    // The memo is shared by every spelling of the instant, so the echo is this request's own.
+    return memo.asOf === this.asOf ? memo : { ...memo, asOf: this.asOf };
+  }
+
+  private async canonicalQuality(): Promise<QualityAssessment> {
     const analysis = await this.analysis();
-    this.qualityMemo ??= computeQualityReview({
-      analysis,
-      pack: this.inputs.pack,
-      ctx: this.engineCtx,
-      config: this.inputs.qualityConfig,
-      actionConfig: this.inputs.actionConfig,
-      asOf: this.asOf,
-    });
-    return this.qualityMemo;
+    const { inputs } = this;
+    if (this.memo.quality === undefined) {
+      this.chargeOnce('instant');
+      this.memo.quality = computeQualityReview({
+        analysis,
+        pack: inputs.pack,
+        ctx: this.engineCtx,
+        config: inputs.qualityConfig,
+        actionConfig: inputs.actionConfig,
+        asOf: this.asOf === null ? null : canonicalInstant(this.asOf),
+      });
+    }
+    return this.memo.quality;
   }
 
   /**
-   * Metric estimates of this view. No counterfactual scenario is passed: a scenario compares itself
+   * Metric estimates of this boundary. No counterfactual scenario is passed: a scenario compares itself
    * with the whole real path, which an as-of window must not see, so Avoidable Support Effort reports
    * honestly that it cannot be estimated here.
    */
   async metrics(): Promise<MetricEstimate[]> {
     const analysis = await this.analysis();
-    const review = await this.quality();
+    const review = await this.canonicalQuality();
     const { inputs } = this;
-    if (this.metricsMemo === undefined) {
+    if (this.memo.metrics === undefined) {
+      this.chargeOnce('instant');
       const avoidable = computeAvoidableEffort({ analysis, pack: inputs.pack, scenarios: [] });
       const efficiency = computeEfficiency({
         analysis,
@@ -117,7 +175,7 @@ export class ViewComputation {
         unitPrices: inputs.unitPrices,
         avoidable,
       });
-      this.metricsMemo = buildMetricEstimates({
+      this.memo.metrics = buildMetricEstimates({
         analysis,
         pack: inputs.pack,
         ctx: this.engineCtx,
@@ -128,12 +186,13 @@ export class ViewComputation {
         actionConfig: inputs.actionConfig,
       });
     }
-    return this.metricsMemo;
+    return this.memo.metrics;
   }
 
   /**
-   * The live-warning replay over this view's own analysis. Dismissals made at or before the boundary
-   * continue the lifecycle; later ones are not yet known and are ignored by the replay itself.
+   * The live-warning replay over this boundary's own analysis. Dismissals made at or before the
+   * boundary continue the lifecycle; later ones are not yet known and are ignored by the replay. The
+   * replay re-evaluates the rules at every event, which costs about as much as a pass.
    */
   async warnings(dismissals: readonly WarningDismissal[]): Promise<WarningReplay> {
     const boundary = this.asOf === null ? Number.POSITIVE_INFINITY : Date.parse(this.asOf);
@@ -142,82 +201,120 @@ export class ViewComputation {
       .map((d) => `${d.dedupeKey}@${d.at}`)
       .sort()
       .join('|');
-    const cached = this.warningMemo.get(key);
+    const cached = this.memo.warnings.get(key);
     if (cached !== undefined) return cached;
 
+    this.chargeOnce('instant');
     const analysis = await this.analysis();
+    const { inputs } = this;
     const replay = replayWarnings({
-      events: this.inputs.events,
-      resolution: this.inputs.resolution,
-      pack: this.inputs.pack,
+      events: inputs.events,
+      resolution: inputs.resolution,
+      pack: inputs.pack,
       ctx: this.engineCtx,
-      config: this.inputs.actionConfig,
-      ...(this.asOf === null ? {} : { asOf: this.asOf }),
+      config: inputs.actionConfig,
+      ...(this.asOf === null ? {} : { asOf: canonicalInstant(this.asOf) }),
       analysis,
       dismissals: relevant,
     });
-    this.warningMemo.set(key, replay);
+    this.memo.warnings.set(key, replay);
     return replay;
   }
 
-  /** Memoises an action ranking built for this view (or for a decision moment inside it). */
+  /**
+   * Memoises an action ranking built for this window (or for a decision moment inside it). A ranking
+   * depends on the visible events alone, so every boundary of the window shares it; building one
+   * re-reads those events, so a cold one is charged like other per-instant work.
+   */
   rankingFor(key: string, build: () => RankingCore): RankingCore {
-    const cached = this.rankingMemo.get(key);
+    const cached = this.entry.rankings.get(key);
     if (cached !== undefined) return cached;
+    this.chargeOnce('instant');
     const built = build();
-    this.rankingMemo.set(key, built);
+    this.entry.rankings.set(key, built);
     return built;
   }
 }
 
-/**
- * What a recomputation depends on besides the immutable record: the two governed configurations and
- * the unit prices. Governance may change them after an analysis, so they are part of the cache key.
- */
-function inputsFingerprint(inputs: AnalysisInputs): string {
-  return sha256Hex(
-    canonicalJson({
-      action: inputs.actionConfig,
-      quality: inputs.qualityConfig,
-      prices: inputs.unitPrices,
-      pack: [inputs.pack.pack.id, inputs.pack.pack.version],
-    }),
-  ).slice(0, 16);
+export interface ViewCacheOptions {
+  /** Charged for cold work (see `ViewComputation`); omit to leave recomputation unmetered (unit tests). */
+  readonly budget?: EngineBudget;
+  readonly passes?: PassCacheOptions;
+  /** Boundaries kept warm (default VIEW_BOUNDARY_CAPACITY). */
+  readonly boundaries?: number;
 }
 
-/** A small per-process LRU of view computations, keyed by tenant, run, boundary and configuration. */
+/**
+ * The per-process caches behind recomputed views: engine passes (heavy, one per window of a run,
+ * bounded by an estimate of their size) and the small per-instant results (quality, metrics, warning
+ * replays), plus the engine budget that meters cold work per caller.
+ */
 export class ViewCache {
-  private readonly entries: LruCache<string, ViewComputation>;
+  readonly passes: PassCache;
+  private readonly boundaries: LruCache<string, BoundaryMemo>;
+  private readonly budget: EngineBudget | undefined;
 
-  constructor(capacity: number = VIEW_CACHE_CAPACITY) {
-    this.entries = new LruCache(capacity);
+  constructor(options: ViewCacheOptions = {}) {
+    this.passes = new PassCache(options.passes);
+    this.boundaries = new LruCache(options.boundaries ?? VIEW_BOUNDARY_CAPACITY);
+    this.budget = options.budget;
   }
 
   get size(): number {
-    return this.entries.size;
+    return this.boundaries.size;
   }
 
-  computation(inputs: AnalysisInputs, run: AnalysisRun, asOf: string | null): ViewComputation {
-    const key = [run.tenantId, run.id, asOf ?? 'full', inputsFingerprint(inputs)].join('|');
-    let found = this.entries.get(key);
-    if (found === undefined) {
-      found = new ViewComputation(inputs, run, asOf);
-      this.entries.set(key, found);
+  /**
+   * The computation of a boundary for one request. Every spelling of one instant, and every instant of
+   * one window, resolves to the same cached pass; `caller` is charged only if that pass, or the warning
+   * replay of this exact instant, has to be computed cold.
+   */
+  computation(
+    caller: EngineBudgetCaller,
+    inputs: AnalysisInputs,
+    run: AnalysisRun,
+    asOf: string | null,
+  ): ViewComputation {
+    const fingerprint = inputsFingerprint(inputs);
+    const instant = asOf === null ? 'full' : canonicalInstant(asOf);
+    // The record's size is part of the key: events appended after a run change what "whole" means.
+    const key = [
+      run.tenantId,
+      run.id,
+      instant,
+      fingerprint,
+      inputs.events.length,
+      inputs.resolution === null ? 0 : 1,
+    ].join('|');
+    let memo = this.boundaries.get(key);
+    if (memo === undefined) {
+      memo = new BoundaryMemo();
+      this.boundaries.set(key, memo);
     }
-    return found;
+    const budget = this.budget;
+    return new ViewComputation(
+      inputs,
+      run,
+      asOf,
+      memo,
+      this.passes,
+      fingerprint,
+      budget === undefined ? undefined : () => budget.charge(caller),
+    );
   }
 }
 
-/** What every view service shares: the process-wide cache of recomputed views. */
+/** What every view service shares: the process-wide caches of recomputed views. */
 export interface ViewDeps {
   readonly cache: ViewCache;
 }
 
 /** The computation of the requested boundary; 409 when the case has never been analysed. */
 export function computationFor(
+  caller: EngineBudgetCaller,
   deps: ViewDeps,
   state: ViewState,
   asOf: string | null,
 ): ViewComputation {
-  return deps.cache.computation(state.inputs, requireRun(state), asOf);
+  return deps.cache.computation(caller, state.inputs, requireRun(state), asOf);
 }

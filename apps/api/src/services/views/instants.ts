@@ -1,3 +1,5 @@
+import { ValidationFailedError } from '../../errors';
+
 /** "Known at" is always an instant comparison: ISO strings of different precision do not sort like instants. */
 export function knownBy(asOf: string | null): (iso: string) => boolean {
   if (asOf === null) return () => true;
@@ -5,9 +7,15 @@ export function knownBy(asOf: string | null): (iso: string) => boolean {
   return (iso) => Date.parse(iso) <= limit;
 }
 
-/** Millisecond-precision UTC form of an ISO timestamp (the form cursors and review keys use). */
+/** Millisecond-precision UTC form of an ISO timestamp (the form cursors, review keys and caches use). */
 export function canonicalInstant(iso: string): string {
-  return new Date(iso).toISOString();
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) {
+    throw new ValidationFailedError('Expected a UTC ISO-8601 timestamp', [
+      { path: 'asOf', message: 'Not a valid instant' },
+    ]);
+  }
+  return new Date(ms).toISOString();
 }
 
 /** Orders two ISO timestamps as instants. */

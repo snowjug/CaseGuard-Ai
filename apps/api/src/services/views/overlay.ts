@@ -1,12 +1,27 @@
 import type { CaseWarning, Claim, DecisionFork, DiagnosticAction } from '@caseguard/schemas';
 import type { RequestContext } from '../../http/request-context';
-import { compareInstants } from './instants';
 
 /*
  * An as-of view is recomputed by the engine on what was known then, so its artefacts carry fresh
  * metadata. People's decisions (reviews, dismissals) and the stored `version` that optimistic locking
  * needs live in the database, so they are laid over the recomputed artefacts by their stable id.
+ *
+ * POLICY for human input inside a window. A decision (a claim's corrected label, its state, note and
+ * who/when; a reviewer's action-value override; a warning dismissal) takes part in a view only from the
+ * moment it was made. A review recorded after the window is information the window did not have: its
+ * note may cite later facts, and even a bare label can carry hindsight (a reviewer who knows the root
+ * cause upgrades an assumption to a confirmed fact). So an earlier window shows the machine
+ * classification, a claim that is still `pending`, no override and the warning as open. The one thing
+ * it does take from a later decision is the stored `version` number, because the optimistic lock of a
+ * review started from that window needs it (it tells that something was edited, not what or when).
+ * The whole record (no `asOf`) shows every decision. The same rule keeps `updatedAt`, which a later
+ * decision moves, out of a window.
  */
+
+/** True when a decision recorded at `at` already existed in the window ending at `asOf` (null: no window). */
+export function knownInWindow(at: string | null, asOf: string | null): boolean {
+  return asOf === null || (at !== null && Date.parse(at) <= Date.parse(asOf));
+}
 
 const CLAIM_PAGE = 200;
 
@@ -29,12 +44,10 @@ export async function loadStoredClaims(
 }
 
 /**
- * A recomputed claim with the reviewer's decision (when there is one) and the stored version. The
- * machine classification (`aiCategory`) stays the recomputed one; the effective category follows the
- * reviewer exactly as the data tier carries a correction across a re-analysis. Inside an `asOf`
- * window the reviewer's free-text note appears only when it had been written by then: a later note is
- * written with hindsight and may cite facts the window must not reveal. The label describes the claim
- * itself, so it stays.
+ * A recomputed claim with the reviewer's decision (when it existed in the window) and the stored
+ * version. The machine classification (`aiCategory`) stays the recomputed one; the effective category
+ * follows the reviewer exactly as the data tier carries a correction across a re-analysis. See the
+ * policy above: inside a window a review made after it is invisible, label and note alike.
  */
 export function overlayClaim(
   computed: Claim,
@@ -42,9 +55,7 @@ export function overlayClaim(
   asOf: string | null = null,
 ): Claim {
   if (stored === undefined) return computed;
-  const reviewed = stored.reviewState !== 'pending';
-  const noteKnown =
-    asOf === null || (stored.reviewedAt !== null && compareInstants(stored.reviewedAt, asOf) <= 0);
+  const reviewed = stored.reviewState !== 'pending' && knownInWindow(stored.reviewedAt, asOf);
   return {
     ...computed,
     ...(reviewed
@@ -52,14 +63,14 @@ export function overlayClaim(
           category: stored.reviewedCategory ?? computed.category,
           reviewedCategory: stored.reviewedCategory,
           reviewState: stored.reviewState,
-          reviewReason: noteKnown ? stored.reviewReason : null,
+          reviewReason: stored.reviewReason,
           reviewedBy: stored.reviewedBy,
           reviewedAt: stored.reviewedAt,
         }
       : {}),
     createdAt: stored.createdAt,
     createdBy: stored.createdBy,
-    updatedAt: stored.updatedAt,
+    ...(asOf === null ? { updatedAt: stored.updatedAt } : {}),
     version: stored.version,
   };
 }
@@ -72,25 +83,33 @@ export function overlayClaims(
   return computed.map((claim) => overlayClaim(claim, stored.get(claim.id), asOf));
 }
 
-/** A recomputed fork with the stored review state and version. */
+/**
+ * A recomputed fork with the stored review state and version. A fork records no time for its review,
+ * only when it was last updated, so inside a window the review is shown only if the fork had not been
+ * updated after it: later than that, the window cannot tell when the review was made and withholds it.
+ */
 export function overlayFork(
   computed: DecisionFork,
   stored: DecisionFork | undefined,
+  asOf: string | null = null,
 ): DecisionFork {
   if (stored === undefined) return computed;
+  const reviewed = stored.reviewState !== 'pending' && knownInWindow(stored.updatedAt, asOf);
   return {
     ...computed,
-    ...(stored.reviewState === 'pending'
-      ? {}
-      : { reviewState: stored.reviewState, reviewReason: stored.reviewReason }),
+    ...(reviewed ? { reviewState: stored.reviewState, reviewReason: stored.reviewReason } : {}),
     createdAt: stored.createdAt,
     createdBy: stored.createdBy,
-    updatedAt: stored.updatedAt,
+    ...(asOf === null || reviewed ? { updatedAt: stored.updatedAt } : {}),
     version: stored.version,
   };
 }
 
-/** A replayed warning with the stored version, so a dismissal from an as-of list is version-checked. */
+/**
+ * A replayed warning with the stored version, so a dismissal from an as-of list is version-checked.
+ * The replay already applied the dismissals that existed in the window; the stored `updatedAt`, which
+ * a later resolution or dismissal moves, stays out.
+ */
 export function overlayWarning(
   computed: CaseWarning,
   stored: CaseWarning | undefined,
@@ -100,7 +119,6 @@ export function overlayWarning(
     ...computed,
     createdAt: stored.createdAt,
     createdBy: stored.createdBy,
-    updatedAt: stored.updatedAt,
     version: stored.version,
   };
 }

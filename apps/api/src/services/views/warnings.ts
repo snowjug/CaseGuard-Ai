@@ -1,6 +1,6 @@
 import type { WarningDismissal } from '@caseguard/domain';
 import type { CaseWarning } from '@caseguard/schemas';
-import { NotFoundError, VersionConflictError } from '../../errors';
+import { ConflictError, NotFoundError, VersionConflictError } from '../../errors';
 import type { BodyOf, QueryOf } from '../../http/route-binder';
 import type { RequestContext } from '../../http/request-context';
 import { computationFor, type ViewComputation, type ViewDeps } from './computation';
@@ -55,7 +55,7 @@ export async function listWarnings(
   }
 
   const state = await loadViewState(ctx, caseId);
-  const computation = computationFor(deps, state, query.asOf);
+  const computation = computationFor(ctx, deps, state, query.asOf);
   const stored = await ctx.repos.analysis.listWarnings(caseId);
   const replay = await computation.warnings(dismissalsOf(stored));
   const storedById = new Map(stored.map((warning) => [warning.id, warning]));
@@ -66,8 +66,16 @@ export async function listWarnings(
 }
 
 /**
+ * The answer when a warning cannot be dismissed any more. It is the same wherever the request came
+ * from: a warning that an as-of list showed as open may since have resolved, and naming that state
+ * would reveal a resolution the window did not know.
+ */
+export const WARNING_NOT_DISMISSIBLE = 'This warning can no longer be dismissed';
+
+/**
  * Dismisses an open warning with a reason. The dismissal is version-checked, recorded as a review
- * decision and audited in one transaction; the reason never enters the audit details.
+ * decision and audited in one transaction; the reason never enters the audit details. A warning that
+ * is no longer open is a 409 with a neutral message (see WARNING_NOT_DISMISSIBLE).
  */
 export async function dismissWarning(
   ctx: RequestContext,
@@ -84,6 +92,7 @@ export async function dismissWarning(
     if (before.version !== body.expectedVersion) {
       throw new VersionConflictError('Warning', body.expectedVersion, before.version);
     }
+    if (before.state !== 'open') throw new ConflictError(WARNING_NOT_DISMISSIBLE);
     const next = await tx.analysis.dismissWarning(caseId, warningId, {
       by: ctx.auth.userId,
       at: ctx.now().toISOString(),

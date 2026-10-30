@@ -59,7 +59,7 @@ export async function getTimeline(
   const after = decoded === null ? null : { at: String(decoded[0]), sequence: Number(decoded[1]) };
 
   const state = await loadViewState(ctx, caseId);
-  const computation = computationFor(deps, state, asOf);
+  const computation = computationFor(ctx, deps, state, asOf);
   const [analysis, stored, scenario, openWarnings] = await Promise.all([
     computation.analysis(),
     loadStoredClaims(ctx, caseId),

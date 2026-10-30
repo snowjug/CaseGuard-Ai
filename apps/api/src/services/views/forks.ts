@@ -39,13 +39,13 @@ export async function listForks(
 
   const state = await loadViewState(ctx, caseId);
   const [analysis, stored] = await Promise.all([
-    computationFor(deps, state, query.asOf).analysis(),
+    computationFor(ctx, deps, state, query.asOf).analysis(),
     ctx.repos.analysis.listForks(caseId),
   ]);
   const storedById = new Map(stored.map((fork) => [fork.id, fork]));
   return {
     items: analysis.forks.map((fork) =>
-      withoutHindsight(overlayFork(fork, storedById.get(fork.id))),
+      withoutHindsight(overlayFork(fork, storedById.get(fork.id), query.asOf)),
     ),
     earliestMeaningfulForkId: analysis.earliestMeaningfulForkId,
   };
@@ -66,10 +66,10 @@ export async function getFork(
   }
 
   const state = await loadViewState(ctx, caseId);
-  const analysis = await computationFor(deps, state, query.asOf).analysis();
+  const analysis = await computationFor(ctx, deps, state, query.asOf).analysis();
   const fork = analysis.forks.find((candidate) => candidate.id === forkId);
   if (fork === undefined) throw new NotFoundError('Decision fork', forkId);
   return withoutHindsight(
-    overlayFork(fork, (await ctx.repos.analysis.getFork(caseId, forkId)) ?? undefined),
+    overlayFork(fork, (await ctx.repos.analysis.getFork(caseId, forkId)) ?? undefined, query.asOf),
   );
 }

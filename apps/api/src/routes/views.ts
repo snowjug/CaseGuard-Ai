@@ -1,7 +1,6 @@
 import type { HandlerMap } from '../http/route-binder';
 import type { Infrastructure } from '../infrastructure';
 import {
-  ViewCache,
   compareCases,
   dismissWarning,
   getCoaching,
@@ -20,7 +19,7 @@ import {
   overrideAction,
   rankActions,
   reviewClaim,
-  type ViewDeps,
+  viewDepsFor,
 } from '../services/views';
 
 /**
@@ -31,10 +30,12 @@ import {
  * binder enforces each route's permission and validates its parameters, query and body.
  *
  * Every view that accepts `asOf` recomputes the engine on what was known then (never a filtered copy
- * of the final analysis); one small LRU cache per app keeps recent recomputations warm.
+ * of the final analysis). One engine pass serves every instant of a window between two events and is
+ * kept in a size-bounded cache per app; a request that has to run a cold pass spends one unit of the
+ * caller's engine budget (429 with Retry-After when it is empty), and cached reads are free.
  */
-export function viewsRoutes(_infra: Infrastructure): HandlerMap {
-  const deps: ViewDeps = { cache: new ViewCache() };
+export function viewsRoutes(infra: Infrastructure): HandlerMap {
+  const deps = viewDepsFor(infra);
 
   return {
     'twin.get': ({ params, query, ctx }) => getTwin(ctx, deps, params.caseId, query),

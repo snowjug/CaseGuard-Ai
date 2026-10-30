@@ -9,12 +9,14 @@ import {
 } from '@caseguard/domain';
 import type { ActionRanking, ActionValueBreakdown } from '@caseguard/schemas';
 import { z } from 'zod';
+import type { ReviewRepository } from '../../db';
 import { NotFoundError, ValidationFailedError } from '../../errors';
 import type { BodyOf, QueryOf } from '../../http/route-binder';
 import type { RequestContext } from '../../http/request-context';
 import type { AnalysisInputs } from '../analysis/inputs';
 import type { RankingCore, ViewComputation, ViewDeps } from './computation';
 import { canonicalInstant, compareText } from './instants';
+import { knownInWindow } from './overlay';
 import { recordReview, requireReason } from './reviews';
 import { loadViewState, requireRun } from './state';
 
@@ -22,8 +24,10 @@ export const ACTION_VALUE_NOTICE =
   'Scores come from a configurable decision-support heuristic, not a scientific measurement. Actions blocked by the safety policy are never recommended, whatever their score. A reviewer override is recorded and audited next to the machine rank, which is never replaced.';
 
 /** Reviewer overrides of one instant are found by scanning the case's review decisions, newest first. */
-const REVIEW_PAGE = 200;
-const MAX_REVIEW_PAGES = 25;
+export const OVERRIDE_PAGE = 200;
+export const OVERRIDE_MAX_PAGES = 25;
+const REVIEW_PAGE = OVERRIDE_PAGE;
+const MAX_REVIEW_PAGES = OVERRIDE_MAX_PAGES;
 
 const OverrideValueSchema = z.object({ rank: z.number().int().min(1) });
 
@@ -33,6 +37,11 @@ type StoredOverride = NonNullable<ActionValueBreakdown['override']>;
 interface RankingTarget {
   readonly inputs: AnalysisInputs;
   readonly instant: string;
+  /**
+   * The window the ranking is a decision-time view of, or null for the whole record. Inside a window
+   * a reviewer's override made after it is invisible, entirely (see the policy in `overlay.ts`).
+   */
+  readonly asOf: string | null;
   readonly computation: ViewComputation;
   readonly key: string;
   readonly build: () => RankingCore;
@@ -73,7 +82,8 @@ async function resolveTarget(
     return {
       inputs,
       instant: fork.timestamp,
-      computation: deps.cache.computation(inputs, run, null),
+      asOf: fork.timestamp,
+      computation: deps.cache.computation(ctx, inputs, run, null),
       key: `fork:${fork.id}`,
       // Strictly before the decision: neither the step itself nor anything later is in the view.
       build: () => rankingCore(inputs, createTemporalViewBeforeEvent(inputs.events, fork.eventId)),
@@ -82,33 +92,54 @@ async function resolveTarget(
 
   const last = inputs.events[inputs.events.length - 1];
   const instant = query.asOf ?? last?.timestamp ?? inputs.caseRecord.openedAt;
-  const computation = deps.cache.computation(inputs, run, instant);
+  const computation = deps.cache.computation(ctx, inputs, run, instant);
   return {
     inputs,
     instant,
+    asOf: query.asOf ?? null,
     computation,
     key: 'at',
     build: () => rankingCore(inputs, computation.view),
   };
 }
 
-/** The override a reviewer recorded for each action at this instant; the latest decision wins. */
-async function loadOverrides(
-  ctx: RequestContext,
+/** What the override scan needs of a request: the review repository and a logger. */
+export interface OverrideSource {
+  readonly repos: { readonly reviews: Pick<ReviewRepository, 'list'> };
+  readonly logger: { warn(details: object, message: string): void };
+}
+
+/**
+ * The override a reviewer recorded for each action at this instant; the latest decision wins. Inside
+ * a window (`knownBy` is its boundary) only decisions made by then count, so the latest of those is
+ * the current one and a later override leaves no trace at all.
+ *
+ * Only `action_value` decisions of the case are read (the repository filters them in the database),
+ * newest first, REVIEW_PAGE at a time, up to MAX_REVIEW_PAGES pages. If that bound is reached with more
+ * decisions left, the overrides beyond it are not read, and that is logged with the case id and the
+ * number of decisions scanned, never silently.
+ */
+export async function loadOverrides(
+  ctx: OverrideSource,
   caseId: string,
   instant: string,
+  knownBy: string | null,
 ): Promise<Map<string, StoredOverride>> {
   const prefix = `${canonicalInstant(instant)}|`;
   const found = new Map<string, StoredOverride>();
   let cursor: string | undefined;
-  for (let pages = 0; pages < MAX_REVIEW_PAGES; pages++) {
+  let scanned = 0;
+  for (let pages = 0; ; pages++) {
     const page = await ctx.repos.reviews.list({
       caseId,
+      targetType: 'action_value',
       limit: REVIEW_PAGE,
       ...(cursor === undefined ? {} : { cursor }),
     });
+    scanned += page.items.length;
     for (const decision of page.items) {
       if (decision.targetType !== 'action_value' || !decision.targetId.startsWith(prefix)) continue;
+      if (!knownInWindow(decision.decidedAt, knownBy)) continue;
       const actionKey = decision.targetId.slice(prefix.length);
       const value = OverrideValueSchema.safeParse(decision.newValue);
       // Decisions arrive newest first, so the first one seen for an action is the current one.
@@ -121,6 +152,13 @@ async function loadOverrides(
       });
     }
     if (page.nextCursor === null) break;
+    if (pages + 1 >= MAX_REVIEW_PAGES) {
+      ctx.logger.warn(
+        { caseId, scanned, bound: MAX_REVIEW_PAGES * REVIEW_PAGE },
+        'The scan for reviewer overrides reached its bound; older decisions were not read',
+      );
+      break;
+    }
     cursor = page.nextCursor;
   }
   return found;
@@ -160,7 +198,7 @@ export async function rankActions(
   query: QueryOf<'actionValue.rank'>,
 ): Promise<ActionRanking> {
   const target = await resolveTarget(ctx, deps, caseId, query);
-  return assemble(target, await loadOverrides(ctx, caseId, target.instant));
+  return assemble(target, await loadOverrides(ctx, caseId, target.instant, target.asOf));
 }
 
 /**
@@ -229,5 +267,6 @@ export async function overrideAction(
     );
   });
 
-  return assemble(target, await loadOverrides(ctx, caseId, target.instant));
+  // The reviewer who just decided sees the whole record, their own override included.
+  return assemble(target, await loadOverrides(ctx, caseId, target.instant, null));
 }

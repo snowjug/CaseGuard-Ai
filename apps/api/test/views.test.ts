@@ -22,6 +22,7 @@ import {
 } from '@caseguard/schemas';
 import type { Database } from '../src/db';
 import { TEST_DATABASE_STARTUP_TIMEOUT_MS } from '../src/db/testing';
+import { ENGINE_BUDGET_WINDOW_MS } from '../src/services/engine-budget';
 import { ViewCache, compareCases, overrideAction, reviewClaim } from '../src/services/views';
 import { buildIngestInput } from './builders';
 import {
@@ -137,10 +138,18 @@ afterAll(async () => {
 });
 
 const api = (caseId: string, path = ''): string => `/api/v1/cases/${caseId}${path}`;
-const get = (url: string, persona: string | null = PERSONAS.reviewer) =>
-  h.call(persona, { method: 'GET', url });
-const post = (url: string, body: unknown, persona: string | null = PERSONAS.reviewer) =>
-  h.call(persona, { method: 'POST', url, payload: body as object });
+/**
+ * Every request starts with a full engine budget (the clock jumps a window), so the instants these
+ * tests scan are never throttled; the metering is tested in views-temporal.test.ts.
+ */
+const get = (url: string, persona: string | null = PERSONAS.reviewer) => {
+  h.clock.advance(ENGINE_BUDGET_WINDOW_MS);
+  return h.call(persona, { method: 'GET', url });
+};
+const post = (url: string, body: unknown, persona: string | null = PERSONAS.reviewer) => {
+  h.clock.advance(ENGINE_BUDGET_WINDOW_MS);
+  return h.call(persona, { method: 'POST', url, payload: body as object });
+};
 
 async function latestRun(caseId: string): Promise<AnalysisRun> {
   const run = await h.repos(CONTOSO).analysis.getLatestRun(caseId);
@@ -1239,6 +1248,7 @@ describe('warning dismissal', () => {
     );
     expect(again.statusCode).toBe(409);
     expect(again.data.code).toBe('conflict');
+    expect(again.data.detail).toBe('This warning can no longer be dismissed');
     // A warning that resolved by itself cannot be dismissed either.
     const resolved = (await get(api(ONE, '/warnings?state=resolved'))).data.items[0];
     const late = await post(
@@ -1248,6 +1258,41 @@ describe('warning dismissal', () => {
     );
     expect(late.statusCode).toBe(409);
     expect(late.data.code).toBe('conflict');
+    expect(late.data.detail).toBe('This warning can no longer be dismissed');
+  });
+
+  it('[FR-LQ-02] answers a dismissal from an as-of list with a neutral 409 when the warning resolved since', async () => {
+    // At e07 the replay shows warnings open that the finished case has long since resolved.
+    const asOf = eventBySuffix(oneEvents, 'e07').timestamp;
+    const open = (await get(api(ONE, `/warnings?asOf=${asOf}&state=open`))).data.items as Json[];
+    expect(open.length).toBeGreaterThan(0);
+    const stored = (await get(api(ONE, '/warnings?state=all'))).data.items as Json[];
+    expect(stored.find((item) => item.id === open[0]?.id)?.state).toBe('resolved');
+
+    const reviewsBefore = (await h.repos(CONTOSO).reviews.list({ caseId: ONE, limit: 200 })).items;
+    const auditBefore = (
+      await h.repos(CONTOSO).audit.list({ action: 'warning.dismissed', limit: 50 })
+    ).items;
+    const secret = 'Reason-token-d51a: the customer still cannot sign in';
+    const res = await post(
+      api(ONE, `/warnings/${open[0]?.id}/dismiss`),
+      { reason: secret, expectedVersion: open[0]?.version },
+      PERSONAS.engineer,
+    );
+    expect(res.statusCode).toBe(409);
+    expect(res.data.code).toBe('conflict');
+    // The answer is the same wherever the request came from: it does not say that the warning has
+    // resolved, nor why or when, which the window this client was looking at did not know.
+    expect(res.data.detail).toBe('This warning can no longer be dismissed');
+    expect(res.body).not.toMatch(/resolved|resolution|only open/i);
+    expect(res.body).not.toContain('Reason-token-d51a');
+    // Nothing was recorded.
+    expect((await h.repos(CONTOSO).reviews.list({ caseId: ONE, limit: 200 })).items).toHaveLength(
+      reviewsBefore.length,
+    );
+    expect(
+      (await h.repos(CONTOSO).audit.list({ action: 'warning.dismissed', limit: 50 })).items,
+    ).toHaveLength(auditBefore.length);
   });
 
   it('[FR-LQ-02] lays the stored version over an as-of replay, so a dismissal from it is checked', async () => {
@@ -1471,43 +1516,180 @@ describe('reviewer corrections survive a forced re-analysis', () => {
     expect(late.asOf).toBe(END_OF_TIME);
   });
 
-  it('[FR-TL-06] withholds a reviewer note written after the window and shows it from then on', async () => {
+  it('[FR-TL-06] keeps a reviewer decision made after the window out of it, label and note alike', async () => {
     const window = eventBySuffix(oneEvents, 'e07').timestamp;
-    const claim = (await allClaims(ONE, 'reviewState=pending&limit=200')).find(
+    const inWindowClaims = (await allClaims(ONE, 'reviewState=pending&limit=200')).filter(
       (item) => item.eventId !== null && Date.parse(item.timestamp) <= Date.parse(window),
     );
-    expect(claim).toBeDefined();
-    const target = claim.aiCategory === 'confirmed_fact' ? 'customer_reported' : 'confirmed_fact';
-    const note = 'Reason-token-5e1d: later logs showed that the resolver cache was stale';
+    expect(inWindowClaims.length).toBeGreaterThan(1);
+    const [earlier, later] = [inWindowClaims[0], inWindowClaims[1]];
+    const flip = (item: Json) =>
+      item.aiCategory === 'confirmed_fact' ? 'customer_reported' : 'confirmed_fact';
+    const visibleNote = 'Reason-token-77aa: checked against the first reply';
+    const hindsightNote = 'Reason-token-5e1d: later logs showed that the resolver cache was stale';
+    const windowLedger = () => allClaims(ONE, `asOf=${window}&limit=200`);
+    const pristine = await windowLedger();
 
-    // The review is made long after the window, as a reviewer looking back at a finished case would.
+    // A review made before the window is part of it.
+    h.clock.set('2026-02-01T00:00:00.000Z');
+    const early = await post(api(ONE, `/claims/${earlier.id}/review`), {
+      category: flip(earlier),
+      reason: visibleNote,
+      expectedVersion: earlier.version,
+    });
+    expect(early.statusCode, JSON.stringify(early.data)).toBe(200);
+    const withEarly = await windowLedger();
+    expect(withEarly.find((item) => item.id === earlier.id)).toMatchObject({
+      category: flip(earlier),
+      reviewState: 'corrected',
+      reviewReason: visibleNote,
+      reviewedBy: PERSONAS.reviewer,
+    });
+    const countsAfterEarly = (await get(api(ONE, `/evidence?asOf=${window}`))).data.counts;
+
+    // A review made long after it, as a reviewer looking back at a finished case would, is not.
     h.clock.set('2026-06-01T00:00:00.000Z');
-    const reviewed = await post(api(ONE, `/claims/${claim.id}/review`), {
+    const target = flip(later);
+    const reviewed = await post(api(ONE, `/claims/${later.id}/review`), {
       category: target,
-      reason: note,
-      expectedVersion: claim.version,
+      reason: hindsightNote,
+      expectedVersion: later.version,
     });
     expect(reviewed.statusCode, JSON.stringify(reviewed.data)).toBe(200);
 
-    // Inside the window the correction is visible, the hindsight note is not.
-    const ledger = await allClaims(ONE, `asOf=${window}&limit=200`);
-    expect(ledger.find((item) => item.id === claim.id)).toMatchObject({
-      category: target,
-      aiCategory: claim.aiCategory,
-      reviewState: 'corrected',
-      reviewedBy: PERSONAS.reviewer,
+    // The window is exactly what it was before that review: the machine classification, still
+    // pending, no note, no reviewer, no later timestamp. Only the version (for the lock) moved.
+    const afterwards = await windowLedger();
+    expect(afterwards).toEqual(
+      withEarly.map((item) =>
+        item.id === later.id ? { ...item, version: reviewed.data.version } : item,
+      ),
+    );
+    const seen = afterwards.find((item) => item.id === later.id);
+    expect(seen).toMatchObject({
+      reviewState: 'pending',
+      reviewedCategory: null,
       reviewReason: null,
+      reviewedBy: null,
+      reviewedAt: null,
+      version: later.version + 1,
     });
-    const detail = (await get(api(ONE, `/events/${claim.eventId}?asOf=${window}`))).data;
-    expect(detail.claims.find((item: Json) => item.id === claim.id).reviewReason).toBeNull();
-    for (const body of [ledger, detail, (await get(api(ONE, `/timeline?asOf=${window}`))).data]) {
-      expect(JSON.stringify(body)).not.toContain('Reason-token-5e1d');
+    expect(seen.category).toBe(seen.aiCategory);
+    const pending = pristine.find((item) => item.id === later.id);
+    expect(seen).toEqual({ ...pending, version: later.version + 1 });
+
+    // Counts, filters, the event detail and the timeline follow the same rule.
+    const countsOf = async () => (await get(api(ONE, `/evidence?asOf=${window}`))).data.counts;
+    expect(await countsOf()).toEqual(countsAfterEarly);
+    const byCategory = await allClaims(ONE, `asOf=${window}&category=${seen.aiCategory}&limit=200`);
+    expect(byCategory.map((item) => item.id)).toContain(later.id);
+    const corrected = await allClaims(ONE, `asOf=${window}&reviewState=corrected&limit=200`);
+    expect(corrected.map((item) => item.id)).toContain(earlier.id);
+    expect(corrected.map((item) => item.id)).not.toContain(later.id);
+    const detail = (await get(api(ONE, `/events/${later.eventId}?asOf=${window}`))).data;
+    expect(detail.claims.find((item: Json) => item.id === later.id)).toMatchObject({
+      reviewState: 'pending',
+      reviewReason: null,
+      reviewedBy: null,
+    });
+    const timeline = (await get(api(ONE, `/timeline?asOf=${window}&limit=200`))).data;
+    for (const body of [afterwards, detail, timeline]) {
+      const text = JSON.stringify(body);
+      expect(text).not.toContain('Reason-token-5e1d');
+      expect(text).not.toContain('2026-06-01');
     }
 
-    // From the review onwards, and in the whole record, the note is part of the view.
-    const later = await allClaims(ONE, `asOf=${END_OF_TIME}&limit=200`);
-    expect(later.find((item) => item.id === claim.id)?.reviewReason).toBe(note);
-    const whole = await allClaims(ONE, 'limit=200');
-    expect(whole.find((item) => item.id === claim.id)?.reviewReason).toBe(note);
+    // From the review onwards, and in the whole record, the decision is part of the view.
+    for (const view of [
+      await allClaims(ONE, `asOf=${END_OF_TIME}&limit=200`),
+      await allClaims(ONE, 'limit=200'),
+    ]) {
+      expect(view.find((item) => item.id === later.id)).toMatchObject({
+        category: target,
+        reviewState: 'corrected',
+        reviewReason: hindsightNote,
+        reviewedBy: PERSONAS.reviewer,
+      });
+    }
+  });
+
+  it('[FR-AV-02] shows an override inside a window only once it was decided, and the whole record the latest', async () => {
+    const last = eventBySuffix(oneEvents, 'e31').timestamp;
+    const ranked = (await get(api(ONE, '/action-values'))).data;
+    // The whole-record ranking is the ranking at the last event.
+    expect(ranked.asOf).toBe(last);
+    expect(ranked.candidates.length).toBeGreaterThan(3);
+    const target = ranked.candidates[3];
+    const decide = async (rank: number, reason: string) => {
+      const res = await post(api(ONE, '/action-values/override'), {
+        asOf: last,
+        actionKey: target.actionKey,
+        rank,
+        reason,
+      });
+      expect(res.statusCode, JSON.stringify(res.data)).toBe(200);
+      return res.data.candidates.find((entry: Json) => entry.actionKey === target.actionKey)
+        .override;
+    };
+    const overrideAt = async (path: string) => {
+      const res = (await get(api(ONE, `/action-values${path}`))).data;
+      return res.candidates.find((entry: Json) => entry.actionKey === target.actionKey).override;
+    };
+
+    // Decided while the case was still running: part of the window.
+    h.clock.set(new Date(Date.parse(last) - 3_600_000).toISOString());
+    const first = await decide(2, 'Reason-token-1c3d: the customer cannot run captures this week');
+    expect(first).toMatchObject({ rank: 2, by: PERSONAS.reviewer });
+    // Decided long after the window, with hindsight.
+    h.clock.set('2026-07-01T00:00:00.000Z');
+    const hindsight =
+      'Reason-token-9e7f: the resolver query would have found the root cause on day one';
+    expect(await decide(1, hindsight)).toMatchObject({ rank: 1, reason: hindsight });
+
+    // The whole record shows the latest decision.
+    expect(await overrideAt('')).toMatchObject({
+      rank: 1,
+      reason: hindsight,
+      by: PERSONAS.reviewer,
+    });
+    // The window ending at that instant shows the latest decision made by then, and nothing of the
+    // later one: not its reason, not its rank, not who made it or when.
+    const windowed = await overrideAt(`?asOf=${last}`);
+    expect(windowed).toMatchObject({ rank: 2, by: PERSONAS.reviewer, at: first.at });
+    expect(Date.parse(windowed.at)).toBeLessThanOrEqual(Date.parse(last));
+    const body = (await get(api(ONE, `/action-values?asOf=${last}`))).body;
+    for (const text of [hindsight, 'Reason-token-9e7f', '2026-07-01']) {
+      expect(body).not.toContain(text);
+    }
+    // The same instant spelled with milliseconds is the same window.
+    expect(await overrideAt(`?asOf=${last.replace('Z', '.000Z')}`)).toMatchObject({ rank: 2 });
+    // Another instant has no decision of its own.
+    const instant = eventBySuffix(oneEvents, 'e30').timestamp;
+    const otherInstant = (await get(api(ONE, `/action-values?asOf=${instant}`))).data;
+    expect(otherInstant.candidates.every((entry: Json) => entry.override === null)).toBe(true);
+  });
+
+  it('[FR-AV-02] keeps an override made after a fork out of the ranking at that fork', async () => {
+    const fork = (await get(api(ONE, '/forks'))).data.items.find(
+      (item: Json) => item.isEarliestMeaningful,
+    );
+    const ranked = (await get(api(ONE, `/action-values?asOf=${fork.timestamp}`))).data;
+    const target = ranked.candidates[0];
+    h.clock.set('2026-07-02T00:00:00.000Z');
+    const secret = 'Reason-token-4b2a: we should have captured the resolver cache at once';
+    const res = await post(api(ONE, '/action-values/override'), {
+      asOf: fork.timestamp,
+      actionKey: target.actionKey,
+      rank: 1,
+      reason: secret,
+    });
+    expect(res.statusCode, JSON.stringify(res.data)).toBe(200);
+    for (const path of [`?forkId=${fork.id}`, `?asOf=${fork.timestamp}`]) {
+      const view = await get(api(ONE, `/action-values${path}`));
+      expect(view.data.asOf).toBe(fork.timestamp);
+      expect(view.data.candidates.every((entry: Json) => entry.override === null)).toBe(true);
+      expect(view.body).not.toContain('Reason-token-4b2a');
+      expect(view.body).not.toContain('2026-07-02');
+    }
   });
 });

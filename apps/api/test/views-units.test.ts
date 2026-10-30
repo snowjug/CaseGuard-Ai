@@ -14,7 +14,6 @@ import {
 } from '@caseguard/schemas';
 import { ValidationFailedError } from '../src/errors';
 import { parseCaseIds } from '../src/services/views/compare';
-import { VIEW_CACHE_CAPACITY } from '../src/services/views/computation';
 import { hypothesisAliases, rankHypotheses } from '../src/services/views/hypotheses';
 import {
   canonicalInstant,
@@ -105,10 +104,9 @@ describe('LruCache', () => {
     expect(cache.size).toBe(0);
   });
 
-  it('refuses a capacity below one, and the view cache holds about sixteen computations', () => {
+  it('refuses a capacity below one', () => {
     expect(() => new LruCache(0)).toThrow(RangeError);
     expect(() => new LruCache(1.5)).toThrow(RangeError);
-    expect(VIEW_CACHE_CAPACITY).toBe(16);
   });
 });
 
@@ -326,6 +324,101 @@ describe('decisions laid over a recomputed view', () => {
     expect(merged.version).toBe(5);
     expect(merged.createdBy).toBe('system:earlier');
     expect(overlayWarning(replayed, undefined)).toBe(replayed);
+  });
+
+  it('[FR-LQ-01] keeps a later resolution or dismissal out of an as-of warning, taking only the version', () => {
+    const [replayed] = warnings;
+    if (replayed === undefined) throw new Error('the sample has warnings');
+    const stored = {
+      ...replayed,
+      state: 'dismissed' as const,
+      updatedAt: '2026-10-30T09:00:00.000Z',
+      version: 5,
+    };
+    const merged = overlayWarning(replayed, stored);
+    expect(merged.updatedAt).toBe(replayed.updatedAt);
+    expect(merged.version).toBe(5);
+  });
+
+  it('[FR-EV-03] shows a review inside a window only once it was made, taking only the version before', () => {
+    const [recomputed] = analysis.claims;
+    if (recomputed === undefined) throw new Error('the sample has claims');
+    const other: EvidenceCategory =
+      recomputed.aiCategory === 'confirmed_fact' ? 'customer_reported' : 'confirmed_fact';
+    const stored = {
+      ...recomputed,
+      category: other,
+      reviewedCategory: other,
+      reviewState: 'corrected' as const,
+      reviewReason: 'Later logs showed this was a confirmed fact',
+      reviewedBy: 'user_riley_reviewer',
+      reviewedAt: '2026-10-30T09:00:00.000Z',
+      updatedAt: '2026-10-30T09:00:00.000Z',
+      version: 4,
+    };
+    const before = '2026-03-09T10:00:00Z';
+    const hidden = overlayClaim(recomputed, stored, before);
+    // Label, state, note, who and when are all later than the window, so none of them is in it.
+    expect(hidden).toMatchObject({
+      category: recomputed.category,
+      reviewedCategory: recomputed.reviewedCategory,
+      reviewState: recomputed.reviewState,
+      reviewReason: recomputed.reviewReason,
+      reviewedBy: recomputed.reviewedBy,
+      reviewedAt: recomputed.reviewedAt,
+      updatedAt: recomputed.updatedAt,
+      aiCategory: recomputed.aiCategory,
+      // The optimistic lock of a review started from this window still needs the version.
+      version: 4,
+    });
+    expect(JSON.stringify(hidden)).not.toContain('Later logs');
+    expect(JSON.stringify(hidden)).not.toContain('user_riley_reviewer');
+    expect(JSON.stringify(hidden)).not.toContain('2026-10-30');
+
+    // From the instant of the review (inclusive) it is part of the view; the whole record has it too.
+    expect(overlayClaim(recomputed, stored, stored.reviewedAt)).toMatchObject({
+      category: other,
+      reviewState: 'corrected',
+      reviewReason: stored.reviewReason,
+      reviewedBy: 'user_riley_reviewer',
+    });
+    expect(overlayClaim(recomputed, stored, '2026-10-30T09:00:00.000Z').reviewState).toBe(
+      'corrected',
+    );
+    expect(overlayClaim(recomputed, stored, '2026-10-30T08:59:59.999Z').reviewState).toBe(
+      recomputed.reviewState,
+    );
+    expect(overlayClaim(recomputed, stored)).toMatchObject({
+      reviewState: 'corrected',
+      updatedAt: stored.updatedAt,
+    });
+    const map = new Map([[recomputed.id, stored]]);
+    expect(overlayClaims(analysis.claims, map, before)[0]?.reviewState).toBe(
+      recomputed.reviewState,
+    );
+    expect(overlayClaims(analysis.claims, map)[0]?.reviewState).toBe('corrected');
+  });
+
+  it('[FR-CF-07] shows a fork review inside a window only if the fork was not updated after it', () => {
+    const fork = analysis.forks[0];
+    if (fork === undefined) throw new Error('the sample has forks');
+    const stored = {
+      ...fork,
+      reviewState: 'rejected' as const,
+      reviewReason: 'Looking back, not a fork',
+      updatedAt: '2026-10-30T09:00:00.000Z',
+      version: 7,
+    };
+    const hidden = overlayFork(fork, stored, '2026-03-09T10:00:00Z');
+    expect(hidden.reviewState).toBe(fork.reviewState);
+    expect(hidden.reviewReason).toBe(fork.reviewReason);
+    expect(hidden.updatedAt).toBe(fork.updatedAt);
+    expect(hidden.version).toBe(7);
+    expect(overlayFork(fork, stored, '2026-10-30T09:00:00.000Z')).toMatchObject({
+      reviewState: 'rejected',
+      reviewReason: 'Looking back, not a fork',
+    });
+    expect(overlayFork(fork, stored).reviewState).toBe('rejected');
   });
 
   it('[FR-LQ-02] hands the replay the dismissals people made, keyed by fingerprint', () => {

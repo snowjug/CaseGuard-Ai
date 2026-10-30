@@ -25,7 +25,7 @@ export async function getTwin(
   }
 
   const state = await loadViewState(ctx, caseId);
-  const computation = computationFor(deps, state, query.asOf);
+  const computation = computationFor(ctx, deps, state, query.asOf);
   const analysis = await computation.analysis();
   const twin = buildDigitalTwin({
     caseRecord: state.inputs.caseRecord,

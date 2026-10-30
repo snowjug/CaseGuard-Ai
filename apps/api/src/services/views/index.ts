@@ -1,7 +1,8 @@
 export { rankActions, overrideAction } from './action-value';
 export { reviewClaim } from './claims';
 export { compareCases } from './compare';
-export { ViewCache, type ViewDeps } from './computation';
+export { ViewCache, type ViewCacheOptions, type ViewDeps } from './computation';
+export { viewDepsFor } from './deps';
 export { getEventDetail } from './events';
 export { getFork, listForks } from './forks';
 export { getGraph } from './graph';

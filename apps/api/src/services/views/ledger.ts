@@ -164,7 +164,7 @@ async function ledgerAsOf(
   after: LedgerCursor | null,
 ): Promise<EvidenceLedgerResponse> {
   const state = await loadViewState(ctx, caseId);
-  const computation = computationFor(deps, state, asOf);
+  const computation = computationFor(ctx, deps, state, asOf);
   const [analysis, stored] = await Promise.all([
     computation.analysis(),
     loadStoredClaims(ctx, caseId),

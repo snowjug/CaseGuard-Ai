@@ -57,7 +57,7 @@ export async function listHypotheses(
   }
 
   const state = await loadViewState(ctx, caseId);
-  const analysis = await computationFor(deps, state, query.asOf).analysis();
+  const analysis = await computationFor(ctx, deps, state, query.asOf).analysis();
   return {
     caseId,
     asOf: query.asOf,
@@ -85,6 +85,6 @@ export async function listActions(
     return { items: await ctx.repos.analysis.listActions(caseId) };
   }
   const state = await loadViewState(ctx, caseId);
-  const analysis = await computationFor(deps, state, query.asOf).analysis();
+  const analysis = await computationFor(ctx, deps, state, query.asOf).analysis();
   return { items: analysis.actions.map(decisionTimeAction) };
 }

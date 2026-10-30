@@ -53,7 +53,7 @@ async function derivedAsOf(
   asOf: string,
 ): Promise<Derived> {
   const state = await loadViewState(ctx, caseId);
-  const computation = computationFor(deps, state, asOf);
+  const computation = computationFor(ctx, deps, state, asOf);
   const [analysis, stored] = await Promise.all([
     computation.analysis(),
     loadStoredClaims(ctx, caseId),

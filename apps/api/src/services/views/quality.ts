@@ -23,7 +23,7 @@ export async function getQuality(
     return assessment;
   }
   const state = await loadViewState(ctx, caseId);
-  return computationFor(deps, state, query.asOf).quality();
+  return computationFor(ctx, deps, state, query.asOf).quality();
 }
 
 /**
@@ -43,7 +43,7 @@ export async function getMetrics(
     return { items: await ctx.repos.analysis.listMetrics(caseId) };
   }
   const state = await loadViewState(ctx, caseId);
-  return { items: await computationFor(deps, state, query.asOf).metrics() };
+  return { items: await computationFor(ctx, deps, state, query.asOf).metrics() };
 }
 
 /** The coaching report of the finished case (a retrospective review, so it has no time cursor). */

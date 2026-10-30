@@ -22,10 +22,12 @@ import {
 } from '@caseguard/schemas';
 import type { Database } from '../src/db';
 import { TEST_DATABASE_STARTUP_TIMEOUT_MS } from '../src/db/testing';
-import { ViewCache } from '../src/services/views';
+import { ENGINE_BUDGET_WINDOW_MS, engineBudgetFor } from '../src/services/engine-budget';
+import { ViewCache, viewDepsFor } from '../src/services/views';
 import { loadViewState } from '../src/services/views/state';
 import {
   CONTOSO,
+  FABRIKAM,
   PERSONAS,
   createHarness,
   openSharedDatabase,
@@ -97,8 +99,14 @@ afterAll(async () => {
   await database.close();
 });
 
-const get = (url: string, persona: string | null = PERSONAS.reviewer) =>
-  h.call(persona, { method: 'GET', url });
+/**
+ * Every request starts with a full engine budget (the clock jumps a window), so the many instants
+ * these tests scan are not throttled; the metering itself is tested on its own further down.
+ */
+const get = (url: string, persona: string | null = PERSONAS.reviewer) => {
+  h.clock.advance(ENGINE_BUDGET_WINDOW_MS);
+  return h.call(persona, { method: 'GET', url });
+};
 
 const base = `/api/v1/cases/${ONE}`;
 const at = (asOf: string): string => `asOf=${encodeURIComponent(asOf)}`;
@@ -511,8 +519,7 @@ describe('as-of views equal a fresh engine analysis of the same window', () => {
         expect(entry.confidence).toBe(round(last?.posterior[entry.key] ?? Number.NaN, 3));
       }
       const top = Object.entries(last?.posterior ?? {}).sort((a, b) => b[1] - a[1])[0];
-      expect(leader?.key).toBe(top?.[0]);
-      expect(Math.abs((leader?.confidence ?? 0) - (top?.[1] ?? 0))).toBeLessThan(0.01);
+      expect(posterior[0]?.key).toBe(top?.[0]);
     }
   });
 });
@@ -662,56 +669,163 @@ describe('counterfactual overlays inside a window', () => {
   });
 });
 
-describe('recomputation is cached', () => {
-  it('reuses one computation per run and instant, and keeps the cache bounded', async () => {
-    const ctx = contextFor(h, PERSONAS.reviewer);
-    const state = await loadViewState(ctx, ONE);
-    if (state.run === null) throw new Error('expected an analysed case');
-    const cache = new ViewCache(3);
-    const asOf = eventBySuffix(events, 'e07').timestamp;
-
-    const first = cache.computation(state.inputs, state.run, asOf);
-    expect(cache.computation(state.inputs, state.run, asOf)).toBe(first);
-    expect(await first.analysis()).toBe(await first.analysis());
-    expect(await first.quality()).toBe(await first.quality());
-
-    const other = cache.computation(
-      state.inputs,
-      state.run,
-      eventBySuffix(events, 'e03').timestamp,
-    );
-    expect(other).not.toBe(first);
-    expect(cache.computation(state.inputs, state.run, null)).not.toBe(first);
-
-    for (const suffix of ['e08', 'e09', 'e10', 'e11']) {
-      cache.computation(state.inputs, state.run, eventBySuffix(events, suffix).timestamp);
-    }
-    expect(cache.size).toBe(3);
-    // The oldest entry was evicted, so a new computation is made for it.
-    expect(cache.computation(state.inputs, state.run, asOf)).not.toBe(first);
+describe('recomputation is cached and metered', () => {
+  // A harness of its own on the shared database: its caches and budget start empty and full, so the
+  // counts below are exact whatever the tests above have already computed.
+  let g: Harness;
+  beforeAll(async () => {
+    g = await createHarness({ database });
+  }, TEST_DATABASE_STARTUP_TIMEOUT_MS);
+  afterAll(async () => {
+    await g.close();
   });
 
-  it('never serves a computation made under another governed configuration', async () => {
-    const ctx = contextFor(h, PERSONAS.reviewer);
-    const state = await loadViewState(ctx, ONE);
-    if (state.run === null) throw new Error('expected an analysed case');
-    const cache = new ViewCache();
-    const asOf = eventBySuffix(events, 'e07').timestamp;
-    const governed = cache.computation(state.inputs, state.run, asOf);
-    const changed = {
-      ...state.inputs,
-      actionConfig: { ...state.inputs.actionConfig, version: '9.9.9' },
-    };
-    expect(cache.computation(changed, state.run, asOf)).not.toBe(governed);
-    expect(cache.computation(state.inputs, state.run, asOf)).toBe(governed);
-    expect(cache.size).toBe(2);
+  const caller = (userId: string, tenantId: string = CONTOSO) => ({
+    auth: { tenantId, userId },
+    now: () => g.clock.now(),
+  });
+  const deps = () => viewDepsFor(g.infra);
+  const budget = () => engineBudgetFor(g.infra);
+  const cold = (): number => deps().cache.passes.stats.coldPasses;
+  const ask = (path: string, persona: string = PERSONAS.reviewer) =>
+    g.call(persona, { method: 'GET', url: `/api/v1/cases/${ONE}${path}` });
+  const hypotheses = (asOf: string, persona: string = PERSONAS.reviewer) =>
+    ask(`/hypotheses?${at(asOf)}`, persona);
+
+  it('[NFR-SEC-05] runs one engine pass for every spelling and offset inside one window', async () => {
+    const first = eventBySuffix(events, 'e20').timestamp;
+    const next = eventBySuffix(events, 'e21').timestamp;
+    const gap = Date.parse(next) - Date.parse(first);
+    expect(gap).toBeGreaterThan(4);
+    const variants = [
+      first,
+      first.replace('Z', '.000Z'),
+      first.replace('Z', '.0000Z'),
+      first.replace('Z', '.00000Z'),
+      new Date(Date.parse(first) + 1).toISOString(),
+      new Date(Date.parse(first) + 2).toISOString(),
+      new Date(Date.parse(first) + Math.floor(gap / 2)).toISOString(),
+      new Date(Date.parse(next) - 1).toISOString(),
+    ];
+    const before = cold();
+    const bodies: string[] = [];
+    for (const asOf of variants) {
+      const res = await hypotheses(asOf);
+      expect(res.statusCode, asOf).toBe(200);
+      expect(res.data.asOf).toBe(asOf);
+      bodies.push(JSON.stringify({ ...res.data, asOf: null }));
+    }
+    expect(cold() - before).toBe(1);
+    // The answers are the same view of the same window.
+    expect(new Set(bodies).size).toBe(1);
+    // The next event opens another window, which needs its own pass.
+    expect((await hypotheses(next)).statusCode).toBe(200);
+    expect(cold() - before).toBe(2);
+    expect((await hypotheses(next.replace('Z', '.000Z'))).statusCode).toBe(200);
+    expect(cold() - before).toBe(2);
+  });
+
+  it('[NFR-SEC-05] keeps every route of one instant on one pass, and echoes each spelling', async () => {
+    const instant = eventBySuffix(events, 'e12').timestamp;
+    const precise = instant.replace('Z', '.000Z');
+    const before = cold();
+    for (const [name, url] of Object.entries(asOfUrls(instant))) {
+      expect((await g.call(PERSONAS.reviewer, { method: 'GET', url })).statusCode, name).toBe(200);
+    }
+    expect(cold() - before).toBe(1);
+    const plain = (await ask(`/quality?${at(instant)}`)).data;
+    const spelled = (await ask(`/quality?${at(precise)}`)).data;
+    expect(plain.asOf).toBe(instant);
+    expect(spelled.asOf).toBe(precise);
+    expect({ ...spelled, asOf: null }).toEqual({ ...plain, asOf: null });
+    expect(cold() - before).toBe(1);
+  });
+
+  it('[NFR-SEC-05] answers 429 with Retry-After when a caller keeps asking for new windows, and only then', async () => {
+    const asker = PERSONAS.reviewer;
+    g.clock.advance(ENGINE_BUDGET_WINDOW_MS);
+    expect(budget().passes).toBe(30);
+    expect(budget().windowMs).toBe(60_000);
+    expect(budget().remaining(caller(asker))).toBe(30);
+
+    // One cold request takes one unit; a request for a cached window takes none.
+    const warm = eventBySuffix(events, 'e20').timestamp;
+    const fresh = eventBySuffix(events, 'e22').timestamp;
+    const spent = cold();
+    expect((await hypotheses(fresh)).statusCode).toBe(200);
+    expect(cold() - spent).toBe(1);
+    expect(budget().remaining(caller(asker))).toBe(29);
+    expect((await hypotheses(fresh)).statusCode).toBe(200);
+    expect((await hypotheses(fresh.replace('Z', '.000Z'))).statusCode).toBe(200);
+    expect(budget().remaining(caller(asker))).toBe(29);
+
+    // Run the allowance down, as a client scanning many new instants would.
+    budget().charge(caller(asker), 29);
+    expect(budget().remaining(caller(asker))).toBe(0);
+
+    const next = eventBySuffix(events, 'e24').timestamp;
+    const refused = await hypotheses(next);
+    expect(refused.statusCode).toBe(429);
+    expect(refused.data.code).toBe('rate_limited');
+    expect(refused.headers['retry-after']).toBe('2');
+    expect(refused.headers['content-type']).toContain('application/problem+json');
+    expect(refused.body).not.toContain(asker);
+    expect(cold() - spent).toBe(1);
+
+    // Everything already computed is still served: other routes of an instant its first request paid
+    // for, other spellings, and the stored views. What would need new work is refused: a new window,
+    // and a new instant of a cached window that needs more than the shared pass (its own quality or
+    // warning replay), while one that needs only the pass is free.
+    expect((await hypotheses(warm)).statusCode).toBe(200);
+    expect((await ask(`/quality?${at(fresh)}`)).statusCode).toBe(200);
+    expect((await ask(`/twin?${at(fresh)}`)).statusCode).toBe(200);
+    expect((await ask(`/warnings?${at(fresh)}`)).statusCode).toBe(200);
+    expect((await ask('/hypotheses')).statusCode).toBe(200);
+    const nearby = new Date(Date.parse(fresh) + 5).toISOString();
+    expect((await hypotheses(nearby)).statusCode).toBe(200);
+    expect((await ask(`/quality?${at(nearby)}`)).statusCode).toBe(429);
+    expect((await ask(`/warnings?${at(nearby)}`)).statusCode).toBe(429);
+    expect((await ask(`/graph?${at(next)}`)).statusCode).toBe(429);
+    expect(cold() - spent).toBe(1);
+
+    // Another user of the same tenant has an allowance of their own.
+    expect((await hypotheses(next, PERSONAS.engineer)).statusCode).toBe(200);
+    expect(budget().remaining(caller(PERSONAS.engineer))).toBe(29);
+    // And the first user can use that window now that it is cached.
+    expect((await hypotheses(next)).statusCode).toBe(200);
+
+    // After the window the caller can start new passes again.
+    g.clock.advance(ENGINE_BUDGET_WINDOW_MS);
+    expect(budget().remaining(caller(asker))).toBe(30);
+    expect((await hypotheses(eventBySuffix(events, 'e26').timestamp)).statusCode).toBe(200);
+    expect(budget().remaining(caller(asker))).toBe(29);
+  });
+
+  it('[NFR-SEC-05] draws on one bucket per tenant and user, never on a case', async () => {
+    g.clock.advance(ENGINE_BUDGET_WINDOW_MS);
+    const first = (await h.repos(CONTOSO).cases.getAllEvents(TWO))[6]?.timestamp ?? '';
+    const before = cold();
+    const res = await g.call(PERSONAS.reviewer, {
+      method: 'GET',
+      url: `/api/v1/cases/${TWO}/hypotheses?${at(first)}`,
+    });
+    expect(res.statusCode).toBe(200);
+    const spent = cold() - before;
+    expect(spent).toBeLessThanOrEqual(1);
+    // Case Two is another case of the same tenant: it shares the reviewer's bucket.
+    expect(budget().remaining(caller(PERSONAS.reviewer))).toBe(30 - spent);
+    // Another user, and another tenant's user, have buckets of their own.
+    expect(budget().remaining(caller(PERSONAS.engineer))).toBe(30);
+    expect(budget().remaining(caller(PERSONAS.otherTenantEngineer, FABRIKAM))).toBe(30);
   });
 
   it('[FR-TL-06] recomputes the whole record under the stored run, with exactly the stored artefact ids', async () => {
     const ctx = contextFor(h, PERSONAS.reviewer);
     const state = await loadViewState(ctx, ONE);
     if (state.run === null) throw new Error('expected an analysed case');
-    const analysis = await new ViewCache().computation(state.inputs, state.run, null).analysis();
+    const analysis = await new ViewCache()
+      .computation(ctx, state.inputs, state.run, null)
+      .analysis();
     const repos = h.repos(CONTOSO);
     const sorted = (ids: readonly string[]): string[] => [...ids].sort();
     expect(sorted(analysis.forks.map((fork) => fork.id))).toEqual(
