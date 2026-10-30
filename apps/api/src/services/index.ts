@@ -2,6 +2,7 @@ import type { BaseInfrastructure } from '../infrastructure';
 import { createAiService } from './ai';
 import { createAnalysisService } from './analysis';
 import { createCounterfactualService } from './counterfactuals';
+import { createDemoService } from './demo';
 import { createIngestionService } from './ingestion';
 import { JobService } from './job-service';
 import type { Services } from './ports';
@@ -32,6 +33,7 @@ export function createServices(
     counterfactuals: createCounterfactualService(deps),
     skills: createSkillsService(deps),
     ingestion: createIngestionService(deps),
+    demo: createDemoService(deps),
     objects: infra.objects,
     ...overrides,
   };

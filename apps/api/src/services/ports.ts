@@ -3,6 +3,7 @@ import type {
   AgentName,
   CounterfactualScenario,
   CounterfactualStrategy,
+  DemoState,
   HindsightCheck,
   IngestRequest,
   IngestResult,
@@ -332,6 +333,26 @@ export interface AiPort {
   health(ctx: RequestContext): Promise<AiHealth>;
 }
 
+// ---------------------------------------------------------------- demo
+
+/** `base` leaves the story at step one for a live walk-through; `portfolio` plays it to the end. */
+export type DemoProfile = 'base' | 'portfolio';
+
+/**
+ * The guided demo of the synthetic tenant. `seed` and `reset` are only allowed in a synthetic demo
+ * tenant (a conflict otherwise) and act through the real services as the story's personas, so
+ * permissions, four-eyes rules and audit apply exactly as they do over HTTP. Progress is always
+ * derived from stored facts, never from a flag the client sends.
+ */
+export interface DemoPort {
+  /** The 13 story steps with progress derived from the tenant's stored data. */
+  state(ctx: RequestContext): Promise<DemoState>;
+  /** Seeds the profile (idempotent: a second run changes nothing) and returns the resulting state. */
+  seed(ctx: RequestContext, options: { readonly profile: DemoProfile }): Promise<DemoState>;
+  /** Erases the tenant's case data (users, settings and audit stay) and returns the fresh state. */
+  reset(ctx: RequestContext): Promise<DemoState>;
+}
+
 // ---------------------------------------------------------------- the container
 
 /** Services resolvable from any request context. Implementations are wired in `container.ts`. */
@@ -342,6 +363,7 @@ export interface Services {
   readonly counterfactuals: CounterfactualPort;
   readonly skills: SkillsPort;
   readonly ingestion: IngestionPort;
+  readonly demo: DemoPort;
   readonly objects: ObjectStore;
 }
 

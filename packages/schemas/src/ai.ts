@@ -184,10 +184,11 @@ export const EfficiencyOverviewSchema = z.object({
     totalTokens: z.number().int().min(0),
     estimatedQualityImpact: z.string(),
   }),
+  /** A limit that is not configured is null: unset never reads as zero or as an invented default. */
   budgets: z.object({
-    perRequestMaxTokens: z.number().int(),
-    perCaseMaxTokens: z.number().int(),
-    perDayMaxTokens: z.number().int(),
+    perRequestMaxTokens: z.number().int().nullable(),
+    perCaseMaxTokens: z.number().int().nullable(),
+    perDayMaxTokens: z.number().int().nullable(),
     consumedToday: z.number().int().min(0),
     costLimitUsdPerDay: z.number().nullable(),
   }),

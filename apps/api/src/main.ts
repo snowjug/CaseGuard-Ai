@@ -3,6 +3,7 @@ import { buildApp } from './app';
 import { createInfrastructure, knownTenantIds } from './container';
 import { IDEMPOTENCY_PURGE_INTERVAL_MS, purgeExpiredIdempotency } from './maintenance';
 import { createHandlers } from './routes';
+import { autoSeedDemo } from './services/demo/auto-seed';
 import { JOB_STALE_AFTER_MS } from './services/job-service';
 import packageJson from '../package.json';
 
@@ -99,6 +100,10 @@ async function main(): Promise<void> {
   };
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
   process.on('SIGINT', () => void shutdown('SIGINT'));
+
+  // Demo data is seeded after migrations and before the first request; a failure is logged and the
+  // server still starts (the next start, or `pnpm demo:seed`, resumes where it stopped).
+  if (config.demo.autoSeed) await autoSeedDemo(infra);
 
   await app.listen({ host: config.http.host, port: config.http.port });
   logger.info(describeConfig(config), 'CaseGuard API started');

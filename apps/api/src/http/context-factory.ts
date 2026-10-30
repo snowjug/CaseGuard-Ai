@@ -4,6 +4,15 @@ import type { AuthContext } from '@caseguard/security';
 import type { Infrastructure } from '../infrastructure';
 import { auditRoleOf, type RequestContext } from './request-context';
 
+/**
+ * The part of the infrastructure a context is built from. It is narrower than `Infrastructure` so that
+ * a service can build the context of another persona (the demo seeder) without the identity provider.
+ */
+export type ContextInfrastructure = Pick<
+  Infrastructure,
+  'config' | 'metrics' | 'repos' | 'services' | 'now' | 'newId'
+>;
+
 export interface ContextInput {
   readonly requestId: string;
   readonly auth: AuthContext;
@@ -20,7 +29,10 @@ export interface ContextInput {
  * repositories returned here are bound to that tenant, so a handler cannot read another tenant's rows
  * even by mistake.
  */
-export function buildRequestContext(infra: Infrastructure, input: ContextInput): RequestContext {
+export function buildRequestContext(
+  infra: ContextInfrastructure,
+  input: ContextInput,
+): RequestContext {
   const { auth } = input;
   const repos = infra.repos.forTenant({ tenantId: auth.tenantId, actorId: auth.userId });
   const actorRole = auditRoleOf(auth, input.permission);
