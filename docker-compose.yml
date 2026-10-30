@@ -92,8 +92,8 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         GIT_COMMIT: ${GIT_COMMIT:-local}
-        # Build-time values: Next.js bakes the rewrite target and NEXT_PUBLIC_* into the image.
-        API_INTERNAL_URL: http://api:4000
+        # Build-time values: Next.js inlines NEXT_PUBLIC_* into the client bundle. The API address is a
+        # runtime setting (environment, below), read on every request by the web server.
         NEXT_PUBLIC_AUTH_MODE: dev
         NEXT_PUBLIC_APP_ENV: local
     image: caseguard-web:local

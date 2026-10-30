@@ -38,7 +38,7 @@ The apps keep several revisions; each new revision receives 100% of traffic once
    ```
 
 4. **Deactivate the bad revision** (stops its replicas and cost): `az containerapp revision deactivate ... --revision <bad revision>`.
-5. **Repeat for the web app** if the release changed both. Mind the coupling: the web image has the API URL and `NEXT_PUBLIC_*` baked in at build time and calls the API's `/api/*` routes, so web and API contracts must stay compatible across the pair you leave running.
+5. **Repeat for the web app** if the release changed both. Mind the coupling: the web image has the `NEXT_PUBLIC_*` values baked in at build time and calls the API's `/api/*` routes (the API address itself is a runtime setting of the web container, so it follows the revision's configuration), so web and API contracts must stay compatible across the pair you leave running.
 6. **Scale-to-zero note:** if `minReplicas` is 0 the previous revision starts on the first request; expect a cold start.
 
 **Durable rollback.** Traffic shifting is an operational override. The next deployment resets traffic to the latest revision (the template sets `latestRevision` to 100%). To make a rollback durable, re-run stage 2 with the **previous immutable tag**:

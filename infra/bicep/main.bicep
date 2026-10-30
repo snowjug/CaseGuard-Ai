@@ -1077,9 +1077,8 @@ output searchEndpoint string = search.?outputs.endpoint ?? ''
 @description('Azure OpenAI endpoint the application uses (empty for the deterministic provider).')
 output openAiEndpoint string = openAiEndpoint
 
-@description('KEY=VALUE build arguments for the WEB image. Next.js bakes API_INTERNAL_URL (the /api rewrite target) and NEXT_PUBLIC_* into the build, so the web image is specific to this environment. None of these values is a secret.')
+@description('KEY=VALUE build arguments for the WEB image. Next.js inlines the NEXT_PUBLIC_* values into the client build, so the web image is specific to this environment (its Entra registration). None of these values is a secret. The API address is not one of them: the web container reads API_INTERNAL_URL at runtime (see the web app in containerapps.bicep).')
 output webBuildArguments array = [
-  'API_INTERNAL_URL=https://${names.apiApp}.internal.${containerApps.outputs.defaultDomain}'
   'NEXT_PUBLIC_AUTH_MODE=entra'
   'NEXT_PUBLIC_APP_ENV=${appEnvironment}'
   'NEXT_PUBLIC_ENTRA_CLIENT_ID=${entraWebClientId}'

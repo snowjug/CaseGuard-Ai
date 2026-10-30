@@ -251,7 +251,6 @@ jobs:
           tags: caseguard-web:local
           build-args: |
             GIT_COMMIT=${{ github.sha }}
-            API_INTERNAL_URL=http://api:4000
             NEXT_PUBLIC_AUTH_MODE=dev
             NEXT_PUBLIC_APP_ENV=local
           cache-from: type=gha,scope=web

@@ -1,13 +1,17 @@
 # CaseGuard AI web image (Next.js App Router, standalone output).
 #
 # The build context MUST be the repository root:
-#   docker build -f apps/web/Dockerfile -t caseguard-web:local \
-#     --build-arg API_INTERNAL_URL=http://api:4000 .
+#   docker build -f apps/web/Dockerfile -t caseguard-web:local .
+#   docker run -e API_INTERNAL_URL=http://api:4000 -p 3000:3000 caseguard-web:local
 #
-# Build-time configuration (important): Next.js inlines NEXT_PUBLIC_* values into the client bundle and
-# evaluates next.config rewrites during `next build`, so API_INTERNAL_URL and the NEXT_PUBLIC_* values
-# below are BUILD ARGUMENTS. Changing them requires rebuilding the image. None of them is a secret
-# (Entra client id, authority and scope are public by design); never pass credentials as build args.
+# Configuration (important):
+#   - Next.js inlines NEXT_PUBLIC_* values into the client bundle, so those are BUILD ARGUMENTS below.
+#     Changing them requires rebuilding the image. None of them is a secret (Entra client id, authority
+#     and scope are public by design); never pass credentials as build args.
+#   - API_INTERNAL_URL (where the web server forwards /api/*, /livez, /healthz and /readyz) is a RUNTIME
+#     environment variable read on every request by src/proxy.ts. It is deliberately NOT a build
+#     argument and the image has no default for it: when it is missing the web server answers 502
+#     (problem+json, code upstream_not_configured) in production instead of forwarding to a wrong host.
 #
 # Requirements on apps/web/next.config.ts (owned by the web workstream): `output: 'standalone'` and
 # `outputFileTracingRoot` set to the monorepo root, so the server entry is
@@ -32,15 +36,13 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 RUN pnpm fetch
 
 FROM fetch AS build
-ARG API_INTERNAL_URL=http://localhost:4000
 ARG NEXT_PUBLIC_AUTH_MODE=dev
 ARG NEXT_PUBLIC_APP_ENV=local
 ARG NEXT_PUBLIC_ENTRA_CLIENT_ID=
 ARG NEXT_PUBLIC_ENTRA_AUTHORITY=
 ARG NEXT_PUBLIC_ENTRA_API_SCOPE=
 ARG NEXT_PUBLIC_API_VALIDATION=
-ENV API_INTERNAL_URL=${API_INTERNAL_URL} \
-    NEXT_PUBLIC_AUTH_MODE=${NEXT_PUBLIC_AUTH_MODE} \
+ENV NEXT_PUBLIC_AUTH_MODE=${NEXT_PUBLIC_AUTH_MODE} \
     NEXT_PUBLIC_APP_ENV=${NEXT_PUBLIC_APP_ENV} \
     NEXT_PUBLIC_ENTRA_CLIENT_ID=${NEXT_PUBLIC_ENTRA_CLIENT_ID} \
     NEXT_PUBLIC_ENTRA_AUTHORITY=${NEXT_PUBLIC_ENTRA_AUTHORITY} \
@@ -59,7 +61,6 @@ RUN test -f apps/web/.next/standalone/apps/web/server.js || { \
 
 FROM node:24.22.2-trixie-slim AS runtime
 ARG GIT_COMMIT=unknown
-ARG API_INTERNAL_URL=http://localhost:4000
 ARG NEXT_PUBLIC_AUTH_MODE=dev
 ARG NEXT_PUBLIC_APP_ENV=local
 ARG NEXT_PUBLIC_ENTRA_CLIENT_ID=
@@ -73,7 +74,6 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
     PORT=3000 \
     GIT_COMMIT=${GIT_COMMIT} \
-    API_INTERNAL_URL=${API_INTERNAL_URL} \
     NEXT_PUBLIC_AUTH_MODE=${NEXT_PUBLIC_AUTH_MODE} \
     NEXT_PUBLIC_APP_ENV=${NEXT_PUBLIC_APP_ENV} \
     NEXT_PUBLIC_ENTRA_CLIENT_ID=${NEXT_PUBLIC_ENTRA_CLIENT_ID} \

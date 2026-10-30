@@ -183,8 +183,9 @@ try {
     $registry = $stage1.containerRegistryName.value
 
     if (-not $SkipImageBuild) {
-        # Next.js bakes the /api rewrite target and NEXT_PUBLIC_* into the web image, so the web build needs values from
-        # this environment. They are non-secret and come from the stage-1 deployment outputs.
+        # Next.js inlines the NEXT_PUBLIC_* values into the web image, so the web build needs values from this
+        # environment. They are non-secret and come from the stage-1 deployment outputs. (The API address is a
+        # runtime setting of the web container, set by the Bicep template.)
         $webBuildArguments = @($stage1.webBuildArguments.value)
         foreach ($image in @(
                 @{ Key = 'api'; Repository = $ApiImageRepository; Dockerfile = $ApiDockerfile },

@@ -152,8 +152,9 @@ registry="$(deployment_output "$infra_deployment" containerRegistryName)"
 if [[ "$skip_build" == "true" ]]; then
   cg_info "Skipping the image build; the registry must already contain tag $image_tag."
 else
-  # Next.js bakes the /api rewrite target and NEXT_PUBLIC_* into the web image, so the web build needs values from this
-  # environment. They are non-secret and come from the stage-1 deployment outputs.
+  # Next.js inlines the NEXT_PUBLIC_* values into the web image, so the web build needs values from this
+  # environment. They are non-secret and come from the stage-1 deployment outputs. (The API address is a
+  # runtime setting of the web container, set by the Bicep template.)
   mapfile -t web_build_args < <(az deployment sub show --subscription "$CG_SUB_ID" --name "$infra_deployment" \
     --query 'properties.outputs.webBuildArguments.value[]' --output tsv)
   for pair in "api|$api_repository|$api_dockerfile" "web|$web_repository|$web_dockerfile"; do

@@ -208,8 +208,9 @@ jobs:
         run: |
           api_args=(--build-arg "GIT_COMMIT=$GITHUB_SHA")
           web_args=(--build-arg "GIT_COMMIT=$GITHUB_SHA")
-          # Next.js bakes API_INTERNAL_URL and NEXT_PUBLIC_* into the web image, so its build arguments
-          # come from this environment's stage 1 outputs. None of them is a secret.
+          # Next.js inlines the NEXT_PUBLIC_* values into the web image, so its build arguments come from
+          # this environment's stage 1 outputs. None of them is a secret. The API address is not one of
+          # them: the web server reads API_INTERNAL_URL at runtime (set on the container by Bicep).
           while IFS= read -r arg; do
             if [ -n "$arg" ]; then web_args+=(--build-arg "$arg"); fi
           done <<< "$WEB_BUILD_ARGS"

@@ -1,7 +1,8 @@
 // Container Apps environment, the `web` and `api` apps and the manual `migrate` job.
 //
 // Topology: only `web` has external ingress. `api` has INTERNAL ingress: the browser reaches it through the web app's
-// same-origin /api rewrite, whose server-side target is API_INTERNAL_URL. The `migrate` job runs the API image with
+// same-origin /api proxy (apps/web/src/proxy.ts), whose server-side target is the runtime variable API_INTERNAL_URL
+// set below. The `migrate` job runs the API image with
 // `node dist/db/migrate-cli.js` and is started manually (az containerapp job start).
 //
 // Secrets are never inline: every secret is a Key Vault reference resolved with the user-assigned identity, which must
