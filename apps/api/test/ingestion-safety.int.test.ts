@@ -4,6 +4,7 @@ import type { Database } from '../src/db';
 import { TEST_DATABASE_STARTUP_TIMEOUT_MS, withFaultInjection } from '../src/db/testing';
 import { INJECTION_TEXT, bundleOf, secrets, transcriptOf } from './ingestion-fixtures';
 import {
+  SAMPLE_SOURCE,
   auditOf,
   createCase,
   leakSurface,
@@ -133,6 +134,25 @@ describe('secrets never leave the pipeline (FR-ING-04)', () => {
     expect(
       res.data.preview.redaction.findings.map((finding: { category: string }) => finding.category),
     ).toEqual(['github_token', 'custom']);
+  });
+
+  it('[FR-ING-04] a tenant pattern for ticket ids does not stop the built-in sample (review L2)', async () => {
+    const { h } = await openHarness(database, harnesses);
+    const repos = h.repos(CONTOSO);
+    await repos.governance.getSettings();
+    await repos.governance.updateSection(
+      'redaction',
+      {
+        ...DEFAULT_REDACTION_CONFIG,
+        customPatterns: [{ name: 'support ticket ids', pattern: 'CG-[A-Z]+-[0-9]{4}' }],
+      },
+      { expectedVersion: 1, changeNote: 'test configuration', by: PERSONAS.admin },
+    );
+    const preview = await previewCase(h, PERSONAS.engineer, SAMPLE_SOURCE);
+    expect(preview.data).toMatchObject({ ok: true, summary: { reference: 'CG-SYN-1001' } });
+    const res = await createCase(h, PERSONAS.engineer, SAMPLE_SOURCE);
+    expect(res.statusCode).toBe(201);
+    expect(res.data.case.reference).toBe('CG-SYN-1001');
   });
 });
 

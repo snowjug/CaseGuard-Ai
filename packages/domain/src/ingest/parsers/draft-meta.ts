@@ -56,11 +56,12 @@ export function pickTitle(
   return input.source === 'csv' ? 'Imported case events' : 'Pasted case transcript';
 }
 
-export function pickReference(
+/** The reference the caller or the text itself states; null when the draft has to name itself. */
+export function statedReference(
   options: ResolvedOptions,
   input: AssembleInput,
   warnings: WarningCollector,
-): string {
+): string | null {
   if (options.reference) return options.reference;
   if (input.header.reference) {
     const cleaned = normaliseReference(input.header.reference);
@@ -71,7 +72,22 @@ export function pickReference(
       'The case reference in the text is not usable (4-40 characters of A-Z, 0-9 and dashes); a generated reference was used.',
     );
   }
-  const digest = createHash('sha256').update(input.referenceSeed, 'utf8').digest('hex');
+  return null;
+}
+
+/**
+ * The name a draft gives itself: `CG-DRAFT-` and eight hex digits of a digest of the input text and
+ * of the whole draft with an empty reference. Everything that feeds the content therefore feeds the
+ * reference too (the date a time-only stamp was given, the case details passed with the text), so
+ * identical input gives an identical reference and content that differs never keeps one it already
+ * had; hashing the text alone left the same reference on a different case the next day.
+ */
+export function generatedReference(input: AssembleInput, unnamedDraft: unknown): string {
+  const digest = createHash('sha256')
+    .update(input.referenceSeed, 'utf8')
+    .update('\u0000')
+    .update(JSON.stringify(unnamedDraft), 'utf8')
+    .digest('hex');
   return `CG-DRAFT-${digest.slice(0, 8).toUpperCase()}`;
 }
 

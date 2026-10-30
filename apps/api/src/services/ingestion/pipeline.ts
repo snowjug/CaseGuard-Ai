@@ -1,25 +1,19 @@
 import {
-  BundleValidationError,
   buildDraftPreview,
-  normalizeBundle,
   toValidationIssues,
   type IngestFailure,
   type IngestSuccess,
 } from '@caseguard/domain';
-import type {
-  CaseBundle,
-  InjectionSummary,
-  RedactionSummary,
-  ValidationIssue,
-} from '@caseguard/schemas';
+import type { InjectionSummary, RedactionSummary, ValidationIssue } from '@caseguard/schemas';
 import { canonicalJson, sha256Hex } from '@caseguard/security';
 import type { IngestSource } from '../ports';
 import { resolveInput, type ResolvedInput } from './input';
-import { errorIssue, formatPath, orderIssues, sanitizeIssues } from './issues';
+import { orderIssues, sanitizeIssues } from './issues';
 import { checkDataPolicy } from './policy';
 import { credentialLikeIdentifiers, redactBundle, redactionOptionsFor } from './redact';
 import { screenBundle } from './screen';
 import type { PipelineEnv, PipelineOutcome } from './types';
+import { redactedBundleIssues, semanticIssues } from './validate';
 
 /**
  * Inputs from this size on yield to the event loop between phases: parsing and redaction are
@@ -42,31 +36,6 @@ const emptyInjection = (): InjectionSummary => ({
   highestSeverity: 'none',
   findings: [],
 });
-
-/**
- * `normalizeBundle` is what rejects replies that point at later events. Running it here (with
- * throwaway ids) makes a preview refuse exactly what ingestion would, with the same field paths.
- */
-function semanticIssues(bundle: CaseBundle, now: string): ValidationIssue[] {
-  try {
-    normalizeBundle(bundle, {
-      tenantId: 'preview',
-      caseId: 'preview',
-      sourceId: 'preview',
-      createdBy: 'preview',
-      now,
-      sourceKind: 'pasted_text',
-      storedPayload: '{}',
-      redactionReplacements: 0,
-    });
-    return [];
-  } catch (error) {
-    if (error instanceof BundleValidationError) {
-      return error.issues.map((issue) => errorIssue(formatPath(issue.path), issue.message));
-    }
-    throw error;
-  }
-}
 
 function failedOutcome(
   resolved: ResolvedInput,
@@ -127,6 +96,8 @@ async function succeededOutcome(
   const found: ValidationIssue[] = [
     ...(policy === null ? [] : [policy]),
     ...credentialLikeIdentifiers(bundle, options),
+    // Without a replacement the redacted bundle is the one the parser already validated.
+    ...(redaction.summary.totalReplacements > 0 ? redactedBundleIssues(redaction.bundle) : []),
     ...semanticIssues(redaction.bundle, env.now),
     ...draft.issues,
     ...resolved.notes,

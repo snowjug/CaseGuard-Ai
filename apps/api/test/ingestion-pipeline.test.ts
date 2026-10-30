@@ -201,6 +201,44 @@ describe('redaction (FR-ING-04)', () => {
     expect(outcome.prepared).toBeNull();
     expect(outcome.preview.issues[0]).toMatchObject({ severity: 'error', path: 'case.reference' });
   });
+
+  describe('a tenant pattern that matches ticket ids (review L2)', () => {
+    const redaction = {
+      ...DEFAULT_REDACTION_CONFIG,
+      customPatterns: [{ name: 'support ticket ids', pattern: 'CG-[A-Z]+-[0-9]{4}' }],
+    };
+
+    it('still ingests the built-in sample, whose reference is exactly such an id', async () => {
+      const outcome = await runPipeline(
+        { type: 'sample', sampleId: PRIMARY.id },
+        env({ redaction }),
+      );
+      expect(outcome.preview.issues.filter((issue) => issue.severity === 'error')).toEqual([]);
+      expect(outcome.preview.ok).toBe(true);
+      expect(outcome.prepared?.bundle.case.reference).toBe('CG-SYN-1001');
+    });
+
+    it('stores a reference that matches the pattern as given, even when the same id is in the text', async () => {
+      const bundle = bundleOf({
+        reference: 'CG-ABC-1234',
+        body: 'Please look at CG-ABC-1234 again.',
+      });
+      const outcome = await run(bundle, { redaction });
+      expect(outcome.preview.ok).toBe(true);
+      expect(outcome.prepared?.bundle.case.reference).toBe('CG-ABC-1234');
+    });
+
+    it('leaves the built-in credential rules on the reference and the workload in force', async () => {
+      const credential = await run(bundleOf({ reference: secrets.awsAccessKeyId() }), {
+        redaction,
+      });
+      expect(credential.preview.ok).toBe(false);
+      expect(credential.preview.issues[0]).toMatchObject({
+        severity: 'error',
+        path: 'case.reference',
+      });
+    });
+  });
 });
 
 describe('prompt injection screening (NFR-SEC-05)', () => {

@@ -4,8 +4,10 @@ import { UnsafeContentError, ValidationFailedError } from '../../errors';
 import type { RequestContext } from '../../http/request-context';
 import type { ServiceDeps } from '..';
 import type { IngestInput, IngestSource, IngestionPort } from '../ports';
+import { errorIssue, orderIssues } from './issues';
 import { persistCase } from './persist';
 import { runPipeline } from './pipeline';
+import { findCaseByReference, referenceInUseMessage } from './reference';
 import type { PipelineEnv, PipelineOutcome } from './types';
 
 /** What the pipeline needs from the tenant's settings and the process configuration. */
@@ -46,14 +48,26 @@ async function runChecked(ctx: RequestContext, source: IngestSource): Promise<Pi
   return outcome;
 }
 
-/** Validates, redacts and screens a payload; reports whether the same content is already stored. */
+/**
+ * Validates, redacts and screens a payload and says what a create would do with it: identical
+ * content is already stored (`alreadyIngestedCaseId`), a reference used by a case with different
+ * content is refused (an error issue, as the create answers 409). Reads only; nothing is persisted.
+ */
 async function previewSource(ctx: RequestContext, source: IngestSource): Promise<IngestionPreview> {
-  const outcome = await runChecked(ctx, source);
-  const existing =
-    outcome.prepared === null
-      ? null
-      : await ctx.repos.cases.findByContentHash(outcome.preview.contentHash);
-  return { ...outcome.preview, alreadyIngestedCaseId: existing?.id ?? null };
+  const { preview, prepared } = await runChecked(ctx, source);
+  if (prepared === null) return preview;
+  const identical = await ctx.repos.cases.findByContentHash(preview.contentHash);
+  if (identical !== null) return { ...preview, alreadyIngestedCaseId: identical.id };
+  const reference = prepared.bundle.case.reference;
+  if ((await findCaseByReference(ctx.repos, reference)) === null) return preview;
+  return {
+    ...preview,
+    ok: false,
+    issues: orderIssues([
+      errorIssue('case.reference', referenceInUseMessage(reference)),
+      ...preview.issues,
+    ]),
+  };
 }
 
 /** A refused payload as a 422 whose `errors` are the field-level issues the preview would show. */

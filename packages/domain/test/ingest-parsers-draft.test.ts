@@ -218,6 +218,63 @@ describe('draft assembly: CSV specifics', () => {
   });
 });
 
+describe('draft assembly: a generated reference names the content, not only the text', () => {
+  const timeOnly = [
+    '09:12 UTC Customer: Teams fails for 40 users.',
+    '09:40 UTC Support Engineer: Looking at it now.',
+  ].join('\n');
+  const dated = [
+    `${stamp(0)} Customer: Teams fails for 40 users.`,
+    `${stamp(10)} Support Engineer: Looking at it now.`,
+  ].join('\n');
+  const csvText =
+    'Time,Author,Text\n09:00 UTC,Contoso admin,hello\n09:05 UTC,Support Engineer,hi\n';
+  const referenceOf = (result: ReturnType<typeof parsePastedTranscript>): string =>
+    expectOk(result).bundle.case.reference;
+  const csv = (extra: Record<string, unknown> = {}) =>
+    parseCsvEvents(csvText, { ...BASE, workload: 'teams-authentication', ...extra });
+
+  it('[FR-ING-01] gives time-only stamps read on another day another reference, the same day the same', () => {
+    const first = referenceOf(parse(timeOnly, { now: '2026-10-29T08:00:00Z' }));
+    expect(first).toMatch(/^CG-DRAFT-[0-9A-F]{8}$/);
+    expect(referenceOf(parse(timeOnly, { now: '2026-10-29T18:30:00Z' }))).toBe(first);
+    expect(referenceOf(parse(timeOnly, { now: '2026-10-30T08:00:00Z' }))).not.toBe(first);
+  });
+
+  it('[FR-ING-01] does the same for a CSV whose time column carries no date', () => {
+    const first = expectOk(csv({ now: '2026-10-29T08:00:00Z' })).bundle.case.reference;
+    expect(expectOk(csv({ now: '2026-10-29T23:00:00Z' })).bundle.case.reference).toBe(first);
+    expect(expectOk(csv({ now: '2026-10-30T08:00:00Z' })).bundle.case.reference).not.toBe(first);
+  });
+
+  it('[FR-ING-01] keeps the reference when nothing but the clock differs (dated text, or an explicit default date)', () => {
+    expect(referenceOf(parse(dated, { now: '2026-10-29T08:00:00Z' }))).toBe(
+      referenceOf(parse(dated, { now: '2026-12-01T08:00:00Z' })),
+    );
+    const pinned = { defaultDate: '2026-03-09' };
+    expect(referenceOf(parse(timeOnly, { ...pinned, now: '2026-10-29T08:00:00Z' }))).toBe(
+      referenceOf(parse(timeOnly, { ...pinned, now: '2026-12-01T08:00:00Z' })),
+    );
+  });
+
+  it('[FR-ING-01] follows the case details passed with the text', () => {
+    const plain = referenceOf(parse(dated));
+    expect(referenceOf(parse(dated))).toBe(plain);
+    expect(referenceOf(parse(dated, { title: 'Another title for the same text' }))).not.toBe(plain);
+    expect(referenceOf(parse(dated, { product: 'Microsoft Teams' }))).not.toBe(plain);
+    expect(referenceOf(parse(dated, { synthetic: false }))).not.toBe(plain);
+  });
+
+  it('[FR-ING-01] never touches a reference the caller or the text states', () => {
+    const stated = parse(timeOnly, { reference: 'CG-MINE-1001', now: '2026-10-30T08:00:00Z' });
+    expect(referenceOf(stated)).toBe('CG-MINE-1001');
+    const header = parse(`Reference: ab-1234\n${timeOnly}`, { now: '2026-10-30T08:00:00Z' });
+    expect(referenceOf(header)).toBe('AB-1234');
+    const later = parse(`Reference: ab-1234\n${timeOnly}`, { now: '2026-11-30T08:00:00Z' });
+    expect(referenceOf(later)).toBe('AB-1234');
+  });
+});
+
 describe('parse confidence', () => {
   const clean = {
     eventCount: 10,

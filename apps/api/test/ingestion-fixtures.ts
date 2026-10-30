@@ -1,5 +1,6 @@
 import { DEFAULT_REDACTION_CONFIG } from '@caseguard/schemas';
 import { createMalwareScanner, sha256Hex } from '@caseguard/security';
+import type { CaseListItem } from '../src/db';
 import { AppError } from '../src/errors';
 import { runPipeline } from '../src/services/ingestion/pipeline';
 import type { PipelineEnv } from '../src/services/ingestion/types';
@@ -20,6 +21,26 @@ export const pipelineEnv = (overrides: Partial<PipelineEnv> = {}): PipelineEnv =
   uploadMaxBytes: 2_097_152,
   scanner: createMalwareScanner('none'),
   ...overrides,
+});
+
+/** A row of the case list (what the repository returns) with the given id and reference. */
+export const listItemOf = (id: string, reference = `CG-${id}`): CaseListItem => ({
+  id,
+  reference,
+  title: 'Teams sign-in fails',
+  product: 'Microsoft Teams',
+  workload: 'teams-authentication',
+  severity: 'A',
+  status: 'open',
+  customerAlias: 'Customer',
+  openedAt: '2026-01-05T09:00:00.000Z',
+  closedAt: null,
+  synthetic: true,
+  eventCount: 3,
+  analysisState: 'not_analyzed',
+  analyzedAt: null,
+  hasResolution: false,
+  injectionDetected: false,
 });
 
 /** An uploaded file as the HTTP layer would hand it to the pipeline. */

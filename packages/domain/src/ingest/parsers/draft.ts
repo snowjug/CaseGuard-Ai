@@ -10,9 +10,10 @@ import {
   addTimestampWarnings,
   dedupeTags,
   DEFAULT_PRODUCT,
-  pickReference,
+  generatedReference,
   pickTitle,
   sourceList,
+  statedReference,
   syntheticNoticeFor,
   workloadWarning,
 } from './draft-meta';
@@ -198,12 +199,13 @@ export function assembleDraft(input: AssembleInput): DraftSuccess | DraftFailure
   if (!workload) workloadWarning(warnings);
 
   const notice = syntheticNoticeFor(options);
-  const draft: CaseBundle = {
+  const stated = statedReference(options, input, warnings);
+  const compose = (reference: string): CaseBundle => ({
     schemaVersion: CASE_BUNDLE_SCHEMA_VERSION,
     synthetic: options.synthetic,
     ...(notice ? { syntheticNotice: notice } : {}),
     case: {
-      reference: pickReference(options, input, warnings),
+      reference,
       title,
       product: product ?? DEFAULT_PRODUCT,
       workload: workload ?? DEFAULT_WORKLOAD,
@@ -234,7 +236,8 @@ export function assembleDraft(input: AssembleInput): DraftSuccess | DraftFailure
           },
         }
       : {}),
-  };
+  });
+  const draft = compose(stated ?? generatedReference(input, compose('')));
 
   const parsed = CaseBundleSchema.safeParse(draft);
   if (!parsed.success) {

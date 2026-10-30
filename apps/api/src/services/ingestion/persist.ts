@@ -5,10 +5,8 @@ import { AppError, ConflictError } from '../../errors';
 import type { RequestContext } from '../../http/request-context';
 import { buildObjectKey, scopeObjectStoreToTenant, type ObjectStore } from '../../storage';
 import { summarizeCase } from '../cases/summaries';
+import { findCaseByReference, referenceConflict } from './reference';
 import type { PreparedPayload } from './types';
-
-const REFERENCE_PAGE_SIZE = 200;
-const REFERENCE_MAX_PAGES = 10;
 
 /** A payload that passed the pipeline, with what the caller is told about it. */
 export interface AcceptedPayload {
@@ -18,34 +16,6 @@ export interface AcceptedPayload {
 
 export interface PersistOptions {
   readonly analyze: boolean;
-}
-
-/**
- * True when a case of this tenant already uses `reference`. The case table has no unique index on
- * the reference (only on the content), so the service checks; `q` narrows by substring and the exact
- * comparison decides. Two concurrent requests with the same new reference can still both pass.
- */
-async function referenceInUse(repos: TenantRepositories, reference: string): Promise<boolean> {
-  let cursor: string | undefined;
-  for (let page = 0; page < REFERENCE_MAX_PAGES; page += 1) {
-    const result = await repos.cases.list({
-      limit: REFERENCE_PAGE_SIZE,
-      q: reference,
-      ...(cursor === undefined ? {} : { cursor }),
-    });
-    if (result.items.some((item) => item.reference === reference)) return true;
-    if (result.nextCursor === null) return false;
-    cursor = result.nextCursor;
-  }
-  return false;
-}
-
-/** The reference is validated (upper-case letters, digits, dashes), so it is safe to show. */
-function referenceConflict(reference: string): ConflictError {
-  return new ConflictError(
-    `A case with reference ${reference} already exists in this workspace with different content. Change the case reference in the payload, or delete the existing case first.`,
-    { reason: 'reference_in_use' },
-  );
 }
 
 const previewPart = (preview: IngestionPreview): IngestResult['preview'] => ({
@@ -79,7 +49,7 @@ async function commit(
   const { prepared, preview } = accepted;
   const identical = await tx.cases.findByContentHash(prepared.contentHash);
   if (identical !== null) return { case: identical, created: false };
-  if (await referenceInUse(tx, input.case.reference)) {
+  if ((await findCaseByReference(tx, input.case.reference)) !== null) {
     throw referenceConflict(input.case.reference);
   }
   const stored = await tx.cases.ingest(input);

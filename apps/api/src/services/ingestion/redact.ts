@@ -225,18 +225,21 @@ export async function redactBundle(
 /**
  * The reference and the workload are identifiers (other records point at them), so they are not
  * redacted in place. When one of them looks like a credential or personal data the payload is
- * refused instead, because both appear in audit records, logs and URLs.
+ * refused instead, because both appear in audit records, logs and URLs. Only the built-in rules
+ * decide that: a tenant pattern describes text to hide (typically ticket ids, which is exactly what
+ * a case reference is), so applying it here would refuse every case the pattern was written for.
  */
 export function credentialLikeIdentifiers(
   bundle: CaseBundle,
   options: RedactionOptions,
 ): ValidationIssue[] {
+  const builtInRules: RedactionOptions = { ...options, customPatterns: [] };
   const probes: readonly (readonly [string, string])[] = [
     ['case.reference', bundle.case.reference],
     ['case.workload', bundle.case.workload],
   ];
   return probes
-    .filter(([, value]) => redactText(value, options).totalReplacements > 0)
+    .filter(([, value]) => redactText(value, builtInRules).totalReplacements > 0)
     .map(([path]) =>
       errorIssue(
         path,
