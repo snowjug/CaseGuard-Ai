@@ -33,6 +33,7 @@ import {
   useAsOfCursor,
 } from '../../components/case/as-of';
 import { caseTimeRange, useCaseDetail, useKnownAt } from '../../components/case/case-hooks';
+import { CaseNotFoundState } from '../../components/case/CaseNotFoundState';
 import { NotAnalysedState, isNotAnalysedError } from '../../components/case/NotAnalysedState';
 import { IdentityRequired } from '../../components/common/IdentityRequired';
 import { LinkButton } from '../../components/common/LinkButton';
@@ -286,6 +287,8 @@ export function EvidenceLedgerPage({ caseId }: { caseId: string }) {
       }
     />
   );
+
+  if (detail.isError && detail.error.isNotFound) return <CaseNotFoundState />;
 
   if (pages.isError && isNotAnalysedError(pages.error)) {
     return (

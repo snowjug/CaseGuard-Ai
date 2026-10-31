@@ -1078,6 +1078,23 @@ describe('[FR-TIME-05] a case that is not analysed, loading and errors', () => {
     expect(await screen.findByRole('list', { name: 'Events, 3 shown' })).toBeInTheDocument();
   });
 
+  it('says the case cannot be found, with a way back, and never waits for it, when it does not exist', async () => {
+    const missing = (): never => {
+      throw new ApiError({ status: 404, code: 'not_found', title: 'Not found' });
+    };
+    renderApp(<TimelinePage caseId="case_gone" />, {
+      api: api({ 'cases.get': missing, 'timeline.get': missing }),
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'We could not find that case' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Browse cases' })).toHaveAttribute('href', '/cases');
+    expect(screen.queryByText(/Loading what was known/)).toBeNull();
+    expect(screen.queryByText('The timeline could not be loaded')).toBeNull();
+    // Nothing is left busy: a screen reader would otherwise announce a page that is loading for ever.
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+  });
+
   it('refreshes on demand', async () => {
     const user = userEvent.setup();
     const handler = api();

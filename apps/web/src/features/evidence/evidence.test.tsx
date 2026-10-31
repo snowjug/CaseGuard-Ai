@@ -1112,6 +1112,23 @@ describe('[FR-LEDGER-06] a case that is not analysed, loading and errors', () =>
     await user.click(screen.getByRole('button', { name: /Retry/ }));
     expect(await screen.findByRole('list', { name: 'Claims, 2 shown' })).toBeInTheDocument();
   });
+
+  it('says the case cannot be found, with a way back, and never waits for it, when it does not exist', async () => {
+    const missing = (): never => {
+      throw new ApiError({ status: 404, code: 'not_found', title: 'Not found' });
+    };
+    renderApp(<EvidenceLedgerPage caseId="case_gone" />, {
+      api: api({ 'cases.get': missing, 'evidence.list': missing }),
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'We could not find that case' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Browse cases' })).toHaveAttribute('href', '/cases');
+    expect(screen.queryByText(/Loading what was known/)).toBeNull();
+    expect(screen.queryByText('The evidence ledger could not be loaded')).toBeNull();
+    // Nothing is left busy: a screen reader would otherwise announce a page that is loading for ever.
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+  });
 });
 
 describe('[FR-LEDGER-07] a page that failed is not requested again in a loop', () => {
