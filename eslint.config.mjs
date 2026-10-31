@@ -30,13 +30,10 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: [
-            '*.mjs',
-            'scripts/*.mjs',
-            'scripts/*.ts',
-            'e2e/*.ts',
-            '*.config.ts',
-          ],
+          // Files outside a package (scripts, root configs) are checked with the shared compiler options, not with
+          // TypeScript's built-in defaults (which have no modern lib, no JSON imports). `e2e/` has its own tsconfig.
+          defaultProject: 'tsconfig.base.json',
+          allowDefaultProject: ['*.mjs', 'scripts/*.mjs', 'scripts/*.ts', '*.config.ts'],
         },
         tsconfigRootDir: import.meta.dirname,
       },
