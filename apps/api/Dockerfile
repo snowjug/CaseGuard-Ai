@@ -20,7 +20,7 @@
 #     (no daemon available). The same pnpm fetch/install/deploy and tsup steps were run outside Docker
 #     and the bundled output was started against the deployed node_modules. CI builds this image.
 
-FROM node:24.22.2-trixie-slim AS base
+FROM node:26.12.1-trixie-slim AS base
 # corepack reads the exact pnpm version from the "packageManager" field of package.json.
 # HUSKY=0 stops the root "prepare" script from installing git hooks inside the image build.
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
@@ -45,7 +45,7 @@ RUN pnpm install --offline --frozen-lockfile --filter "@caseguard/api..." \
     && npm_config_inject_workspace_packages=true \
        pnpm --filter=@caseguard/api --prod deploy --offline /out/api
 
-FROM node:24.22.2-trixie-slim AS runtime
+FROM node:26.12.1-trixie-slim AS runtime
 ARG GIT_COMMIT=unknown
 ENV NODE_ENV=production \
     API_HOST=0.0.0.0 \
