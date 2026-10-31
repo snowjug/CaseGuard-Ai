@@ -239,9 +239,10 @@ export interface SkillsPort {
   /**
    * `skillMatches.apply`: records that the engineer adopted the guided plan of a match (idempotent). The
    * match is addressed by the id a list returned, stored or not yet; the application stores it. An
-   * application that has to be measured announces each cold pass to `options.beforeColdPass` first: the
-   * case itself, and (once per run) the recorded path of the case the skill came from, which the
-   * skill's effectiveness is also compared with.
+   * application announces each measurement that no cache can serve to `options.beforeColdPass` before it
+   * runs: the case itself, the recorded path of the case the skill came from (once per run of that case),
+   * and each of the latest earlier applications whose measurement is not cached, which the skill's
+   * effectiveness is recomputed from.
    */
   applyMatch(
     ctx: RequestContext,
@@ -250,9 +251,12 @@ export interface SkillsPort {
     options?: ColdPassOptions,
   ): Promise<SkillMatch>;
   /**
-   * `skills.apply`: applies a skill to a case (stores the match with its application; idempotent) and
-   * updates the skill's effectiveness: estimated against a simulated baseline and, where the origin
-   * case is available and is not this case, against its recorded path (`effectiveness.precedent`).
+   * `skills.apply`: applies a skill to a case (stores the match with its application; idempotent: an
+   * application recorded meanwhile by someone else stays as it was, audited once) and updates the skill's
+   * effectiveness: estimated against a simulated baseline and, where the origin case is available and is
+   * not this case, against its recorded path (`effectiveness.precedent`). Applications that run at the
+   * same time are all counted: the update is guarded by the version of the skill and recomputed when
+   * another one commits first.
    */
   applyToCase(
     ctx: RequestContext,

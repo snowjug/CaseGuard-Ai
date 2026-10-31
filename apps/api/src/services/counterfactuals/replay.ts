@@ -25,7 +25,14 @@ export interface CaseReplay {
   readonly analysis: DeterministicAnalysis;
 }
 
-const REPLAY_CACHE_ENTRIES = 8;
+/**
+ * Analyses kept in memory. One skill application walks the case itself, the case the skill came from
+ * and up to `MAX_USAGE_CASES - 1` earlier applications (so `MAX_USAGE_CASES + 1` cases), in the same
+ * order every time. A least-recently-used cache that is smaller than such a walk misses on every step
+ * of it, so it must hold at least the walk and a little more (`skills-application.test.ts` pins the
+ * relation). It is bounded by entries, not bytes: a very large case takes a lot of memory.
+ */
+export const REPLAY_CACHE_ENTRIES = 12;
 
 /**
  * Loads replays and keeps the few most recent analyses (the expensive part). The cache key names the
@@ -34,6 +41,12 @@ const REPLAY_CACHE_ENTRIES = 8;
  */
 export class ReplayLoader {
   private readonly analyses = new LruCache<DeterministicAnalysis>(REPLAY_CACHE_ENTRIES);
+  private enginePasses = 0;
+
+  /** How many times the engine really ran for a replay (a cache hit does not count). */
+  get passes(): number {
+    return this.enginePasses;
+  }
 
   /**
    * 404 when the case does not exist for the caller's tenant, 422 for an unsupported workload and
@@ -55,6 +68,7 @@ export class ReplayLoader {
     const nowMs = ctx.now().getTime();
     let analysis = this.analyses.get(key, nowMs);
     if (analysis === undefined) {
+      this.enginePasses += 1;
       analysis = runDeterministicAnalysis({
         view: createFullView(inputs.events, inputs.resolution),
         pack: inputs.pack,

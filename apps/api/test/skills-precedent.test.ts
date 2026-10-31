@@ -2,21 +2,12 @@ import { describe, expect, it, vi, type Mock } from 'vitest';
 import {
   aggregateSkillEffectiveness,
   createFullView,
-  extractSkillCandidates,
-  generateCounterfactuals,
-  getCompiledPack,
   impactPrecedentOf,
   runDeterministicAnalysis,
-  type EngineContext,
   type MatchableSkill,
   type SkillImpactPrecedent,
 } from '@caseguard/domain';
-import {
-  DEFAULT_ACTION_VALUE_CONFIG,
-  DEFAULT_QUALITY_CONFIG,
-  type AnalysisRun,
-  type SkillContent,
-} from '@caseguard/schemas';
+import { DEFAULT_ACTION_VALUE_CONFIG, type SkillContent } from '@caseguard/schemas';
 import {
   AppError,
   ConflictError,
@@ -25,7 +16,6 @@ import {
   ValidationFailedError,
 } from '../src/errors';
 import type { RequestContext } from '../src/http/request-context';
-import type { AnalysisInputs } from '../src/services/analysis';
 import type { CaseReplay, ReplayLoader } from '../src/services/counterfactuals/replay';
 import {
   PrecedentLoader,
@@ -34,135 +24,27 @@ import {
   type OriginPrecedent,
 } from '../src/services/skills/precedent';
 import { buildSkillUsage } from '../src/services/skills/usage';
-import { SAMPLE_FILES, normalizeSample } from './support/samples';
+import {
+  TENANT,
+  ctxOne,
+  draft,
+  entry,
+  measuredOne,
+  minimumEvidence,
+  one,
+  pack,
+  replayOf,
+  replayOne,
+  replayTwo,
+  runOf,
+} from './skills-world';
 
 /*
  * Pure unit tests of how an application is compared with the recorded path of the case the skill came
  * from: the loader that measures that path (with fakes for the case store and the replay), and the
- * records it puts on a usage. The engine runs on the real synthetic cases; nothing touches a database.
+ * records it puts on a usage. The engine runs on the real synthetic cases (`skills-world.ts`);
+ * nothing touches a database.
  */
-
-const TENANT = 'tenant_unit';
-const pack = getCompiledPack('teams-authentication');
-if (pack === null) throw new Error('the teams-authentication pack is missing');
-
-const one = normalizeSample(SAMPLE_FILES.caseOne, { tenantId: TENANT, caseId: 'case_unit_one' });
-const two = normalizeSample(SAMPLE_FILES.caseTwo, { tenantId: TENANT, caseId: 'case_unit_two' });
-const engineCtx = (caseId: string, runId: string): EngineContext => ({
-  tenantId: TENANT,
-  caseId,
-  runId,
-  now: '2026-01-15T09:00:00.000Z',
-  createdBy: 'user_ava_engineer',
-  seed: `seed-${caseId}`,
-});
-const ctxOne = engineCtx('case_unit_one', 'run_unit_1');
-const ctxTwo = engineCtx('case_unit_two', 'run_unit_2');
-const analyse = (normalized: typeof one, ctx: EngineContext) =>
-  runDeterministicAnalysis({
-    view: createFullView(normalized.events, normalized.resolution),
-    pack,
-    config: DEFAULT_ACTION_VALUE_CONFIG,
-    ctx,
-  });
-const analysisOne = analyse(one, ctxOne);
-const analysisTwo = analyse(two, ctxTwo);
-
-const fork = analysisOne.forks.find((f) => f.isEarliestMeaningful) ?? analysisOne.forks[0];
-if (fork === undefined) throw new Error('Case One has no fork');
-const pending = generateCounterfactuals({
-  analysis: analysisOne,
-  fork,
-  strategies: ['balanced'],
-  events: one.events,
-  resolution: one.resolution,
-  pack,
-  config: DEFAULT_ACTION_VALUE_CONFIG,
-  ctx: ctxOne,
-}).scenarios[0];
-if (pending === undefined) throw new Error('no scenario');
-const draft = extractSkillCandidates({
-  analysis: analysisOne,
-  fork,
-  scenarios: [{ ...pending, reviewState: 'confirmed' }],
-  events: one.events,
-  resolution: one.resolution,
-  pack,
-  config: DEFAULT_ACTION_VALUE_CONFIG,
-  ctx: ctxOne,
-  caseInfo: { workload: one.case.workload, product: one.case.product },
-  caseReference: one.case.reference,
-  synthetic: true,
-}).candidates[0];
-if (draft === undefined) throw new Error('no draft skill');
-const entry: MatchableSkill = {
-  skill: { ...draft.skill, lifecycle: 'published' },
-  version: draft.version,
-};
-
-const runOf = (ctx: EngineContext, id = ctx.runId): AnalysisRun => ({
-  tenantId: TENANT,
-  createdAt: ctx.now,
-  updatedAt: ctx.now,
-  createdBy: 'system:analysis',
-  version: 1,
-  id,
-  caseId: ctx.caseId,
-  status: 'succeeded',
-  provider: 'deterministic',
-  model: 'deterministic-knowledge-pack',
-  simulated: true,
-  knowledgePackId: pack.pack.id,
-  knowledgePackVersion: pack.pack.version,
-  qualityConfigVersion: '1',
-  actionValueConfigVersion: '1',
-  inputHash: 'hash',
-  startedAt: ctx.now,
-  completedAt: ctx.now,
-  counts: {
-    events: 0,
-    evidence: 0,
-    claims: 0,
-    hypotheses: 0,
-    actions: 0,
-    forks: 0,
-    warnings: 0,
-    modelExecutions: 0,
-  },
-  error: null,
-});
-const inputsOf = (normalized: typeof one): AnalysisInputs => ({
-  caseRecord: normalized.case,
-  source: normalized.source,
-  events: normalized.events,
-  resolution: normalized.resolution,
-  pack,
-  actionConfig: DEFAULT_ACTION_VALUE_CONFIG,
-  qualityConfig: DEFAULT_QUALITY_CONFIG,
-  skills: [entry],
-  unitPrices: { inputPer1kUsd: null, outputPer1kUsd: null, cachedInputPer1kUsd: null },
-});
-const replayOf = (
-  normalized: typeof one,
-  ctx: EngineContext,
-  analysis: typeof analysisOne,
-): CaseReplay => ({
-  run: runOf(ctx),
-  inputs: inputsOf(normalized),
-  engineCtx: ctx,
-  analysis,
-});
-const replayOne = replayOf(one, ctxOne, analysisOne);
-const replayTwo = replayOf(two, ctxTwo, analysisTwo);
-
-const minimumEvidence = entry.version.content.minimumEvidence.map((m) => m.requirementId);
-const measuredOne = impactPrecedentOf({
-  reference: one.case.reference,
-  analysis: analysisOne,
-  pack,
-  minimumEvidence,
-});
-if (measuredOne === null) throw new Error('Case One has no measurable recorded path');
 
 describe('which case a skill came from', () => {
   it('is the source case with the role origin, else the first case the skill names, else none', () => {

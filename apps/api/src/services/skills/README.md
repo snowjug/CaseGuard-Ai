@@ -93,7 +93,8 @@ filtered down), and the matcher derives its knowledge state from the visible eve
   metered. An instant before the first event sees nothing and is not metered.
 
 `skillMatches.apply` and `skills.apply` record that an engineer adopted the guided plan (idempotent, audited
-once) with its conformance and the estimated effectiveness. A re-analysis keeps an applied match:
+once, also when two requests apply the same match at the same time; see "Applying a skill" below for that and
+for the engine budget) with its conformance and the estimated effectiveness. A re-analysis keeps an applied match:
 `services/analysis/carry.ts` carries who applied it and when onto the new match and recomputes its
 conformance with `withApplication` (`applied.ts`), the same function the matcher uses on every read. An
 application is a human decision, so it also survives the skill: when the skill is deprecated or retired
@@ -140,8 +141,31 @@ version, origin case, its run and the governed configuration) and shares it with
 application on the origin case itself is not compared with its own path, and when the origin case was erased,
 was never analysed or cannot be measured the application gets no precedent and no error; both are said in
 `notes` ("... is not available, so n applications have no comparison with it"). When no application has a
-precedent the block is absent. The first application of a run also spends one more cold pass of the caller's
-engine budget on that measurement (`beforeColdPass`), the later ones none.
+precedent the block is absent.
+
+## Applying a skill: concurrent applications and the engine budget
+
+Recomputing the effectiveness reads the skill's applications and measures the latest ones again
+(`measure.ts`), which takes a while when nothing is cached. Two rules keep that safe and bounded.
+
+- **No application is lost, none is recorded twice.** An attempt reads the skill, with its version, before
+  it measures anything, and writes the aggregate only at that version (`application.ts`). Another
+  application (or any other change to the skill) that commits meanwhile makes the write a version conflict,
+  and the attempt starts again from what is stored then: up to `APPLY_ATTEMPTS` (5) tries, each of them cheap
+  after the first because every measurement is cached, then a 409 `version_conflict`. The skill is read
+  again each time, so one that was retired meanwhile, or that has a new current version since the match was
+  computed, is refused (409) instead of getting an application of a plan it no longer has.
+  The transaction also looks at the stored match once more: an application recorded meanwhile stays as it
+  was (nobody's `appliedBy` is overwritten) and is audited once.
+- **Every measurement no cache can serve is metered.** The case itself, the recorded path of the origin
+  and each of the latest `MAX_USAGE_CASES - 1` (9) earlier applications is looked up in a cache first (keyed
+  by tenant, skill version, case, the case's latest run, the origin measurement and the governed
+  configuration: a couple of cheap queries and no replay), and a miss is announced to
+  `options.beforeColdPass` before its replay starts, one unit of the caller's engine budget each. An empty
+  budget is a 429 before any engine work, with nothing stored; what was measured before it stays cached, so
+  the retry carries on where it stopped. The replay cache holds `REPLAY_CACHE_ENTRIES` (12, at least
+  `MAX_USAGE_CASES + 2`) analyses, so the walk over the origin, the case and its earlier applications is
+  not evicted as it is read (a smaller cache would miss on every step of that walk).
 
 ## Driving it from code
 

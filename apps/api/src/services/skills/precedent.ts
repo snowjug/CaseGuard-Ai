@@ -50,6 +50,15 @@ const configFingerprint = (config: ActionValueConfig): string =>
   sha256Hex(canonicalJson(config)).slice(0, 16);
 
 /**
+ * What the governed action-value configuration contributes to a cache key: a measurement made under
+ * one configuration is never reused under another.
+ */
+export async function configKeyOf(ctx: Pick<RequestContext, 'repos'>): Promise<string> {
+  const settings = await ctx.repos.governance.getSettings();
+  return configFingerprint(settings.action_value.value);
+}
+
+/**
  * Measures the recorded path of a skill's origin case so applications can be compared with it. Both are
  * recorded paths from their own decision point, measured the same way. A case that no longer exists,
  * was never analysed or cannot be measured gives no precedent, and says so; it never fails the caller.
@@ -66,33 +75,28 @@ export class PrecedentLoader {
   /**
    * The origin's recorded path for this skill version. A first measurement of a run replays the origin
    * case, which is cold engine work: it is announced to `options.beforeColdPass` before it starts (a
-   * cached measurement is free). Cheap lookups first, so an erased origin costs no replay.
+   * cached measurement is free). Cheap lookups first, so an erased origin costs no replay. A caller
+   * that has the configuration key already passes it, so the settings are read once.
    */
   async resolve(
     ctx: RequestContext,
     entry: MatchableSkill,
     options: ColdPassOptions = {},
+    configKey?: string,
   ): Promise<OriginPrecedent> {
     const caseId = originCaseIdOf(entry);
     if (caseId === null) return { kind: 'unavailable', caseId, key: 'no-origin' };
 
-    const [caseRecord, run, settings] = await Promise.all([
+    const [caseRecord, run, config] = await Promise.all([
       ctx.repos.cases.get(caseId),
       ctx.repos.analysis.getLatestRun(caseId),
-      ctx.repos.governance.getSettings(),
+      configKey ?? configKeyOf(ctx),
     ]);
     if (caseRecord === null || run === null) {
       return { kind: 'unavailable', caseId, key: `gone|${caseId}` };
     }
     const { skill, version } = entry;
-    const key = [
-      ctx.scope.tenantId,
-      skill.id,
-      version.id,
-      caseId,
-      run.id,
-      configFingerprint(settings.action_value.value),
-    ].join('|');
+    const key = [ctx.scope.tenantId, skill.id, version.id, caseId, run.id, config].join('|');
     const nowMs = ctx.now().getTime();
     const cached = this.measured.get(key, nowMs);
     if (cached !== undefined) return outcomeOf(caseId, key, cached);

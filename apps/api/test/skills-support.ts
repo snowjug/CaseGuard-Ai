@@ -1,5 +1,7 @@
 import { normalizeBundle } from '@caseguard/domain';
 import { CaseBundleSchema, type AuditEvent, type CaseBundle } from '@caseguard/schemas';
+import type { RequestContext } from '../src/http/request-context';
+import { ReplayLoader, type CaseReplay } from '../src/services/counterfactuals/replay';
 import {
   CONTOSO,
   PERSONAS,
@@ -13,6 +15,45 @@ import { SAMPLE_FILES, ingestSample, loadSampleBundle, toIngestInput } from './s
 /** Helpers shared by the counterfactual and SkillDNA integration tests (HTTP only, real personas). */
 
 export const API = '/api/v1';
+
+/**
+ * A replay loader that holds the first `parties` loads of the cases `holds` selects until `release()`
+ * is called, so a test can let other requests commit while an application of a skill is being
+ * measured. `reached` resolves once `parties` loads are waiting; the loads that follow pass freely.
+ */
+export class GatedReplays extends ReplayLoader {
+  readonly reached: Promise<void>;
+  private readonly released: Promise<void>;
+  private reach: () => void = () => undefined;
+  private open: () => void = () => undefined;
+  private waiting = 0;
+
+  constructor(
+    private readonly holds: (caseId: string) => boolean,
+    private readonly parties = 1,
+  ) {
+    super();
+    this.reached = new Promise<void>((resolve) => {
+      this.reach = resolve;
+    });
+    this.released = new Promise<void>((resolve) => {
+      this.open = resolve;
+    });
+  }
+
+  release(): void {
+    this.open();
+  }
+
+  override async load(ctx: RequestContext, caseId: string): Promise<CaseReplay> {
+    if (this.holds(caseId) && this.waiting < this.parties) {
+      this.waiting += 1;
+      if (this.waiting === this.parties) this.reach();
+      await this.released;
+    }
+    return super.load(ctx, caseId);
+  }
+}
 
 /**
  * A resolved case of the same workload that the DNS skill must NOT match: one laptop, fixed by

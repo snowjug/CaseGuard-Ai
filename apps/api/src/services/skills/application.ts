@@ -1,49 +1,54 @@
 import {
   MATCHABLE_LIFECYCLES,
   aggregateSkillEffectiveness,
-  toMatchConformance,
   type MatchableSkill,
-  type SkillUsageRecord,
 } from '@caseguard/domain';
-import type { SkillDna, SkillMatch } from '@caseguard/schemas';
+import type { SkillDna, SkillEffectiveness, SkillMatch } from '@caseguard/schemas';
 import { ConflictError, NotAnalysedError, NotFoundError, VersionConflictError } from '../../errors';
 import type { RequestContext } from '../../http/request-context';
-import { LruCache } from '../counterfactuals/cache';
 import type { ReplayLoader } from '../counterfactuals/replay';
 import type { ColdPassOptions } from '../ports';
+import { SkillMeasurer, type Measured, type MeasureScope } from './measure';
 import { loadMatchContext, type CaseMatcher } from './matching';
-import { PrecedentLoader, precedentFor, type OriginPrecedent } from './precedent';
-import { buildSkillUsage, matchedOnlyRecord } from './usage';
+import { configKeyOf } from './precedent';
 
-/** Effectiveness is estimated from this many of the most recent applications; older ones are only counted. */
-export const MAX_USAGE_CASES = 10;
-/** Matches of one skill examined when its effectiveness is recomputed. */
-const MAX_EXAMINED_MATCHES = 100;
-const USAGE_CACHE_ENTRIES = 64;
-const APPLY_ATTEMPTS = 3;
+/**
+ * How often one application is recomputed when the skill changes under it. A recomputation is cheap
+ * after the first (every measurement is cached), so a few more tries are better than a 409 for a
+ * request that only lost a race.
+ */
+export const APPLY_ATTEMPTS = 5;
 
 /**
  * Applying a skill records that an engineer adopted its guided plan for a case. It is idempotent
  * (applying twice changes nothing and is audited once), refuses skills that are not yet in a pilot,
  * validated or published state and skills that do not apply to the case, and stores the match and
- * updates the skill's effectiveness aggregate in the same transaction as its audit event. The passes
- * that are not served from a cache (matching, measuring a first application, and measuring the
- * recorded path of the case the skill came from) are announced to `options.beforeColdPass`, where the
- * HTTP layer spends the caller's engine budget.
+ * updates the skill's effectiveness aggregate in the same transaction as its audit event.
+ *
+ * The effectiveness aggregate is recomputed from the applications stored so far, which takes a while
+ * when it is cold, so the write is guarded: the skill is read, with its version, before anything is
+ * measured, and the transaction updates it only at that version. Another application (or any change)
+ * committed meanwhile makes the write a version conflict and the application is recomputed from what is
+ * stored then, so no application is ever missing from the aggregate it should be in. The transaction
+ * also looks at the stored match again: an application someone else recorded meanwhile stays as it
+ * was (no second write, no second audit event).
+ *
+ * Every measurement that no cache can serve (the case itself, the recorded path of the case the skill
+ * came from, and each earlier application that has to be measured again; see `measure.ts`) is announced
+ * to `options.beforeColdPass` first, where the HTTP layer spends the caller's engine budget.
  *
  * Effectiveness is measured two ways, and both are estimates: against a simulated "without the skill"
  * baseline, and against the recorded path of the case the skill came from (`precedent.ts`). The
  * second is skipped, and says so, for an application on that case itself and when that case is gone.
  */
 export class SkillApplier {
-  private readonly usage = new LruCache<SkillUsageRecord>(USAGE_CACHE_ENTRIES);
-  private readonly precedents: PrecedentLoader;
+  private readonly measurer: SkillMeasurer;
 
   constructor(
-    private readonly replays: ReplayLoader,
+    replays: ReplayLoader,
     private readonly matcher: CaseMatcher,
   ) {
-    this.precedents = new PrecedentLoader(replays);
+    this.measurer = new SkillMeasurer(replays);
   }
 
   /**
@@ -71,13 +76,7 @@ export class SkillApplier {
     skillId: string,
     options: ColdPassOptions = {},
   ): Promise<SkillMatch> {
-    const skill = await ctx.repos.skills.get(skillId);
-    if (skill === null) throw new NotFoundError('Skill', skillId);
-    if (!MATCHABLE_LIFECYCLES.includes(skill.lifecycle)) {
-      throw new ConflictError(
-        `Only pilot, validated or published skills can be applied to a case; this skill is ${skill.lifecycle}.`,
-      );
-    }
+    await this.requireApplicable(ctx, skillId);
     if ((await loadMatchContext(ctx, caseId)) === null) {
       throw new NotAnalysedError('The case has not been analysed yet. Run the analysis first.');
     }
@@ -94,60 +93,96 @@ export class SkillApplier {
     }
     if (match.applied) return match;
 
-    // Measuring the application replays the case: announced once, however often it is retried.
-    options.beforeColdPass?.();
     for (let attempt = 1; ; attempt += 1) {
       try {
-        return await this.record(ctx, caseId, skill, match, options);
+        return await this.record(ctx, caseId, skillId, match, options);
       } catch (error) {
-        // Someone else changed the skill while its effectiveness was being recomputed: recompute.
+        // The skill changed while its effectiveness was being recomputed: recompute from what is stored now.
         if (!(error instanceof VersionConflictError) || attempt >= APPLY_ATTEMPTS) throw error;
       }
     }
   }
 
+  /** The skill as it is now: 404 when it is gone, 409 unless it may be matched (pilot, validated or published). */
+  private async requireApplicable(ctx: RequestContext, skillId: string): Promise<SkillDna> {
+    const skill = await ctx.repos.skills.get(skillId);
+    if (skill === null) throw new NotFoundError('Skill', skillId);
+    if (!MATCHABLE_LIFECYCLES.includes(skill.lifecycle)) {
+      throw new ConflictError(
+        `Only pilot, validated or published skills can be applied to a case; this skill is ${skill.lifecycle}.`,
+      );
+    }
+    return skill;
+  }
+
+  /**
+   * One attempt. Everything is computed from what is read here and committed only if the skill is
+   * still at the version read first (`commit`), so an attempt that lost a race throws a
+   * VersionConflictError and its caller starts again.
+   */
   private async record(
+    ctx: RequestContext,
+    caseId: string,
+    skillId: string,
+    match: SkillMatch,
+    options: ColdPassOptions,
+  ): Promise<SkillMatch> {
+    const skill = await this.requireApplicable(ctx, skillId);
+    // Someone applied it since the caller looked: it stays as it was, nothing is measured.
+    const stored = await ctx.repos.skills.getMatch(caseId, match.id);
+    if (stored?.applied === true) return stored;
+    // The match was computed for a version that is no longer the skill's current one: its plan and
+    // conformance are not what this attempt would measure.
+    if (match.versionId !== skill.currentVersionId) {
+      throw new ConflictError(
+        'The skill moved to a new version while it was being applied. List the matches again and apply again.',
+      );
+    }
+
+    const version = await ctx.repos.skills.getVersion(skill.id, skill.currentVersionId);
+    if (version === null) {
+      throw new ConflictError('The skill is no longer available for matching.');
+    }
+    const entry: MatchableSkill = { skill, version };
+    const configKey = await configKeyOf(ctx);
+    // Resolved once for the whole recomputation: the recorded path of the case the skill came from.
+    const origin = await this.measurer.originOf(ctx, entry, configKey, options);
+    const scope: MeasureScope = { entry, origin, configKey, options };
+    const measured = await this.measurer.measureCase(ctx, scope, caseId);
+    const records = await this.measurer.recordsFor(ctx, scope, measured.record);
+    const { effectiveness } = aggregateSkillEffectiveness(records, { skillId: skill.id });
+    return this.commit(ctx, caseId, skill, match, measured, effectiveness);
+  }
+
+  private async commit(
     ctx: RequestContext,
     caseId: string,
     skill: SkillDna,
     match: SkillMatch,
-    options: ColdPassOptions,
+    measured: Measured,
+    effectiveness: SkillEffectiveness,
   ): Promise<SkillMatch> {
-    const replay = await this.replays.load(ctx, caseId);
-    const entry = replay.inputs.skills.find((candidate) => candidate.skill.id === skill.id);
-    if (entry === undefined)
-      throw new ConflictError('The skill is no longer available for matching.');
-    // Resolved once for the whole recomputation: the recorded path of the case the skill came from.
-    const origin = await this.precedents.resolve(ctx, entry, options);
-    const usage = buildSkillUsage({
-      replay,
-      entry,
-      applied: true,
-      precedent: precedentFor(origin, caseId),
-    });
-    const records = await this.recordsFor(ctx, skill, usage.record, origin);
-    const effectiveness = aggregateSkillEffectiveness(records, { skillId: skill.id }).effectiveness;
-
     const now = ctx.now().toISOString();
     await ctx.repos.transaction(async (tx) => {
-      const current = await tx.skills.get(skill.id);
-      if (current === null) throw new NotFoundError('Skill', skill.id);
       // The match may have been computed by the read that listed it and not stored yet: an application
       // is what stores it (an analysis snapshot is the other way a whole-case match gets stored).
       const existing = await tx.skills.getMatch(caseId, match.id);
-      const applied: SkillMatch = {
+      // Applied by someone else while this was being measured: it stays as it was, with one audit event.
+      if (existing?.applied === true) return;
+      // At the version read before measuring: a skill that changed since (another application, a
+      // transition) is a conflict, never a silent overwrite of an aggregate built from older data.
+      await tx.skills.update(skill.id, { effectiveness }, skill.version);
+      await tx.skills.upsertMatch({
         ...match,
         applied: true,
         appliedAt: now,
         appliedBy: ctx.auth.userId,
-        conformance: toMatchConformance(usage.conformance),
+        conformance: measured.conformance,
         createdAt: existing?.createdAt ?? match.createdAt,
         createdBy: existing?.createdBy ?? match.createdBy,
         updatedAt: now,
         version: existing === null ? 1 : existing.version + 1,
-      };
-      await tx.skills.upsertMatch(applied);
-      await tx.skills.update(skill.id, { effectiveness }, current.version);
+      });
       await ctx.audit(
         {
           action: 'skill.applied',
@@ -161,9 +196,9 @@ export class SkillApplier {
             skillVersion: match.skillVersion,
             applicability: match.applicability,
             score: match.score,
-            stepsFollowed: usage.conformance.stagesFollowed,
-            stepsTotal: usage.conformance.stagesTotal,
-            conformanceScore: usage.conformance.score,
+            stepsFollowed: measured.conformance.stepsFollowed,
+            stepsTotal: measured.conformance.stepsTotal,
+            conformanceScore: measured.conformance.score,
           },
         },
         tx,
@@ -173,90 +208,5 @@ export class SkillApplier {
     const stored = await ctx.repos.skills.getMatch(caseId, match.id);
     if (stored === null) throw new NotFoundError('Skill match', match.id);
     return stored;
-  }
-
-  /**
-   * The usage of every case the skill was matched or applied to. The newest applications contribute
-   * recorded and baseline measures (cached per skill version, case and run, and per origin
-   * measurement); the rest only count.
-   */
-  private async recordsFor(
-    ctx: RequestContext,
-    skill: SkillDna,
-    current: SkillUsageRecord,
-    origin: OriginPrecedent,
-  ): Promise<SkillUsageRecord[]> {
-    const records: SkillUsageRecord[] = [current];
-    const stored = await ctx.repos.skills.listMatchesForSkill(skill.id);
-    let measured = 1;
-    for (const match of stored.slice(0, MAX_EXAMINED_MATCHES)) {
-      if (match.caseId === current.caseId) continue;
-      const caseRecord = await ctx.repos.cases.get(match.caseId);
-      if (caseRecord === null) continue;
-      const base = {
-        skillId: skill.id,
-        versionId: match.versionId,
-        caseId: match.caseId,
-        synthetic: caseRecord.synthetic,
-      };
-      if (!match.applied) {
-        if (match.applicability !== 'not_applicable') records.push(matchedOnlyRecord(base));
-        continue;
-      }
-      const measuredRecord =
-        measured < MAX_USAGE_CASES ? await this.measure(ctx, skill, match, origin) : null;
-      if (measuredRecord !== null) {
-        measured += 1;
-        records.push(measuredRecord);
-      } else {
-        records.push({
-          ...matchedOnlyRecord(base),
-          applied: true,
-          conformanceScore: match.conformance?.score ?? null,
-        });
-      }
-    }
-    return records;
-  }
-
-  private async measure(
-    ctx: RequestContext,
-    skill: SkillDna,
-    match: SkillMatch,
-    origin: OriginPrecedent,
-  ): Promise<SkillUsageRecord | null> {
-    try {
-      const replay = await this.replays.load(ctx, match.caseId);
-      const entry: MatchableSkill | undefined = replay.inputs.skills.find(
-        (candidate) => candidate.skill.id === skill.id,
-      );
-      if (entry === undefined) return null;
-      const key = [
-        ctx.scope.tenantId,
-        skill.id,
-        entry.version.id,
-        match.caseId,
-        replay.run.id,
-        origin.key,
-      ].join('|');
-      const nowMs = ctx.now().getTime();
-      const cached = this.usage.get(key, nowMs);
-      if (cached !== undefined) return cached;
-      const record = buildSkillUsage({
-        replay,
-        entry,
-        applied: true,
-        precedent: precedentFor(origin, match.caseId),
-      }).record;
-      this.usage.set(key, record, nowMs);
-      return record;
-    } catch (error) {
-      if (ctx.signal.aborted) throw error;
-      ctx.logger.warn(
-        { err: error, skillId: skill.id },
-        'a past application could not be re-measured; it is counted without measures',
-      );
-      return null;
-    }
   }
 }

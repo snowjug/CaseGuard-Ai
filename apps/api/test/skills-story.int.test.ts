@@ -18,6 +18,8 @@ import {
 import { DEFAULT_ACTION_VALUE_CONFIG } from '@caseguard/schemas';
 import type { Database } from '../src/db';
 import { TEST_DATABASE_STARTUP_TIMEOUT_MS } from '../src/db/testing';
+import { SkillApplier } from '../src/services/skills/application';
+import { CaseMatcher } from '../src/services/skills/matching';
 import {
   CONTOSO,
   FABRIKAM,
@@ -27,7 +29,9 @@ import {
   type Harness,
   type Json,
 } from './support/app-harness';
+import { contextFor } from './support/context';
 import {
+  GatedReplays,
   acceptScenario,
   allAuditEvents,
   apiOf,
@@ -1044,6 +1048,98 @@ describe('when the case the skill came from is erased', () => {
       );
       expect(applications).toHaveLength(1);
       expect(applications[0]).toMatchObject({ outcome: 'success', actorId: PERSONAS.engineer });
+    },
+  );
+});
+
+describe('applications of one skill that run at the same time', () => {
+  const [FIVE, SIX, SEVEN] = ['case_story_five', 'case_story_six', 'case_story_seven'];
+  const skillRecord = async (): Promise<Json> =>
+    (await api.get(PERSONAS.engineer, `/skills/${skillId}`)).data.skill;
+  const applicationsAudited = async (caseId: string) =>
+    (await audits()).filter((e) => e.action === 'skill.applied' && e.caseId === caseId);
+
+  it(
+    'counts an application that commits while another is being measured, and audits each once',
+    { timeout: 300_000 },
+    async () => {
+      await ingestCaseTwoCopy(h, FIVE, 'CG-SYN-1005');
+      await ingestCaseTwoCopy(h, SIX, 'CG-SYN-1006');
+      const before = await skillRecord();
+
+      // One request measures Case Five. While it measures the earlier applications (it has read the list
+      // of them by then and holds the version of the skill), another request applies the skill to Case Six
+      // and commits. The gate is a replay loader that holds the first replay of any other case.
+      const gate = new GatedReplays((caseId) => caseId !== FIVE);
+      const slow = new SkillApplier(gate, new CaseMatcher());
+      h.clock.advance(60_000);
+      const mine = slow.apply(contextFor(h, PERSONAS.engineer), FIVE, skillId);
+      await gate.reached;
+
+      h.clock.advance(60_000);
+      const curator = contextFor(h, PERSONAS.curator);
+      const theirs = await curator.services.skills.applyToCase(curator, SIX, skillId);
+      expect(theirs).toMatchObject({ caseId: SIX, applied: true, appliedBy: PERSONAS.curator });
+      gate.release();
+      expect(await mine).toMatchObject({
+        caseId: FIVE,
+        applied: true,
+        appliedBy: PERSONAS.engineer,
+      });
+
+      // Neither application is missing from the aggregate, and the skill was written once for each.
+      const after = await skillRecord();
+      expect(after.effectiveness.applications).toBe(before.effectiveness.applications + 2);
+      expect(after.effectiveness.matchedCases).toBeGreaterThanOrEqual(
+        before.effectiveness.applications + 2,
+      );
+      expect(after.version).toBe(before.version + 2);
+      expect(await applicationsAudited(FIVE)).toHaveLength(1);
+      expect(await applicationsAudited(SIX)).toHaveLength(1);
+      const matches = (await api.get(PERSONAS.engineer, `/skills/${skillId}`)).data.matches;
+      const appliedCases = (matches as Json[]).filter((m) => m.applied).map((m) => m.caseId);
+      expect(appliedCases).toEqual(expect.arrayContaining([FIVE, SIX]));
+    },
+  );
+
+  it(
+    'audits one application, not two, when the same match is applied twice at once',
+    { timeout: 300_000 },
+    async () => {
+      await ingestCaseTwoCopy(h, SEVEN, 'CG-SYN-1007');
+      const before = await skillRecord();
+      const [matchBefore] = await h.repos(CONTOSO).skills.listMatchesForCase(SEVEN);
+      expect(matchBefore).toMatchObject({ caseId: SEVEN, applied: false });
+
+      // Two requests measure Case Seven side by side and are let go together, so both are about to record it.
+      const gate = new GatedReplays((caseId) => caseId === SEVEN, 2);
+      const applier = new SkillApplier(gate, new CaseMatcher());
+      h.clock.advance(60_000);
+      const both = Promise.all([
+        applier.apply(contextFor(h, PERSONAS.engineer), SEVEN, skillId),
+        applier.apply(contextFor(h, PERSONAS.curator), SEVEN, skillId),
+      ]);
+      await gate.reached;
+      gate.release();
+      const [first, second] = await both;
+
+      // The one that committed first is who applied it; the other sees exactly that.
+      expect(first).toMatchObject({ caseId: SEVEN, applied: true });
+      expect(second).toEqual(first);
+      expect([PERSONAS.engineer, PERSONAS.curator]).toContain(first.appliedBy);
+      const events = await applicationsAudited(SEVEN);
+      expect(events).toHaveLength(1);
+      expect(events[0]?.actorId).toBe(first.appliedBy);
+      const stored = await h.repos(CONTOSO).skills.getMatch(SEVEN, first.id);
+      // Written once: the stored match moved one version on, and belongs to the one who recorded it.
+      expect(stored).toMatchObject({
+        applied: true,
+        appliedBy: first.appliedBy,
+        version: (matchBefore?.version ?? 0) + 1,
+      });
+      const after = await skillRecord();
+      expect(after.effectiveness.applications).toBe(before.effectiveness.applications + 1);
+      expect(after.version).toBe(before.version + 1);
     },
   );
 });
