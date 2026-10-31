@@ -350,11 +350,13 @@ Rules of thumb:
   (`keepWithinBoundary`): the page says which moment it is looking up meanwhile (`LookingUp` in
   `features/reasoning`, or `AsOfPanel` while its own counts load). The action ranking (`ActionValuePanel`) lists the
   reviewer overrides the response carries (`reviewerOverrides`, newest decision first). An earlier view lists only
-  the overrides decided, and about a moment, by its end and says how many it cannot show (`withheldOverrides`, a
-  count and never content). The machine rank of an override is shown only when the override is about the ranking on
-  screen, the one machine rank the response carries. A reviewer can also override a rank on an earlier ranking (it
-  costs one metered pass: a 429 `engine_budget` is explained and nothing was recorded); the whole-record list in the
-  response replaces the cached one at once (`usePrimeWholeRecordRanking`) and every other ranking is read again. The
+  the overrides decided, and about a moment, by its end, and always carries the same sentence: overrides recorded
+  after that moment are not shown (no count, and no hint whether there are any: even their number would be
+  something that happened after the moment). The machine rank of an override is shown only when the override is
+  about the ranking on screen, the one machine rank the response carries. A reviewer can also override a rank on an
+  earlier ranking (it costs one metered pass: a 429 `engine_budget` is explained and nothing was recorded); the
+  whole-record list in the response replaces the cached one at once (`usePrimeWholeRecordRanking`), the
+  whole-record ranking is read again, and an earlier window is not (its answer cannot change). The
   last event of a resolved case has nothing left to rank (every score is 0): the panel says so and, for the whole
   record, shows the ranking just before the earliest meaningful decision fork instead (`useDecisionPoint`; the
   cursor and the address are untouched). Zero scores are never presented as a recommendation.

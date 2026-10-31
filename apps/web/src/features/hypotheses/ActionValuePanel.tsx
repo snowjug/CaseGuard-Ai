@@ -36,7 +36,7 @@ import { GatedAction } from '../../lib/auth/session';
 import { useToast } from '../../lib/toast';
 import { explainOverrideFailure } from '../reasoning/errors';
 import { formatInstant } from '../reasoning/format';
-import { useActorLabel, useInvalidate } from '../reasoning/hooks';
+import { useActorLabel } from '../reasoning/hooks';
 import { usePrimeWholeRecordRanking } from './hooks';
 import { hasNothingToRank, overrideEntries, type RankingView } from './model';
 import { OverridesList } from './OverridesList';
@@ -170,7 +170,7 @@ const useStyles = makeStyles({
 });
 
 const HELP =
-  'Ranks the diagnostic actions that could be taken next with a configurable decision-support heuristic: expected information × relevance × confidence, divided by time, tokens, customer effort and operational risk, every term scaled to 0–1. It is not a scientific law. Actions the safety policy blocks are never recommended, whatever their score. A reviewer can record an override of a rank, with a reason: it is audited, listed under the ranking and shown next to the machine rank, which is never replaced. An earlier view lists only the overrides recorded, and about a moment, by its end, and says how many it cannot show. When the last event has nothing left to rank, the ranking just before the earliest meaningful decision fork is shown instead.';
+  'Ranks the diagnostic actions that could be taken next with a configurable decision-support heuristic: expected information × relevance × confidence, divided by time, tokens, customer effort and operational risk, every term scaled to 0–1. It is not a scientific law. Actions the safety policy blocks are never recommended, whatever their score. A reviewer can record an override of a rank, with a reason: it is audited, listed under the ranking and shown next to the machine rank, which is never replaced. An earlier view lists only the overrides recorded, and about a moment, by its end, and always says that those recorded after it are not shown. When the last event has nothing left to rank, the ranking just before the earliest meaningful decision fork is shown instead.';
 
 interface TermRow {
   id: string;
@@ -277,18 +277,14 @@ function OverrideAction({
 }) {
   const toast = useToast();
   const restoreFocus = useRestoreFocusTarget();
-  const invalidate = useInvalidate();
   const prime = usePrimeWholeRecordRanking();
   const [open, setOpen] = useState(false);
   const [rank, setRank] = useState(String(item.override?.rank ?? item.rank));
   const mutation = useApiMutation('actionValue.override', {
-    // The response carries the whole-record list: it replaces the cached one at once. Every other ranking (an earlier
-    // window counts the overrides it cannot show) is read again in the background, so none keeps an old list or count;
-    // the dialog does not wait for those reads.
-    onSuccess: (updated) => {
-      prime(caseId, updated);
-      void invalidate(['actionValue.rank']);
-    },
+    // The response carries the whole-record list: it replaces the cached one at once, and the whole-record ranking is
+    // read again in the background (the dialog does not wait for it). An earlier window cannot know a decision made
+    // after it, so none is read again: that read is metered and its answer would not change.
+    onSuccess: (updated) => prime(caseId, updated),
   });
   const parsed = Number.parseInt(rank, 10);
   const valid = Number.isInteger(parsed) && parsed >= 1 && parsed <= Math.max(count, 1);
@@ -517,7 +513,7 @@ const LAST_EVENT_PLAIN =
 
 export interface ActionValuePanelProps {
   caseId: string;
-  /** What to show: the ranking, which overrides it lists and how to word what it cannot show. */
+  /** What to show: the ranking, which overrides it lists and whether it is an earlier view. */
   view: RankingView;
   /** Leaves an earlier view for the whole record, where every override is listed. */
   onShowLatest?: () => void;
@@ -526,10 +522,11 @@ export interface ActionValuePanelProps {
 /**
  * The ranked next actions with the whole calculation visible: inputs, scaled values, sensitivity to the weights, the
  * safety verdict and a gated, audited reviewer override, then the list of reviewer overrides. It is a heuristic and says
- * so. An earlier view lists only the overrides recorded (and about a moment) by its end and says how many it cannot show;
- * an override may still be recorded on it, about its moment, and then appears in the whole record. A ranking whose every
- * score is zero (a resolved case at its last event) is never presented as a recommendation: the panel says so, and the
- * page shows the ranking just before the earliest meaningful decision fork instead when it has one.
+ * so. An earlier view lists only the overrides recorded (and about a moment) by its end and always says that those
+ * recorded after it are not shown (no count); an override may still be recorded on it, about its moment, and then
+ * appears in the whole record. A ranking whose every score is zero (a resolved case at its last event) is never
+ * presented as a recommendation: the panel says so, and the page shows the ranking just before the earliest meaningful
+ * decision fork instead when it has one.
  */
 export function ActionValuePanel({ caseId, view, onShowLatest }: ActionValuePanelProps) {
   const styles = useStyles();
@@ -629,8 +626,6 @@ export function ActionValuePanel({ caseId, view, onShowLatest }: ActionValuePane
       <OverridesList
         entries={overrideEntries(view.overrides, ranking)}
         windowed={windowed}
-        withheld={view.withheld}
-        viewAsOf={ranking.asOf}
         onShowWholeRecord={onShowLatest}
       />
 

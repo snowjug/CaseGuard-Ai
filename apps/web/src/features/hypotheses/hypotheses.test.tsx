@@ -42,9 +42,16 @@ const BETWEEN_EVENTS = '2026-03-09T09:40:59Z';
 /** The `asOf` of the ranking fixture, which the override is recorded against. */
 const RANKING_AS_OF = '2026-03-09T09:40:59Z';
 const LATER_DECISIONS = 'Reviewer decisions recorded later are not shown in this earlier view.';
+/** What every earlier view says about the overrides it lists: the same sentence whatever happened later. */
+const LATER_OVERRIDES =
+  'Reviewer overrides recorded after this moment are not shown in this earlier view.';
 
 const asOfOf = (input: unknown): string | null =>
   (input as { query?: { asOf?: string } }).query?.asOf ?? null;
+
+/** How many times the action ranking has been asked for so far. */
+const rankingReads = (handler: ReturnType<typeof api>): number =>
+  handler.call.mock.calls.filter(([route]) => route === 'actionValue.rank').length;
 
 function api(overrides: FakeHandlers = {}, role: 'reviewer' | 'engineer' = 'reviewer') {
   return fakeApi({
@@ -309,7 +316,7 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
     ).toBeInTheDocument();
   });
 
-  it('lists the overrides an earlier view may show and says how many recorded later it cannot, never what they are', async () => {
+  it('lists the overrides an earlier view may show, and always says that those recorded after it are not shown', async () => {
     navigateTo(`/?asOf=${BEFORE_FORK_EVENT}`);
     renderArena(
       api({
@@ -323,70 +330,44 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
                 reason: 'Wait for the customer reply.',
               }),
             ],
-            withheldOverrides: 2,
           }),
       }),
     );
     const ranking = await screen.findByRole('group', { name: 'Next best action' });
     const overrides = await within(ranking).findByRole('group', { name: 'Reviewer overrides (1)' });
-    expect(
-      within(overrides).getByText(
-        '2 reviewer overrides recorded later are not shown, because this view only shows what was known at 9 Mar 2026, 09:30 UTC.',
-      ),
-    ).toBeInTheDocument();
+    expect(within(overrides).getByText(LATER_OVERRIDES)).toBeInTheDocument();
     expect(within(overrides).getByText(/Wait for the customer reply\./)).toBeInTheDocument();
-    // The older note, which carried no count, is gone: this one is the only statement about what is withheld.
+    // The note states no count and does not say whether any exist; the older note of the page is gone.
+    expect(within(overrides).queryByText(/\d+ reviewer overrides?/)).toBeNull();
     expect(within(ranking).queryByText(LATER_DECISIONS)).toBeNull();
   });
 
-  it('says "1 reviewer override ... is not shown" for a single withheld override and offers the whole record', async () => {
+  it('says the same sentence when the earlier view lists nothing, and offers the whole record', async () => {
     const user = userEvent.setup();
     navigateTo(`/?asOf=${BEFORE_FORK_EVENT}`);
     renderArena(
       api({
-        'actionValue.rank': (input) =>
-          actionRanking({ asOf: asOfOf(input) ?? BEFORE_FORK_EVENT, withheldOverrides: 1 }),
-      }),
-    );
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
-    expect(
-      await within(ranking).findByText(
-        '1 reviewer override recorded later is not shown, because this view only shows what was known at 9 Mar 2026, 09:30 UTC.',
-      ),
-    ).toBeInTheDocument();
-    await user.click(within(ranking).getByRole('button', { name: 'Show the whole record' }));
-    await waitFor(() => expect(window.location.search).toBe(''));
-  });
-
-  it('shows no note when nothing is withheld, or when the field is absent', async () => {
-    navigateTo(`/?asOf=${BEFORE_FORK_EVENT}`);
-    renderArena(
-      api({
-        'actionValue.rank': (input) => {
-          const ranking = actionRanking({ asOf: BEFORE_FORK_EVENT });
-          // A server that predates the fields sends neither of them; the schema keeps both optional.
-          return asOfOf(input) ? { ...ranking, withheldOverrides: undefined } : ranking;
-        },
+        'actionValue.rank': (input) => actionRanking({ asOf: asOfOf(input) ?? BEFORE_FORK_EVENT }),
       }),
     );
     const ranking = await screen.findByRole('group', { name: 'Next best action' });
     const overrides = await within(ranking).findByRole('group', { name: 'Reviewer overrides (0)' });
-    expect(within(overrides).queryByText(/recorded later/)).toBeNull();
+    expect(within(overrides).getByText(LATER_OVERRIDES)).toBeInTheDocument();
     expect(
       within(overrides).getByText('No reviewer override had been recorded by this moment.'),
     ).toBeInTheDocument();
+    expect(within(overrides).queryByText(/\d+ reviewer overrides?/)).toBeNull();
+    await user.click(within(ranking).getByRole('button', { name: 'Show the whole record' }));
+    await waitFor(() => expect(window.location.search).toBe(''));
   });
 
-  it('offers an override on an earlier view, about its moment, says where it will appear and counts it as withheld there', async () => {
+  it('offers an override on an earlier view, about its moment, and says where it will appear', async () => {
     const user = userEvent.setup();
     navigateTo(`/?asOf=${BEFORE_FORK_EVENT}`);
-    let recorded = false;
     const handler = api({
-      'actionValue.rank': () =>
-        actionRanking({ asOf: BEFORE_FORK_EVENT, withheldOverrides: recorded ? 1 : 0 }),
-      'actionValue.override': () => {
-        recorded = true;
-        return actionRanking({
+      'actionValue.rank': () => actionRanking({ asOf: BEFORE_FORK_EVENT }),
+      'actionValue.override': () =>
+        actionRanking({
           asOf: BEFORE_FORK_EVENT,
           reviewerOverrides: [
             reviewerOverride({
@@ -397,9 +378,7 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
               reason: 'The customer already mentioned a deployment.',
             }),
           ],
-          withheldOverrides: 0,
-        });
-      },
+        }),
     });
     renderArena(handler);
     const ranking = await screen.findByRole('group', { name: 'Next best action' });
@@ -408,6 +387,8 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
         within(ranking).getByRole('button', { name: 'Override this rank' }),
       ).not.toHaveAttribute('aria-disabled', 'true'),
     );
+    expect(within(ranking).getByText(LATER_OVERRIDES)).toBeInTheDocument();
+    const readsBefore = rankingReads(handler);
     await user.click(within(ranking).getByRole('button', { name: 'Override this rank' }));
     const dialog = await screen.findByRole('alertdialog', { name: /Override the rank of/ });
     expect(
@@ -443,23 +424,22 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
         )
       ).length,
     ).toBeGreaterThan(0);
-    // The earlier view never shows a decision made after it: the whole-record list in the response is not put into it.
-    // Its window is read again, and now counts the override it cannot show.
-    expect(
-      await within(ranking).findByText(
-        '1 reviewer override recorded later is not shown, because this view only shows what was known at 9 Mar 2026, 09:30 UTC.',
-      ),
-    ).toBeInTheDocument();
-    // The dialog may still be closing: the page behind a modal dialog is not in the accessibility tree until it is gone.
+    // The earlier view never shows a decision made after it: the list in the response is not put into it, and the note
+    // is the same sentence as before, with no count. Its window is not read again either (that read is metered, and
+    // its answer cannot change).
     expect(
       await within(ranking).findByRole('group', { name: 'Reviewer overrides (0)' }),
     ).toBeInTheDocument();
+    expect(within(ranking).getAllByText(LATER_OVERRIDES)).toHaveLength(1);
+    expect(within(ranking).queryByText(/\d+ reviewer overrides?/)).toBeNull();
+    expect(rankingReads(handler)).toBe(readsBefore);
   });
 
-  it('does not add the withheld note to the whole-record view, where every override is listed', async () => {
+  it('does not add the note to the whole-record view, where every override is listed', async () => {
     renderArena();
     const ranking = await screen.findByRole('group', { name: 'Next best action' });
-    expect(within(ranking).queryByText(/recorded later/)).toBeNull();
+    expect(within(ranking).queryByText(LATER_OVERRIDES)).toBeNull();
+    expect(within(ranking).queryByText(/recorded after this moment/)).toBeNull();
     expect(within(ranking).queryByText(LATER_DECISIONS)).toBeNull();
     expect(
       await within(ranking).findByText(
@@ -972,7 +952,7 @@ describe('[FR-HY-03] action-value ranking', () => {
     expect(theirs).not.toHaveTextContent('the one shown here');
     expect(theirs).toHaveTextContent('Decided by user_riley_reviewer on 29 Oct 2026, 10:00 UTC.');
     expect(theirs).toHaveTextContent('“Too early to ask the customer for data.”');
-    expect(within(overrides).queryByText(/recorded later/)).toBeNull();
+    expect(within(overrides).queryByText(/recorded after this moment/)).toBeNull();
   });
 
   it('shows the newest eight overrides and the rest on request', async () => {
@@ -1200,7 +1180,7 @@ describe('[FR-HY-03] a resolved case has nothing left to rank at its last event'
     const overrides = within(ranking).getByRole('group', { name: 'Reviewer overrides (1)' });
     expect(overrides).toHaveTextContent('Reviewer rank 1, machine rank 2');
     expect(within(ranking).getByText('Reviewer override: rank 1')).toBeInTheDocument();
-    expect(within(ranking).queryByText(/recorded later/)).toBeNull();
+    expect(within(ranking).queryByText(LATER_OVERRIDES)).toBeNull();
   });
 
   it('records an override on that ranking at its own moment and lists it at once', async () => {

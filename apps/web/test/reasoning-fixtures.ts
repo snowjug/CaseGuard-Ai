@@ -572,9 +572,9 @@ export function actionRanking(overrides: Partial<ActionRanking> = {}): ActionRan
         },
       }),
     ],
-    // The API always sends both: the overrides this view may show, and how many a window cannot.
+    // The API always sends the overrides this view may show: every one on the whole record, only what was decided (and
+    // about an instant) by its end in an earlier view.
     reviewerOverrides: [],
-    withheldOverrides: 0,
     ...overrides,
   });
 }

@@ -7,10 +7,17 @@ import { useId, useState } from 'react';
 import { formatInstant } from '../reasoning/format';
 import { useActorLabel } from '../reasoning/hooks';
 import { TruncatedText } from '../reasoning/TruncatedText';
-import { withheldOverridesText, type OverrideEntry } from './model';
+import type { OverrideEntry } from './model';
 
 /** The newest overrides shown before "Show all": the API lists up to 200 per ranking. */
 export const OVERRIDES_SHOWN = 8;
+
+/**
+ * What every earlier view says about the overrides it lists, whatever was decided later: it states no count and does not
+ * say whether any exist, because even their number would be something that happened after the moment.
+ */
+const LATER_OVERRIDES_NOTE =
+  'Reviewer overrides recorded after this moment are not shown in this earlier view.';
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: cg.space[2], minWidth: 0 },
@@ -61,12 +68,8 @@ const useStyles = makeStyles({
 
 export interface OverridesListProps {
   entries: readonly OverrideEntry[];
-  /** True for an earlier view: it lists only the overrides decided, and about a moment, by its end. */
+  /** True for an earlier view: it lists only the overrides decided, and about a moment, by its end, and says so. */
   windowed: boolean;
-  /** How many overrides this view cannot show: a count, never content. 0 (or absent) shows no note. */
-  withheld: number;
-  /** The moment this view is of, named by the note about what it cannot show. */
-  viewAsOf: string;
   /** Leaves the earlier view for the whole record, where every override is listed. */
   onShowWholeRecord?: (() => void) | undefined;
 }
@@ -75,21 +78,15 @@ export interface OverridesListProps {
  * The reviewer overrides of the action ranking, newest decision first: which action, the rank the reviewer preferred (and
  * the machine's rank when the override is about the ranking on screen, the only one whose machine rank is known), the
  * moment the ranking it is about was evaluated at, who decided and when, and the reason as plain text. An earlier view
- * lists only what was known by its moment and says how many it cannot show, never what they are.
+ * lists only what was known by its moment and always carries the same sentence saying that overrides recorded after it
+ * are not shown: no count, and no hint whether there are any.
  */
-export function OverridesList({
-  entries,
-  windowed,
-  withheld,
-  viewAsOf,
-  onShowWholeRecord,
-}: OverridesListProps) {
+export function OverridesList({ entries, windowed, onShowWholeRecord }: OverridesListProps) {
   const styles = useStyles();
   const actorLabel = useActorLabel();
   const headingId = useId();
   const [all, setAll] = useState(false);
   const shown = all ? entries : entries.slice(0, OVERRIDES_SHOWN);
-  const note = windowed ? withheldOverridesText(withheld, formatInstant(viewAsOf)) : null;
 
   return (
     <div className={styles.root} role="group" aria-labelledby={headingId}>
@@ -102,9 +99,9 @@ export function OverridesList({
           : 'Every override recorded on this case, newest decision first.'}{' '}
         An override never replaces the machine rank.
       </p>
-      {note ? (
+      {windowed ? (
         <Notice variant="info" compact title={null}>
-          {note}
+          {LATER_OVERRIDES_NOTE}
           {onShowWholeRecord ? (
             <div className={styles.noteAction}>
               <Button

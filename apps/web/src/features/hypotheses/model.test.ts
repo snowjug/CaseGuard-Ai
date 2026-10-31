@@ -30,8 +30,6 @@ import {
   sameInstant,
   statusChanges,
   withListedOverrides,
-  withheldOverrideCount,
-  withheldOverridesText,
 } from './model';
 
 const response = hypothesesResponse();
@@ -166,18 +164,14 @@ describe('hypothesis model: status and selection', () => {
 });
 
 describe('hypothesis model: the action ranking and its reviewer overrides', () => {
-  const WHOLE = '9 Mar 2026, 09:30 UTC';
-
   it('compares instants as moments, whatever their notation', () => {
     expect(sameInstant('2026-03-09T09:30:00Z', '2026-03-09T09:30:00.000Z')).toBe(true);
     expect(sameInstant('2026-03-09T09:30:00Z', '2026-03-09T09:30:01Z')).toBe(false);
     expect(sameInstant('not a date', 'not a date')).toBe(false);
   });
 
-  it('reads the optional fields of a server that does not send them as none', () => {
+  it('reads the list of a server that does not send one as empty', () => {
     expect(listedOverrides({})).toEqual([]);
-    expect(withheldOverrideCount({})).toBe(0);
-    expect(withheldOverrideCount({ withheldOverrides: 3 })).toBe(3);
     const listed = [reviewerOverride()];
     expect(listedOverrides({ reviewerOverrides: listed })).toBe(listed);
   });
@@ -189,17 +183,6 @@ describe('hypothesis model: the action ranking and its reviewer overrides', () =
     expect(hasNothingToRank({ candidates: [] })).toBe(false);
     const mixed = [...zeroScoreRanking().candidates, ...actionRanking().candidates.slice(0, 1)];
     expect(hasNothingToRank({ candidates: mixed })).toBe(false);
-  });
-
-  it('words what a window cannot show with a count and a moment, never with content', () => {
-    expect(withheldOverridesText(0, WHOLE)).toBeNull();
-    expect(withheldOverridesText(-1, WHOLE)).toBeNull();
-    expect(withheldOverridesText(1, WHOLE)).toBe(
-      `1 reviewer override recorded later is not shown, because this view only shows what was known at ${WHOLE}.`,
-    );
-    expect(withheldOverridesText(3, WHOLE)).toBe(
-      `3 reviewer overrides recorded later are not shown, because this view only shows what was known at ${WHOLE}.`,
-    );
   });
 
   it('gives the machine rank of an override only when it is about the ranking on screen, and invents none otherwise', () => {
@@ -268,30 +251,31 @@ describe('hypothesis model: the action ranking and its reviewer overrides', () =
     expect(withListedOverrides(carrying, [record]).candidates[1]?.override).toEqual(carried);
   });
 
-  it('describes the whole record as not windowed: every override is listed and none is withheld', () => {
-    const ranking = actionRanking({
-      reviewerOverrides: [reviewerOverride()],
-      withheldOverrides: 4,
-    });
+  it('describes the whole record as not windowed: every override the ranking lists is listed', () => {
+    const ranking = actionRanking({ reviewerOverrides: [reviewerOverride()] });
     const view = cursorView(ranking, { asOf: null, lastInstant: LAST_EVENT, caseResolved: true });
-    expect(view).toMatchObject({
-      windowed: false,
-      withheld: 0,
-      caseResolved: true,
-      decisionFork: null,
-    });
+    expect(view).toMatchObject({ windowed: false, caseResolved: true, decisionFork: null });
     expect(view.overrides).toHaveLength(1);
   });
 
-  it('describes an earlier view as windowed, with what it cannot show counted', () => {
-    const ranking = actionRanking({ asOf: BEFORE_FORK_EVENT, withheldOverrides: 2 });
+  it('describes an earlier view as windowed, lists what the response carries and carries no count of anything else', () => {
+    const ranking = actionRanking({ asOf: BEFORE_FORK_EVENT });
     const view = cursorView(ranking, {
       asOf: BEFORE_FORK_EVENT,
       lastInstant: LAST_EVENT,
       caseResolved: true,
     });
-    expect(view).toMatchObject({ windowed: true, withheld: 2, atLastEvent: false });
+    expect(view).toMatchObject({ windowed: true, atLastEvent: false });
     expect(view.overrides).toEqual([]);
+    // What was decided after the moment is not even counted: the view model has nothing to count it with.
+    expect(Object.keys(view).sort()).toEqual([
+      'atLastEvent',
+      'caseResolved',
+      'decisionFork',
+      'overrides',
+      'ranking',
+      'windowed',
+    ]);
   });
 
   it('knows a ranking is at the last event from its instant, or from the cursor when the last event is unknown', () => {
@@ -306,14 +290,14 @@ describe('hypothesis model: the action ranking and its reviewer overrides', () =
     expect(at(actionRanking(), BEFORE_FORK_EVENT, null)).toBe(false);
   });
 
-  it('shows the ranking before the earliest fork with the whole record\u2019s list and no note about a window', () => {
+  it('shows the ranking before the earliest fork with the whole record\u2019s list, as the whole record', () => {
     const record = reviewerOverride({
       instant: '2026-03-09T09:30:00.000Z',
       actionKey: 'act.request-recent-changes',
       rank: 1,
     });
-    const whole = zeroScoreRanking({ reviewerOverrides: [record], withheldOverrides: 5 });
-    const before = actionRanking({ asOf: BEFORE_FORK_EVENT, withheldOverrides: 2 });
+    const whole = zeroScoreRanking({ reviewerOverrides: [record] });
+    const before = actionRanking({ asOf: BEFORE_FORK_EVENT });
     const view = decisionPointView(
       before,
       whole,
@@ -322,7 +306,6 @@ describe('hypothesis model: the action ranking and its reviewer overrides', () =
     );
     expect(view).toMatchObject({
       windowed: false,
-      withheld: 0,
       atLastEvent: false,
       caseResolved: true,
       decisionFork: { title: 'Heavy customer request', at: '2026-03-09T09:41:00Z' },

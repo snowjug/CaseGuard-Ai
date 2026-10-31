@@ -113,9 +113,9 @@ export function useDecisionPoint(caseId: string, wanted: boolean): DecisionPoint
 /**
  * After a reviewer records an override, the response carries the whole-record list of reviewer overrides: the one view
  * that must show it at once. It replaces the cached whole-record ranking's list, and the whole ranking when the override
- * was about that ranking's own instant (the response is then that very ranking). An earlier window is never primed: it
- * cannot know a decision made after it, so the caller invalidates it, and the server then also refreshes the count of
- * what it withholds.
+ * was about that ranking's own instant (the response is then that very ranking); the whole-record ranking is then read
+ * again in the background. An earlier window is left alone: it cannot know a decision made after it, so nothing about it
+ * changes and it is not asked for again (its read is metered).
  */
 export function usePrimeWholeRecordRanking(): (caseId: string, response: ActionRanking) => void {
   const queryClient = useQueryClient();
@@ -129,12 +129,9 @@ export function usePrimeWholeRecordRanking(): (caseId: string, response: ActionR
       queryClient.setQueryData<ActionRanking>(key, (cached) => {
         if (!cached) return undefined;
         if (sameInstant(cached.asOf, response.asOf)) return response;
-        return {
-          ...cached,
-          reviewerOverrides: response.reviewerOverrides ?? [],
-          withheldOverrides: 0,
-        };
+        return { ...cached, reviewerOverrides: response.reviewerOverrides ?? [] };
       });
+      void queryClient.invalidateQueries({ queryKey: key, exact: true });
     },
     [queryClient, identityKey],
   );

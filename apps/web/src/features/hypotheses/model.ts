@@ -201,23 +201,12 @@ export const listedOverrides = (
   ranking: Pick<ActionRanking, 'reviewerOverrides'>,
 ): readonly ActionOverrideRecord[] => ranking.reviewerOverrides ?? [];
 
-/** How many overrides a window cannot show (a count, never content). Absent means 0. */
-export const withheldOverrideCount = (ranking: Pick<ActionRanking, 'withheldOverrides'>): number =>
-  ranking.withheldOverrides ?? 0;
-
 /**
  * True when no candidate is expected to add any information: every score is zero, so the list is not a recommendation
  * and must not be presented as one. A ranking without candidates is a different case (everything is blocked).
  */
 export function hasNothingToRank(ranking: Pick<ActionRanking, 'candidates'>): boolean {
   return ranking.candidates.length > 0 && ranking.candidates.every((item) => item.score === 0);
-}
-
-/** The calm note of a window that cannot show some overrides: how many, and the moment it is a view of. */
-export function withheldOverridesText(count: number, instant: string): string | null {
-  if (count <= 0) return null;
-  const many = count !== 1;
-  return `${count} reviewer override${many ? 's' : ''} recorded later ${many ? 'are' : 'is'} not shown, because this view only shows what was known at ${instant}.`;
 }
 
 export interface OverrideEntry {
@@ -272,7 +261,7 @@ export function withListedOverrides(
   };
 }
 
-/** What the "Next best action" panel shows: a ranking, which overrides it lists and how to word what it cannot show. */
+/** What the "Next best action" panel shows: a ranking, which overrides it lists and whether it is an earlier view. */
 export interface RankingView {
   /** The ranking on screen. Its candidates carry the override about their own instant, whichever response it came from. */
   ranking: ActionRanking;
@@ -280,8 +269,6 @@ export interface RankingView {
   windowed: boolean;
   /** The reviewer overrides to list, newest decision first. */
   overrides: readonly ActionOverrideRecord[];
-  /** How many overrides this view cannot show (a count, never content); 0 outside a window. */
-  withheld: number;
   /** True when the ranking is the one at the case's last event. */
   atLastEvent: boolean;
   /** True when the case is resolved or closed (the last event then has nothing left to learn). */
@@ -309,7 +296,6 @@ export function cursorView(ranking: ActionRanking, options: CursorViewOptions): 
     ranking,
     windowed,
     overrides: listedOverrides(ranking),
-    withheld: windowed ? withheldOverrideCount(ranking) : 0,
     atLastEvent,
     caseResolved: options.caseResolved,
     decisionFork: null,
@@ -332,7 +318,6 @@ export function decisionPointView(
     ranking: withListedOverrides(ranking, overrides),
     windowed: false,
     overrides,
-    withheld: 0,
     atLastEvent: false,
     caseResolved,
     decisionFork: { title: fork.title, at: fork.timestamp },
