@@ -1010,6 +1010,22 @@ describe('[FR-QR-07] Case Quality Review: SkillDNA matches', () => {
   });
 });
 
+// The API answers 404 for a case that does not exist: here, any comparison that names `case_gone`.
+const withMissingCase: FakeHandlers = {
+  'compare.cases': (input) => {
+    if ((input as Input).query.caseIds?.includes('case_gone')) {
+      throw new ApiError({
+        status: 404,
+        code: 'not_found',
+        title: 'Not Found',
+        message: 'Case "case_gone" was not found',
+      });
+    }
+    return caseComparison();
+  },
+};
+const MISSING_HEADING = 'The case to compare with was not found';
+
 describe('[FR-QR-08] Case Quality Review: coaching and comparison', () => {
   it('shows a constructive, retrospective coaching report with its limits', async () => {
     navigateTo('/cases/case_1/quality?tab=coaching');
@@ -1061,6 +1077,71 @@ describe('[FR-QR-08] Case Quality Review: coaching and comparison', () => {
     await userEvent.selectOptions(select, 'case_2');
     await waitFor(() => expect(window.location.search).toContain('with=case_2'));
   });
+
+  it('says calmly that the case to compare with was not found: no Retry, and the chooser is free', async () => {
+    navigateTo('/cases/case_1/quality?tab=compare&with=case_gone');
+    const fake = api(withMissingCase, MANAGER);
+    renderApp(<CaseQualityPage caseId="case_1" />, { api: fake });
+    expect(
+      await screen.findByRole('heading', { name: MISSING_HEADING, level: 2 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('case_gone')).toBeInTheDocument();
+    expect(
+      screen.getByText(/It may have been removed, or a link to it may be out of date/),
+    ).toBeInTheDocument();
+    // Asking again can only get the same answer: no Retry, no alert, and no claim that the comparison failed to load.
+    expect(screen.queryByRole('button', { name: /retry|try again/i })).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText('The comparison could not be loaded')).toBeNull();
+    expect(inputsOf(fake, 'compare.cases')).toHaveLength(1);
+    // The unknown id is not shown as a choice: nothing is selected until another case is picked.
+    const select = screen.getByRole('combobox', { name: 'Compare with' });
+    expect(select).toBeEnabled();
+    expect(select).toHaveValue('');
+    expect(within(select).getByRole('option', { name: 'Choose another case' })).toBeInTheDocument();
+    await userEvent.selectOptions(select, 'case_2');
+    await waitFor(() => expect(window.location.search).toContain('with=case_2'));
+    expect(window.location.search).not.toContain('case_gone');
+    expect(
+      await screen.findByRole('table', { name: 'Comparison of the two cases' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: MISSING_HEADING })).toBeNull();
+    const chosen = screen.getByRole('combobox', { name: 'Compare with' });
+    expect(chosen).toHaveValue('case_2');
+    expect(within(chosen).queryByRole('option', { name: 'Choose another case' })).toBeNull();
+  });
+
+  it('moves focus to the chooser from the notice', async () => {
+    navigateTo('/cases/case_1/quality?tab=compare&with=case_gone');
+    renderApp(<CaseQualityPage caseId="case_1" />, { api: api(withMissingCase, MANAGER) });
+    await userEvent.click(await screen.findByRole('button', { name: 'Choose another case' }));
+    expect(screen.getByRole('combobox', { name: 'Compare with' })).toHaveFocus();
+  });
+
+  it.each([
+    { status: 500, code: 'internal_error' },
+    { status: 400, code: 'validation_failed' },
+  ])(
+    'still shows every other failure of the comparison as a failure, with a Retry ($status)',
+    async ({ status, code }) => {
+      navigateTo('/cases/case_1/quality?tab=compare&with=case_2');
+      renderApp(<CaseQualityPage caseId="case_1" />, {
+        api: api(
+          {
+            'compare.cases': () => {
+              throw new ApiError({ status, code, title: 'Request failed' });
+            },
+          },
+          MANAGER,
+        ),
+      });
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('The comparison could not be loaded');
+      expect(within(alert).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: MISSING_HEADING })).toBeNull();
+      expect(screen.getByRole('combobox', { name: 'Compare with' })).toHaveValue('case_2');
+    },
+  );
 
   it('explains that comparing cases needs a role with analytics access', async () => {
     navigateTo('/cases/case_1/quality?tab=compare');
@@ -1118,6 +1199,20 @@ describe('[FR-QR-09] Case Quality Review accessibility', () => {
         api: api({}, MANAGER),
       });
       await screen.findByRole('table', { name: 'Comparison of the two cases' });
+      await expectNoAxeViolations(container);
+    },
+    AXE_TIMEOUT,
+  );
+
+  it.each(['light', 'dark'] as const)(
+    'has no axe violations when the case to compare with is not found (%s mode)',
+    async (mode) => {
+      navigateTo('/cases/case_1/quality?tab=compare&with=case_gone');
+      const { container } = renderApp(<CaseQualityPage caseId="case_1" />, {
+        api: api(withMissingCase, MANAGER),
+        mode,
+      });
+      await screen.findByRole('heading', { name: MISSING_HEADING });
       await expectNoAxeViolations(container);
     },
     AXE_TIMEOUT,

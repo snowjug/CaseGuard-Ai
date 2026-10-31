@@ -14,10 +14,10 @@ import {
   formatProbability,
   type DataTableColumn,
 } from '@caseguard/ui';
-import { Field, Select } from '@fluentui/react-components';
-import { ArrowSwapRegular } from '@fluentui/react-icons';
+import { Button, Field, Select } from '@fluentui/react-components';
+import { ArrowSwapRegular, SearchRegular } from '@fluentui/react-icons';
 import { keepPreviousData } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { PermissionNeeded } from '../../components/common/PermissionNeeded';
 import { useApiQuery } from '../../lib/api/hooks';
 import { useAuth } from '../../lib/auth/context';
@@ -182,6 +182,44 @@ function ComparisonBody({ comparison }: { comparison: CaseComparison }) {
   );
 }
 
+/**
+ * The case to compare with does not exist (the API answers 404), most likely because a link to it is out of date. Asking
+ * again can only get the same answer, so this is not a failure to retry: it says what happened and points at the chooser.
+ */
+function CaseToCompareMissing({
+  caseId,
+  onChoose,
+}: {
+  caseId: string | null;
+  onChoose: () => void;
+}) {
+  const styles = useInsightStyles();
+  return (
+    <EmptyState
+      compact
+      headingLevel={2}
+      icon={<SearchRegular />}
+      title="The case to compare with was not found"
+      description={
+        <>
+          {caseId ? (
+            <>
+              No case with the id <span className={styles.mono}>{caseId}</span> is available to
+              you.{' '}
+            </>
+          ) : null}
+          It may have been removed, or a link to it may be out of date. Nothing was compared.
+        </>
+      }
+      action={
+        <Button appearance="outline" onClick={onChoose}>
+          Choose another case
+        </Button>
+      }
+    />
+  );
+}
+
 export interface CompareViewProps {
   caseId: string;
   cursorIgnored: boolean;
@@ -189,12 +227,15 @@ export interface CompareViewProps {
 
 /**
  * The "Compare cases" tab: this case against another analysed case (`compare.cases`, `?with=`). It compares finished
- * cases, so the time cursor does not apply. Estimates only, with the API's own narrative and notice.
+ * cases, so the time cursor does not apply. Estimates only, with the API's own narrative and notice. A `?with=` that
+ * names no case the person can open (404) is explained calmly, with no Retry, and the chooser shows nothing selected so
+ * that another case can be picked; every other failure is shown as a failure.
  */
 export function CompareView({ caseId, cursorIgnored }: CompareViewProps) {
   const styles = useInsightStyles();
   const auth = useAuth();
   const { can } = useSession();
+  const chooser = useRef<HTMLSelectElement>(null);
   const [withParam, setWith] = useUrlState('with', WITH_CODEC);
   const cases = useApiQuery(
     'cases.list',
@@ -214,6 +255,8 @@ export function CompareView({ caseId, cursorIgnored }: CompareViewProps) {
       placeholderData: keepPreviousData,
     },
   );
+  // The chosen case is not there: its id is not a choice the chooser can show, and asking again cannot help.
+  const missing = query.isError && query.error.isNotFound;
 
   if (!allowed) {
     return (
@@ -248,11 +291,13 @@ export function CompareView({ caseId, cursorIgnored }: CompareViewProps) {
       <div className={styles.toolbar}>
         <Field label="Compare with" className={styles.field}>
           <Select
+            ref={chooser}
             className={styles.select}
-            value={chosen ?? ''}
+            value={missing ? '' : (chosen ?? '')}
             disabled={others.length === 0}
             onChange={(_event, next) => setWith(next.value || null)}
           >
+            {missing ? <option value="">Choose another case</option> : null}
             {others.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.reference} · {item.title}
@@ -261,20 +306,24 @@ export function CompareView({ caseId, cursorIgnored }: CompareViewProps) {
           </Select>
         </Field>
       </div>
-      <PanelBoundary
-        query={query}
-        subject="The comparison"
-        skeleton={<LoadingSkeleton variant="table" count={5} label="Loading the comparison" />}
-      >
-        {(comparison, meta) => (
-          <div
-            aria-busy={meta.isRefreshing}
-            style={meta.isRefreshing ? { opacity: 0.72 } : undefined}
-          >
-            <ComparisonBody comparison={comparison} />
-          </div>
-        )}
-      </PanelBoundary>
+      {missing ? (
+        <CaseToCompareMissing caseId={chosen} onChoose={() => chooser.current?.focus()} />
+      ) : (
+        <PanelBoundary
+          query={query}
+          subject="The comparison"
+          skeleton={<LoadingSkeleton variant="table" count={5} label="Loading the comparison" />}
+        >
+          {(comparison, meta) => (
+            <div
+              aria-busy={meta.isRefreshing}
+              style={meta.isRefreshing ? { opacity: 0.72 } : undefined}
+            >
+              <ComparisonBody comparison={comparison} />
+            </div>
+          )}
+        </PanelBoundary>
+      )}
     </div>
   );
 }
