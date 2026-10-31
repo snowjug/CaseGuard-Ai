@@ -58,7 +58,7 @@ export class ReplayLoader {
     if (run === null) {
       throw new NotAnalysedError('The case has not been analysed yet. Run the analysis first.');
     }
-    const engineCtx = engineContextForRun(run);
+    const engineCtx = engineContextForRun(run, inputs);
     const key = [
       ctx.scope.tenantId,
       caseId,

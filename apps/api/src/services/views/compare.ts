@@ -35,7 +35,12 @@ export function parseCaseIds(raw: string): [string, string] {
 function skillReuseOf(matches: readonly SkillMatch[]): CaseComparison['skillReuse'] {
   const best = matches
     .filter((match) => match.applicability !== 'not_applicable')
-    .sort((a, b) => b.score - a.score || compareText(a.skillId, b.skillId))[0];
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        compareText(a.skillName, b.skillName) ||
+        compareText(a.skillId, b.skillId),
+    )[0];
   if (best === undefined) return null;
   return {
     skillId: best.skillId,

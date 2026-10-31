@@ -8,7 +8,7 @@ import {
 } from '@caseguard/domain';
 import type { ActionRanking, AnalysisRun } from '@caseguard/schemas';
 import { canonicalJson, sha256Hex } from '@caseguard/security';
-import { ENGINE_VERSION, engineContextForRun, type AnalysisInputs } from '../analysis/inputs';
+import { engineContextForRun, type AnalysisInputs } from '../analysis/inputs';
 import { LruCache } from './lru';
 
 /*
@@ -220,24 +220,24 @@ export function passKey(run: AnalysisRun, view: TemporalView, fingerprint: strin
 
 /**
  * The identity a pass runs under. Artefact ids and timestamps come from the stored run, so they equal
- * the stored ones. The seed of the confidence bands is the stored run's input hash only when the view
- * is the whole record, which is exactly what that run analysed. A window must not be seeded by a hash
- * of the whole stored source (it would change with text recorded after the window), so it gets a seed
- * derived from the case, the pack and the visible events alone.
+ * the stored ones. The seed of the confidence bands is the case's simulation seed only when the view
+ * is the whole record, which is exactly what the stored run analysed. A window must not be seeded by a
+ * hash of the whole stored source (it would change with text recorded after the window), so it gets a
+ * seed derived from the pack and the visible events alone. Like the stored seed it names content only:
+ * no generated id (case, run, tenant) and no engine version, so the same window of the same content
+ * draws the same bands in any database.
  */
 export function passContext(
   run: AnalysisRun,
   inputs: AnalysisInputs,
   view: TemporalView,
 ): EngineContext {
-  const stored = engineContextForRun(run);
+  const stored = engineContextForRun(run, inputs);
   if (coversWholeRecord(inputs, view)) return stored;
   return {
     ...stored,
     seed: sha256Hex(
       canonicalJson({
-        engine: ENGINE_VERSION,
-        caseId: run.caseId,
         pack: [inputs.pack.pack.id, inputs.pack.pack.version],
         events: view.fingerprint,
         resolved: view.resolution !== null,

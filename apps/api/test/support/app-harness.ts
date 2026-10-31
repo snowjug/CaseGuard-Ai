@@ -8,6 +8,7 @@ import { buildApp } from '../../src/app';
 import { createInfrastructure, type Container } from '../../src/container';
 import { createTestDatabase, TestClock, createSequentialIdGenerator } from '../../src/db/testing';
 import type { Database, TenantRepositories } from '../../src/db';
+import type { IdGenerator } from '../../src/db/ids';
 import type { HandlerMap } from '../../src/http/route-binder';
 import { createHandlers } from '../../src/routes';
 import type { Services } from '../../src/services/ports';
@@ -35,6 +36,8 @@ export interface HarnessOptions {
   readonly database?: Database;
   /** Replaces individual services (for example a fake `analysis` port in ingestion tests). */
   readonly services?: Partial<Services>;
+  /** Replaces the process-wide sequential id source, for example with ids shaped like production ones. */
+  readonly newId?: IdGenerator;
 }
 
 /** Parsed response bodies are asserted on freely in tests, so they are deliberately loosely typed. */
@@ -90,7 +93,7 @@ export async function createHarness(options: HarnessOptions = {}): Promise<Harne
   const infra = await createInfrastructure(config, {
     database,
     now: clock.now,
-    newId: sharedIds,
+    newId: options.newId ?? sharedIds,
     ...(options.services ? { services: options.services } : {}),
     logDestination: { write: (chunk: string) => void lines.push(chunk) },
   });

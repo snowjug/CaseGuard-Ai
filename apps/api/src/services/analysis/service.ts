@@ -6,7 +6,13 @@ import { planReviewCarry, recordReviewResets } from '../counterfactuals/carry';
 import { runAnalysisAgents } from './agents';
 import { carryApplications, withdrawnLifecycles } from './carry';
 import { computeAnalysis, type AnalysisComputation, type StageReporter } from './compute';
-import { ENGINE_VERSION, computeInputHash, engineContextFor, loadAnalysisInputs } from './inputs';
+import {
+  ENGINE_VERSION,
+  computeInputHash,
+  engineContextFor,
+  loadAnalysisInputs,
+  simulationSeed,
+} from './inputs';
 import { buildSnapshot } from './snapshot';
 import type { AnalysisOutcome, AnalysisPort, AnalyzeOptions, JobHandle, JobSpec } from '../ports';
 
@@ -146,7 +152,7 @@ export class AnalysisService implements AnalysisPort {
         caseId,
         runId,
         startedAt,
-        inputHash: hash,
+        seed: simulationSeed(inputs),
       });
 
       const computation = await computeAnalysis(inputs, engineCtx, async (stageId, detail) => {

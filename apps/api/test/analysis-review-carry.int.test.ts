@@ -305,7 +305,7 @@ describe('an applied skill keeps its application and its conformance', () => {
 
 describe('a changed simulation comes back pending, and the reset is audited', () => {
   it(
-    're-analysis with a changed input resets the decisions it can no longer vouch for',
+    're-analysis with a changed input resets the decisions it can no longer vouch for, and only those',
     { timeout: 180_000 },
     async () => {
       const { accepted, rejected } = await decideTwo();
@@ -316,24 +316,36 @@ describe('a changed simulation comes back pending, and the reset is audited', ()
       const runAfter = await analyse(ONE);
       expect(runAfter).not.toBe(runBefore);
       const after = await scenariosOf(ONE);
-      for (const id of [accepted.id, rejected.id]) {
-        const was = before.find((s) => s.id === id);
-        const now = after.find((s) => s.id === id);
-        if (was === undefined || now === undefined) throw new Error(`scenario ${id} disappeared`);
-        expect(now).toMatchObject({
-          analysisRunId: runAfter,
-          reviewState: 'pending',
-          reviewReason: null,
-          reviewedBy: null,
-          reviewedAt: null,
-        });
-        // It is a different simulation: the engine reseeds its rollouts from the analysis input.
-        expect(now.rollouts.seed).not.toBe(was.rollouts.seed);
-        expect(now.version).toBeGreaterThan(was.version);
-      }
+      const pick = (list: CounterfactualScenario[], id: string): CounterfactualScenario => {
+        const found = list.find((s) => s.id === id);
+        if (found === undefined) throw new Error(`scenario ${id} disappeared`);
+        return found;
+      };
+
+      // The governed weights drive the balanced path only: that simulation changed, so its acceptance is
+      // reset. The fastest path does not use them, is the same simulation, and keeps its rejection.
+      const was = pick(before, accepted.id);
+      const now = pick(after, accepted.id);
+      expect(now).toMatchObject({
+        analysisRunId: runAfter,
+        reviewState: 'pending',
+        reviewReason: null,
+        reviewedBy: null,
+        reviewedAt: null,
+      });
+      // The random stream names the case content only, so it is the same stream: the numbers moved
+      // because the model did, not because the draws did.
+      expect(now.rollouts.seed).toBe(was.rollouts.seed);
+      expect(now.version).toBeGreaterThan(was.version);
+      expect(pick(after, rejected.id)).toMatchObject({
+        analysisRunId: runAfter,
+        reviewState: 'rejected',
+        reviewReason: REJECT_REASON,
+        reviewedBy: PERSONAS.reviewer,
+      });
 
       const resets = await resetEvents(runAfter);
-      expect(resets.map((e) => e.targetId).sort()).toEqual([accepted.id, rejected.id].sort());
+      expect(resets.map((e) => e.targetId)).toEqual([accepted.id]);
       for (const event of resets) {
         expect(event).toMatchObject({
           outcome: 'success',
@@ -341,12 +353,11 @@ describe('a changed simulation comes back pending, and the reset is audited', ()
           caseId: ONE,
           actorId: PERSONAS.engineer,
         });
-        const was = before.find((s) => s.id === event.targetId);
         expect(event.details).toEqual({
           forkId: earliestForkId,
-          strategy: was?.strategy,
-          previousState: was?.reviewState,
-          previousVersion: was?.version,
+          strategy: was.strategy,
+          previousState: was.reviewState,
+          previousVersion: was.version,
           previousAnalysisRunId: runBefore,
           analysisRunId: runAfter,
           cause: 'simulation_changed',
@@ -357,8 +368,8 @@ describe('a changed simulation comes back pending, and the reset is audited', ()
       );
       expect(completed?.details).toMatchObject({
         runId: runAfter,
-        reviewsCarried: 0,
-        reviewsReset: 2,
+        reviewsCarried: 1,
+        reviewsReset: 1,
       });
 
       // The history of what people decided stays; only the standing decision on the new path is gone.
@@ -411,14 +422,15 @@ describe('a changed simulation comes back pending, and the reset is audited', ()
         expect((await repos().cases.get(ONE))?.analysisState).toBe('analyzed');
 
         // The same analysis, once the audit trail can be written, resets them together with the snapshot.
+        // Only the balanced path depends on the governed weights; the fastest one is unchanged and kept.
         const outcome = await ctx.services.analysis.analyzeCase(ctx, ONE);
         expect(outcome.run.id).not.toBe(before.run);
         const resets = await resetEvents(outcome.run.id);
-        expect(resets).toHaveLength(2);
+        expect(resets).toHaveLength(1);
         expect(
           (await allAuditEvents(h)).filter((e) => e.action === 'counterfactual.review_reset'),
-        ).toHaveLength(before.resets + 2);
-        expect((await scenariosOf(ONE)).filter((s) => s.reviewState !== 'pending')).toHaveLength(0);
+        ).toHaveLength(before.resets + 1);
+        expect((await scenariosOf(ONE)).filter((s) => s.reviewState !== 'pending')).toHaveLength(1);
       } finally {
         await harness.close();
       }

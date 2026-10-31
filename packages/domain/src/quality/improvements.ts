@@ -229,12 +229,11 @@ export function buildImprovements(input: {
     }
   }
 
+  // Candidates are listed in a fixed order (penalties, then weak checks by dimension), so a stable sort
+  // keeps equal gains in that order; breaking the tie by `id` would order them by a hash of the case id.
   const improvements = candidates
     .filter((c) => c.expectedScoreGain >= params.minImprovementGain)
-    .sort(
-      (a, b) =>
-        b.expectedScoreGain - a.expectedScoreGain || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-    )
+    .sort((a, b) => b.expectedScoreGain - a.expectedScoreGain)
     .slice(0, 8);
 
   const total = improvements.reduce((s, i) => s + i.expectedScoreGain, 0);

@@ -38,7 +38,7 @@ export async function loadMatchContext(
   return {
     inputs,
     run,
-    engineCtx: engineContextForRun(run),
+    engineCtx: engineContextForRun(run, inputs),
     lastEventAt: lastEventAtOf({ inputs }),
   };
 }

@@ -20,7 +20,7 @@ import {
   type CaseEvent,
 } from '@caseguard/schemas';
 import { RateLimitedError, ValidationFailedError } from '../src/errors';
-import type { AnalysisInputs } from '../src/services/analysis/inputs';
+import { simulationSeed, type AnalysisInputs } from '../src/services/analysis/inputs';
 import {
   ENGINE_BUDGET_PASSES,
   ENGINE_BUDGET_WINDOW_MS,
@@ -727,7 +727,7 @@ describe('what a pass depends on', () => {
     expect(passContext(run, inputs, longer).seed).not.toBe(passContext(run, inputs, strict).seed);
     // The whole record is exactly what the stored run analysed, so it keeps the stored seed and ids.
     const stored = passContext(run, inputs, whole);
-    expect(stored.seed).toBe(run.inputHash);
+    expect(stored.seed).toBe(simulationSeed(inputs));
     expect(stored.runId).toBe(run.id);
     expect(stored.now).toBe(run.startedAt);
     expect(passContext(run, inputs, strict).runId).toBe(run.id);

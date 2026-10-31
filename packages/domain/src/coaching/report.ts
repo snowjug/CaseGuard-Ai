@@ -119,8 +119,14 @@ function strengths(
 export function buildCoachingReport(input: CoachingInput): CoachingReport {
   const { analysis, pack, ctx, review } = input;
   const config = input.config ?? DEFAULT_ACTION_VALUE_CONFIG;
+  // Equal match scores order by skill name (content); a generated id only separates identical names.
   const skills = [...(input.skills ?? [])]
-    .sort((a, b) => b.matchScore - a.matchScore || (a.skillId < b.skillId ? -1 : 1))
+    .sort(
+      (a, b) =>
+        b.matchScore - a.matchScore ||
+        (a.name < b.name ? -1 : a.name > b.name ? 1 : 0) ||
+        (a.skillId < b.skillId ? -1 : 1),
+    )
     .slice(0, 3);
   const skillFor = (actionKey: string | undefined): string | null =>
     (actionKey ? skills.find((s) => s.coversActions?.includes(actionKey)) : undefined)?.skillId ??

@@ -606,9 +606,8 @@ export function buildClaims(input: ClaimsInput): ClaimsOutput {
     );
   }
 
-  claims.sort((a, b) => {
-    const byTime = compareIso(a.timestamp, b.timestamp);
-    return byTime < 0 ? -1 : byTime > 0 ? 1 : a.id < b.id ? -1 : 1;
-  });
+  // Claims at one instant keep the order they were derived in (event, then rule), which is fixed by
+  // the case content; breaking the tie by claim id would order them by a generated id.
+  claims.sort((a, b) => compareIso(a.timestamp, b.timestamp));
   return { claims, anchors, notes };
 }

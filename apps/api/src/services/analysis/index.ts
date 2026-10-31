@@ -5,6 +5,7 @@ export {
   engineContextFor,
   engineContextForRun,
   loadAnalysisInputs,
+  simulationSeed,
 } from './inputs';
 export type { AnalysisInputs } from './inputs';
 export { computeAnalysis } from './compute';

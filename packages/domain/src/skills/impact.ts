@@ -202,7 +202,9 @@ export function estimateSkillImpact(input: SkillImpactInput): SkillImpactEstimat
     pack,
     config,
     strategy,
-    seed: `${ctx.seed}|skill-impact|${plan.skillId}`,
+    // The baseline is what the knowledge-pack policy does at this moment, with or without any one skill, so
+    // its stream is named by the moment. A skill id is generated per database and must not enter a seed.
+    seed: `${ctx.seed}|skill-impact|${plan.asOf}`,
     rolloutCount: input.rolloutCount ?? pack.pack.policies.rolloutCount,
     minimumEvidence,
   });

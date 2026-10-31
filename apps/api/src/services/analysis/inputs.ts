@@ -27,8 +27,12 @@ import type { RequestContext } from '../../http/request-context';
  * scenario summaries no longer compare with the real case.
  * 2026.2.1: the token-efficiency figure of a synthetic case reads "simulated telemetry" instead of
  * "measured" (text only; no number moved).
+ * 2026.3.0: no generated id enters a seed or an ordering (see `simulationSeed`), so the same case
+ * content gives the same simulated numbers in every database. Every simulated figure moved once
+ * (rollouts, confidence bands, skill baselines); stored runs are recomputed and the decisions on their
+ * scenarios are reset (and audited) because the regenerated simulation differs.
  */
-export const ENGINE_VERSION = '2026.2.1';
+export const ENGINE_VERSION = '2026.3.0';
 
 /** Everything an analysis reads. Loaded once per run and never mutated. */
 export interface AnalysisInputs {
@@ -103,13 +107,41 @@ export interface EngineContextInput {
   readonly caseId: string;
   readonly runId: string;
   readonly startedAt: string;
-  readonly inputHash: string;
+  /** From `simulationSeed`: never from a hash that covers generated ids. */
+  readonly seed: string;
 }
 
 /**
- * The identity the engine runs under. Artefact ids, timestamps and the simulation seed derive from it,
- * so a view that recomputes an analysis from the stored record (for an as-of request) must build its
- * context with `engineContextForRun` to get exactly the ids that were stored.
+ * The seed of every simulation of a case: the confidence bands, the counterfactual rollouts and the
+ * skill baselines all draw from streams named by it. It covers the CONTENT being simulated (the stored
+ * payload's content hash, how many events and whether it is resolved, and the pack) and nothing that
+ * is generated per database: not the tenant, case, run or source ids, not the skill library (its ids
+ * are random) and not the provider. The engine version is left out too, so a release that moves no
+ * number redraws none. Same content therefore gives the same simulated numbers in any database, and
+ * a library or provider change does not redraw a case that is analysed again.
+ *
+ * `computeInputHash` remains the IDENTITY of an input (it must change when a skill is added, because
+ * matching has to re-run); this is only the seed. It is recomputed from the stored record, so replaying
+ * a stored run (`engineContextForRun`) draws exactly the streams that run drew.
+ */
+export function simulationSeed(
+  inputs: Pick<AnalysisInputs, 'source' | 'events' | 'resolution' | 'pack'>,
+): string {
+  return sha256Hex(
+    canonicalJson({
+      source: inputs.source.receivedSha256,
+      events: inputs.events.length,
+      resolution: inputs.resolution !== null,
+      pack: [inputs.pack.pack.id, inputs.pack.pack.version],
+    }),
+  );
+}
+
+/**
+ * The identity the engine runs under. Artefact ids and timestamps derive from the run and the case; the
+ * simulation seed does not (see `simulationSeed`). A view that recomputes an analysis from the stored
+ * record (for an as-of request) must build its context with `engineContextForRun` to get exactly the ids
+ * that were stored.
  */
 export function engineContextFor(input: EngineContextInput): EngineContext {
   return {
@@ -118,17 +150,17 @@ export function engineContextFor(input: EngineContextInput): EngineContext {
     runId: input.runId,
     now: input.startedAt,
     createdBy: 'system:analysis',
-    seed: input.inputHash,
+    seed: input.seed,
   };
 }
 
-export function engineContextForRun(run: AnalysisRun): EngineContext {
+export function engineContextForRun(run: AnalysisRun, inputs: AnalysisInputs): EngineContext {
   return engineContextFor({
     tenantId: run.tenantId,
     caseId: run.caseId,
     runId: run.id,
     startedAt: run.startedAt,
-    inputHash: run.inputHash,
+    seed: simulationSeed(inputs),
   });
 }
 

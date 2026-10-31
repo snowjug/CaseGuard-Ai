@@ -207,7 +207,12 @@ export function buildAnalyticsOverview(
         synthetic: s.synthetic,
       };
     })
-    .sort((a, b) => b.applications - a.applications || (a.skillId < b.skillId ? -1 : 1));
+    .sort(
+      (a, b) =>
+        b.applications - a.applications ||
+        (a.name < b.name ? -1 : a.name > b.name ? 1 : 0) ||
+        (a.skillId < b.skillId ? -1 : 1),
+    );
 
   const tokenRows = input.metrics.filter((m) => m.key === 'token_efficiency' && m.value !== null);
   const savingsByCase = new Map<string, number[]>();

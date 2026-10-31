@@ -290,7 +290,11 @@ export function simulateAlternativePath(input: SimulateInput): SimulationResult 
 
   // Monte-Carlo rollouts: the source of every metric range and of the representative path.
   const count = input.rolloutCount ?? policies.rolloutCount;
-  const seed = `${ctx.seed}|${fork.id}|${strategy}${input.conditionOnHypothesis ? `|truth:${input.conditionOnHypothesis}` : ''}`;
+  // The stream is named by where the decision sits in the case (events before it, its instant) and
+  // never by the fork id, which derives from the generated case id: the same case content must draw
+  // the same numbers in any database.
+  const decision = `fork:${preView.events.length}@${fork.timestamp}`;
+  const seed = `${ctx.seed}|${decision}|${strategy}${input.conditionOnHypothesis ? `|truth:${input.conditionOnHypothesis}` : ''}`;
   const rng = createRng(seed);
   const rootVector = beliefToVector(pack, initialBelief);
   const samples: RolloutSummary['samples'] = {
@@ -576,7 +580,7 @@ export function assembleScenario(input: AssembleInput): CounterfactualScenario {
         return { id: e.id, score: best };
       })
       .filter((x) => x.score >= 0.3)
-      .sort((a, b) => b.score - a.score || (a.id < b.id ? -1 : 1));
+      .sort((a, b) => b.score - a.score);
     return scored.slice(0, 3).map((x) => x.id);
   };
 

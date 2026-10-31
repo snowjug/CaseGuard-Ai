@@ -185,7 +185,8 @@ await move(riley, 'validated');
 await move(alex, 'published');
 ```
 
-Analyse Case One once, before the reviewer accepts its scenario. The engine seeds its simulations from the
-analysis input hash, and a skill entering the pilot changes that hash, so analysing Case One again afterwards
-resets the reviewed scenario (audited as `counterfactual.review_reset`) although the skill keeps its
-provenance.
+Case One can be analysed again at any time: the engine seeds its simulations from the case content alone (not from
+the analysis input hash, which also covers the skill library), so a skill entering the pilot re-runs the analysis
+without redrawing a number, the regenerated scenario is the same simulation, and the reviewer's decision on it is
+carried over. A decision is reset (audited as `counterfactual.review_reset`) only when the simulation really changed,
+for example after the governed action-value weights moved.

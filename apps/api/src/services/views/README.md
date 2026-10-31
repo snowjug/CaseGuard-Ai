@@ -15,11 +15,11 @@ repositories. `events.get` reads the immutable record and works before a case is
 artefact views answer 409 for a case that has never been analysed.
 
 The identity of a recomputation is the stored run's (`engineContextForRun`), so artefact ids equal the
-stored ones. The seed of the confidence bands is the stored run's input hash only for a view of the
-whole record, which is exactly what that run analysed. A strict window gets a seed derived from the
-case, the pack and the visible events alone: the input hash covers the whole stored source, so a window
-seeded by it would show confidence ranges that change with text recorded after the window (found by
-`test/views-metamorphic.int.test.ts`).
+stored ones. The seed of the confidence bands is the case's simulation seed (`simulationSeed`: a hash of
+the case content, never of a generated id) only for a view of the whole record, which is exactly what
+that run analysed. A strict window gets a seed derived from the pack and the visible events alone: the
+simulation seed covers the whole stored source, so a window seeded by it would show confidence ranges
+that change with text recorded after the window (found by `test/views-metamorphic.int.test.ts`).
 
 ## Cost: one pass per window, a budget for cold work
 

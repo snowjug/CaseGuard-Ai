@@ -146,9 +146,12 @@ export class CounterfactualRepositoryImpl implements CounterfactualRepository {
     q.where(`case_id = ${q.bind(caseId)}`);
     if (filter.forkId) q.where(`fork_id = ${q.bind(filter.forkId)}`);
     return this.ctx.run(async (tx) => {
+      // Scenarios of one analysis share `created_at`: order them by the decision they start from and
+      // their strategy (content), so the order is the same in every database. `id` only separates
+      // scenarios that are identical in all three.
       const result = await tx.query<DataRow>(
         `SELECT data FROM counterfactual_scenarios WHERE ${q.clause}
-          ORDER BY created_at, id LIMIT ${MAX_SCENARIOS_PER_CASE}`,
+          ORDER BY created_at, as_of, strategy, id LIMIT ${MAX_SCENARIOS_PER_CASE}`,
         q.params,
       );
       return result.rows.map((row) =>

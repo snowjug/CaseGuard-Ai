@@ -18,6 +18,7 @@ import {
 import { DEFAULT_ACTION_VALUE_CONFIG } from '@caseguard/schemas';
 import type { Database } from '../src/db';
 import { TEST_DATABASE_STARTUP_TIMEOUT_MS } from '../src/db/testing';
+import { simulationSeed } from '../src/services/analysis/inputs';
 import { SkillApplier } from '../src/services/skills/application';
 import { CaseMatcher } from '../src/services/skills/matching';
 import {
@@ -98,20 +99,21 @@ const audits = (tenantId = CONTOSO) => allAuditEvents(h, tenantId);
 /** A stored case replayed through the domain on exactly the input its latest analysis used. */
 async function replayThroughDomain(caseId: string, workload: string) {
   const repos = h.repos(CONTOSO);
-  const [events, run, resolution] = await Promise.all([
+  const [events, run, resolution, source] = await Promise.all([
     repos.cases.getAllEvents(caseId),
     repos.analysis.getLatestRun(caseId),
     repos.cases.getResolution(caseId),
+    repos.cases.getSource(caseId),
   ]);
   const pack = getCompiledPack(workload);
-  if (pack === null || run === null) throw new Error('missing pack or run');
+  if (pack === null || run === null || source === null) throw new Error('missing pack or run');
   const ctx = {
     tenantId: CONTOSO,
     caseId,
     runId: run.id,
     now: run.startedAt,
     createdBy: 'system:analysis',
-    seed: run.inputHash,
+    seed: simulationSeed({ source, events, resolution, pack }),
   } satisfies EngineContext;
   const analysis = runDeterministicAnalysis({
     view: createFullView(events, resolution),

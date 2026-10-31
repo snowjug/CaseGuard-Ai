@@ -225,6 +225,13 @@ export function matchSkills(input: MatchSkillsInput): SkillMatchSet {
       appliedBy: null,
     });
   }
-  matches.sort((a, b) => b.score - a.score || (a.skillId < b.skillId ? -1 : 1));
+  // Equal scores order by what the skill is called (content); a generated id only separates identical names.
+  matches.sort(
+    (a, b) =>
+      b.score - a.score ||
+      (a.skillName < b.skillName ? -1 : a.skillName > b.skillName ? 1 : 0) ||
+      (a.skillVersion < b.skillVersion ? -1 : a.skillVersion > b.skillVersion ? 1 : 0) ||
+      (a.skillId < b.skillId ? -1 : 1),
+  );
   return { matches, plans, excluded };
 }
