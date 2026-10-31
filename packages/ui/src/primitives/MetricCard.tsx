@@ -63,6 +63,8 @@ const useStyles = makeStyles({
     gap: cg.space[1],
     fontSize: tokens.fontSizeBase300,
     fontVariantNumeric: 'tabular-nums',
+    // A long label wraps inside the flex row; the arrow must keep its size instead of shrinking to a few pixels.
+    '& > svg': { flexShrink: 0 },
   },
   range: { display: 'flex', flexDirection: 'column', gap: cg.space[1] },
   rangeLabel: { margin: 0, fontSize: tokens.fontSizeBase200, color: cg.textMuted },
@@ -100,6 +102,21 @@ function trendJudgement(
   if (!definition) return null;
   const up = direction === 'up';
   return up === definition.higherIsBetter ? 'improving' : 'worsening';
+}
+
+/**
+ * The trend line: the signed change followed by what it is compared with. Producers differ (the label is either the
+ * comparison on its own, "vs previous run", or the whole phrase, "+63.1 points compared with ..."), so a label that
+ * already starts with the change is shown as it is and the number is never printed twice.
+ */
+export function trendText(trend: { delta: number; label: string }): string {
+  const change = formatNumber(trend.delta, { signed: true, maximumFractionDigits: 2 });
+  const plain = (text: string): string => text.replace(/\u2212/g, '-').trimStart();
+  const label = plain(trend.label);
+  const start = plain(change);
+  // "+6" begins "+63 points" too: the label counts as already carrying the change only when the number ends there.
+  const repeated = label.startsWith(start) && !/^[\d.,]/.test(label.slice(start.length));
+  return repeated ? trend.label : `${change} ${trend.label}`;
 }
 
 export interface MetricCardProps {
@@ -184,10 +201,7 @@ export function MetricCard({ metric, headingLevel = 3, className }: MetricCardPr
       {metric.trend ? (
         <span className={styles.trend} style={{ color: trendTone }}>
           <TrendIcon aria-hidden="true" />
-          <span>
-            {formatNumber(metric.trend.delta, { signed: true, maximumFractionDigits: 2 })}{' '}
-            {metric.trend.label}
-          </span>
+          <span>{trendText(metric.trend)}</span>
           {judgement ? <VisuallyHidden>({judgement})</VisuallyHidden> : null}
         </span>
       ) : null}
