@@ -25,6 +25,7 @@ import {
   useAsOfCursor,
 } from '../../components/case/as-of';
 import { caseTimeRange, useKnownAt } from '../../components/case/case-hooks';
+import { CaseNotFoundState } from '../../components/case/CaseNotFoundState';
 import { LinkButton } from '../../components/common/LinkButton';
 import { QueryBoundary } from '../../components/common/QueryBoundary';
 import { QueryErrorState } from '../../components/common/QueryErrorState';
@@ -305,6 +306,9 @@ export function HypothesisArenaPage({ caseId }: { caseId: string }) {
     if (known.isError) void known.refetch();
   };
   const wholeRecord = (): void => setAsOf(null);
+
+  // A case that does not exist has nothing to wait for and nothing to retry: say so, instead of failing on each read.
+  if (caseQuery.isError && caseQuery.error.isNotFound) return <CaseNotFoundState />;
 
   return (
     <>

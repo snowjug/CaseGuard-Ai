@@ -18,6 +18,7 @@ import {
 } from '@fluentui/react-icons';
 import { useMemo } from 'react';
 import { AsOfLimited, isRateLimited } from '../../components/case/as-of';
+import { CaseNotFoundState } from '../../components/case/CaseNotFoundState';
 import { LinkButton } from '../../components/common/LinkButton';
 import { QueryBoundary } from '../../components/common/QueryBoundary';
 import { QueryErrorState } from '../../components/common/QueryErrorState';
@@ -299,6 +300,9 @@ export function CounterfactualLabPage({ caseId }: { caseId: string }) {
   const caseQuery = useCaseDetail(caseId);
   const forks = useForkList(caseId);
   const detail = caseQuery.data;
+
+  // A case that does not exist has nothing to wait for and nothing to retry: say so, instead of failing on each read.
+  if (caseQuery.isError && caseQuery.error.isNotFound) return <CaseNotFoundState />;
 
   return (
     <>

@@ -72,6 +72,11 @@ const tab = (name: string | RegExp) => screen.getByRole('tab', { name });
 const queryOf = (input: unknown): Record<string, string> =>
   (input as { query?: Record<string, string> }).query ?? {};
 
+/** The API's answer for a case (or anything of it) that does not exist. */
+const missing = (): never => {
+  throw new ApiError({ status: 404, code: 'not_found', title: 'Not found' });
+};
+
 // A gated button is replaced by a plain one when the permission check settles, so it is looked up again each time.
 async function ready(
   name: string | RegExp,
@@ -1646,6 +1651,34 @@ describe('[FR-CF-11] Counterfactual Lab states', () => {
     );
     expect(await screen.findByText('You do not have access to this')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Retry/ })).toBeNull();
+  });
+
+  it('says the case cannot be found, with a way back and no Retry, when it does not exist', async () => {
+    renderApp(<CounterfactualLabPage caseId="case_gone" />, {
+      api: api({ 'cases.get': missing, 'forks.list': missing, 'counterfactuals.list': missing }),
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'We could not find that case' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Browse cases' })).toHaveAttribute('href', '/cases');
+    // Not the generic failure of the page, whose Retry could never succeed, and none of the Lab around it.
+    expect(screen.queryByText('The Counterfactual Lab could not be loaded')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Retry/ })).toBeNull();
+    expect(screen.queryByText('Simulation, not history')).toBeNull();
+    expect(screen.queryByRole('list', { name: 'Decision forks in time order' })).toBeNull();
+    // Nothing is left busy: a screen reader would otherwise announce a page that is loading for ever.
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+  });
+
+  it('does not wait for the forks of a case that does not exist', async () => {
+    renderApp(<CounterfactualLabPage caseId="case_gone" />, {
+      api: api({ 'cases.get': missing, 'forks.list': () => new Promise<never>(() => undefined) }),
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'We could not find that case' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Loading the decision forks/)).toBeNull();
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
   });
 
   it('asks for an identity instead of failing when nobody is signed in', async () => {

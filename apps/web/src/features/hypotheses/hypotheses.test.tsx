@@ -53,6 +53,11 @@ const asOfOf = (input: unknown): string | null =>
 const rankingReads = (handler: ReturnType<typeof api>): number =>
   handler.call.mock.calls.filter(([route]) => route === 'actionValue.rank').length;
 
+/** The API's answer for a case (or anything of it) that does not exist. */
+const missing = (): never => {
+  throw new ApiError({ status: 404, code: 'not_found', title: 'Not found' });
+};
+
 function api(overrides: FakeHandlers = {}, role: 'reviewer' | 'engineer' = 'reviewer') {
   return fakeApi({
     'session.me': () =>
@@ -1368,6 +1373,45 @@ describe('[FR-HY-04] Hypothesis Arena states', () => {
     );
     expect(await screen.findByText('You do not have access to this')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Retry/ })).toBeNull();
+  });
+
+  it('says the case cannot be found, with a way back and no Retry, when it does not exist', async () => {
+    const { container } = renderApp(<HypothesisArenaPage caseId="case_gone" />, {
+      api: api({
+        'cases.get': missing,
+        'hypotheses.list': missing,
+        'forks.list': missing,
+        'actions.list': missing,
+        'actionValue.rank': missing,
+        'timeline.get': missing,
+      }),
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'We could not find that case' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Browse cases' })).toHaveAttribute('href', '/cases');
+    // Not the generic failure of the page, whose Retry could never succeed.
+    expect(screen.queryByText('The Hypothesis Arena could not be loaded')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Retry/ })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Next best action' })).toBeNull();
+    expect(screen.queryByText(/Loading the confidence chart/)).toBeNull();
+    // Nothing is left busy: a screen reader would otherwise announce a page that is loading for ever.
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+    await expectNoAxeViolations(container);
+  });
+
+  it('does not wait for the hypotheses of a case that does not exist', async () => {
+    renderApp(<HypothesisArenaPage caseId="case_gone" />, {
+      api: api({
+        'cases.get': missing,
+        'hypotheses.list': () => new Promise<never>(() => undefined),
+      }),
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'We could not find that case' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Loading the confidence chart/)).toBeNull();
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
   });
 
   it('asks for an identity instead of failing when nobody is signed in', async () => {
