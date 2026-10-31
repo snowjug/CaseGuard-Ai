@@ -34,6 +34,8 @@ export default tseslint.config(
           // TypeScript's built-in defaults (which have no modern lib, no JSON imports). `e2e/` has its own tsconfig.
           defaultProject: 'tsconfig.base.json',
           allowDefaultProject: ['*.mjs', 'scripts/*.mjs', 'scripts/*.ts', '*.config.ts'],
+          // The scripts and the root configs are a few dozen files; the default allows eight.
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 32,
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -94,6 +96,8 @@ export default tseslint.config(
     rules: {
       ...nextPlugin.configs.recommended.rules,
       ...nextPlugin.configs['core-web-vitals'].rules,
+      // The app uses the App Router only: there is no `pages` directory for this rule to compare links with.
+      '@next/next/no-html-link-for-pages': 'off',
     },
   },
   {
