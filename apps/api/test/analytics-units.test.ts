@@ -239,6 +239,8 @@ describe('[FR-AN-01] quality analytics', () => {
         name: 'Skill skill_pub',
         applications: 1,
         timeToDiagnosisDeltaPct: 50,
+        // This fixture carries no comparison with the case the skill came from, so the simulated baseline is the basis.
+        timeToDiagnosisBasis: 'simulated_baseline',
         synthetic: true,
       },
     ]);
