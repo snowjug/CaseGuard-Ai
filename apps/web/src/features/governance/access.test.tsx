@@ -1,8 +1,8 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoAxeViolations, renderApp } from '../../../test/harness';
-import { navigateTo } from '../../../test/next-navigation';
+import { navigateTo, setNavigationLatency } from '../../../test/next-navigation';
 import {
   T0,
   USER_ROSTER,
@@ -325,6 +325,99 @@ describe('[FR-GOV-31] audit log', () => {
     await user.click(screen.getAllByRole('button', { name: 'Clear filters' })[0] as HTMLElement);
     expect(await screen.findByRole('list', { name: /Audit events, 1 shown/ })).toBeVisible();
     expect(window.location.search).toBe('?tab=audit');
+  });
+
+  describe('typing in the filters', () => {
+    const pause = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+    const auditQueries = (fake: ReturnType<typeof api>): Record<string, unknown>[] =>
+      fake.call.mock.calls.filter((call) => call[0] === 'governance.audit').map(queryOf);
+    const lastAuditQuery = (fake: ReturnType<typeof api>): Record<string, unknown> | undefined =>
+      auditQueries(fake).at(-1);
+
+    it('keeps every character typed with no pause, however late the address is reported back', async () => {
+      const user = userEvent.setup({ delay: null });
+      open('audit');
+      setNavigationLatency(5);
+      const fake = api({ 'governance.audit': () => auditPage([auditEvent()]) });
+      renderApp(<GovernancePage />, { api: fake });
+      await screen.findByRole('list', { name: /Audit events, 1 shown/ });
+      const action = screen.getByLabelText('Action');
+      await user.click(action);
+      for (const [index, char] of [...'skill'].entries()) {
+        await user.keyboard(char);
+        expect(action).toHaveValue('skill'.slice(0, index + 1));
+      }
+      const actor = screen.getByLabelText('Actor id');
+      await user.click(actor);
+      for (const [index, char] of [...'user_a'].entries()) {
+        await user.keyboard(char);
+        expect(actor).toHaveValue('user_a'.slice(0, index + 1));
+      }
+      await waitFor(() => expect(window.location.search).toBe('?tab=audit&act=skill&actor=user_a'));
+      await waitFor(
+        () =>
+          expect(lastAuditQuery(fake)).toEqual({ limit: 50, action: 'skill', actorId: 'user_a' }),
+        { timeout: 5000 },
+      );
+      await pause(60);
+      expect(action).toHaveValue('skill');
+      expect(actor).toHaveValue('user_a');
+    });
+
+    it('keeps a date as it was entered while the address is reported back late', async () => {
+      open('audit');
+      setNavigationLatency(5);
+      const fake = api({ 'governance.audit': () => auditPage([auditEvent()]) });
+      renderApp(<GovernancePage />, { api: fake });
+      await screen.findByRole('list', { name: /Audit events, 1 shown/ });
+      const from = screen.getByLabelText('From (UTC date)');
+      fireEvent.change(from, { target: { value: '2025-03-14' } });
+      expect(from).toHaveValue('2025-03-14');
+      await waitFor(() => expect(window.location.search).toContain('afrom=2025-03-14'));
+      await pause(60);
+      expect(from).toHaveValue('2025-03-14');
+      await waitFor(
+        () => expect(lastAuditQuery(fake)).toEqual({ limit: 50, from: '2025-03-14T00:00:00.000Z' }),
+        { timeout: 5000 },
+      );
+    });
+
+    it('empties every filter with Clear filters, also before the typing was written', async () => {
+      const user = userEvent.setup({ delay: null });
+      open('audit');
+      setNavigationLatency(5);
+      const fake = api({ 'governance.audit': () => auditPage([auditEvent()]) });
+      renderApp(<GovernancePage />, { api: fake });
+      await screen.findByRole('list', { name: /Audit events, 1 shown/ });
+      await user.type(screen.getByLabelText('Actor id'), 'user_a');
+      await user.click(screen.getAllByRole('button', { name: 'Clear filters' })[0] as HTMLElement);
+      expect(screen.getByLabelText('Actor id')).toHaveValue('');
+      await waitFor(() => expect(window.location.search).toBe('?tab=audit'));
+      await pause(500);
+      expect(screen.getByLabelText('Actor id')).toHaveValue('');
+      expect(window.location.search).toBe('?tab=audit');
+      expect(lastAuditQuery(fake)).toEqual({ limit: 50 });
+    });
+
+    it('neither queries nor changes the address for the partial text of an IME composition', async () => {
+      open('audit');
+      const fake = api({ 'governance.audit': () => auditPage([auditEvent()]) });
+      renderApp(<GovernancePage />, { api: fake });
+      await screen.findByRole('list', { name: /Audit events, 1 shown/ });
+      const action = screen.getByLabelText('Action');
+      fireEvent.compositionStart(action);
+      fireEvent.change(action, { target: { value: 'ni' } });
+      expect(action).toHaveValue('ni');
+      await pause(700);
+      expect(window.location.search).toBe('?tab=audit');
+      expect(lastAuditQuery(fake)).toEqual({ limit: 50 });
+      fireEvent.change(action, { target: { value: '你好' } });
+      fireEvent.compositionEnd(action);
+      await waitFor(() => expect(lastAuditQuery(fake)).toEqual({ limit: 50, action: '你好' }), {
+        timeout: 5000,
+      });
+      expect(new URLSearchParams(window.location.search).get('act')).toBe('你好');
+    });
   });
 
   it('loads the next page with the cursor the API returned', async () => {

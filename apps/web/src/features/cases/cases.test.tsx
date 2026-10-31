@@ -1,4 +1,4 @@
-import { configure, screen, waitFor, within } from '@testing-library/react';
+import { act, configure, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { caseSummary, session } from '../../../test/fixtures';
@@ -8,7 +8,7 @@ import {
   renderApp,
   type FakeHandlers,
 } from '../../../test/harness';
-import { navigateTo } from '../../../test/next-navigation';
+import { navigateTo, setNavigationLatency } from '../../../test/next-navigation';
 import { installMatchMedia } from '../../../test/media';
 import { ApiError } from '../../lib/api/errors';
 import { CasesPage } from './CasesPage';
@@ -334,6 +334,107 @@ describe('[FR-CASES-02] filters, sort and pagination live in the URL', () => {
     );
     expect(sortCodec.parse('nope.up')).toEqual({ columnId: 'opened', direction: 'descending' });
     expect(sortCodec.serialize({ columnId: 'opened', direction: 'descending' })).toBeNull();
+  });
+});
+
+describe('[FR-CASES-02] typing in the search box', () => {
+  /** The search text of each list request, in order (undefined: no search). */
+  const searchesOf = (handler: ReturnType<typeof api>): (string | undefined)[] =>
+    handler.call.mock.calls
+      .filter((call) => call[0] === 'cases.list')
+      .map((call) => (call[1] as { query?: { limit?: number; q?: string } }).query)
+      .filter((query) => query?.limit === 25)
+      .map((query) => query?.q);
+  const pause = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+  it('keeps every character typed with no pause, however late the address is reported back', async () => {
+    setNavigationLatency(5);
+    const user = userEvent.setup({ delay: null });
+    const handler = api();
+    renderApp(<CasesPage />, { api: handler });
+    const box = await screen.findByRole('searchbox');
+    await user.click(box);
+    for (const [index, char] of [...'xyz'].entries()) {
+      await user.keyboard(char);
+      expect(box).toHaveValue('xyz'.slice(0, index + 1));
+    }
+    await waitFor(() => expect(window.location.search).toBe('?q=xyz'));
+    await waitFor(() => expect(searchesOf(handler)).toEqual([undefined, 'xyz']));
+    await pause(60);
+    expect(box).toHaveValue('xyz');
+    expect(window.location.search).toBe('?q=xyz');
+  });
+
+  it('empties the box and the address with Clear filters, also before the typing was written', async () => {
+    setNavigationLatency(5);
+    const user = userEvent.setup({ delay: null });
+    const handler = api();
+    renderApp(<CasesPage />, { api: handler });
+    const box = await screen.findByRole('searchbox');
+    await user.type(box, 'proxy');
+    await user.click(screen.getAllByRole('button', { name: 'Clear filters' })[0] as HTMLElement);
+    expect(box).toHaveValue('');
+    await waitFor(() => expect(window.location.search).toBe(''));
+    await pause(400);
+    expect(box).toHaveValue('');
+    expect(window.location.search).toBe('');
+    expect(searchesOf(handler)).toEqual([undefined]);
+  });
+
+  it('keeps the search box on screen while a search that found nothing is cleared and the full list is on its way', async () => {
+    navigateTo('/cases?q=zzz');
+    const user = userEvent.setup({ delay: null });
+    const handler = api({
+      'cases.list': (input) => {
+        const query = (input as { query?: { limit?: number; q?: string } }).query;
+        if (query?.limit !== 25) return { items: [two, one], nextCursor: null };
+        // The unfiltered list never arrives: the answer of the search that found nothing stays on screen.
+        return query.q === undefined
+          ? new Promise<never>(() => undefined)
+          : { items: [], nextCursor: null };
+      },
+    });
+    renderApp(<CasesPage />, { api: handler });
+    expect(
+      await screen.findByRole('heading', { name: 'No cases match these filters' }),
+    ).toBeInTheDocument();
+    const box = screen.getByRole('searchbox');
+    await user.clear(box);
+    expect(box).toHaveValue('');
+    expect(screen.getByRole('searchbox')).toBe(box);
+    await waitFor(() => expect(searchesOf(handler)).toEqual(['zzz', undefined]));
+    await pause(100);
+    expect(screen.getByRole('searchbox')).toBe(box);
+    expect(screen.queryByRole('heading', { name: 'No cases yet' })).toBeNull();
+    await user.type(box, 'abc');
+    expect(box).toHaveValue('abc');
+  });
+
+  it('follows the address when it changes for another reason, such as a link or Back', async () => {
+    navigateTo('/cases?q=proxy');
+    const handler = api();
+    renderApp(<CasesPage />, { api: handler });
+    const box = await screen.findByRole('searchbox');
+    expect(box).toHaveValue('proxy');
+    act(() => navigateTo('/cases?q=dns'));
+    expect(box).toHaveValue('dns');
+    await waitFor(() => expect(searchesOf(handler)).toEqual(['proxy', 'dns']));
+  });
+
+  it('neither searches nor changes the address for the partial text of an IME composition', async () => {
+    const handler = api();
+    renderApp(<CasesPage />, { api: handler });
+    const box = await screen.findByRole('searchbox');
+    fireEvent.compositionStart(box);
+    fireEvent.change(box, { target: { value: 'ni' } });
+    expect(box).toHaveValue('ni');
+    await pause(500);
+    expect(window.location.search).toBe('');
+    expect(searchesOf(handler)).toEqual([undefined]);
+    fireEvent.change(box, { target: { value: '你好' } });
+    fireEvent.compositionEnd(box);
+    await waitFor(() => expect(searchesOf(handler)).toEqual([undefined, '你好']));
+    expect(new URLSearchParams(window.location.search).get('q')).toBe('你好');
   });
 });
 

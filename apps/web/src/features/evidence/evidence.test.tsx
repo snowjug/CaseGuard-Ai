@@ -1,5 +1,5 @@
 import { formatDateTimeUtc } from '@caseguard/ui';
-import { configure, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, configure, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -25,7 +25,7 @@ import {
 import { installNearEndObserver } from '../../../test/intersection';
 import { liveRegionOf } from '../../../test/live-region';
 import { installMatchMedia } from '../../../test/media';
-import { navigateTo } from '../../../test/next-navigation';
+import { navigateTo, setNavigationLatency } from '../../../test/next-navigation';
 import { ApiError } from '../../lib/api/errors';
 import { EvidenceLedgerPage } from './EvidenceLedgerPage';
 import {
@@ -275,6 +275,73 @@ describe('[FR-LEDGER-02] filters live in the URL', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('The analysis found no claims in this case.')).toBeInTheDocument();
     expect(screen.getByText('Nothing is required at this point in the case.')).toBeInTheDocument();
+  });
+});
+
+describe('[FR-LEDGER-02] typing in the search box', () => {
+  const pause = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+  const searchBox = (): HTMLElement => screen.getByRole('searchbox', { name: 'Search claims' });
+
+  it('keeps every character typed with no pause, however late the address is reported back', async () => {
+    setNavigationLatency(5);
+    const user = userEvent.setup({ delay: null });
+    const handler = api();
+    renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: handler });
+    await screen.findByRole('list', { name: 'Claims, 2 shown' });
+    const box = searchBox();
+    await user.click(box);
+    for (const [index, char] of [...'xyz'].entries()) {
+      await user.keyboard(char);
+      expect(box).toHaveValue('xyz'.slice(0, index + 1));
+    }
+    await waitFor(() => expect(param('q')).toBe('xyz'));
+    await waitFor(() => expect(lastQuery(handler)).toEqual({ limit: 100, q: 'xyz' }));
+    await pause(60);
+    expect(box).toHaveValue('xyz');
+    expect(param('q')).toBe('xyz');
+  });
+
+  it('empties the box with Clear filters, also before the typing was written', async () => {
+    setNavigationLatency(5);
+    const user = userEvent.setup({ delay: null });
+    const handler = api();
+    renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: handler });
+    await screen.findByRole('list', { name: 'Claims, 2 shown' });
+    await user.type(searchBox(), 'proxy');
+    await user.click(screen.getAllByRole('button', { name: 'Clear filters' })[0] as HTMLElement);
+    expect(searchBox()).toHaveValue('');
+    await waitFor(() => expect(window.location.search).toBe(''));
+    await pause(400);
+    expect(searchBox()).toHaveValue('');
+    expect(lastQuery(handler)).toEqual({ limit: 100 });
+  });
+
+  it('follows the address when it changes for another reason, such as a link or Back', async () => {
+    navigateTo('/cases/case_1/evidence?q=proxy');
+    const handler = api();
+    renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: handler });
+    await screen.findByRole('list', { name: 'Claims, 2 shown' });
+    expect(searchBox()).toHaveValue('proxy');
+    act(() => navigateTo('/cases/case_1/evidence?q=dns'));
+    expect(searchBox()).toHaveValue('dns');
+    await waitFor(() => expect(lastQuery(handler)).toEqual({ limit: 100, q: 'dns' }));
+  });
+
+  it('neither searches nor changes the address for the partial text of an IME composition', async () => {
+    const handler = api();
+    renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: handler });
+    await screen.findByRole('list', { name: 'Claims, 2 shown' });
+    const box = searchBox();
+    fireEvent.compositionStart(box);
+    fireEvent.change(box, { target: { value: 'ni' } });
+    expect(box).toHaveValue('ni');
+    await pause(500);
+    expect(window.location.search).toBe('');
+    expect(lastQuery(handler)).toEqual({ limit: 100 });
+    fireEvent.change(box, { target: { value: '你好' } });
+    fireEvent.compositionEnd(box);
+    await waitFor(() => expect(lastQuery(handler)).toEqual({ limit: 100, q: '你好' }));
+    expect(param('q')).toBe('你好');
   });
 });
 

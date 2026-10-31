@@ -44,7 +44,7 @@ import { useApiPages } from '../../lib/api/pages';
 import { useAuth } from '../../lib/auth/context';
 import { caseHref } from '../../lib/deep-links';
 import { useDebouncedValue } from '../../lib/use-debounced-value';
-import { useSelectionState, useUrlStates } from '../../lib/url-state';
+import { useSelectionState, useUrlStates, useUrlTextState } from '../../lib/url-state';
 import { VirtualRow, useNearEnd, useWindowVirtualizer } from '../../lib/virtual-list';
 import { CategoryTiles } from './CategoryTiles';
 import { ClaimDetail, ClaimMissing } from './ClaimDetail';
@@ -147,7 +147,10 @@ export function EvidenceLedgerPage({ caseId }: { caseId: string }) {
   const { asOf, setAsOf } = cursor;
   const [selected, select] = useSelectionState();
   const [filters, update] = useUrlStates(LEDGER_FILTERS);
-  const { category, review, hyp, q } = filters;
+  const { category, review, hyp } = filters;
+  // The search text is typed, so it lives in the field and reaches the URL when typing pauses (see `useUrlTextState`).
+  const searchField = useUrlTextState('q', LEDGER_FILTERS.q);
+  const q = searchField.value;
   const search = useDebouncedValue(q.trim(), 300);
   const detail = useCaseDetail(caseId);
 
@@ -245,7 +248,10 @@ export function EvidenceLedgerPage({ caseId }: { caseId: string }) {
   const sentinel = useNearEnd(Boolean(hasNextPage), loadNext);
 
   const activeCount = activeLedgerFilters(values);
-  const clearFilters = (): void => update({ category: 'all', review: 'all', hyp: null, q: '' });
+  const clearFilters = (): void => {
+    searchField.set('');
+    update({ category: 'all', review: 'all', hyp: null });
+  };
   const known = useKnownAt(caseId, asOf, cursor.ready);
   const knownSummary = known.data
     ? {
@@ -466,12 +472,11 @@ export function EvidenceLedgerPage({ caseId }: { caseId: string }) {
               >
                 <Field label="Search claims" className={styles.search}>
                   <Input
+                    {...searchField.inputProps}
                     type="search"
-                    value={q}
                     placeholder="Words in the claim or its subject"
                     contentBefore={<SearchRegular aria-hidden="true" />}
                     maxLength={200}
-                    onChange={(_event, next) => update({ q: next.value })}
                   />
                 </Field>
                 <Field label="Review state" className={styles.field}>

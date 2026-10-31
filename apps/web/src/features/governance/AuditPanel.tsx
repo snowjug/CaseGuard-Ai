@@ -23,7 +23,7 @@ import { useAuth } from '../../lib/auth/context';
 import { caseHref } from '../../lib/deep-links';
 import { shortId } from '../../lib/format';
 import { useDebouncedValue } from '../../lib/use-debounced-value';
-import { useUrlStates } from '../../lib/url-state';
+import { useUrlStates, useUrlTextState } from '../../lib/url-state';
 import { VirtualRow, useWindowVirtualizer } from '../../lib/virtual-list';
 import {
   AUDIT_FILTERS,
@@ -240,9 +240,21 @@ export function AuditPanel() {
   const auth = useAuth();
   const ready = auth.status === 'ready';
   const [filters, update] = useUrlStates(AUDIT_FILTERS);
+  // The text and date filters are typed, so each lives in its field and reaches the URL from there (see
+  // `useUrlTextState`); a date is complete when it changes, so it is written at once.
+  const actionField = useUrlTextState('act', AUDIT_FILTERS.act);
+  const actorField = useUrlTextState('actor', AUDIT_FILTERS.actor);
+  const fromField = useUrlTextState('afrom', AUDIT_FILTERS.afrom, { delayMs: 0 });
+  const toField = useUrlTextState('ato', AUDIT_FILTERS.ato, { delayMs: 0 });
   const listId = useId();
-  const values: AuditFilterValues = filters;
-  // Text filters update the URL at once but only query after typing pauses, so each keystroke is not an audited read.
+  const values: AuditFilterValues = {
+    ...filters,
+    act: actionField.value,
+    actor: actorField.value,
+    afrom: fromField.value,
+    ato: toField.value,
+  };
+  // Text filters query only after typing pauses, so each keystroke is not an audited read.
   const debouncedAction = useDebouncedValue(values.act, 400);
   const debouncedActor = useDebouncedValue(values.actor, 400);
   const pages = useApiPages(
@@ -263,8 +275,10 @@ export function AuditPanel() {
   const sentinel = useAutoLoadNext(pages);
 
   const active = activeAuditFilters(values);
-  const clear = (): void =>
-    update({ act: '', actor: '', acase: null, aout: 'all', afrom: '', ato: '' });
+  const clear = (): void => {
+    for (const field of [actionField, actorField, fromField, toField]) field.set('');
+    update({ acase: null, aout: 'all' });
+  };
   const boundary = pagedBoundary(pages);
   const suggestions = useMemo(
     () => [...new Set([...KNOWN_AUDIT_ACTIONS, ...events.map((event) => event.action)])].sort(),
@@ -302,11 +316,10 @@ export function AuditPanel() {
         >
           <Field label="Action" className={styles.wide}>
             <Input
-              value={values.act}
+              {...actionField.inputProps}
               list={listId}
               maxLength={80}
               placeholder="For example skill.published"
-              onChange={(_event, data) => update({ act: data.value })}
             />
           </Field>
           <datalist id={listId}>
@@ -315,12 +328,7 @@ export function AuditPanel() {
             ))}
           </datalist>
           <Field label="Actor id" className={styles.field}>
-            <Input
-              value={values.actor}
-              maxLength={120}
-              placeholder="user_alex_admin"
-              onChange={(_event, data) => update({ actor: data.value })}
-            />
+            <Input {...actorField.inputProps} maxLength={120} placeholder="user_alex_admin" />
           </Field>
           <Field label="Outcome" className={styles.field}>
             <Select
@@ -345,18 +353,10 @@ export function AuditPanel() {
             />
           </Field>
           <Field label="From (UTC date)" className={styles.field}>
-            <Input
-              type="date"
-              value={values.afrom}
-              onChange={(_event, data) => update({ afrom: data.value })}
-            />
+            <Input type="date" {...fromField.inputProps} />
           </Field>
           <Field label="To (UTC date)" className={styles.field}>
-            <Input
-              type="date"
-              value={values.ato}
-              onChange={(_event, data) => update({ ato: data.value })}
-            />
+            <Input type="date" {...toField.inputProps} />
           </Field>
           <Button appearance="subtle" disabled={active === 0} onClick={clear}>
             Clear filters

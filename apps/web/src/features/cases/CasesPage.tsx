@@ -29,7 +29,7 @@ import { pagedBoundary, useApiPages } from '../../lib/api/pages';
 import { useAuth } from '../../lib/auth/context';
 import { GatedAction, useSession } from '../../lib/auth/session';
 import { useDebouncedValue } from '../../lib/use-debounced-value';
-import { useUrlStates } from '../../lib/url-state';
+import { useUrlStates, useUrlTextState } from '../../lib/url-state';
 import {
   CASE_FILTERS,
   DATA_FILTERS,
@@ -145,8 +145,11 @@ export function CasesPage() {
   const auth = useAuth();
   const compact = useMediaQuery('(max-width: 1279px)');
   const [filters, update] = useUrlStates(CASE_FILTERS);
-  const search = useDebouncedValue(filters.q.trim(), 300);
-  const { q, state, status, workload, data: dataFilter, sort } = filters;
+  // The search text is typed, so it lives in the field and reaches the URL when typing pauses (see `useUrlTextState`).
+  const searchField = useUrlTextState('q', CASE_FILTERS.q);
+  const q = searchField.value;
+  const search = useDebouncedValue(q.trim(), 300);
+  const { state, status, workload, data: dataFilter, sort } = filters;
   const params = useMemo(
     () => serverQuery({ q, state, status, workload, data: dataFilter }, search),
     [q, state, status, workload, dataFilter, search],
@@ -169,14 +172,18 @@ export function CasesPage() {
   }, [everyCase.data, workload]);
 
   const active = hasActiveFilters({ q, state, status, workload, data: dataFilter });
+  // What the answer on screen was asked for: the search text is sent after a pause, the other filters at once.
+  const asked = hasActiveFilters({ q: search, state, status, workload, data: dataFilter });
   const loaded = useMemo(() => pages.data?.pages.flatMap((page) => page.items) ?? [], [pages.data]);
   const visible = useMemo(
     () => loaded.filter((item) => matchesDataFilter(item, dataFilter)),
     [loaded, dataFilter],
   );
 
-  const clearFilters = (): void =>
-    update({ q: '', state: 'all', status: 'all', workload: '', data: 'all' });
+  const clearFilters = (): void => {
+    searchField.set('');
+    update({ state: 'all', status: 'all', workload: '', data: 'all' });
+  };
   const changeSort = (next: SortState | null): void => update({ sort: next ?? DEFAULT_SORT });
 
   return (
@@ -207,7 +214,11 @@ export function CasesPage() {
         query={pagedBoundary(pages)}
         subject="The case list"
         skeleton={<CasesSkeleton />}
-        isEmpty={(value) => !active && (value.pages[0]?.items.length ?? 0) === 0}
+        // "No cases yet" is for the answer to an unfiltered request. While the answer of a search that found nothing is
+        // still on screen (just cleared, the full list on its way) the form must stay, or it is gone while typing.
+        isEmpty={(value) =>
+          !asked && !pages.isPlaceholderData && (value.pages[0]?.items.length ?? 0) === 0
+        }
         empty={<NoCases />}
       >
         {(_data, meta) => (
@@ -220,12 +231,11 @@ export function CasesPage() {
             >
               <Field label="Search" className={styles.search}>
                 <Input
+                  {...searchField.inputProps}
                   type="search"
-                  value={q}
                   placeholder="Reference, title, product or customer"
                   contentBefore={<SearchRegular aria-hidden="true" />}
                   maxLength={200}
-                  onChange={(_event, next) => update({ q: next.value })}
                 />
               </Field>
               <Field label="Analysis state" className={styles.field}>

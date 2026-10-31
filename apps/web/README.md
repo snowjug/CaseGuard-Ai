@@ -143,12 +143,30 @@ Rules of thumb:
    const [tab, setTab] = useTabState(['all', 'gaps'] as const, 'all'); // ?tab=
    const [filters, update] = useUrlStates({
      status: codecs.enumOf(STATUSES, 'all'),
-     q: codecs.string(),
+     page: codecs.integer({ fallback: 1, min: 1 }),
    });
    ```
 
    Codecs are total (hostile input falls back to the default) and defaults are omitted so URLs stay
    short. Updates use the History API: no full reload, no server round trip.
+
+   **Text a person types** (a search box, an id filter) is the exception: `useSearchParams` reports a
+   write a moment late, so an input whose value comes straight from the URL drops characters typed
+   quickly. Use `useUrlTextState` instead; it keeps the text in the field, writes it to the URL when
+   typing pauses (250 ms), on Enter and on blur, writes nothing while an IME composition is in
+   progress, and follows the URL again only when it changed for another reason (Back, a link, Clear
+   filters):
+
+   ```tsx
+   const SEARCH = boundedString(200); // at module level: one codec for the life of the page
+   const search = useUrlTextState('q', SEARCH); // ?q=
+   const q = search.value; // what to request and to count as a filter (no IME text in progress)
+   <Input {...search.inputProps} type="search" />;
+   const clear = () => search.set(''); // text and URL together
+   ```
+
+   Tests make the router answer late with `setNavigationLatency(5)` (`test/next-navigation.ts`) and
+   type with `userEvent.setup({ delay: null })`.
 
 5. **Permissions** - deny by default through `useSession()`:
 

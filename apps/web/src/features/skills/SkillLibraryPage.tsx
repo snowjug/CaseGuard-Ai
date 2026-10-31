@@ -18,9 +18,9 @@ import { useActiveCase } from '../../lib/active-case';
 import { pagedBoundary, useApiPages } from '../../lib/api/pages';
 import { useAuth } from '../../lib/auth/context';
 import { caseHref } from '../../lib/deep-links';
-import { clipText } from '../../lib/text';
 import { useDebouncedValue } from '../../lib/use-debounced-value';
-import { codecs, useUrlStates } from '../../lib/url-state';
+import { boundedString } from '../../lib/url-codecs';
+import { codecs, useUrlStates, useUrlTextState } from '../../lib/url-state';
 import { useInsightStyles } from '../quality/styles';
 import { LIFECYCLE_MEANING } from './labels';
 import { SkillCard } from './SkillCard';
@@ -29,10 +29,10 @@ import { LibrarySkeleton } from './Skeleton';
 const LIFECYCLE_VALUES = ['all', ...SKILL_LIFECYCLE] as const;
 const FILTERS = {
   lifecycle: codecs.enumOf(LIFECYCLE_VALUES, 'all'),
-  q: codecs.string(),
 };
 const PAGE_SIZE = 25;
 const MAX_SEARCH = 200;
+const SEARCH = boundedString(MAX_SEARCH);
 
 const PAGE_HELP = (
   <>
@@ -81,7 +81,10 @@ function LibraryContent() {
   const styles = useInsightStyles();
   const auth = useAuth();
   const [filters, update] = useUrlStates(FILTERS);
-  const search = useDebouncedValue(clipText(filters.q.trim(), MAX_SEARCH), 300);
+  // The search text is typed, so it lives in the field and reaches the URL when typing pauses (see `useUrlTextState`).
+  const searchField = useUrlTextState('q', SEARCH);
+  const q = searchField.value;
+  const search = useDebouncedValue(q.trim(), 300);
   const params = useMemo(
     () => ({
       limit: PAGE_SIZE,
@@ -95,16 +98,25 @@ function LibraryContent() {
     { query: params },
     { enabled: auth.status === 'ready', placeholderData: keepPreviousData },
   );
-  const active = filters.lifecycle !== 'all' || filters.q.trim() !== '';
+  const active = filters.lifecycle !== 'all' || q.trim() !== '';
+  // What the answer on screen was asked for: the search text is sent after a pause, the lifecycle at once.
+  const asked = filters.lifecycle !== 'all' || search !== '';
   const skills = useMemo(() => pages.data?.pages.flatMap((page) => page.items) ?? [], [pages.data]);
-  const clear = (): void => update({ lifecycle: 'all', q: '' });
+  const clear = (): void => {
+    searchField.set('');
+    update({ lifecycle: 'all' });
+  };
 
   return (
     <QueryBoundary
       query={pagedBoundary(pages)}
       subject="The skill library"
       skeleton={<LibrarySkeleton />}
-      isEmpty={(value) => !active && (value.pages[0]?.items.length ?? 0) === 0}
+      // The empty library is for the answer to an unfiltered request. While the answer of a search that found nothing is
+      // still on screen (just cleared, the full list on its way) the form must stay, or it is gone while typing.
+      isEmpty={(value) =>
+        !asked && !pages.isPlaceholderData && (value.pages[0]?.items.length ?? 0) === 0
+      }
       empty={<EmptyLibrary />}
     >
       {(_data, meta) => (
@@ -117,12 +129,11 @@ function LibraryContent() {
           >
             <Field label="Search" className={styles.field}>
               <Input
+                {...searchField.inputProps}
                 type="search"
-                value={filters.q}
                 placeholder="Name, workload or description"
                 contentBefore={<SearchRegular aria-hidden="true" />}
                 maxLength={MAX_SEARCH}
-                onChange={(_event, next) => update({ q: next.value })}
               />
             </Field>
             <Field label="Lifecycle state" className={styles.field}>

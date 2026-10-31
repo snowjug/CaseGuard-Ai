@@ -1,5 +1,5 @@
 import { SYNTHETIC_EFFECTIVENESS_NOTICE, type Permission } from '@caseguard/schemas';
-import { configure, screen, waitFor, within } from '@testing-library/react';
+import { configure, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -12,7 +12,7 @@ import {
   type FakeApi,
   type FakeHandlers,
 } from '../../../test/harness';
-import { navigateTo } from '../../../test/next-navigation';
+import { navigateTo, setNavigationLatency } from '../../../test/next-navigation';
 import {
   OTHER_CASE_ID,
   PRECEDENT_BASIS,
@@ -114,6 +114,10 @@ function lifecycleApprovals() {
 
 const callsOf = (fake: FakeApi, routeId: string): unknown[] =>
   fake.call.mock.calls.filter(([id]) => id === routeId).map(([, input]): unknown => input);
+
+/** The search text of each library request, in order (undefined: no search). */
+const searchesOf = (fake: FakeApi): (string | undefined)[] =>
+  callsOf(fake, 'skills.list').map((input) => (input as { query: { q?: string } }).query.q);
 
 async function openDialog(button: HTMLElement, title: string): Promise<HTMLElement> {
   await userEvent.click(button);
@@ -357,6 +361,83 @@ describe('[FR-SK-02] SkillDNA Library', () => {
         timeout: 3000,
       },
     );
+  });
+
+  it('keeps every character typed with no pause, however late the address is reported back', async () => {
+    setNavigationLatency(5);
+    const user = userEvent.setup({ delay: null });
+    const fake = api();
+    renderApp(<SkillLibraryPage />, { api: fake });
+    await screen.findByRole('list', { name: 'Skills' });
+    const box = screen.getByRole('searchbox', { name: 'Search' });
+    await user.click(box);
+    for (const [index, char] of [...'xyz'].entries()) {
+      await user.keyboard(char);
+      expect(box).toHaveValue('xyz'.slice(0, index + 1));
+    }
+    await waitFor(() => expect(window.location.search).toBe('?q=xyz'));
+    await waitFor(() => expect(searchesOf(fake)).toEqual([undefined, 'xyz']));
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(box).toHaveValue('xyz');
+    expect(window.location.search).toBe('?q=xyz');
+  });
+
+  it('empties the box with Clear filters, also before the typing was written', async () => {
+    setNavigationLatency(5);
+    const user = userEvent.setup({ delay: null });
+    const fake = api();
+    renderApp(<SkillLibraryPage />, { api: fake });
+    await screen.findByRole('list', { name: 'Skills' });
+    const box = screen.getByRole('searchbox', { name: 'Search' });
+    await user.type(box, 'dns');
+    await user.click(
+      screen.getAllByRole('button', { name: 'Clear filters' }).at(-1) as HTMLElement,
+    );
+    expect(box).toHaveValue('');
+    await waitFor(() => expect(window.location.search).toBe(''));
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(box).toHaveValue('');
+    expect(searchesOf(fake)).toEqual([undefined]);
+  });
+
+  it('neither searches nor changes the address for the partial text of an IME composition', async () => {
+    const fake = api();
+    renderApp(<SkillLibraryPage />, { api: fake });
+    await screen.findByRole('list', { name: 'Skills' });
+    const box = screen.getByRole('searchbox', { name: 'Search' });
+    fireEvent.compositionStart(box);
+    fireEvent.change(box, { target: { value: 'ni' } });
+    expect(box).toHaveValue('ni');
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(window.location.search).toBe('');
+    expect(searchesOf(fake)).toEqual([undefined]);
+    fireEvent.change(box, { target: { value: '你好' } });
+    fireEvent.compositionEnd(box);
+    await waitFor(() => expect(searchesOf(fake)).toEqual([undefined, '你好']));
+    expect(new URLSearchParams(window.location.search).get('q')).toBe('你好');
+  });
+
+  it('keeps the search box on screen while a search that found nothing is cleared and the full list is on its way', async () => {
+    navigateTo('/skills?q=zzz');
+    const user = userEvent.setup({ delay: null });
+    const fake = api({
+      'skills.list': (input) =>
+        (input as { query: { q?: string } }).query.q === undefined
+          ? new Promise<never>(() => undefined)
+          : { items: [], nextCursor: null },
+    });
+    renderApp(<SkillLibraryPage />, { api: fake });
+    expect(await screen.findByText('No skill matches the filters')).toBeInTheDocument();
+    const box = screen.getByRole('searchbox', { name: 'Search' });
+    await user.clear(box);
+    expect(box).toHaveValue('');
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toBe(box);
+    await waitFor(() => expect(searchesOf(fake)).toEqual(['zzz', undefined]));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toBe(box);
+    expect(screen.queryByText('No skills yet')).toBeNull();
+    await user.type(box, 'abc');
+    expect(box).toHaveValue('abc');
   });
 
   it('opens with the filters of the address and offers to clear them when nothing matches', async () => {

@@ -1,7 +1,16 @@
 'use client';
 
 import { usePathname, useSearchParams } from 'next/navigation';
-import { useCallback, useMemo } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  type ChangeEvent,
+  type CompositionEvent,
+  type KeyboardEvent,
+} from 'react';
 
 /**
  * Shareable, typed URL query state for filters, `asOf`, selection and tabs. The URL is the source of truth, so every
@@ -108,7 +117,11 @@ export function writeUrlState(patch: Patch, history: 'replace' | 'push' = 'repla
   else window.history.replaceState(null, '', url);
 }
 
-/** One typed query parameter. The setter accepts a value or an updater and never triggers a full page load. */
+/**
+ * One typed query parameter. The setter accepts a value or an updater and never triggers a full page load. For text a
+ * person types into an input use `useUrlTextState`: the value here follows `useSearchParams`, which reports a write a
+ * moment late.
+ */
 export function useUrlState<T>(
   key: string,
   codec: UrlCodec<T>,
@@ -135,7 +148,8 @@ export type UrlValues<S extends Schema> = {
 
 /**
  * Several typed parameters at once (a filter bar). `update` changes any subset in one history operation, so
- * "set the status and reset the page cursor" is a single URL change.
+ * "set the status and reset the page cursor" is a single URL change. Text typed into an input is the exception: it
+ * belongs to `useUrlTextState`.
  */
 export function useUrlStates<S extends Schema>(
   schema: S,
@@ -161,6 +175,202 @@ export function useUrlStates<S extends Schema>(
     [schema, history],
   );
   return [values, update] as const;
+}
+
+/** Idle time after the last change before text typed into a field is written to the URL. */
+export const URL_TEXT_DELAY_MS = 250;
+
+export interface UrlTextOptions {
+  /**
+   * Idle time after the last change before the text is written to the URL (default 250 ms, trailing; `0` writes at every
+   * change). Pressing Enter, or leaving the field, writes at once.
+   */
+  delayMs?: number | undefined;
+}
+
+/** What to spread onto the text input (a Fluent `Input` or a native `<input>`). */
+export interface UrlTextProps {
+  value: string;
+  onChange: (event: ChangeEvent<HTMLInputElement>, data?: { value: string }) => void;
+  onBlur: () => void;
+  onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
+  onCompositionStart: () => void;
+  onCompositionEnd: (event: CompositionEvent<HTMLInputElement>) => void;
+}
+
+export interface UrlTextState {
+  /**
+   * The text of the field without an IME composition in progress: use it for the request and for "is a filter on".
+   * It is what was typed, which the URL never overwrites while it is being edited.
+   */
+  value: string;
+  inputProps: UrlTextProps;
+  /** Replaces the text and the URL at once (a programmatic change, not typing). */
+  set: (text: string) => void;
+}
+
+interface TextField {
+  /** What the input shows. */
+  text: string;
+  /** `text` without an IME composition in progress: what it was when the composition began. */
+  committed: string;
+  composing: boolean;
+  /** The URL value (raw) the field was last in step with. */
+  seen: string | null;
+  /** Text typed that has not reached the URL yet: waiting for the pause, or an IME composition in progress. */
+  dirty: boolean;
+  /** Values the field wrote to the URL whose arrival through `useSearchParams` has not been seen yet, oldest first. */
+  sent: readonly (string | null)[];
+}
+
+type TextAction =
+  | { type: 'type'; text: string }
+  | { type: 'compose'; composing: boolean }
+  | { type: 'written'; raw: string | null }
+  | { type: 'settled' }
+  | { type: 'url'; raw: string | null; text: string };
+
+const MAX_SENT = 8;
+
+function reduceText(state: TextField, action: TextAction): TextField {
+  switch (action.type) {
+    case 'type':
+      return {
+        ...state,
+        text: action.text,
+        committed: state.composing ? state.committed : action.text,
+        dirty: true,
+      };
+    case 'compose':
+      // Whatever the composition left in the field is committed when it ends (or the field loses focus).
+      return {
+        ...state,
+        composing: action.composing,
+        committed: action.composing ? state.committed : state.text,
+      };
+    case 'written':
+      return { ...state, dirty: false, sent: [...state.sent, action.raw].slice(-MAX_SENT) };
+    case 'settled':
+      return { ...state, dirty: false };
+    case 'url': {
+      // The field's own write coming back, however late: the text is already there, or further on.
+      const own = state.sent.indexOf(action.raw);
+      if (own >= 0) return { ...state, seen: action.raw, sent: state.sent.slice(own + 1) };
+      // Another reason (Back, a link, "Clear filters"): follow it, unless the person is typing, whose text stays.
+      if (state.dirty || state.composing) return { ...state, seen: action.raw, sent: [] };
+      return {
+        text: action.text,
+        committed: action.text,
+        composing: false,
+        seen: action.raw,
+        dirty: false,
+        sent: [],
+      };
+    }
+  }
+}
+
+/**
+ * A free-text parameter that a person types into (a search box, an id filter). `useUrlState` shows the URL's value,
+ * which `useSearchParams` reports a moment after each write, so a field built on it re-renders with the old value
+ * between two quick key presses and drops characters. This keeps the text in local state that the URL never overwrites
+ * while it is being edited, and writes it to the URL when typing pauses (`delayMs`), on Enter and when the field loses
+ * focus; an IME composition writes nothing until it ends. The text follows the URL again only when the URL changes for
+ * another reason (Back and Forward, a link, "Clear filters", a write elsewhere) and nothing typed is waiting to be
+ * written. Spread `inputProps` on the input and read `value` for everything else (the debounced request, whether a
+ * filter is active). The text is kept in the codec's canonical form, so a bounded codec bounds what is typed too.
+ * Selects, tabs and other choices are not typed: they stay on `useUrlState`/`useUrlStates`.
+ */
+export function useUrlTextState(
+  key: string,
+  codec: UrlCodec<string>,
+  options: UrlTextOptions = {},
+): UrlTextState {
+  const searchParams = useSearchParams();
+  const raw = searchParams.get(key);
+  const delayMs = options.delayMs ?? URL_TEXT_DELAY_MS;
+  const [field, dispatch] = useReducer(reduceText, undefined, (): TextField => {
+    const text = codec.parse(raw);
+    return { text, committed: text, composing: false, seen: raw, dirty: false, sent: [] };
+  });
+  if (field.seen !== raw) dispatch({ type: 'url', raw, text: codec.parse(raw) });
+
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const composing = useRef(false);
+  /** The text typed and not written yet, or null. */
+  const typed = useRef<string | null>(null);
+  // A pause that is still running when the page goes away must not write into whatever URL is shown by then.
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const write = useCallback(
+    (text: string): void => {
+      clearTimeout(timer.current);
+      timer.current = undefined;
+      typed.current = null;
+      const next = codec.serialize(text);
+      if (next === new URLSearchParams(window.location.search).get(key)) {
+        dispatch({ type: 'settled' });
+        return;
+      }
+      writeUrlState({ [key]: next });
+      dispatch({ type: 'written', raw: next });
+    },
+    [codec, key],
+  );
+
+  const compose = useCallback((on: boolean): void => {
+    composing.current = on;
+    dispatch({ type: 'compose', composing: on });
+    if (on) {
+      clearTimeout(timer.current);
+      timer.current = undefined;
+    }
+  }, []);
+
+  const edit = useCallback(
+    (input: string): void => {
+      const text = codec.parse(codec.serialize(input));
+      typed.current = text;
+      dispatch({ type: 'type', text });
+      clearTimeout(timer.current);
+      timer.current = undefined;
+      if (composing.current) return;
+      if (delayMs <= 0) write(text);
+      else timer.current = setTimeout(() => write(text), delayMs);
+    },
+    [codec, delayMs, write],
+  );
+
+  const flush = useCallback((): void => {
+    if (composing.current) compose(false);
+    if (typed.current !== null) write(typed.current);
+  }, [compose, write]);
+
+  const set = useCallback(
+    (input: string): void => {
+      if (composing.current) compose(false);
+      const text = codec.parse(codec.serialize(input));
+      dispatch({ type: 'type', text });
+      write(text);
+    },
+    [codec, compose, write],
+  );
+
+  const inputProps: UrlTextProps = {
+    value: field.text,
+    onChange: (event, data) => edit(data?.value ?? event.target.value),
+    onBlur: flush,
+    onKeyDown: (event) => {
+      // Enter that confirms an IME candidate is not a request to search.
+      if (event.key === 'Enter' && !composing.current && !event.nativeEvent.isComposing) flush();
+    },
+    onCompositionStart: () => compose(true),
+    onCompositionEnd: (event) => {
+      compose(false);
+      edit(event.currentTarget.value);
+    },
+  };
+  return { value: field.committed, inputProps, set };
 }
 
 const ASOF_CODEC = codecs.isoTimestamp();

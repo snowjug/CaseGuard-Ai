@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 import { installMatchMedia } from './media';
-import { navigateTo, patchHistory, router } from './next-navigation';
+import { navigateTo, patchHistory, router, setNavigationLatency } from './next-navigation';
 import { installWebStorage } from './storage';
 
 // `next/navigation` needs the App Router at runtime; tests use a history-backed fake (see test/next-navigation.ts).
@@ -42,6 +42,7 @@ new MutationObserver(() => {
 
 afterEach(() => {
   cleanup();
+  setNavigationLatency(0);
   navigateTo('/');
   clearCookies();
   window.localStorage.clear();
