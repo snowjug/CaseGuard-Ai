@@ -19,6 +19,7 @@ import {
   DialogSurface,
   DialogTitle,
   makeStyles,
+  mergeClasses,
   tokens,
 } from '@fluentui/react-components';
 import { DismissRegular, PersonWarningRegular } from '@fluentui/react-icons';
@@ -143,6 +144,8 @@ const useStyles = makeStyles({
   },
   name: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300 },
   meta: { color: cg.textSecondary, fontSize: tokens.fontSizeBase200 },
+  // The chosen persona is a filled (primary) button: the muted text colour has 1.4:1 contrast on it.
+  metaOnBrand: { color: 'inherit' },
   content: { display: 'flex', flexDirection: 'column', gap: cg.space[3] },
 });
 
@@ -209,22 +212,26 @@ export function PersonaPickerDialog() {
                   <p className={styles.meta}>{personas.data.notice}</p>
                 ) : null}
                 <ul className={styles.list} aria-label="Personas">
-                  {personas.data.items.map((persona: Persona) => (
-                    <li key={persona.id}>
-                      <Button
-                        className={styles.option}
-                        appearance={persona.id === dev.personaId ? 'primary' : 'outline'}
-                        aria-pressed={persona.id === dev.personaId}
-                        onClick={() => dev.selectPersona(persona.id)}
-                      >
-                        <span className={styles.name}>
-                          {persona.displayName} · {ROLE_LABELS[persona.role]}
-                        </span>
-                        <span className={styles.meta}>{persona.description}</span>
-                        <span className={styles.meta}>Tenant: {persona.tenantId}</span>
-                      </Button>
-                    </li>
-                  ))}
+                  {personas.data.items.map((persona: Persona) => {
+                    const chosen = persona.id === dev.personaId;
+                    const meta = mergeClasses(styles.meta, chosen && styles.metaOnBrand);
+                    return (
+                      <li key={persona.id}>
+                        <Button
+                          className={styles.option}
+                          appearance={chosen ? 'primary' : 'outline'}
+                          aria-pressed={chosen}
+                          onClick={() => dev.selectPersona(persona.id)}
+                        >
+                          <span className={styles.name}>
+                            {persona.displayName} · {ROLE_LABELS[persona.role]}
+                          </span>
+                          <span className={meta}>{persona.description}</span>
+                          <span className={meta}>Tenant: {persona.tenantId}</span>
+                        </Button>
+                      </li>
+                    );
+                  })}
                 </ul>
               </>
             ) : null}

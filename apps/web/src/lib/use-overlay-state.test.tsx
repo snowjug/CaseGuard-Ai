@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import { useOverlayState } from './use-overlay-state';
 
@@ -80,10 +80,12 @@ describe('[A11Y-FOCUS-01] an overlay gives focus back when it closes', () => {
   });
 
   it('leaves focus alone when it was opened with nothing focused (a shortcut on the bare page)', async () => {
-    let control: ((open: boolean) => void) | null = null;
+    const holder: { set: ((open: boolean) => void) | null } = { set: null };
     function Probe() {
       const [open, setOpen] = useOverlayState();
-      control = setOpen;
+      useEffect(() => {
+        holder.set = setOpen;
+      }, [setOpen]);
       return <p>{open ? 'open' : 'closed'}</p>;
     }
     render(
@@ -93,9 +95,9 @@ describe('[A11Y-FOCUS-01] an overlay gives focus back when it closes', () => {
       </>,
     );
     (document.activeElement as HTMLElement | null)?.blur();
-    act(() => control?.(true));
+    act(() => holder.set?.(true));
     expect(screen.getByText('open')).toBeInTheDocument();
-    act(() => control?.(false));
+    act(() => holder.set?.(false));
     await new Promise((resolve) => window.setTimeout(resolve, 10));
     expect(screen.getByText('closed')).toBeInTheDocument();
     expect(document.body).toHaveFocus();
