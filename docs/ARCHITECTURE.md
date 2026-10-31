@@ -298,7 +298,9 @@ Notes on the flow, each traced to code in `apps/api/src/services`:
 - **Analysis** (`services/analysis`): job stages `load`, `analyse`, `counterfactuals`, `assess`, `warnings`, `skills`, `agents`,
   `save`. The **input hash** covers the stored payload, pack id and version, action-value and quality configuration, the skill
   library, the engine version and the AI provider and model; identical input is not recomputed (the previous run is reused), and
-  `force` re-runs it. The engine seed is the input hash, so reruns reproduce. The counterfactual stage simulates up to 12 eligible
+  `force` re-runs it. The engine seed is `simulationSeed(inputs)`, a hash of the case content only (stored payload hash, event
+  count, resolved or not, pack): no generated id, and not the skill library, provider, configuration or engine version that
+  the input hash also covers, so reruns reproduce and the same content gives the same numbers in any database. The counterfactual stage simulates up to 12 eligible
   forks: the earliest meaningful fork with all three strategies, the others with `balanced`.
 - **Agents** run after the deterministic computation, validated and recorded. In the committed pipeline **model proposals are not
   merged**: every stored artefact comes from the engine ([AI_ORCHESTRATION.md](AI_ORCHESTRATION.md#8-how-the-api-binds-it-appsapisrcservicesai)).

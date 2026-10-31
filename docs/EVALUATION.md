@@ -112,38 +112,45 @@ baseline and a demonstration, not an independent test.**
 The numbers below come from a throw-away script (not committed) that calls the same public functions as the tests
 (`prepareCase`, `runDeterministicAnalysis`, `generateCounterfactuals`, `computeQualityReview`, `computeAvoidableEffort`,
 `replayWarnings`, the SkillDNA lifecycle) with the knowledge pack `kp.teams-authentication` v1.0.0 (9 hypotheses, 30 signals, 21
-actions, 13 requirements) and the seed `test-seed`. The API seeds the engine with the analysis input hash instead, so the
-**rollout-derived values** (counterfactual metrics and Avoidable Support Effort) can differ slightly there; forks, belief point
-estimates, Case Quality Index and warnings do not depend on the seed. The tests pin the qualitative facts (for example
+actions, 13 requirements). Since `ENGINE_VERSION` 2026.3.0 the **rollout-derived values** (counterfactual metrics and Avoidable
+Support Effort) are run with the seed the API itself derives for Case One (`simulationSeed`, a hash of the case content:
+`0c8e3c65…56f53`), so they are the figures the demo shows, and they do not depend on any generated id: two fresh databases with
+random production ids played the whole portfolio story and showed identical figures, and
+`apps/api/test/determinism-across-ids.int.test.ts` pins the same through two databases with different id spaces. Forks, belief
+point estimates, Case Quality Index and warnings do not depend
+on the seed at all. The tests pin the qualitative facts (for example
 `pipeline.test.ts`: 9 forks in Case One, exactly one earliest-meaningful fork and it is the first; `quality-index.test.ts`: Case One
 below the "adequate" band, Case Two "strong" and at least 85; `warnings-case-one.test.ts`: the replay raises the specific warnings
 and Case Two raises none).
 
-**Stability of these numbers.** The tables were produced by the first run of the script. I ran the same script again later in the
-same session; by then the working tree held other workstreams' **uncommitted** edits to the belief update, the decision-time
-views and the counterfactual code. Every headline value in section 3.1 was identical. Only decimals of
-secondary figures moved: the impact of six forks changed by 0.001 (`e08` 0.768, `e11` 0.634, `e13` 0.669, `e15` 0.610, `e16`
-0.618, `e19` 0.723), and for forks other than `e03` a few rollout figures moved by at most 1 percentage point in reach share, 0.005
-in comparison confidence and about 3 minutes in the p90 of simulated time. The `e03` scenarios did not change. The values below are
-the first run; treat the third decimal as noise between code states, not as a measurement. A third run of the same script, after the
-later engine commits (`ENGINE_VERSION` 2026.2.0 and 2026.2.1, and the SkillDNA gate and precedent changes), reproduced every headline
-value of section 3.1, the second run's decimals and the SkillDNA match of section 3.7; its probe timings were about 0.75 s for Case
-One and 21 ms for Case Two against 4.4 s and 36 ms in the first run, which shows how much the timings depend on load.
+**Stability of these numbers.** The tables were first produced with the fixed seed `test-seed`, and the script was run again twice
+as the engine changed. Until `ENGINE_VERSION` 2026.2.1 every headline value of section 3.1 was identical between runs, and only
+decimals of secondary figures moved (the impact of six forks by 0.001, and for forks other than `e03` a few rollout figures by at
+most 1 percentage point in reach share, 0.005 in comparison confidence and about 3 minutes in the p90 of simulated time). Two
+things changed with 2026.3.0, and the values below are the ones after it. First, the rollout seed no longer contains the fork id,
+which derives from the generated case id: with the same fixed seed the old figures differed from one case id to the next (the
+Avoidable Support Effort of Case One was between 57.3 and 61.2 percent over four case ids in the domain, and between 56.3 and 62.8
+percent over five fresh API starts). Second, the tables now use the API's own seed, so the Avoidable Support Effort moved from 58.2
+percent (42.7 to 83.3, the `test-seed` draw) to **55.3 percent (43.7 to 83.3)**, and the best alternative at `e03` is now `balanced`
+instead of `fastest_diagnosis`, because the three paths are close (section 3.3). Quality, forks, impact, real-path figures, the
+token figures (40,850 against 7,900 estimated tokens) and the SkillDNA match did not move. Treat the third decimal as noise between
+code states, not as a measurement; probe timings were 4.4 s and 36 ms for Case One and Two in the first run and below 1 s in later
+ones, which shows how much the timings depend on load.
 
 ### 3.1 Headline results
 
-| Measure                                                          | Case One (CG-SYN-1001)                                                                                            | Case Two (CG-SYN-1002)                                                      |
-| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Events / evidence items / claims / diagnostic actions            | 31 / 26 / 61 / 11                                                                                                 | 15 / 12 / 31 / 5                                                            |
-| Decision forks                                                   | **9**                                                                                                             | **0**                                                                       |
-| Earliest meaningful fork                                         | `e03` at 2026-03-09T09:41:00Z (impact 0.571, medium)                                                              | none                                                                        |
-| Case Quality Index (range) and band                              | **36.0** (32.0 to 39.4), **poor**                                                                                 | **99.1** (95.1 to 99.7), **strong**                                         |
-| Penalty points applied (cap 40, not reached)                     | 32                                                                                                                | 0                                                                           |
-| Estimated CQI if every improvement is applied                    | 68.2 (52.1 to 76.2), 8 improvements                                                                               | 99.1 (no improvement recommended)                                           |
-| Avoidable Support Effort                                         | state `estimated`: **58.2%** (42.7% to 83.3%), confidence **low**; basis fork `e03`, strategy `fastest_diagnosis` | state `no_decision_forks`: 0%, confidence medium                            |
-| Live warnings raised over the case                               | **14** (2 critical, 5 high, 5 medium, 2 low); all resolved by the end                                             | **0**                                                                       |
-| Leading hypothesis over time                                     | proxy-egress 0.187 until `e03`; DNS-resolution 0.725 at `e04`, 0.833 at `e14`, 0.925 at `e24`, 0.926 at `e31`     | proxy-egress 0.701 at `g01`, 0.804 at `g07`, 0.925 at `g09`, 0.926 at `g15` |
-| Time to analyse (probe, 11 counterfactual scenarios in Case One) | about 4.4 s                                                                                                       | about 36 ms                                                                 |
+| Measure                                                          | Case One (CG-SYN-1001)                                                                                        | Case Two (CG-SYN-1002)                                                      |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Events / evidence items / claims / diagnostic actions            | 31 / 26 / 61 / 11                                                                                             | 15 / 12 / 31 / 5                                                            |
+| Decision forks                                                   | **9**                                                                                                         | **0**                                                                       |
+| Earliest meaningful fork                                         | `e03` at 2026-03-09T09:41:00Z (impact 0.571, medium)                                                          | none                                                                        |
+| Case Quality Index (range) and band                              | **36.0** (32.0 to 39.4), **poor**                                                                             | **99.1** (95.1 to 99.7), **strong**                                         |
+| Penalty points applied (cap 40, not reached)                     | 32                                                                                                            | 0                                                                           |
+| Estimated CQI if every improvement is applied                    | 68.2 (52.1 to 76.2), 8 improvements                                                                           | 99.1 (no improvement recommended)                                           |
+| Avoidable Support Effort                                         | state `estimated`: **55.3%** (43.7% to 83.3%), confidence **low**; basis fork `e03`, strategy `balanced`      | state `no_decision_forks`: 0%, confidence medium                            |
+| Live warnings raised over the case                               | **14** (2 critical, 5 high, 5 medium, 2 low); all resolved by the end                                         | **0**                                                                       |
+| Leading hypothesis over time                                     | proxy-egress 0.187 until `e03`; DNS-resolution 0.725 at `e04`, 0.833 at `e14`, 0.925 at `e24`, 0.926 at `e31` | proxy-egress 0.701 at `g01`, 0.804 at `g07`, 0.925 at `g09`, 0.926 at `g15` |
+| Time to analyse (probe, 11 counterfactual scenarios in Case One) | about 4.4 s                                                                                                   | about 36 ms                                                                 |
 
 Confidence values are model estimates; "diagnosed" means the leading non-`other` hypothesis is at 0.75 or more **and** its
 confirmation requirements are satisfied.
@@ -172,21 +179,21 @@ All 11 are `completed`, `valid`, passed the leak check (0 future references) and
 
 | Fork  | Strategy                 | Steps | Rollouts reaching a diagnosis | Comparison confidence | Real time to diagnosis | Simulated time to diagnosis | Real customer minutes | Simulated customer minutes |
 | ----- | ------------------------ | ----: | ----------------------------: | --------------------- | ---------------------: | --------------------------- | --------------------: | -------------------------- |
-| `e03` | `balanced`               |     8 |                         56.5% | low (0.243)           |                  2,994 | 450.5 (189.8 to 707.7)      |                   410 | 110 (20 to 181)            |
-| `e03` | `lowest_customer_effort` |     8 |                         50.0% | low (0.269)           |                  2,994 | 449.7 (210.8 to 582.4)      |                   410 | 90 (20 to 110)             |
-| `e03` | `fastest_diagnosis`      |     8 |                         58.5% | low (0.251)           |                  2,994 | 435.1 (169.0 to 645.4)      |                   410 | 90 (20 to 170)             |
-| `e07` | `balanced`               |     1 |                         97.0% | medium (0.565)        |                  2,845 | 94.0 (56.2 to 198.4)        |                   230 | 10 (10 to 20)              |
-| `e08` | `balanced`               |     1 |                         95.0% | medium (0.557)        |                  2,830 | 96.2 (58.4 to 191.6)        |                   230 | 10 (10 to 20)              |
-| `e09` | `balanced`               |     1 |                         96.0% | medium (0.561)        |                  2,824 | 106.0 (60.9 to 192.0)       |                   200 | 10 (10 to 20)              |
-| `e11` | `balanced`               |     1 |                        100.0% | medium (0.585)        |                  2,735 | 94.0 (54.8 to 160.9)        |                   190 | 10 (10 to 20)              |
-| `e13` | `balanced`               |     1 |                        100.0% | medium (0.586)        |                  2,715 | 97.0 (57.3 to 153.9)        |                   190 | 10 (10 to 20)              |
-| `e15` | `balanced`               |     1 |                         97.5% | medium (0.596)        |                  1,600 | 93.7 (58.3 to 217.2)        |                    10 | 10 (10 to 40)              |
-| `e16` | `balanced`               |     1 |                         97.0% | medium (0.594)        |                  1,565 | 90.1 (56.0 to 248.9)        |                    10 | 10 (10 to 40)              |
-| `e19` | `balanced`               |     1 |                         92.5% | medium (0.576)        |                  1,230 | 90.6 (53.7 to 265.4)        |                    10 | 10 (10 to 50)              |
+| `e03` | `balanced`               |     8 |                         52.0% | low (0.225)           |                  2,994 | 448.6 (166.6 to 659.4)      |                   410 | 110 (20 to 122)            |
+| `e03` | `lowest_customer_effort` |     8 |                         49.5% | low (0.266)           |                  2,994 | 463.5 (203.6 to 588.1)      |                   410 | 110 (20 to 110)            |
+| `e03` | `fastest_diagnosis`      |     8 |                         47.5% | low (0.218)           |                  2,994 | 483.4 (187.3 to 652.7)      |                   410 | 110 (20 to 170)            |
+| `e07` | `balanced`               |     1 |                         97.0% | medium (0.564)        |                  2,845 | 93.4 (61.1 to 199.4)        |                   230 | 10 (10 to 20)              |
+| `e08` | `balanced`               |     1 |                         95.0% | medium (0.556)        |                  2,830 | 93.2 (59.8 to 193.4)        |                   230 | 10 (10 to 20)              |
+| `e09` | `balanced`               |     1 |                         94.5% | medium (0.554)        |                  2,824 | 94.5 (60.0 to 214.0)        |                   200 | 10 (10 to 20)              |
+| `e11` | `balanced`               |     1 |                        100.0% | medium (0.598)        |                  2,735 | 97.0 (63.0 to 155.2)        |                   190 | 10 (10 to 20)              |
+| `e13` | `balanced`               |     1 |                        100.0% | medium (0.593)        |                  2,715 | 92.2 (57.7 to 147.0)        |                   190 | 10 (10 to 20)              |
+| `e15` | `balanced`               |     1 |                         97.5% | medium (0.595)        |                  1,600 | 86.9 (55.1 to 232.0)        |                    10 | 10 (10 to 40)              |
+| `e16` | `balanced`               |     1 |                         96.0% | medium (0.589)        |                  1,565 | 91.7 (54.0 to 259.8)        |                    10 | 10 (10 to 40)              |
+| `e19` | `balanced`               |     1 |                         97.0% | medium (0.592)        |                  1,230 | 94.4 (57.0 to 236.9)        |                    10 | 10 (10 to 40)              |
 
 Reading this table honestly: the earliest fork (`e03`) is far from the diagnosis, so the simulated path is long (8 steps),
-reaches a diagnosis in only about half the rollouts and has **low** comparison confidence; the ASE of 58.2% is therefore labelled
-low confidence with a 42.7% to 83.3% range. Later forks need one targeted step because the leader is already at about 0.73 or
+reaches a diagnosis in only about half the rollouts and has **low** comparison confidence; the ASE of 55.3% is therefore labelled
+low confidence with a 43.7% to 83.3% range. Later forks need one targeted step because the leader is already at about 0.73 or
 more. Simulated times use the pack's customer-response priors (45, 90 and 180 minutes), not measurements. The three strategies
 converge on similar paths at `e03`, which the engine reports rather than hides.
 
@@ -213,13 +220,13 @@ weight is redistributed.
 
 | Component                 |           Real-path total | Effective weight | Avoidable share (low, central, high) |
 | ------------------------- | ------------------------: | ---------------: | ------------------------------------ |
-| `engineer_effort`         |                 9 actions |           0.1579 | 11.1% / 22.2% / 77.8%                |
-| `customer_effort`         |                   410 min |           0.2105 | 55.9% / 78.0% / 95.1%                |
+| `engineer_effort`         |                 9 actions |           0.1579 | 11.1% / 11.1% / 77.8%                |
+| `customer_effort`         |                   410 min |           0.2105 | 58.5% / 73.2% / 95.1%                |
 | `repeated_interactions`   |            5 interactions |           0.1053 | 0% / 0% / 60%                        |
 | `diagnostic_executions`   |                      14.0 |           0.1053 | 42.9% / 57.1% / 92.9%                |
 | `escalations`             |                         1 |           0.0526 | 50% / 100% / 100%                    |
-| `waiting_time`            |                 2,994 min |           0.2105 | 76.4% / 85.5% / 94.4%                |
-| `token_usage`             | 40,850 tokens (estimated) |           0.0526 | 69.2% / 81.6% / 96.3%                |
+| `waiting_time`            |                 2,994 min |           0.2105 | 78.0% / 85.0% / 94.4%                |
+| `token_usage`             | 40,850 tokens (estimated) |           0.0526 | 69.2% / 80.7% / 96.3%                |
 | `low_information_actions` |                 9 actions |           0.1053 | 22.2% / 44.4% / 44.4%                |
 
 ### 3.6 Live warnings raised in Case One (replay, event by event)

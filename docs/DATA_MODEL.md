@@ -266,9 +266,11 @@ as it was, with its `lifecycle` set to the skill's current state, because an app
 of the case's history. A counterfactual scenario keeps its review decision when the regenerated simulation is the same
 one (same fork, strategy, steps, numbers and checks; the run, the model execution, the wording of the steps and the leak
 check time do not count). A scenario whose simulation changed comes back `pending`, and a `counterfactual.review_reset`
-audit event records it with ids and counters only. The engine seeds its rollouts from the analysis input hash, so any
-change of that hash (governed configuration, skill library, provider, engine version) changes the numbers and resets
-the decisions at the next re-analysis.
+audit event records it with ids and counters only. The engine seeds its rollouts from the case content alone (not from the
+analysis input hash, which also covers generated skill ids), so a change of the skill library, the provider or a release
+that moves no number leaves every simulated figure and every decision as it was; a change of the governed configuration
+or of the engine's model changes the numbers of the paths it touches and resets only those decisions at the next
+re-analysis.
 
 | Table                                       | Key columns                                                                                                                           | Notes                                                                                                                            |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |

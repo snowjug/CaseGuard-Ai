@@ -49,7 +49,11 @@ const cf = generateCounterfactuals({
 
 `EngineContext = { tenantId, caseId, runId, now, createdBy, seed }`. Every timestamp, id and random draw is derived from
 it: artefact ids are `stableId(prefix, ...parts)`, randomness is a seeded generator (`util/rng.ts`). The API sets the
-seed to the analysis input hash, so a re-run of identical input reproduces the identical result.
+seed to `simulationSeed(inputs)` (`apps/api/src/services/analysis/inputs.ts`): a hash of the case's **content** (the stored
+payload's content hash, the event count, whether it is resolved, and the pack id and version), so a re-run of the same record
+reproduces the identical result and the same content draws the same numbers in any database. The analysis input hash
+(`computeInputHash`) stays the identity of an input and is not the seed: it also covers the generated ids of the skill library.
+**No generated id enters a seed or an ordering** (section 14).
 
 | Area      | Modules (`src/`)                                            | Public entry points                                                                                                             |
 | --------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -255,7 +259,8 @@ then?". It simulates a **policy tree** (state after each action and outcome is c
    satisfy them. Stop when a non-`other` hypothesis is at or above 0.75 **and** its confirmation requirements are met,
    or after `maxCounterfactualSteps` (8).
 3. Sample each action's outcome from its predictive distribution. Run `rolloutCount` (default 200) seeded rollouts
-   (seed `ctx.seed|forkId|strategy`). The representative path is the modal outcome per node; every metric is reported as
+   (seed `ctx.seed|fork:<events before the decision>@<decision instant>|strategy`, never the fork id, which derives from
+   the generated case id). The representative path is the modal outcome per node; every metric is reported as
    p10, median, p90.
 
 | Strategy                 | Weights (time / token / customer / risk) | Filter                           |
@@ -482,14 +487,31 @@ proposal that goes through the lifecycle); `diffSkillVersions` and `rollbackSkil
   `hardening-bench.ts` measure typical and hostile inputs; results are in [EVALUATION.md](EVALUATION.md#6-performance).
 - **Determinism.** `src/` contains no `Date.now()`, no `Math.random()`, no file or network access (checked with a
   search); the only Node import is `node:crypto` for hashing. The clock and seed are parameters.
-- **Engine version.** `ENGINE_VERSION` (`apps/api/src/services/analysis/inputs.ts`, currently `2026.2.1`) is part of the
+- **Reproducibility across databases (`2026.3.0`).** Same content and same configuration give the same numbers in any
+  database. The rule is that **no generated id enters a seed or an ordering**: tenant, case, run, source and skill ids, and
+  every id derived from them with `stableId` (claims, evidence, forks, scenarios, hypotheses, quality items), differ per
+  database, so they may label a record but never decide a number. In practice: the rollout seed names the decision by the
+  number of events before it and its instant, not by the fork id; the skill-impact baseline seed names the plan moment
+  (`plan.asOf`), not the skill id; claims at one instant keep their derivation order instead of being tie-broken by claim
+  id; evidence, improvements, skill matches and coaching skills break ties by content (score, then name) or by their fixed
+  derivation order; the API seed (`simulationSeed`) leaves out the skill library, the provider, the governed
+  configurations and the engine version, and the seed of an as-of window (`passContext`) is the visible events and the pack
+  alone. `packages/domain/test/determinism-across-ids.test.ts` runs both samples under four sets of generated ids and
+  compares every figure after replacing ids by what they stand for (so a different order of the same things fails too);
+  `apps/api/test/determinism-across-ids.int.test.ts` does the same through two fresh databases.
+- **Engine version.** `ENGINE_VERSION` (`apps/api/src/services/analysis/inputs.ts`, currently `2026.3.0`) is part of the
   analysis input hash, so a change of meaning re-analyses stored cases instead of reusing them. `2026.2.0`: a view's belief is
   one number (the last step of its own timeline), scenario summaries are written from the decision instant and the simulated
   path alone, and the "Retrospectively produced little information" note needs a complete case with a recorded resolution
   (sections 3 and 4). `2026.2.1`: the token-efficiency figure of a synthetic case displays "simulated telemetry" instead of
-  "measured" (text only: the `basis` field and every number are unchanged, and real cases keep "measured"). After a version
+  "measured" (text only: the `basis` field and every number are unchanged, and real cases keep "measured"). `2026.3.0`:
+  the reproducibility rule above; every simulated figure (rollout metrics and ranges, the Avoidable Support Effort and the
+  token figures derived from it, confidence bands, skill baselines) moved once, and the order of claims, improvements and
+  skill matches that were tied by a generated id changed. After a version
   change a reviewer's decision on a counterfactual scenario survives only if the regenerated simulation is identical;
-  otherwise it is reset and the reset is audited.
+  otherwise it is reset and the reset is audited. Because the seed no longer covers the engine version, the skill library or
+  the provider, a change of the library or the provider, or a release that changes no number, re-runs the analysis (new
+  input hash) without redrawing anything; a decision on a scenario then survives it.
 
 ## 15. What the engine does not do
 
