@@ -70,7 +70,28 @@ interface Finding {
   readonly nodes: string[];
 }
 
+/**
+ * Waits for every finite CSS animation and transition to end. A dialog fades in, and axe reads the colours it finds: half
+ * way through the fade the text is blended with the page behind it and its contrast is lower than it ever is at rest.
+ */
+async function animationsSettled(page: Page): Promise<void> {
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+        .map((animation) =>
+          animation.finished.then(
+            () => undefined,
+            () => undefined,
+          ),
+        ),
+    ).then(() => undefined),
+  );
+}
+
 async function scan(page: Page): Promise<Finding[]> {
+  await animationsSettled(page);
   const results = await new AxeBuilder({ page })
     .withTags(TAGS)
     .exclude('[data-tabster-dummy]')
@@ -439,11 +460,11 @@ test.describe('[NFR-A11Y-01] keyboard only', () => {
     await openPage(page, '/cases');
     const search = page.getByRole('searchbox', { name: 'Search' });
     await search.focus();
-    // Typed at a human pace: this field keeps its text in the URL, and characters sent with no pause between them can be
-    // lost (reported separately), which is not what is being checked here.
-    await page.keyboard.type('gd', { delay: 60 });
-    await expect(page).toHaveURL(/\/cases(\?.*)?$/);
+    // No pause between the keys: the field keeps its text locally and writes it to the address afterwards, so nothing is
+    // lost however fast it is typed, and "g" then "d" typed into a field does not go to the Demo Guide.
+    await page.keyboard.type('gd', { delay: 0 });
     await expect(search).toHaveValue('gd');
+    await expect(page).toHaveURL(/\/cases\?(.*&)?q=gd(&.*)?$/);
   });
 
   test('a dialog traps focus while it is open and gives focus back when it closes', async ({

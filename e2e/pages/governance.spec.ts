@@ -85,6 +85,12 @@ test.describe('[FR-GOV-01] Governance: eleven sections in the URL, each saying w
       'true',
     );
     await page.keyboard.press('[');
+    // Each key press is a request for a section, answered after the address has changed: wait for the answer before
+    // pressing again, as a person does.
+    await expect(sections.getByRole('tab', { name: 'Redaction' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     await page.keyboard.press('[');
     await expect(sections.getByRole('tab', { name: 'Retention' })).toHaveAttribute(
       'aria-selected',
