@@ -282,7 +282,7 @@ transcript, a CSV or a JSON bundle through the ingestion routes; the two synthet
 | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `pnpm.cmd test`                                          | Everything, every workspace project (`vitest run`, root `vitest.config.ts` aggregates `packages/*` and `apps/*`) |
 | `pnpm.cmd test:unit`                                     | Everything except `*.int.test.ts`                                                                                |
-| `pnpm.cmd test:int`                                      | Only `*.int.test.ts` (`vitest run --dir apps --dir packages int.test`)                                           |
+| `pnpm.cmd test:int`                                      | Only `*.int.test.ts` (`vitest run .int.test`, a file-name filter)                                                |
 | `pnpm.cmd test:coverage`                                 | `vitest run --coverage` (V8; HTML, lcov and text-summary under `coverage/`)                                      |
 | `pnpm.cmd test:e2e`                                      | Playwright end-to-end and axe accessibility tests (not run by me)                                                |
 | `pnpm.cmd exec vitest run` inside a package              | One package. This is how the counts in [EVALUATION.md](EVALUATION.md) were taken                                 |
