@@ -77,7 +77,9 @@ describe('[NFR-OBS-01] system.health', () => {
     });
 
     const dependencies = byName(report.dependencies);
-    expect(dependencies.get('database')).toMatchObject({ status: 'healthy', simulated: false });
+    // These tests run on PGlite, an in-process stand-in for PostgreSQL, and the row says so.
+    expect(dependencies.get('database')).toMatchObject({ status: 'healthy', simulated: true });
+    expect(dependencies.get('database')?.detail).toContain('PostgreSQL-compatible');
     expect(dependencies.get('migrations')).toMatchObject({ status: 'healthy', simulated: false });
     for (const standIn of ['storage', 'search', 'model_provider']) {
       expect(dependencies.get(standIn)).toMatchObject({ status: 'healthy', simulated: true });

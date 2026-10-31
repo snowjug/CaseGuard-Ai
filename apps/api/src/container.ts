@@ -68,11 +68,21 @@ function registerHealthChecks(
   objects: ObjectStore,
   config: AppConfig,
 ): void {
-  health.registerStandard('database', async () => {
-    const result = await database.ping();
-    if (!result.ok) throw new Error(result.detail);
-    return { detail: `${database.kind} reachable` };
-  });
+  health.registerStandard(
+    'database',
+    async () => {
+      const result = await database.ping();
+      if (!result.ok) throw new Error(result.detail);
+      return {
+        detail:
+          database.kind === 'pglite'
+            ? 'pglite reachable: an in-process PostgreSQL-compatible engine for local development and tests, not the PostgreSQL service a deployment uses'
+            : `${database.kind} reachable`,
+      };
+    },
+    // PGlite is a stand-in for PostgreSQL, so the dependency says so like the local object store does.
+    { simulated: database.kind === 'pglite' },
+  );
   health.registerStandard('migrations', async () => {
     const status = await getMigrationStatus(database);
     if (status.checksumMismatch.length > 0) {

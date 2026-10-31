@@ -14,7 +14,9 @@ the AI service cannot initialise the provider is reported `healthy: false`.
 Honesty rules (`dependencies.ts`, `notices.ts`):
 
 - In-process stand-ins are labelled `simulated: true`: the local object store, built-in lexical search, the
-  deterministic provider, the memory cache and development sign-in.
+  deterministic provider, the memory cache, development sign-in and, when `DATABASE_URL` is `pglite://...`,
+  the database itself (PGlite is an in-process PostgreSQL-compatible engine, not the PostgreSQL service a
+  deployment uses).
 - A configured integration that is not probed here (Azure AI Search, Microsoft Entra ID) is `unknown`, never
   `healthy`. Azure OpenAI is `healthy` only after a call has succeeded.
 - `notices` state what each integration actually is and how far it has been validated: Azure OpenAI, Azure AI
