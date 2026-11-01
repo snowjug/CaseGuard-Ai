@@ -38,6 +38,12 @@ function mount(mode: 'light' | 'dark' = 'light') {
 
 const searchBox = () => screen.getByRole('combobox', { name: /Search cases/ });
 
+// Only the palette's own options. The header's native case <select> has <option>s too, and whether
+// they are still exposed while the modal palette opens is a matter of timing, so a document-wide
+// query for options is fragile.
+const paletteOptions = () =>
+  within(screen.getByRole('listbox', { name: 'Commands' })).getAllByRole('option');
+
 async function openHelpFromTheFooter(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Keyboard shortcuts' }));
   return screen.findByRole('dialog', { name: 'Keyboard shortcuts' });
@@ -132,7 +138,7 @@ describe('[UX-KEYS-04] single-key shortcuts can be turned off (WCAG 2.1.4)', () 
     let input = await screen.findByRole('combobox', { name: 'Search commands' });
     expect(screen.getByRole('option', { name: /Go to Cases\s*G then C/ })).toBeInTheDocument();
     await user.type(input, 'single-key');
-    expect(screen.getAllByRole('option')[0]).toHaveAccessibleName(/^Turn single-key shortcuts off/);
+    expect(paletteOptions()[0]).toHaveAccessibleName(/^Turn single-key shortcuts off/);
     await user.keyboard('{Enter}');
     await expectToast('Single-key shortcuts are off');
     expect(window.localStorage.getItem(SINGLE_KEY_STORAGE_KEY)).toBe('off');
@@ -145,7 +151,7 @@ describe('[UX-KEYS-04] single-key shortcuts can be turned off (WCAG 2.1.4)', () 
     // The hints of the shortcuts that no longer work are gone.
     expect(screen.getByRole('option', { name: 'Go to Cases' })).toBeInTheDocument();
     await user.type(input, 'single-key');
-    expect(screen.getAllByRole('option')[0]).toHaveAccessibleName(/^Turn single-key shortcuts on/);
+    expect(paletteOptions()[0]).toHaveAccessibleName(/^Turn single-key shortcuts on/);
     await user.keyboard('{Enter}');
     await expectToast('Single-key shortcuts are on');
     expect(window.localStorage.getItem(SINGLE_KEY_STORAGE_KEY)).toBe('on');
