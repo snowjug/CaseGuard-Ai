@@ -77,9 +77,13 @@ describe('[NFR-OBS-01] system.health', () => {
     });
 
     const dependencies = byName(report.dependencies);
-    // These tests run on PGlite, an in-process stand-in for PostgreSQL, and the row says so.
-    expect(dependencies.get('database')).toMatchObject({ status: 'healthy', simulated: true });
-    expect(dependencies.get('database')?.detail).toContain('PostgreSQL-compatible');
+    // PGlite is an in-process stand-in for PostgreSQL and its row says so. Against a real server
+    // (TEST_DATABASE_URL, as in CI) the same row describes a real dependency and is not simulated.
+    const isPglite = database.kind === 'pglite';
+    const databaseRow = dependencies.get('database');
+    expect(databaseRow).toMatchObject({ status: 'healthy', simulated: isPglite });
+    expect(databaseRow?.detail).toContain('reachable');
+    expect(databaseRow?.detail.includes('PostgreSQL-compatible')).toBe(isPglite);
     expect(dependencies.get('migrations')).toMatchObject({ status: 'healthy', simulated: false });
     for (const standIn of ['storage', 'search', 'model_provider']) {
       expect(dependencies.get(standIn)).toMatchObject({ status: 'healthy', simulated: true });
