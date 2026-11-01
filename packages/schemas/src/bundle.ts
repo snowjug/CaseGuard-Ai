@@ -315,6 +315,7 @@ export const IngestRequestSchema = z.discriminatedUnion('type', [
     type: z.literal('paste'),
     text: z.string().min(1).max(200_000),
     title: z.string().min(5).max(200).optional(),
+    /** Required unless a `Workload:` line comes before the first message: a case that states neither is refused, not defaulted. */
     workload: z.string().max(80).optional(),
   }),
   /** Raw JSON bundle; validated with CaseBundleSchema so errors can be reported per field. */

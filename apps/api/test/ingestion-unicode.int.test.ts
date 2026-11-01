@@ -122,6 +122,7 @@ const bundleOfBody = (body: string, index: number) => ({
 const pastedText = (body: string) => ({
   type: 'paste',
   text: transcriptOf([body, 'Please send two failed sign-in times.']),
+  workload: 'teams-authentication',
 });
 
 const ways: Way[] = [

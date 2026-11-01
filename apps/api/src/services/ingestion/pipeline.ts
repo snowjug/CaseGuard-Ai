@@ -31,6 +31,7 @@ import {
 import { screenBundle } from './screen';
 import type { PipelineEnv, PipelineOutcome } from './types';
 import { redactedBundleIssues, semanticIssues } from './validate';
+import { checkWorkload } from './workload';
 
 /**
  * Inputs from this size on yield to the event loop between phases: parsing and redaction are
@@ -140,16 +141,18 @@ async function succeededOutcome(
     bundleSynthetic: bundle.synthetic,
     labelDerived: resolved.labelDerived,
   });
+  const workload = checkWorkload(parse, resolved.sourceKind);
   const storedPayload = canonicalJson(redaction.bundle);
   const contentHash = sha256Hex(storedPayload);
   // Built from the redacted bundle, so no excerpt can carry a secret.
   const draft = buildDraftPreview(
-    { ...parse, bundle: redaction.bundle },
+    { ...parse, bundle: redaction.bundle, warnings: workload.warnings },
     { sourceKind: resolved.sourceKind, maxEvents: PREVIEW_EVENTS, excerptChars: EXCERPT_CHARS },
   );
 
   const found: ValidationIssue[] = [
     ...(policy === null ? [] : [policy]),
+    ...workload.issues,
     ...credentialLikeIdentifiers(bundle, options),
     // Without a replacement the redacted bundle is the one the parser already validated.
     ...(redaction.summary.totalReplacements > 0 ? redactedBundleIssues(redaction.bundle) : []),

@@ -37,7 +37,10 @@ describe('pasted text (FR-ING-01, FR-ING-02)', () => {
   ];
 
   it('derives the synthetic label from the tenant and says so as a note', async () => {
-    const outcome = await runPipeline({ type: 'paste', text: transcriptOf(lines) }, env());
+    const outcome = await runPipeline(
+      { type: 'paste', text: transcriptOf(lines), workload: 'teams-authentication' },
+      env(),
+    );
     expect(outcome.preview).toMatchObject({
       ok: true,
       sourceKind: 'pasted_text',
@@ -52,7 +55,7 @@ describe('pasted text (FR-ING-01, FR-ING-02)', () => {
 
   it('treats pasted text as real data in a non-synthetic workspace', async () => {
     const outcome = await runPipeline(
-      { type: 'paste', text: transcriptOf(lines) },
+      { type: 'paste', text: transcriptOf(lines), workload: 'teams-authentication' },
       env({ tenantSynthetic: false }),
     );
     expect(outcome.preview).toMatchObject({ ok: true, synthetic: false });
