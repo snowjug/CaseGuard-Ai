@@ -72,13 +72,7 @@ export default tseslint.config(
   },
   {
     // CLI scripts and build tooling are allowed to print to the console.
-    files: [
-      'scripts/**',
-      'e2e/**',
-      'apps/api/src/**/*-cli.ts',
-      'apps/api/src/openapi-export.ts',
-      '**/*.config.{ts,mjs}',
-    ],
+    files: ['scripts/**', 'e2e/**', 'apps/api/src/**/*-cli.ts', '**/*.config.{ts,mjs}'],
     rules: { 'no-console': 'off' },
   },
   {

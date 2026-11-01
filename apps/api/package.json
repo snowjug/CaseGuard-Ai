@@ -10,8 +10,7 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "db:migrate": "tsx --env-file-if-exists=.env src/db/migrate-cli.ts",
-    "openapi:export": "tsx src/openapi-export.ts"
+    "db:migrate": "tsx --env-file-if-exists=.env src/db/migrate-cli.ts"
   },
   "dependencies": {
     "@azure/identity": "^4.14.0",
