@@ -31,3 +31,57 @@ condition = "AND"
 paths = ['''(^|/)(docs/.*|[^/]*)\.md$''', '''(^|/)\.env\.example$''', '''(^|/)\.github/.*\.(md|ya?ml)$''']
 regexTarget = "line"
 regexes = ['''(?i)(<[a-z0-9_ .-]+>|changeme|placeholder|example|your[-_ ]|x{6,}|0{8}-0{4}-0{4}-0{4}-0{12})''']
+
+[[allowlists]]
+description = "e2e/security-http.spec.ts sends a fixed, made-up Idempotency-Key header (a label that starts with 'e2e-idempotency-key-') to a local echo stub to check that the proxy forwards it unchanged. It is a deterministic test constant and an idempotency key is not a credential, but generic-api-key flags it because the header name contains 'key'. Only that header literal, in that one file, for that one rule is allowed."
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^e2e/security-http\.spec\.ts$''']
+regexTarget = "line"
+regexes = ['''^\s*'idempotency-key':\s*'e2e-idempotency-key-[0-9]{4}',?\s*$''']
+
+# The entries below cover findings that a scan of the whole history reports in older commits (the CI scan only reads
+# the commits of a push or pull request, so it does not show them). Each is a fixed test constant: one file, one rule
+# and the one line shape that holds it.
+
+[[allowlists]]
+description = "apps/api/test/migrate-cli.int.test.ts sets a made-up password marker (a label that starts with 'p4ssw0rd-marker-') to check that the migrate command never prints it. It is a test constant, not a credential. Only that assignment, in that one file, for that one rule is allowed."
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^apps/api/test/migrate-cli\.int\.test\.ts$''']
+regexTarget = "line"
+# secretscan:allow-next-line a regex that matches a made-up password marker in one test, not a credential
+regexes = ['''^\s*const password = 'p4ssw0rd-marker-[0-9]{2}';\s*$''']
+
+[[allowlists]]
+description = "apps/api/test/skills.int.test.ts uses fixed, made-up idempotency keys (labels that start with 'idem-skill-') to repeat a request. An idempotency key is not a credential, but generic-api-key flags the variable name. Only that assignment, in that one file, for that one rule is allowed."
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^apps/api/test/skills\.int\.test\.ts$''']
+regexTarget = "line"
+regexes = ['''^\s*const key = 'idem-skill-[a-z]+-[0-9]{4}';\s*$''']
+
+[[allowlists]]
+description = "packages/ai/test/prompts.test.ts pins the SHA-256 digest of each published prompt template. A content digest is public and not a credential, but generic-api-key flags the 'token_governor' name. Only that one pin line, in that one file, for that one rule is allowed."
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^packages/ai/test/prompts\.test\.ts$''']
+regexTarget = "line"
+regexes = ['''^\s*token_governor:\s*'[0-9a-f]{64}',?\s*$''']
+
+[[allowlists]]
+description = "packages/ai/test/azure-openai.int.test.ts uses an obviously fake API key (a label that starts with 'sk-test-SECRET-KEY-') to check that the provider never echoes it. It is a test constant, not a credential. Only that assignment, in that one file, for that one rule is allowed."
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^packages/ai/test/azure-openai\.int\.test\.ts$''']
+regexTarget = "line"
+regexes = ['''^\s*const API_KEY = 'sk-test-SECRET-KEY-[0-9a-f]+';\s*$''']
+
+[[allowlists]]
+description = "packages/security/test/redaction-property.test.ts builds PEM-shaped private-key blocks from generated bodies to check that redaction removes them. The line is a template with a body placeholder, not a key. Only that template, in that one file, for that one rule is allowed."
+condition = "AND"
+targetRules = ["private-key"]
+paths = ['''^packages/security/test/redaction-property\.test\.ts$''']
+regexTarget = "line"
+# secretscan:allow-next-line a regex that matches a PEM-shaped template with a body placeholder, not a key
+regexes = ['''-----BEGIN PRIVATE KEY-----\\n\$\{body\}\\n-----END PRIVATE KEY-----''']
