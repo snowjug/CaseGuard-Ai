@@ -103,17 +103,28 @@ describe('[FR-ING-07] source, event, resolution and audit records are immutable'
   );
 
   it('the immutability triggers are installed, and the audit trigger fires even when replication triggers are off', async () => {
-    const triggers = await h.database.query<{ tgname: string; tgenabled: string }>(
-      `SELECT tgname, tgenabled FROM pg_trigger
-        WHERE NOT tgisinternal AND tgname IN
-          ('case_sources_immutable', 'case_events_immutable', 'case_resolutions_immutable', 'audit_events_immutable')
-        ORDER BY tgname`,
+    // pg_trigger is database-wide. On a real server every test file migrates its own schema in the
+    // same database, so the same four names come back once per schema in use: look at this one.
+    const triggers = await h.database.query<{
+      table_name: string;
+      tgname: string;
+      tgenabled: string;
+    }>(
+      `SELECT c.relname AS table_name, t.tgname, t.tgenabled
+         FROM pg_trigger t
+         JOIN pg_class c ON c.oid = t.tgrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE NOT t.tgisinternal
+          AND n.nspname = current_schema()
+          AND t.tgname IN ('case_sources_immutable', 'case_events_immutable',
+                           'case_resolutions_immutable', 'audit_events_immutable')
+        ORDER BY c.relname, t.tgname`,
     );
-    expect(triggers.rows.map((t) => t.tgname)).toEqual([
-      'audit_events_immutable',
-      'case_events_immutable',
-      'case_resolutions_immutable',
-      'case_sources_immutable',
+    expect(triggers.rows.map((t) => [t.table_name, t.tgname])).toEqual([
+      ['audit_events', 'audit_events_immutable'],
+      ['case_events', 'case_events_immutable'],
+      ['case_resolutions', 'case_resolutions_immutable'],
+      ['case_sources', 'case_sources_immutable'],
     ]);
     expect(triggers.rows.find((t) => t.tgname === 'audit_events_immutable')?.tgenabled).toBe('A');
 
