@@ -233,15 +233,23 @@ function SamplePanel({
   );
 }
 
+/** The workloads the built-in samples cover. Each has a knowledge pack, so these are the ones a case can state. */
+function supportedWorkloads(samples: SourceStepProps['samples']): string[] {
+  return [...new Set((samples.data?.items ?? []).map((sample) => sample.workload))].sort();
+}
+
 function PastePanel({
   draft,
   onDraftChange,
   examples,
-}: Pick<SourceStepProps, 'draft' | 'onDraftChange' | 'examples'>) {
+  samples,
+}: Pick<SourceStepProps, 'draft' | 'onDraftChange' | 'examples' | 'samples'>) {
   const styles = useStyles();
   const problems = draftProblems(draft);
   const titleProblem = problems.find((problem) => problem.field === 'title');
   const workloadProblem = problems.find((problem) => problem.field === 'workload');
+  const workloads = supportedWorkloads(samples);
+  const supported = workloads.length > 0 ? ` Supported: ${workloads.join(', ')}.` : '';
   const transcripts = (examples.data?.items ?? []).filter(
     (example) => example.kind === 'transcript' && example.pasteText,
   );
@@ -303,8 +311,8 @@ function PastePanel({
           />
         </Field>
         <Field
-          label="Workload (optional)"
-          hint="A knowledge-pack key such as teams-authentication."
+          label="Workload"
+          hint={`Required unless a "Workload:" line comes before the first message.${supported}`}
           validationState={workloadProblem ? 'error' : 'none'}
           validationMessage={workloadProblem?.message}
         >
@@ -622,6 +630,7 @@ export function SourceStep(props: SourceStepProps) {
                 draft={draft}
                 onDraftChange={props.onDraftChange}
                 examples={props.examples}
+                samples={props.samples}
               />
             ) : null}
             {draft.choice === 'file' ? (

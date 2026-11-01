@@ -1061,7 +1061,20 @@ describe('[FR-ING-06] refusals are told apart and explained in words', () => {
 });
 
 describe('[FR-ING-04] paste, upload and bundle sources', () => {
-  it('validates pasted text and sends the optional title and workload only when given', async () => {
+  it('says the workload has to be stated unless the text names it, and lists the supported ones', async () => {
+    navigateTo('/cases/new?source=paste');
+    renderApp(<NewCasePage />, { api: api() });
+    const field = await screen.findByLabelText('Workload');
+    expect(screen.queryByText('Workload (optional)')).not.toBeInTheDocument();
+    // The supported workloads come from the samples, which load after the panel is shown.
+    await waitFor(() =>
+      expect(field).toHaveAccessibleDescription(
+        /Required unless a "Workload:" line comes before the first message\. Supported: teams-authentication\./,
+      ),
+    );
+  });
+
+  it('validates pasted text and sends the title and workload only when given', async () => {
     const user = userEvent.setup();
     navigateTo('/cases/new?source=paste');
     const handler = api();
