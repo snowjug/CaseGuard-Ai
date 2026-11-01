@@ -20,10 +20,13 @@ import { CONTOSO, PERSONAS, type ApiResponse, type Harness } from './support/app
  * (tenant, reference) index of migration 0010 settles two requests that both passed it. Whoever loses
  * is told what the check would have told them: a 409 with the same problem, never a 500.
  *
- * The test database serialises transactions (one connection), so two requests cannot truly overlap
- * and the second one would always see the first. To reach the index anyway, the lookups the checks
- * make are answered as a request that read before the other committed would have seen them: no row.
- * Everything after that (the failing INSERT, its error, the rollback, the cleanup) is the real thing.
+ * Two plain requests do not always reach the index. PGlite serialises transactions (one
+ * connection), so the second request sees the first one's case and the check answers. A real
+ * PostgreSQL (TEST_DATABASE_URL) runs them in parallel: whether the second check comes before the
+ * first commit is up to the timing, so one or two INSERTs are sent and the outcome is the same
+ * either way. To reach the index every time, the lookups the checks make are answered as a request
+ * that read before the other committed would have seen them: no row. Everything after that (the
+ * failing INSERT, its error, the rollback, the cleanup) is the real thing.
  */
 
 let database: Database;
@@ -81,11 +84,17 @@ const problemOf = (res: ApiResponse) => {
 
 describe('two creates for one new reference', () => {
   it.each([
-    { name: 'the second request sees the first one (the check decides)', stale: 0, inserts: 1 },
+    {
+      name: 'the check, or the unique index when both checks come first, decides',
+      stale: 0,
+      // One INSERT when the second check sees the first request's case, two when it ran before that
+      // commit: which one happens depends on the database and on the timing.
+      inserts: [1, 2],
+    },
     {
       name: 'neither sees the other when it checks (the unique index decides)',
       stale: 2,
-      inserts: 2,
+      inserts: [2],
     },
   ])('answer one 201 and one 409, never a 500: $name', async ({ stale, inserts }) => {
     const reads = staleReferenceReads(stale);
@@ -100,9 +109,9 @@ describe('two creates for one new reference', () => {
     expect(sent.map((res) => res.statusCode).sort()).toEqual([201, 409]);
     const loser = sent.find((res) => res.statusCode === 409);
     expect(loser?.data).toMatchObject({ status: 409, detail: referenceInUseMessage(REFERENCE) });
-    // The index was reached exactly when the checks were made blind.
     expect(reads.served()).toBe(stale);
-    expect(log.statements.filter(isCaseInsert)).toHaveLength(inserts);
+    // Both requests reach the INSERT when both checks were blind; otherwise it is up to the timing.
+    expect(inserts).toContain(log.statements.filter(isCaseInsert).length);
 
     // One case, one stored payload, one audit row: the loser left nothing behind.
     expect((await h.repos(CONTOSO).cases.list({ limit: 10 })).items).toHaveLength(1);
