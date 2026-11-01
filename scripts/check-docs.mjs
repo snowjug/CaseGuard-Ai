@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Documentation checks: every relative link, image and heading anchor in the Markdown files resolves, every
-// Mermaid diagram is closed and not empty, every workflow badge names a workflow that exists, and every
-// screenshot a page shows is a file in the repository.
+// Mermaid diagram is closed and not empty, every workflow badge names a workflow that exists, every
+// screenshot a page shows is a file in the repository, and no template placeholder is left unfilled.
 //
 //   node scripts/check-docs.mjs [--root <dir>] [--quiet]
 //   node scripts/check-docs.mjs --self-test
@@ -16,6 +16,11 @@
 //   mermaid-unterminated  a ```mermaid fence is never closed
 //   fence-unterminated    any other code fence is never closed (it would swallow the rest of the page)
 //   badge-workflow-missing a badge or link names `.github/workflows/<file>` and that file does not exist
+//   placeholder-unfilled  a FILL template placeholder (two opening angle brackets, the word FILL, any text without a
+//                         closing bracket, two closing angle brackets) is left on a line, once per occurrence; the raw
+//                         text is read, so a code span, a code fence or a comment does not hide it. The message never
+//                         repeats the placeholder, so a report that quotes this output cannot trip the rule itself.
+//                         Owner-action markers such as "[OWNER TO FILL IN ...]" are not placeholders in this sense.
 //
 // Links inside code spans, code fences and HTML comments are ignored. External links (http, https, mailto, ...) are
 // not fetched: this check needs no network. No dependencies; the exit code is 0 when nothing is wrong, 1 when a rule
@@ -52,6 +57,7 @@ const WORKFLOW_REFERENCES = [
   /actions\/workflows\/([A-Za-z0-9._-]+\.ya?ml)/g,
   /github\/actions\/workflow\/status\/[^/\s)]+\/[^/\s)]+\/([A-Za-z0-9._-]+\.ya?ml)/g,
 ];
+const UNFILLED_PLACEHOLDER = /<<FILL[^>\n]*>>/g;
 
 /** @typedef {{ file: string, line: number, rule: string, message: string }} Problem */
 
@@ -345,6 +351,17 @@ export function checkDocs({ root = DEFAULT_ROOT } = {}) {
       }
     }
 
+    const rawLines = text.replace(/\r\n/g, '\n').split('\n');
+    for (let index = 0; index < rawLines.length; index += 1) {
+      for (const match of rawLines[index].matchAll(UNFILLED_PLACEHOLDER)) {
+        add(
+          index + 1,
+          'placeholder-unfilled',
+          `a FILL template placeholder is left at column ${match.index + 1}`,
+        );
+      }
+    }
+
     for (const { line, text: content } of prose) {
       for (const pattern of WORKFLOW_REFERENCES) {
         for (const match of content.matchAll(pattern)) {
@@ -588,6 +605,52 @@ function selfTest() {
       );
     });
     rmSync(join(scratch, 'README.md'));
+
+    const unfilled = ['<<', 'FILL FROM FINAL_VALIDATION', '>>'].join('');
+    put(
+      'docs/todo.md',
+      [
+        '# Todo',
+        '',
+        `In a code span: \`${unfilled}\``,
+        '```md',
+        unfilled,
+        '```',
+        `Twice on one line: ${unfilled} and ${unfilled}`,
+        `<!-- ${unfilled} -->`,
+      ].join('\n'),
+    );
+    check('an unfilled placeholder is reported at its line wherever it is hidden', () => {
+      const rules = rulesOf(run()).filter((entry) => entry.startsWith('docs/todo.md'));
+      return (
+        rules.join() ===
+        [
+          'docs/todo.md:3:placeholder-unfilled',
+          'docs/todo.md:5:placeholder-unfilled',
+          'docs/todo.md:7:placeholder-unfilled',
+          'docs/todo.md:7:placeholder-unfilled',
+          'docs/todo.md:8:placeholder-unfilled',
+        ].join()
+      );
+    });
+    rmSync(join(scratch, 'docs', 'todo.md'));
+
+    put(
+      'docs/filled.md',
+      [
+        '# Filled in',
+        '',
+        'Result: 5,829 passed, 1 failed.',
+        '[OWNER TO FILL IN the enforcement contact]',
+        'An unfinished `<<FILL` marker has no closing brackets.',
+        'Shifts: a >> b and c << d.',
+      ].join('\n'),
+    );
+    check(
+      'a page with no placeholder, an owner-action marker or a stray opening is clean',
+      () => run().problems.length === 0,
+    );
+    rmSync(join(scratch, 'docs', 'filled.md'));
 
     put('node_modules/pkg/README.md', '[gone](nowhere.md)\n');
     check('dependency and build directories are not scanned', () => run().problems.length === 0);

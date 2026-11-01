@@ -116,6 +116,30 @@ describe('scripts/check-docs.mjs', () => {
     expect(result.stderr).toMatch(/check-docs: 10 problem\(s\) in 2 Markdown file\(s\)/);
   }, 90_000);
 
+  it('reports a FILL placeholder left in a page, wherever it hides, without repeating it', () => {
+    const unfilled = ['<<', 'FILL FROM FINAL_VALIDATION', '>>'].join('');
+    const root = tree({
+      'README.md': [
+        '# Project',
+        `| Unit tests | ${unfilled} |`,
+        `In a code span: \`${unfilled}\``,
+        `<!-- ${unfilled} -->`,
+        '[OWNER TO FILL IN the contact] is an owner action, not a placeholder.',
+      ].join('\n'),
+    });
+    const result = run('--root', root);
+    expect(result.status).toBe(1);
+    for (const line of [2, 3, 4]) {
+      expect(result.stderr).toMatch(
+        new RegExp(`^README\\.md:${line}: \\[placeholder-unfilled\\]`, 'm'),
+      );
+    }
+    expect(result.stderr).not.toMatch(/README\.md:5:/);
+    // The report is copied into validation reports, so it must not trip the rule on the next run.
+    expect(result.stderr).not.toContain('FINAL_VALIDATION');
+    expect(result.stderr).toMatch(/check-docs: 3 problem\(s\) in 1 Markdown file\(s\)/);
+  }, 90_000);
+
   it('ignores code spans, fenced code, HTML comments and external links', () => {
     const root = tree({
       'README.md': [
