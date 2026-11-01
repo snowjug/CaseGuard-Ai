@@ -1,12 +1,15 @@
 name: Set up toolchain
 description: >-
   Installs pnpm (the exact version pinned by "packageManager" in package.json) and Node.js (version from
-  .node-version) with the pnpm store cached, then optionally runs a frozen-lockfile install.
+  .node-version), then optionally runs a frozen-lockfile install. The pnpm store is cached when the
+  dependencies are installed.
   Run actions/checkout first.
 
 inputs:
   install:
-    description: Run `pnpm install --frozen-lockfile` after setting up the toolchain.
+    description: >-
+      Run `pnpm install --frozen-lockfile` after setting up the toolchain, and cache the pnpm store
+      (a job that installs nothing has no store to cache).
     required: false
     default: 'true'
 
@@ -17,12 +20,21 @@ runs:
     - name: Install pnpm
       uses: pnpm/action-setup@v6
 
-    - name: Install Node.js
+    # setup-node saves the cache in a post step that fails when the pnpm store does not exist, which is the
+    # case when nothing is installed. So the cache is only asked for when the dependencies are installed.
+    - name: Install Node.js and cache the pnpm store
+      if: inputs.install == 'true'
       uses: actions/setup-node@v7
       with:
         node-version-file: .node-version
         cache: pnpm
         cache-dependency-path: pnpm-lock.yaml
+
+    - name: Install Node.js
+      if: inputs.install != 'true'
+      uses: actions/setup-node@v7
+      with:
+        node-version-file: .node-version
 
     - name: Install dependencies
       if: inputs.install == 'true'
