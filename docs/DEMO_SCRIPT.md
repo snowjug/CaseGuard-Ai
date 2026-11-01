@@ -203,7 +203,8 @@ Here the reading may be a model's, the numbers are code's, and the authority is 
 At five layers: a branded `TemporalView` type, the engine (a prefix analysis equals the full analysis restricted to it), a leak
 check and eight validity checks on every simulated path, the AI boundary (validators reject identifiers and wording from the
 future) and the read path (views are recomputed as of the instant, not filtered). Property tests and mutation tests exercise it
-(`<<FILL FROM FINAL_VALIDATION>>` tests pass); it is evidence for the tested paths and the two cases, not a proof for any input
+(they passed in the local runs; the CI unit run, 41182982903, had 5,829 pass and 1 fail); it is evidence for the tested paths
+and the two cases, not a proof for any input
 ([EVALUATION.md](EVALUATION.md#4-temporal-integrity-evidence)).
 
 **How are the scores calculated, and are they validated?**
@@ -217,7 +218,8 @@ telemetry is itself simulated, so the interface says "simulated telemetry". Do n
 
 **Is it deployed on Azure?**
 No. The Bicep template is designed and was built and linted with 0 errors, but no what-if or deployment was ever run, and no Docker
-image was built locally. CI would build them; CI has not run ([DEPLOYMENT.md](DEPLOYMENT.md), [CI_CD.md](CI_CD.md)).
+image was built locally. CI builds both images and pushes them nowhere; in run 41182982903 it passed its compose smoke test (12 checks)
+([DEPLOYMENT.md](DEPLOYMENT.md), [CI_CD.md](CI_CD.md)).
 
 **What was validated against Azure?**
 Nothing live. Azure OpenAI, Entra token validation, Blob Storage, AI Search and the Application Insights export were tested
@@ -258,13 +260,16 @@ Not yet, and we do not claim it. Jobs, rate limits and caches live in one API pr
 runs, and there is no load test ([KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md#4-operational-limits)).
 
 **How fast is an analysis?**
-`<<FILL FROM FINAL_VALIDATION>>` from the domain benchmark and the API micro-benchmark (`pnpm bench` and `pnpm bench:api`). These
-are micro-benchmarks on one machine, not a service-level objective.
+Measured locally, not in CI: Case One analysis took 509.3 ms on average (p95 1242.5 ms) in the domain benchmark, and a timeline
+request 34.53 ms at p50 (p95 41.76 ms) in the API micro-benchmark (`pnpm bench` and `pnpm bench:api`;
+[EVALUATION.md](EVALUATION.md#6-performance), [PERFORMANCE.md](PERFORMANCE.md)), both on a loaded machine. These are
+micro-benchmarks on one machine, not a service-level objective.
 
 **How was it tested, and is it accessible?**
-Unit, property, integration and end-to-end tests, with axe checks on every page in light and dark themes: the final validation run
-recorded `<<FILL FROM FINAL_VALIDATION>>` tests passed and `<<FILL FROM FINAL_VALIDATION>>` accessibility checks.
-CI has not run on GitHub yet. The suites that use a database run on PGlite.
+Unit, property, integration and end-to-end tests, with axe checks on every page in light and dark themes: in CI run 41182982903,
+5,829 unit tests passed and 1 failed, 1,008 integration tests passed and 3 failed, and 335 of 342 Playwright tests passed (the axe
+checks are among them; no separate count was recorded), 1 failed and 6 did not run. No CI run has been fully green yet. The
+integration tests ran on PostgreSQL 16 in CI; locally the suites that use a database run on PGlite.
 
 **What is the licence, and what is built on what?**
 No licence has been chosen: the owner decides, and until then all rights are reserved. The stack is open source (Next.js, React,
@@ -272,8 +277,9 @@ Fluent UI, Fastify, Zod, PGlite, Playwright, and others, listed in the README). 
 agents under the owner's direction.
 
 **What would you do next?**
-Push and let CI run; deploy a dev environment and validate Entra, Blob and AI Search for real; evaluate a real model against the
-harness; build a human-labelled evaluation set; then a durable job queue and enforced retention ([ROADMAP.md](ROADMAP.md)).
+Get CI fully green (no run has been yet); deploy a dev environment and validate Entra, Blob and AI Search for real; evaluate a
+real model against the harness; build a human-labelled evaluation set; then a durable job queue and enforced retention
+([ROADMAP.md](ROADMAP.md)).
 
 ## 10. Limitations to state up front
 
@@ -282,8 +288,9 @@ Say at least the first four before anyone asks.
 - **Everything is synthetic**, two cases written alongside the engine: the comparison is a demonstration of the pipeline (n = 2).
 - **Every score is an estimate** from authored priors; none has been validated against real cases or by human labellers.
 - **No real language model has been called**; Azure OpenAI, Entra, Blob, AI Search and Monitor were validated against mocks only.
-- **Nothing has been deployed to Azure**, no Docker image was built locally, and no GitHub Actions workflow has run.
-- PostgreSQL itself was never used (PGlite only); row-level-security parity on a managed server is unverified.
+- **Nothing has been deployed to Azure**, no Docker image was built locally (CI builds them), and no CI run has been fully green yet.
+- PostgreSQL ran only in the CI integration job (1,008 passed, 3 failed); no Azure Database for PostgreSQL was used, so
+  row-level-security parity on a managed server is unverified.
 - One workload (Microsoft Teams sign-in); redaction is pattern-based; malware scanning is a stub; prompt-injection screening
   flags but does not block; retention is stored but not enforced; the audit chain is tamper-evident, not tamper-proof.
 - One API process: jobs, limiters and caches are in memory; no high-availability or backup design was validated.

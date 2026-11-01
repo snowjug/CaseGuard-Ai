@@ -423,8 +423,8 @@ reviewer approval or upgrades. The browser uses `@azure/msal-browser`, a differe
 
 **Not done (backlog in [CI_CD.md](CI_CD.md)):** actions are pinned to major tags rather than commit SHAs, base images are not
 pinned by digest, no SBOM or build provenance is generated, container images are not vulnerability-scanned, and Docker image
-builds have not been run (no Docker daemon was available). I did not run `audit:deps` for this document; it sends the package
-list of the lockfile to a public vulnerability service.
+builds have not been run locally (no Docker daemon was available; CI builds both images). I did not run `audit:deps` for this
+document; it sends the package list of the lockfile to a public vulnerability service.
 
 ## 11. Mapping to the threat model
 

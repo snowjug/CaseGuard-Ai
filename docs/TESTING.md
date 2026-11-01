@@ -192,8 +192,10 @@ pnpm.cmd exec tsc -p e2e/tsconfig.json --noEmit    # type-check the e2e project
 CI (`.github/workflows/ci.yml`, job `e2e`, 45-minute timeout, Ubuntu): `node scripts/verify.mjs --only build`, then
 `pnpm exec playwright install --with-deps chromium`, then `node scripts/verify.mjs --only test:e2e`. With `CI` set Playwright
 uses the bundled Chromium, the built API (`apps/api/dist`) and the web build in `.next`, retries a failed test once, forbids
-`test.only`, and the report and traces are uploaded when the job fails. **That job has never run** (the repository has not been
-pushed); the CI path of the suite (Chromium, `dist` API, `.next`) was not exercised locally.
+`test.only`, and the report and traces are uploaded when the job fails. **That job has run on GitHub** (run 41182982903: of 342 tests, 335
+passed, 1 failed (`e2e/demo-flow.spec.ts`, step "the engineer imports Case Two") and 6 did not run; see
+[CI_CD.md](CI_CD.md#9-what-was-and-was-not-validated)); the CI path of the suite (Chromium, `dist` API, `.next`) was not exercised
+locally.
 
 `node scripts/verify.mjs` runs the whole gate (format, lint, typecheck, tests, build, e2e, secret scan, audit) with PASSED, FAILED or
 NOT RUN for each step; see [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md#10-lint-format-typecheck-build).
@@ -306,8 +308,9 @@ pixels, not by reading styles. Local retries stay off; CI retries a failed test 
 
 ## 8. Not run, and not verifiable
 
-- **Not run:** the CI job (never pushed) and with it Chromium in CI and the `dist` and `.next` path; Docker and the images; anything
-  that needs Azure (`az` was never run); a real PostgreSQL; a screen reader; Firefox and Safari; a load test.
+- **Not run locally:** the CI job (CI has run it on GitHub, see section 4) and with it Chromium in CI and the `dist` and `.next` path;
+  Docker and the images (CI builds them); anything that needs Azure (`az` was never run); a real PostgreSQL (CI runs the integration
+  suite on one); a screen reader; Firefox and Safari; a load test.
 - **Not re-run for this document:** the unit, integration and AI-evaluation suites (their counts are those of
   [EVALUATION.md](EVALUATION.md#2-test-inventory)), coverage, and the domain benchmark.
 - **Cannot be verified here:** that the 45-minute CI timeout holds on a hosted runner (the local run time is in section 2, on a

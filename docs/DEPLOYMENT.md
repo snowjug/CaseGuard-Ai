@@ -227,7 +227,7 @@ Because the web app proxies `/livez`, `/healthz` and `/readyz` to the API, those
 Production is **never** deployed from a laptop. The intended flow (confirm it matches the workflows in `.github/workflows` and `docs/CI_CD.md`, both owned by the CI/CD worker):
 
 1. **Change request** with the release tag, the What-If output and the migration plan (rollback: see runbook).
-2. **Build** - CI builds and scans images; the production image tag is immutable (commit SHA or release version; `latest` is rejected by the template in prod).
+2. **Build** - CI builds the images and does not scan them yet (a follow-up in [CI_CD.md](CI_CD.md)); the production image tag is immutable (commit SHA or release version; `latest` is rejected by the template in prod).
 3. **What-If job** - runs `az deployment sub what-if` against the production subscription with a **read-only** federated identity and attaches the result.
 4. **Approval gate** - a GitHub Environment (`production`) with required reviewers (two people, not the author) and, optionally, a wait timer or deployment-branch restriction.
 5. **Deploy job** - OIDC federated credential bound to the `production` environment subject (no stored secrets; [docs/ENTRA_ID_SETUP.md](ENTRA_ID_SETUP.md#7-github-actions-oidc-for-deployment)); deploys stage 2 with the immutable tag.

@@ -48,7 +48,7 @@ Everything in containers instead: `docker compose up --build` (PostgreSQL + API 
 | `pnpm demo:reset` / `pnpm demo:seed`                     | Reset and seed the synthetic demo data                                                                                                                              |
 | `pnpm db:migrate`                                        | Apply SQL migrations to `DATABASE_URL`                                                                                                                              |
 | `pnpm secrets:scan`                                      | Secret scan of tracked and untracked files                                                                                                                          |
-| `pnpm docs:api` / `pnpm docs:check`                      | Regenerate the route table in `docs/API.md` (`pnpm docs:api --check` fails when it drifted) / check Markdown links, anchors, Mermaid fences, badges and screenshots |
+| `pnpm docs:api` / `pnpm docs:check`                      | Regenerate the route table in `docs/API.md` (`--check` fails when it drifted) / check Markdown links, anchors, Mermaid fences, badges, screenshots and placeholders |
 | `pnpm audit:deps`                                        | Lockfile hygiene and known-vulnerability gate                                                                                                                       |
 | `pnpm infra:validate`                                    | Bicep build, lint and parameter scan                                                                                                                                |
 | `pnpm docker:build`                                      | Build both images and validate `docker-compose.yml`                                                                                                                 |
@@ -56,7 +56,7 @@ Everything in containers instead: `docker compose up --build` (PostgreSQL + API 
 
 `pnpm verify` runs every gate as its own step and never marks a step passed unless its command exited 0. Exit code 3 from a tool means **NOT RUN** (for example no Docker daemon, no Bicep CLI, no network for the audit): it is reported as such and is never a pass. `pnpm verify --only lint,typecheck` runs a subset; a full run writes `docs/assets/VALIDATION_REPORT.md` with the environment (OS, Node, pnpm, date, commit).
 
-Two steps keep the documentation honest. `generated:check` fails when the route table in `docs/API.md` no longer matches the `ROUTES` registry (run `pnpm docs:api` and commit). `docs:check` fails on a relative link or image whose file does not exist, a heading anchor that does not exist, an empty or unclosed Mermaid fence, a badge for a workflow that is not in `.github/workflows`, and a missing screenshot. Run both before you push a documentation change.
+Two steps keep the documentation honest. `generated:check` fails when the route table in `docs/API.md` no longer matches the `ROUTES` registry (run `pnpm docs:api` and commit). `docs:check` fails on a relative link or image whose file does not exist, a heading anchor that does not exist, an empty or unclosed Mermaid fence, a badge for a workflow that is not in `.github/workflows`, a missing screenshot, and a FILL template placeholder left anywhere in a Markdown file (even in a code span or a code fence). Run both before you push a documentation change.
 
 ## Branches, pull requests and reviews
 
@@ -91,7 +91,7 @@ The `commit-msg` hook (`scripts/check-commit-msg.mjs`) enforces the header. The 
 
 ## Secrets and the scanner
 
-No real secret may enter the repository, including `.env` files (only `*.example` files are tracked). `scripts/scan-secrets.mjs` (pre-commit and CI) and gitleaks (CI, full history) look for private keys, cloud and SaaS tokens, Azure storage keys and connection strings, JWTs, credentials in URLs and high-entropy `secret/password/token/api key` assignments. Findings print only `file:line` and a rule id, never the value.
+No real secret may enter the repository, including `.env` files (only `*.example` files are tracked). `scripts/scan-secrets.mjs` (pre-commit and CI) and gitleaks (CI: the commits of the push or pull request; locally: the full history) look for private keys, cloud and SaaS tokens, Azure storage keys and connection strings, JWTs, credentials in URLs and high-entropy `secret/password/token/api key` assignments. Findings print only `file:line` and a rule id, never the value.
 
 For a false positive, prefer the narrowest allowance and always give a reason:
 
