@@ -9,7 +9,7 @@ import { useAuth } from '../../lib/auth/context';
 import { useSession } from '../../lib/auth/session';
 import { useToast } from '../../lib/toast';
 import { useRetryCountdown } from '../../lib/use-retry-countdown';
-import { codecs, useUrlState } from '../../lib/url-state';
+import { codecs, useUrlChoiceState } from '../../lib/url-state';
 import { ConfirmStep, ProgressStep } from './CreateSteps';
 import { explainIngestError, type IngestProblem } from './ingest-errors';
 import {
@@ -85,8 +85,10 @@ export function NewCasePage() {
   const toast = useToast();
   const ready = auth.status === 'ready';
 
-  const [choice, setChoice] = useUrlState('source', CHOICE_CODEC);
-  const [sampleParam, setSampleParam] = useUrlState('sample', SAMPLE_CODEC);
+  // A choice shows at once: the router reports a written URL a moment late, and a radio or tab that waits for it
+  // springs back to the old choice right after the click (see `useUrlChoiceState`).
+  const [choice, setChoice] = useUrlChoiceState('source', CHOICE_CODEC);
+  const [sampleParam, setSampleParam] = useUrlChoiceState('sample', SAMPLE_CODEC);
   const [local, setLocal] = useState<Omit<SourceDraft, 'choice' | 'sampleId'>>({
     pasteText: EMPTY_DRAFT.pasteText,
     title: EMPTY_DRAFT.title,

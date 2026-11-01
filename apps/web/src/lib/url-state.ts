@@ -119,8 +119,8 @@ export function writeUrlState(patch: Patch, history: 'replace' | 'push' = 'repla
 
 /**
  * One typed query parameter. The setter accepts a value or an updater and never triggers a full page load. For text a
- * person types into an input use `useUrlTextState`: the value here follows `useSearchParams`, which reports a write a
- * moment late.
+ * person types into an input use `useUrlTextState`, and for a choice made in a controlled control (a radio group, a tab
+ * strip) use `useUrlChoiceState`: the value here follows `useSearchParams`, which reports a write a moment late.
  */
 export function useUrlState<T>(
   key: string,
@@ -371,6 +371,69 @@ export function useUrlTextState(
     },
   };
   return { value: field.committed, inputProps, set };
+}
+
+interface ChoiceField {
+  /** What the control shows, as the URL's raw value: the choice made last, or the URL's after it changed for another reason. */
+  raw: string | null;
+  /** The URL value (raw) the field was last in step with. */
+  seen: string | null;
+  /** Values the field wrote to the URL whose arrival through `useSearchParams` has not been seen yet, oldest first. */
+  sent: readonly (string | null)[];
+}
+
+type ChoiceAction =
+  { type: 'choose'; raw: string | null; written: boolean } | { type: 'url'; raw: string | null };
+
+function reduceChoice(state: ChoiceField, action: ChoiceAction): ChoiceField {
+  switch (action.type) {
+    case 'choose':
+      return {
+        ...state,
+        raw: action.raw,
+        sent: action.written ? [...state.sent, action.raw].slice(-MAX_SENT) : state.sent,
+      };
+    case 'url': {
+      // The field's own write coming back, however late: the choice is already shown, or a later one is.
+      const own = state.sent.indexOf(action.raw);
+      if (own >= 0) return { ...state, seen: action.raw, sent: state.sent.slice(own + 1) };
+      // Another reason (Back, a link, a write elsewhere): follow the URL.
+      return { raw: action.raw, seen: action.raw, sent: [] };
+    }
+  }
+}
+
+/**
+ * One typed choice whose value lives in the URL (a radio group, a tab strip, a select). `useUrlState` shows the URL's
+ * value, which `useSearchParams` reports a moment after each write, so a controlled control built on it springs back to
+ * the old choice right after a click (React restores a controlled input whose handler changed no state) and moves on
+ * only when the router answers: for that moment the click has changed nothing, to a script or a slow machine as much as
+ * to a person. This keeps the choice in local state that changes at once and writes it to the URL for deep links. The
+ * choice follows the URL again when the URL changes for another reason (Back and Forward, a link, a write elsewhere);
+ * the router's late report of the hook's own writes changes nothing. Typed text belongs to `useUrlTextState`.
+ */
+export function useUrlChoiceState<T>(
+  key: string,
+  codec: UrlCodec<T>,
+  options: UrlStateOptions = {},
+): readonly [T, (next: T) => void] {
+  const searchParams = useSearchParams();
+  const raw = searchParams.get(key);
+  const history = options.history ?? 'replace';
+  const [field, dispatch] = useReducer(reduceChoice, { raw, seen: raw, sent: [] });
+  if (field.seen !== raw) dispatch({ type: 'url', raw });
+  const value = useMemo(() => codec.parse(field.raw), [codec, field.raw]);
+  const set = useCallback(
+    (next: T): void => {
+      const serialized = codec.serialize(next);
+      const written = serialized !== new URLSearchParams(window.location.search).get(key);
+      // The choice is shown before the URL is written, so no report of the write can arrive ahead of it.
+      dispatch({ type: 'choose', raw: serialized, written });
+      if (written) writeUrlState({ [key]: serialized }, history);
+    },
+    [codec, key, history],
+  );
+  return [value, set] as const;
 }
 
 const ASOF_CODEC = codecs.isoTimestamp();

@@ -18,7 +18,7 @@ import {
   type FakeHandlers,
 } from '../../../test/harness';
 import { liveRegionOf, watchChanges } from '../../../test/live-region';
-import { navigateTo, router } from '../../../test/next-navigation';
+import { navigateTo, router, setNavigationLatency } from '../../../test/next-navigation';
 import { ApiError } from '../../lib/api/errors';
 import {
   describeRedactionRefusal,
@@ -173,6 +173,36 @@ describe('[FR-ING-01] the ingestion wizard, end to end', () => {
     renderApp(<NewCasePage />, { api: api() });
     const radios = await screen.findAllByRole('radio');
     expect(radios[1]).toBeChecked();
+  });
+
+  it('shows the sample that was clicked at once, before the router has reported the new address', async () => {
+    // The App Router reports a written URL a moment late. A radio that waited for it sprang back to the first sample
+    // right after the click, so a click on the second one changed nothing that could be seen or checked.
+    setNavigationLatency(80);
+    const user = userEvent.setup();
+    const handler = api();
+    renderApp(<NewCasePage />, { api: handler });
+    const first = await screen.findByRole('radio', { name: /^CG-SYN-1001:/ });
+    const second = screen.getByRole('radio', { name: /^CG-SYN-1002:/ });
+    expect(first).toBeChecked();
+
+    await user.click(second);
+    expect(second).toBeChecked();
+    expect(first).not.toBeChecked();
+    expect(window.location.search).toBe('?sample=case-two-teams-signin-proxy');
+    // The router's report of that write arrives later and changes nothing.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(second).toBeChecked();
+    expect(first).not.toBeChecked();
+
+    await press(user, 'Validate and preview');
+    await screen.findByRole('heading', { name: /Step 2 of 4/ });
+    expect(handler.call).toHaveBeenCalledWith(
+      'ingestion.preview',
+      expect.objectContaining({
+        body: { source: { type: 'sample', sampleId: 'case-two-teams-signin-proxy' } },
+      }),
+    );
   });
 
   it('has no accessibility violations on the source, review, confirm and progress steps', async () => {

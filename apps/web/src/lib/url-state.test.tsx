@@ -9,6 +9,7 @@ import {
   useCurrentUrl,
   useSelectionState,
   useTabState,
+  useUrlChoiceState,
   useUrlState,
   useUrlStates,
   useUrlTextState,
@@ -371,6 +372,82 @@ describe('[UX-URL-04] text typed into a field whose value lives in the URL', () 
       expect(input).toHaveValue('ab😀');
       advance(250);
       expect(readQ()).toBe('ab😀');
+    });
+  });
+});
+
+const MODE = codecs.enumOf(['all', 'open', 'closed'] as const, 'all');
+
+describe('[UX-URL-05] a choice whose value lives in the URL', () => {
+  it('follows the URL when it changes for another reason: a link, a write elsewhere, a new entry', () => {
+    navigateTo('/x?mode=open');
+    const { result } = renderHook(() => useUrlChoiceState('mode', MODE));
+    expect(result.current[0]).toBe('open');
+    act(() => navigateTo('/x?mode=closed'));
+    expect(result.current[0]).toBe('closed');
+    act(() => writeUrlState({ mode: null }));
+    expect(result.current[0]).toBe('all');
+    act(() => result.current[1]('open'));
+    expect(result.current[0]).toBe('open');
+    act(() => window.history.pushState(null, '', '/x?mode=closed'));
+    expect(result.current[0]).toBe('closed');
+  });
+
+  it('writes only when the URL would change, and removes the key for the default', () => {
+    navigateTo('/x?mode=open');
+    const writes = spyOnWrites();
+    const { result } = renderHook(() => useUrlChoiceState('mode', MODE));
+    act(() => result.current[1]('open'));
+    expect(writes).not.toHaveBeenCalled();
+    act(() => result.current[1]('closed'));
+    expect(writes).toHaveBeenCalledTimes(1);
+    expect(window.location.search).toBe('?mode=closed');
+    act(() => result.current[1]('all'));
+    expect(window.location.search).toBe('');
+    expect(result.current[0]).toBe('all');
+  });
+
+  describe('while the router reports a written URL late', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+    const advance = (ms: number): void => {
+      act(() => {
+        vi.advanceTimersByTime(ms);
+      });
+    };
+
+    it('shows the choice at once, as a control that was clicked has to, and keeps it when the report arrives', () => {
+      navigateTo('/x?keep=1');
+      setNavigationLatency(60);
+      const { result } = renderHook(() => useUrlChoiceState('mode', MODE));
+      expect(result.current[0]).toBe('all');
+      act(() => result.current[1]('open'));
+      expect(result.current[0]).toBe('open');
+      expect(window.location.search).toBe('?keep=1&mode=open');
+      advance(59);
+      expect(result.current[0]).toBe('open');
+      advance(1);
+      expect(result.current[0]).toBe('open');
+    });
+
+    it('is not undone by the late report of an earlier choice', () => {
+      navigateTo('/x');
+      setNavigationLatency(60);
+      const { result } = renderHook(() => useUrlChoiceState('mode', MODE));
+      act(() => result.current[1]('open'));
+      advance(30);
+      act(() => result.current[1]('closed'));
+      expect(result.current[0]).toBe('closed');
+      // The router reports 'open' now, behind the choice already shown, and 'closed' a moment later.
+      advance(30);
+      expect(result.current[0]).toBe('closed');
+      advance(30);
+      expect(result.current[0]).toBe('closed');
+      expect(window.location.search).toBe('?mode=closed');
     });
   });
 });
