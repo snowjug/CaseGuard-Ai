@@ -10,7 +10,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "bench": "tsx bench/bench.ts"
+    "bench": "tsx bench/bench.ts",
+    "eval": "tsx test/evaluation/report.ts"
   },
   "dependencies": {
     "@caseguard/schemas": "workspace:*",

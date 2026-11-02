@@ -1,9 +1,10 @@
 # Evaluation
 
 How CaseGuard AI was evaluated, with the numbers that were actually produced for this document, what they prove and what they
-cannot. Every figure comes from a command that was run on one developer machine (given in section 8). Nothing here is a claim
-about real-world accuracy: the only data are **two synthetic cases**, there is **no human-labelled ground truth**, and every score
-is an **estimate** from an authored knowledge pack.
+cannot. Every figure comes from a command that was run on one developer machine (given in section 9). Nothing here is a claim
+about real-world accuracy: the data are **two synthetic cases written together with the engine** and, since the second
+evaluation wave, **a small independent set of 16 synthetic cases** (section 7); there is **no second human annotator** and no real
+customer data, and every score is an **estimate** from an authored knowledge pack.
 
 Related: [DOMAIN_ENGINE.md](DOMAIN_ENGINE.md), [AI_ORCHESTRATION.md](AI_ORCHESTRATION.md), [RESPONSIBLE_AI.md](RESPONSIBLE_AI.md),
 [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md).
@@ -17,7 +18,8 @@ Related: [DOMAIN_ENGINE.md](DOMAIN_ENGINE.md), [AI_ORCHESTRATION.md](AI_ORCHESTR
 | Can the future leak into an earlier decision?                     | As-of equivalence, mutation of everything after a cut, negative controls, leak detector tests   | 4       |
 | Do the AI contracts and validators hold?                          | The evaluation harness with the deterministic provider, 42 adversarial fixtures and 12 controls | 5       |
 | Is it fast enough?                                                | The engine benchmark and the hostile-input benchmark                                            | 6       |
-| How much should the results be trusted?                           | Limits                                                                                          | 7       |
+| Does the engine read text it was not written for?                 | 16 independent synthetic cases (paraphrased, noisy, negative, reordered) and a ReDoS probe      | 7       |
+| How much should the results be trusted?                           | Limits                                                                                          | 8       |
 
 **Machine and conditions.** Windows 10.0.26300, 11th Gen Intel Core i7-1185G7 at 3.00 GHz (8 logical cores), Node v26.13.0
 (the project requires Node 24 or newer), pnpm 10.34.7, repository on a OneDrive-synced folder. **Other workstreams were running
@@ -371,11 +373,123 @@ What this means: a typical case analyses in a fraction of a second, but a maxima
 about 17 s of CPU on one core. The API runs analysis as a background job on the event loop of the API process (concurrency 2, ten
 minute job timeout), so a few such cases would delay other requests; there is no worker pool and no load test of the HTTP layer.
 
-## 7. Limits of this evaluation
+## 7. Independent evaluation: text the pack was not written for
 
-- **Two synthetic cases, written alongside the engine.** No held-out data, no independent authors, no real support cases.
-- **No human-labelled ground truth.** Nobody has judged whether the forks, scores or counterfactuals are right. The test suite
-  checks internal consistency, invariants and regression, not validity.
+The two shipped cases were written together with the knowledge pack, so they show that the engine is consistent, not that it
+reads other people's wording correctly. This section is the first measurement on text the pack was not written for. It is small
+and has one annotator: read it as a warning light, not as an accuracy figure.
+
+**The set** (`packages/domain/test/evaluation/`: 16 synthetic cases, 83 authored events, 66 labelled signal occurrences):
+
+| Group      | Cases | What it checks                                                                                                                                                              |
+| ---------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| paraphrase |     6 | Six Teams sign-in stories (a name server, a proxy node, a Conditional Access rule, a session lifetime, one laptop, a Microsoft incident) told in new words                  |
+| noisy      |     3 | Typos, disclaimers, quoted history, an out-of-office reply, a printer log that looks like a Teams error, chat fragments, one message in Portuguese                          |
+| negative   |     4 | Scheduling, a licence question, a printer problem with Teams-like error text, and a user who says what is _not_ the case ("not intermittent", "only me", "nothing changed") |
+| reordered  |     3 | The same events handed over in another order; the analysis must be identical                                                                                                |
+
+**Method.**
+
+- Every event was labelled, before the engine ran, with the signals it states, judged against the pack's own signal names and
+  descriptions (the patterns were not read while writing or labelling). The list is exhaustive per event: anything the engine
+  reports that is not on it is a false positive.
+- The events are plain text, like a pasted transcript or a CSV: no structured fields and no action metadata.
+- Independence is tested, not asserted: no six-word sequence of any event appears in the two shipped cases
+  (`evaluation.test.ts`). Where the first draft shared a phrase with a sample (an engineer's request for sample users, a
+  service-health check) it was reworded before the numbers below were taken.
+- Event types follow the schema's vocabulary: a check that reports a finding is a diagnostic result. The first draft typed such
+  events as engineer actions; the first run on that draft reported 12 of 66 expected signals (18 %), the re-typed set 13 of 66
+  (20 %), and the re-typing also made two false positives visible that the first typing had hidden.
+- Each story also names the cause a reader would accept (one or two of the nine hypotheses) and, for two stories, the earliest
+  missed decision point. Both are one person's judgement.
+- A spot check of every fourth missed label (13 of 53) against the signal definitions found all 13 defensible and two arguable.
+
+**Signals** (micro-averaged over (event, signal) occurrences; reordered cases repeat other cases and are not counted):
+
+| Group      | Reported and expected | Reported, not expected | Expected, not reported | Precision | Recall |
+| ---------- | --------------------: | ---------------------: | ---------------------: | --------: | -----: |
+| paraphrase |                     9 |                      2 |                     30 |      82 % |   23 % |
+| noisy      |                     4 |                      1 |                     21 |      80 % |   16 % |
+| negative   |                     0 |                      1 |                      2 |       0 % |    0 % |
+| all        |                    13 |                      4 |                     53 |      76 % |   20 % |
+
+Five of the 24 signals that the labels mention were ever read correctly (multiple users affected 6 of 8, service health clear 2
+of 3, site correlated 2 of 4, web client also fails 2 of 2, service-health incident 1 of 1); the other 19 were never read
+correctly in 48 labelled occurrences.
+
+Why the 53 expected signals were not reported, decided mechanically from the detector definitions and not from the wording:
+
+| Reason                                                                                          | Occurrences |
+| ----------------------------------------------------------------------------------------------- | ----------: |
+| Only structured event data can show the signal (the fix-confirmation signals); free text cannot |           4 |
+| No text detector of the signal accepts the event's type or author role                          |           3 |
+| A text detector accepts the event and its pattern did not match what was written                |          46 |
+
+Recall over the 59 occurrences a text detector could have reported is 22 %. Wording is the problem, not the labels' ambition:
+"the name of the server could not be resolved", "the connection timed out", "did both on 5 pcs. nothing changed" and "new cert
+inspection profile went on that cluster" were not recognised.
+
+**Other measures.**
+
+| Measure                                         | Result                                                                                                                                                                                                                                          |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Earliest missed decision point (13 cases)       | Exact in the 2 cases that have one; none missed or off by an event; 1 spurious (a single-laptop story where the engine calls the engineer's early cache removal premature, which the annotator judged reasonable there); 10 agree there is none |
+| Leading hypothesis (the 9 stories with a cause) | The story's cause, moved by evidence: 4. The story's cause only because it is the favourite before any evidence (Conditional Access at its 20 % prior): 1. A different named cause: 4 (three at 20 to 25 %, one at 52 %)                        |
+| No sign-in failure in the story (3 controls)    | No signal and no decision point, but the engine still ranks Conditional Access first, at its 20 % prior                                                                                                                                         |
+| Order of events (3 reordered cases)             | Identical analysis, 3 of 3                                                                                                                                                                                                                      |
+| Unsupported workload                            | Six look-alike names (`teams`, `Teams-Authentication`, ...) get no pack; the refusal at preview, create and analysis is covered by the API tests `ingestion-workload.test.ts` and `analysis-service.test.ts`                                    |
+
+**What it found.**
+
+1. **A statement that denies a signal is read as stating it.** All 4 false positives are of this kind: "nothing active" and "no
+   active incident" in service health read as an incident (twice), "the browser signs in without any problem" as "the web client
+   also fails", "this is not intermittent" as intermittent. In the hourly sign-out story one "nothing active" sentence makes
+   _Microsoft incident_ the leading hypothesis at 52 % while the story's real cause falls from 20 % to 11 %. Three tests state the
+   correct behaviour and are marked `it.fails`: they stay green while the defect is open and turn red the day it is fixed.
+2. **The patterns match the wording of the shipped cases more than the facts.** 46 of the 53 misses.
+3. **Some signals cannot be read from text at all.** The fix-confirmation signals, and "all resolvers" and "all proxy nodes
+   respond", are detected only from structured fields, which pasted text and CSV do not have.
+4. **The parser's event type decides what is read.** A pasted engineer message that opens with an action verb ("Checked the
+   logs...") is typed an engineer action, which the text detector for "no failure records" does not accept; the same sentence
+   opened another way is read. Verified end to end on a three-line transcript (a fourth `it.fails` test).
+5. **Two first-party patterns scanned in quadratic time; fixed.** See the probe below.
+
+**ReDoS and safety probe** (`packages/domain/test/robustness.test.ts`). The existing test ran every shipped pattern on eight
+generic hostile inputs of 20,000 characters. Three checks were added:
+
+- Inputs derived from each pattern itself, in the manner of the probe that guards customer-supplied redaction patterns: runs of
+  the characters and words the pattern mentions, a word cut one character short, words over long gaps, and every separator the
+  pattern names (`.`, `-`, `@`, ...) alternating with a word character, which puts a word boundary at every other position.
+  Limit: 100 ms per input.
+- The static check of that guard (`describeBacktrackingRisk`) over the shipped patterns. Nested repetition, a back-reference or
+  more than four unbounded repetitions fail the test; its 80 look-around reports are not counted, because the pack compiler
+  itself adds a one-character look-behind as a word boundary. Two patterns (`sig.no-server-side-failure-records`,
+  `sig.resolver-inconsistent`) are reviewed exceptions: separate `\s+` runs between literal words, 0.2 ms at 20,000 characters.
+- An equivalence test for the e-mail pattern.
+
+The probe found two defects. `sig.proxy-node-inconsistent` took **9.8 s** on one 20,000-character event of `proxy-proxy-...`
+(24, 76, 341 and 1,346 ms at 1, 2, 4 and 8 thousand characters, so quadratic): an unbounded `[\w-]*` after the literal `proxy`
+re-scans the rest of the run from every occurrence. `req.sample-users`, the e-mail pattern, took 0.4 to 0.8 s on `a.a.a....`
+for the same reason. A bundle may hold 2,000 events of 20,000 characters, a 2 MiB upload about 100 of them, and an engine pass
+blocks the API's event loop (OP-3), so a crafted case could have held it for minutes. Both repetitions are now bounded (at most 40
+characters of node name; the RFC limits of 64 and 63 for an address); every derived input stays under the 100 ms limit (about
+10 ms for the address on the worst one), ordinary text and addresses match exactly as before, and the 1,042 domain tests are
+unchanged. With the two old patterns restored, the new tests fail on both. These changes alter two patterns only: no score,
+weight or prior was touched.
+
+## 8. Limits of this evaluation
+
+- **Two shipped synthetic cases, written alongside the engine.** They show consistency. The independent set of section 7 is a
+  first step beyond them, no more.
+- **The independent set is small and has one annotator.** 16 cases, 83 events, 66 labelled occurrences, 9 stories with a cause,
+  2 with an expected missed moment; no confidence intervals and no second annotator, so no agreement figure. The annotator also
+  wrote the cases, and both were produced with the help of the AI model that helped build the product, so author and labels can
+  share blind spots.
+- **Synthetic text only.** Nobody has judged real customer cases; real mail will differ in both directions.
+- **Text only.** The set has no structured fields, which the shipped cases use and which the engine reads through other
+  detectors. Requirement detectors, warnings, quality scores, counterfactuals and Avoidable Support Effort were not evaluated.
+- **No human-labelled ground truth beyond that.** Nobody has judged whether the forks, scores or counterfactuals of real cases
+  are right. The test suite checks internal consistency, invariants and regression, not validity.
 - **Estimates, not measurements.** Confidence, quality, avoidable effort and simulated time come from authored priors and
   likelihoods in one knowledge pack. Customer response times and effort minutes are assumptions.
 - **No real model was evaluated.** The AI gates verify the contracts with the deterministic provider; the Azure OpenAI provider
@@ -387,12 +501,18 @@ minute job timeout), so a few such cases would delay other requests; there is no
 - **Timings are noisy** (section 6) and OneDrive-synced storage inflates start-up times.
 - **Nothing was deployed.** No result here says anything about behaviour on Azure.
 
-## 8. Reproduce
+## 9. Reproduce
 
 ```powershell
 # Per-package tests: run inside the package directory (repeat for each package)
 Set-Location packages\domain
 pnpm.cmd exec vitest run
+Set-Location ..\..
+
+# Independent evaluation (section 7): the pinned baseline, the ReDoS probe, and the tables above (Linux and macOS: drop ".cmd")
+Set-Location packages\domain
+pnpm.cmd exec vitest run test/evaluation.test.ts test/robustness.test.ts
+pnpm.cmd run eval
 Set-Location ..\..
 
 # API: a few files
