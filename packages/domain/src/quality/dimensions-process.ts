@@ -21,6 +21,7 @@ export function scopingCompleteness(f: QualityFacts): DimensionDraft {
   let counted = 0;
   let pending = 0;
   const missing: EvidenceLink[] = [];
+  const captured: EvidenceLink[] = [];
   for (const req of scoping) {
     const state = f.requirement(req.id);
     if (!state || state.firstRelevantIndex === null) continue;
@@ -32,8 +33,11 @@ export function scopingCompleteness(f: QualityFacts): DimensionDraft {
     }
     const weight = CRITICALITY_WEIGHT[req.criticality];
     counted += weight;
-    if (satisfied) earned += weight;
-    else missing.push(evidenceLink('requirement', req.id, req.label));
+    const link = evidenceLink('requirement', req.id, req.label);
+    if (satisfied) {
+      earned += weight;
+      captured.push(link);
+    } else missing.push(link);
   }
   // Items still inside the grace period are neither credited nor held against the case, but a
   // verdict of "everything was captured" cannot be given while some are still open.
@@ -48,7 +52,7 @@ export function scopingCompleteness(f: QualityFacts): DimensionDraft {
             missing.length === 0
               ? 'Every scoping item the knowledge pack expects was captured.'
               : `${plural(missing.length, 'scoping item')} still missing: ${missing.map((m) => m.label ?? m.id).join('; ')}.`,
-          evidence: missing,
+          evidence: missing.length > 0 ? missing : captured,
         })
       : undecided(
           'SC-1',
@@ -167,6 +171,7 @@ export function customerCommunication(f: QualityFacts): DimensionDraft {
   const withExpectation = emails.filter((e) =>
     f.pack.lexicon.expectation.some((re) => re.test(e.body)),
   );
+  const withoutExpectation = emails.filter((e) => !withExpectation.includes(e));
   const expectationCheck =
     emails.length > 0
       ? makeCheck({
@@ -175,8 +180,7 @@ export function customerCommunication(f: QualityFacts): DimensionDraft {
           weight: 0.25,
           score: withExpectation.length / emails.length,
           note: `${withExpectation.length} of ${plural(emails.length, 'message')} to the customer said when the next update or result would come.`,
-          evidence: emails
-            .filter((e) => !withExpectation.includes(e))
+          evidence: (withoutExpectation.length > 0 ? withoutExpectation : withExpectation)
             .slice(0, 4)
             .map(eventLink),
         })
@@ -332,6 +336,13 @@ export function resolutionValidation(f: QualityFacts): DimensionDraft {
 export function efficiencyProportionality(f: QualityFacts): DimensionDraft {
   const { params } = f;
   const lowValue = f.actions.filter((a) => a.lowValue);
+  // When no step was wasted, the steps that earned the pass are the ones that taught the most.
+  const informative = [...f.actions]
+    .filter((a) => a.realizedInformationGainBits > 0)
+    .sort(
+      (a, b) =>
+        b.realizedInformationGainBits - a.realizedInformationGainBits || a.sequence - b.sequence,
+    );
   const valueCheck =
     f.actions.length > 0
       ? makeCheck({
@@ -340,7 +351,9 @@ export function efficiencyProportionality(f: QualityFacts): DimensionDraft {
           weight: 0.35,
           score: 1 - lowValue.length / f.actions.length,
           note: `${lowValue.length} of ${plural(f.actions.length, 'step')} repeated earlier work, re-checked what was already known, or had a far better alternative available.`,
-          evidence: lowValue.slice(0, 4).map((a) => evidenceLink('action', a.id, a.label)),
+          evidence: (lowValue.length > 0 ? lowValue.slice(0, 4) : informative.slice(0, 3)).map(
+            (a) => evidenceLink('action', a.id, a.label),
+          ),
         })
       : undecided(
           'EF-1',
@@ -353,6 +366,14 @@ export function efficiencyProportionality(f: QualityFacts): DimensionDraft {
   const heavy = f.actions.filter(
     (a) => f.actionConfig.effortScale[a.customerEffort] >= params.heavyEffortScore,
   );
+  // Without a heavy request, the requests the minutes were added up from.
+  const requests = [...f.actions]
+    .filter((a) => DEFAULT_EFFORT_MINUTES[a.customerEffort] > 0)
+    .sort(
+      (a, b) =>
+        DEFAULT_EFFORT_MINUTES[b.customerEffort] - DEFAULT_EFFORT_MINUTES[a.customerEffort] ||
+        a.sequence - b.sequence,
+    );
   const burdenCheck =
     f.actions.length > 0
       ? makeCheck({
@@ -361,7 +382,9 @@ export function efficiencyProportionality(f: QualityFacts): DimensionDraft {
           weight: 0.35,
           score: scoreBetween(minutes, params.customerMinutesGood, params.customerMinutesBad),
           note: `About ${minutes} minutes of customer time were requested (estimated from effort levels), including ${plural(heavy.length, 'heavy request')}.`,
-          evidence: heavy.slice(0, 4).map((a) => evidenceLink('action', a.id, a.label)),
+          evidence: (heavy.length > 0 ? heavy : requests)
+            .slice(0, 4)
+            .map((a) => evidenceLink('action', a.id, a.label)),
         })
       : undecided(
           'EF-2',
