@@ -152,16 +152,37 @@ describe('property: parsePastedTranscript', () => {
         const a = parsePastedTranscript(text, BASE);
         const b = parsePastedTranscript(text, BASE);
         expect(a).toEqual(b);
-        const lf = parsePastedTranscript(text.replaceAll('\r\n', '\n'), BASE);
-        const crlf = parsePastedTranscript(
-          text.replaceAll('\r\n', '\n').replaceAll('\n', '\r\n'),
-          BASE,
-        );
+        // A carriage return, a line feed and a pair of them are each one line break, and a stray carriage return at the
+        // end of a generated line is a break of its own. So the other conventions are made with the parser's rule, not by
+        // merging pairs, which would turn "\r\r\n" (two breaks) into "\r\n" (one) and change the text.
+        const lfText = text.replace(/\r\n?/g, '\n');
+        const lf = parsePastedTranscript(lfText, BASE);
+        const crlf = parsePastedTranscript(lfText.replaceAll('\n', '\r\n'), BASE);
         expect(crlf.ok).toBe(lf.ok);
-        if (lf.ok && crlf.ok) expect(crlf.bundle).toEqual(lf.bundle);
+        expect(a.ok).toBe(lf.ok);
+        if (a.ok && lf.ok && crlf.ok) {
+          expect(crlf.bundle).toEqual(lf.bundle);
+          expect(a.bundle).toEqual(lf.bundle);
+        }
       }),
       { numRuns: 150 },
     );
+  });
+
+  it('[FR-ING-01] reads a stray carriage return before a line break as a break of its own', () => {
+    // Found by a random run on CI (fast-check seed -1436613378): "\r\r\n" is a carriage return and then a pair, two
+    // breaks, so it is not the text "\r\n". Each form must read like its canonical rewrite.
+    const text = '[1960-00-00 00:00] Customer: \r\r\n[1970-01-01 00:00] Customer: \r\n!';
+    const lfText = text.replace(/\r\n?/g, '\n');
+    const a = parsePastedTranscript(text, BASE);
+    const lf = parsePastedTranscript(lfText, BASE);
+    const crlf = parsePastedTranscript(lfText.replaceAll('\n', '\r\n'), BASE);
+    expect(a.ok).toBe(lf.ok);
+    expect(crlf.ok).toBe(lf.ok);
+    if (a.ok && lf.ok && crlf.ok) {
+      expect(a.bundle).toEqual(lf.bundle);
+      expect(crlf.bundle).toEqual(lf.bundle);
+    }
   });
 
   it('[FR-ING-01] trailing blank lines and spaces never change the events', () => {
