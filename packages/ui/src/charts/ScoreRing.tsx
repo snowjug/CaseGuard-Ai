@@ -41,6 +41,8 @@ export interface ScoreRingProps {
   /** Pixel size of the square canvas (default 132). */
   size?: number;
   status?: ScoreStatus;
+  /** The status in the page's own words (a quality band, say), so one card never names it twice in two ways. */
+  statusLabel?: string;
   /** Text in the middle of the ring; defaults to the rounded value. */
   valueText?: string;
   /** Small caption under the ring (for example "Estimated"). */
@@ -60,12 +62,14 @@ export function ScoreRing({
   label,
   size = 132,
   status = 'unknown',
+  statusLabel,
   valueText,
   caption,
   className,
 }: ScoreRingProps) {
   const styles = useStyles();
   const meta = STATUS_META[STATUS[status].badge];
+  const statusWords = statusLabel ?? STATUS[status].label;
   const tone = cg.tone[meta.tone];
   const stroke = 12;
   const centre = size / 2;
@@ -75,7 +79,7 @@ export function ScoreRing({
   const hasValue = value !== null && Number.isFinite(value);
   const hasRange = low !== null && high !== null && high >= low;
   const shown = valueText ?? (hasValue ? formatNumber(value, { maximumFractionDigits: 0 }) : '—');
-  const alt = `${label}: ${hasValue ? shown : 'not enough data'}${hasValue ? ` out of ${max}` : ''}, ${STATUS[status].label}${hasRange ? `, estimated range ${formatNumber(low, { maximumFractionDigits: 0 })} to ${formatNumber(high, { maximumFractionDigits: 0 })}` : ''}`;
+  const alt = `${label}: ${hasValue ? shown : 'not enough data'}${hasValue ? ` out of ${max}` : ''}, ${statusWords}${hasRange ? `, estimated range ${formatNumber(low, { maximumFractionDigits: 0 })} to ${formatNumber(high, { maximumFractionDigits: 0 })}` : ''}`;
   const StatusIcon = meta.icon;
 
   return (
@@ -163,7 +167,7 @@ export function ScoreRing({
           }}
         >
           <StatusIcon aria-hidden="true" />
-          {STATUS[status].label}
+          {statusWords}
         </span>
         {caption ? <span> · {caption}</span> : null}
       </figcaption>
@@ -172,7 +176,7 @@ export function ScoreRing({
         headers={['Measure', 'Value']}
         rows={[
           [label, hasValue ? shown : 'not enough data'],
-          ['Status', STATUS[status].label],
+          ['Status', statusWords],
           ...(hasRange
             ? [
                 ['Estimated low', formatNumber(low, { maximumFractionDigits: 0 })],

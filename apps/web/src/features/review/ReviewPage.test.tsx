@@ -101,7 +101,14 @@ describe('[REV-PAGE-02] the verdict', () => {
         'Case quality is poor: about 36 out of 100 (plausible range 32 to 39). This is an estimate.',
       ),
     ).toBeVisible();
-    expect(verdict.getByText('Poor')).toBeVisible();
+    // The ring, its table and the badge name the band in one word; the generic word of the ring is not used beside it.
+    expect(
+      verdict.getByRole('img', {
+        name: 'Case quality: 36 out of 100, Poor, estimated range 32 to 39',
+      }),
+    ).toBeVisible();
+    expect(verdict.getAllByText('Poor').length).toBeGreaterThanOrEqual(2);
+    expect(verdict.queryByText('Needs attention')).toBeNull();
     expect(verdict.getAllByText('The earliest important missed moment')[0]).toBeVisible();
     expect(
       verdict.getByText('Heavy customer request when a lighter ask was available'),
@@ -115,7 +122,13 @@ describe('[REV-PAGE-02] the verdict', () => {
     installMatchMedia();
     const { container } = renderReview({ fixture: CASE_TWO });
     const verdict = within(await region('Verdict'));
-    expect(await verdict.findByText('Strong')).toBeVisible();
+    expect(
+      await verdict.findByRole('img', {
+        name: /^Case quality: 99 out of 100, Strong, estimated range /,
+      }),
+    ).toBeVisible();
+    expect(verdict.getAllByText('Strong').length).toBeGreaterThanOrEqual(2);
+    expect(verdict.queryByText('Good')).toBeNull();
     expect(await verdict.findByText('No decision point stood out')).toBeVisible();
     expect(verdict.getByText(/That is a good sign for this case, not an error/)).toBeVisible();
     await expectNoAxeViolations(container);

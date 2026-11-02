@@ -290,6 +290,15 @@ describe('[NFR-A11Y-01] StackedBar, ScoreRing and DeltaBar', () => {
     expect(screen.getByRole('img', { name: /not enough data/ })).toBeInTheDocument();
   });
 
+  it('ScoreRing says the status in the words of the page when it is given them, not twice in two ways', () => {
+    renderWithTheme(<ScoreRing label="Case quality" value={36} status="poor" statusLabel="Poor" />);
+    expect(
+      screen.getByRole('img', { name: 'Case quality: 36 out of 100, Poor' }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('Poor').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Needs attention')).not.toBeInTheDocument();
+  });
+
   it('DeltaBar labels the simulated bar and states the difference in words', async () => {
     const { container } = renderWithTheme(
       <DeltaBar

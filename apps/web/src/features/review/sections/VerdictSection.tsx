@@ -135,6 +135,7 @@ function QualityCard({ caseId }: { caseId: string }) {
             high={verdict.high}
             label="Case quality"
             status={verdict.ring}
+            statusLabel={verdict.bandLabel}
             caption="Estimated"
           />
           <div className={styles.heroText}>
