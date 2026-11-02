@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import { listCases } from '../support/api';
 import { expect, test, type ThemeMode } from '../support/fixtures';
+import { toast } from '../support/flows';
 import { mainRegion, navLink, openPage, primaryNav, settle } from '../support/ui';
 
 /**
@@ -46,7 +47,9 @@ const REPORT_SECTIONS = [
   'Review and approval',
 ] as const;
 
-const section = (page: Page, name: string | RegExp) => page.getByRole('region', { name });
+const section = (page: Page, name: string | RegExp) =>
+  // A string name is a substring match by default, and "Chronology" is also part of "Chronology strip, scrollable".
+  page.getByRole('region', typeof name === 'string' ? { name, exact: true } : { name });
 
 test.describe('[FR-REV-01] the guided review reads the case from the verdict to what to do next', () => {
   test('has seven named sections in reading order, with a section navigation that moves focus', async ({
@@ -208,7 +211,13 @@ test.describe('[FR-REV-01] the guided review reads the case from the verdict to 
     }
     const overall = page.getByText('How this whole review was calculated');
     await overall.click();
-    await expect(page.getByText(/decision support for a human review/i).first()).toBeVisible();
+    // Every section carries a note of its own, closed until asked for: the one that opened is the one that shows.
+    await expect(
+      page
+        .getByText(/decision support for a human review/i)
+        .filter({ visible: true })
+        .first(),
+    ).toBeVisible();
     await expect(mainRegion(page)).not.toContainText(/CQI|SkillDNA|claims ledger/);
   });
 });
@@ -303,7 +312,10 @@ test.describe('[FR-REV-03] a section the role may not read degrades on its own',
     ).toBeVisible();
     await expect(section(page, 'Learning')).toContainText('This resembles');
     // The role is told what it lacks; the page does not provoke a refusal to find out.
-    expect(requested.filter((path) => /\/(quality|coaching|metrics)$/.test(path))).toEqual([]);
+    // The side navigation prefetches the Quality Review page, so only the API's own paths count here.
+    expect(
+      requested.filter((path) => /^\/api\/.+\/(quality|coaching|metrics)$/.test(path)),
+    ).toEqual([]);
   });
 
   test('the report leaves out the verdict with an explicit note instead of failing', async ({
@@ -411,7 +423,7 @@ test.describe('[FR-REV-06] the report: read it, print it, copy it, download it',
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await openPage(page, `/cases/${demo.caseOneId}/report`);
     await page.getByRole('button', { name: 'Copy summary' }).click();
-    await expect(page.getByText('Summary copied')).toBeVisible();
+    await expect(toast(page, 'Summary copied')).toBeVisible();
     const text = await page.evaluate(() => navigator.clipboard.readText());
     expect(text.split('\n')[0]).toMatch(/^CaseGuard guided review: CG-SYN-1001, /);
     expect(text).toContain('This is an estimate.');
@@ -424,13 +436,16 @@ test.describe('[FR-REV-06] the report: read it, print it, copy it, download it',
     page,
     demo,
     browser,
-  }) => {
+  }, testInfo) => {
     await openPage(page, `/cases/${demo.caseOneId}/report`);
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Download HTML' }).click();
     const file = await download;
     expect(file.suggestedFilename()).toBe('CG-SYN-1001-guided-review.html');
-    const path = await file.path();
+    // Playwright keeps a download under a name with no extension, which a browser opens as plain text: save it as the
+    // file a person would have (its own name) before opening it.
+    const path = testInfo.outputPath(file.suggestedFilename());
+    await file.saveAs(path);
     const html = await readFile(path, 'utf8');
     expect(html.startsWith('<!doctype html>')).toBe(true);
     expect(html).toContain('http-equiv="Content-Security-Policy"');
@@ -491,7 +506,10 @@ test.describe('[FR-REV-06] the report: read it, print it, copy it, download it',
 
   test('reports a case nobody can find as not found, never as an empty report', async ({
     page,
+    diagnostics,
   }) => {
+    // The 404 of the unknown case is what this test provokes.
+    diagnostics.allow(/status of 404/);
     await page.goto('/cases/case_does_not_exist/report');
     await expect(page.getByRole('heading', { name: 'We could not find that case' })).toBeVisible();
   });
