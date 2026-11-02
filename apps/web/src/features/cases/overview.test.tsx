@@ -122,6 +122,14 @@ describe('[FR-CASE-01] Case overview', () => {
       '/cases/case_1/timeline',
     );
   });
+
+  it('makes the guided review the one primary action and keeps the timeline one click away', async () => {
+    renderApp(<CaseOverviewPage caseId={CASE_ID} />, { api: api() });
+    const review = await screen.findByRole('link', { name: /Open guided review/ });
+    expect(review).toHaveAttribute('href', '/cases/case_1/review');
+    expect(screen.getAllByRole('link', { name: /Open guided review/ })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: /Open the timeline/ })).toHaveLength(1);
+  });
 });
 
 describe('[FR-CASE-02] digital twin', () => {

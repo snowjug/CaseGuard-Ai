@@ -360,6 +360,34 @@ Rules of thumb:
   (`not_a_demo_tenant`, `job_active`, `personas_unavailable`), which `lib/presentation/demo-errors.ts`
   turns into the sentence the confirmation dialog shows.
 
+### Guided review and report
+
+- **Guided review** (`features/review`, `/cases/[caseId]/review`): one scrolling page of seven sections (verdict,
+  chronology, what went wrong, what should have happened, next actions, learning, share), each a named region with
+  its own loading, error, empty and permission state and a "How this was calculated" disclosure. The reads are in
+  `features/review/hooks.ts`: each hook says whether its read is loading, was **not made** because the role may not
+  make it (a skill curator has no `quality:read`, so no request goes out and the section names the missing
+  permission), failed, or is ready, so one part never fails the page. The request shapes match the other case pages
+  and share their cache.
+- **One pure model layer** (`features/review/model`): every figure and sentence of the review and the report is
+  derived there, from the real engine output, with no clock, network or component in sight (verdict, chronology and
+  strip layout, decision points, paths, next actions, learning and the skill overlay, method notes, the share
+  summary). The derivations are tested against trimmed real responses of the two samples
+  (`test/fixtures/review`, see its README for how they were captured). Estimates and simulations are always
+  labelled, a simulated range that includes the record is never called an improvement, and the skill overlay shows
+  the API's numbers exactly (the screen does no arithmetic).
+- **Evidence drawer** (`features/review/evidence`): from a recommendation or decision point, an evidence chip opens
+  one drawer that calls `provenance.resolve`. Only a passage the server **verified** is shown as a quotation (with
+  the match highlighted and a "Checked against the stored message" badge); a mismatch is said to be unmatched and is
+  never shown as a quotation, and a derived item shows its title only. `?evidence=type:id` keeps the drawer in the
+  address, so Back from "Show in timeline" returns to it.
+- **Report** (`features/review/report`, `/cases/[caseId]/report`): the same derivations composed into nine
+  sections as one document (`ReportDocument`: plain semantic HTML and one stylesheet, no component library). It is
+  read in the app, printed (a real `@media print` stylesheet; print to PDF is the PDF route), copied as a short
+  summary, or downloaded as one HTML file made with `renderToStaticMarkup` (no scripts, every case string escaped by
+  React, a restrictive Content-Security-Policy meta). A section the role may not read is left out with an explicit
+  note. No endpoint was added.
+
 ### Hypothesis Arena and Counterfactual Lab
 
 - **Hypothesis Arena** (`features/hypotheses`, `/cases/[caseId]/hypotheses`): every read of the page carries the
@@ -480,7 +508,7 @@ destinations exist.
 - Entra sign-in is not validated against a live tenant (mocked MSAL only).
 - No live API existed when this foundation was written: states and layouts are verified with typed
   fixtures in tests and with intercepted responses in a real browser.
-- All 12 destinations exist. A link to a case, skill or other record that no longer exists (for example
+- All 13 destinations exist. A link to a case, skill or other record that no longer exists (for example
   after a demo reset) leads to the not-found page, which says so.
 - Governance sections: the retention periods, the legal hold and the feature flags are stored and audited
   but nothing enforces them yet (the page labels them _recorded only_, and so does each control's help

@@ -24,7 +24,10 @@ import { CaseSelect } from '../common/CaseSelect';
 
 const GROUPS: { label: string; ids: readonly string[] }[] = [
   { label: 'Overview', ids: ['command-center'] },
-  { label: 'Investigate', ids: ['cases', 'timeline', 'evidence', 'hypotheses', 'counterfactual'] },
+  {
+    label: 'Investigate',
+    ids: ['cases', 'guided-review', 'timeline', 'evidence', 'hypotheses', 'counterfactual'],
+  },
   { label: 'Improve', ids: ['quality', 'skills', 'efficiency'] },
   { label: 'Operate', ids: ['governance', 'system', 'demo'] },
 ];
@@ -292,7 +295,7 @@ function NavList({ inDrawer, onNavigate }: { inDrawer: boolean; onNavigate?: () 
   );
 }
 
-/** Primary navigation: all 12 destinations; icon rail below 1100 px; a drawer below 720 px (see `NavDrawer`). */
+/** Primary navigation: all 13 destinations; icon rail below 1100 px; a drawer below 720 px (see `NavDrawer`). */
 export function SideNav() {
   const styles = useStyles();
   return (

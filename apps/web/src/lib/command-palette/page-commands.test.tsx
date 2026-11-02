@@ -60,7 +60,7 @@ async function search(user: ReturnType<typeof userEvent.setup>, text: string) {
 }
 
 describe('[UX-PALETTE-04] the palette reaches every page', () => {
-  it('lists a "Go to" command for each of the 12 destinations', async () => {
+  it('lists a "Go to" command for each of the 13 destinations', async () => {
     const user = userEvent.setup();
     mount();
     await user.keyboard('{Control>}k{/Control}');

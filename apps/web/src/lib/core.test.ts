@@ -97,13 +97,14 @@ describe('[CFG-ENV-01] public environment', () => {
 });
 
 describe('[UX-NAV-01] navigation model', () => {
-  it('has the 12 destinations of the spec with unique shortcut keys', () => {
-    expect(NAV_ITEMS).toHaveLength(12);
+  it('has the 13 destinations (the 12 of the spec and the guided review) with unique shortcut keys', () => {
+    expect(NAV_ITEMS).toHaveLength(13);
     const keys = NAV_ITEMS.map((item) => item.shortcutKey);
-    expect(new Set(keys).size).toBe(12);
+    expect(new Set(keys).size).toBe(13);
     expect(NAV_ITEMS.map((item) => item.label)).toEqual([
       'Command Center',
       'Cases',
+      'Guided Review',
       'Case Timeline',
       'Evidence Ledger',
       'Hypothesis Arena',
@@ -134,6 +135,8 @@ describe('[UX-NAV-01] navigation model', () => {
     expect(active('/cases/new')).toEqual(['cases']);
     expect(active('/cases/c1')).toEqual(['cases']);
     expect(active('/cases/c1/timeline')).toEqual(['timeline']);
+    expect(active('/cases/c1/review')).toEqual(['guided-review']);
+    expect(active('/cases/c1/report')).toEqual(['guided-review']);
     expect(active('/cases/c1/quality')).toEqual(['quality']);
     expect(active('/quality')).toEqual(['quality']);
     expect(active('/skills/s1')).toEqual(['skills']);
@@ -155,6 +158,16 @@ describe('[UX-NAV-01] navigation model', () => {
       { label: 'Case Timeline' },
     ]);
     expect(buildBreadcrumbs('/skills/skill_1').at(-1)).toEqual({ label: 'skill_1' });
+    expect(
+      buildBreadcrumbs('/cases/case_1/review', { 'case:case_1': 'SAMPLE-001' }).at(-1),
+    ).toEqual({
+      label: 'Guided Review',
+    });
+    expect(
+      buildBreadcrumbs('/cases/case_1/report', { 'case:case_1': 'SAMPLE-001' }).at(-1),
+    ).toEqual({
+      label: 'Report',
+    });
   });
 });
 

@@ -6,7 +6,7 @@ CaseGuard AI reviews technical support cases: it reads the written record of a c
 
 - Everything here is implemented, on **synthetic data only**; the routes are exercised by the API tests and the pages by the web component tests (jsdom, not a real browser unless the end-to-end suite was run). The AI provider is the deterministic offline engine; no language model is called ([AI_ORCHESTRATION.md](AI_ORCHESTRATION.md)).
 - Every score, range and simulated outcome is an **estimate** from authored priors and is labelled as one ([RESPONSIBLE_AI.md](RESPONSIBLE_AI.md#5-communicating-uncertainty)).
-- Route ids (for example `analysis.start`) are the ids of the route registry; paths, permissions and shapes are in the generated tables of [API.md](API.md#route-reference). Page names are the 12 navigation destinations of the web app (`apps/web/src/lib/nav.ts`).
+- Route ids (for example `analysis.start`) are the ids of the route registry; paths, permissions and shapes are in the generated tables of [API.md](API.md#route-reference). Page names are the 13 navigation destinations of the web app (`apps/web/src/lib/nav.ts`).
 - "Limits" lists the entries of [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md) that matter for the persona. The roles and their permissions are in the matrix of [SECURITY.md](SECURITY.md#4-rbac-matrix).
 
 ## The personas
