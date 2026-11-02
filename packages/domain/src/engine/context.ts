@@ -3,7 +3,8 @@ import { CUSTOMER_SIDE_ROLES } from '@caseguard/schemas';
 import type { CompiledPack } from '../knowledge/compile';
 import { clamp } from '../util/math';
 import { earlierPosition, positionsOf } from './responders';
-import type { Observation } from './signals';
+import { MAX_EXCERPT_CHARS, type Observation } from './signals';
+import { sourcePointerFor } from './source-ref';
 import type { TemporalView } from './temporal';
 
 /** Shared, injected context for every engine function (clock, ids and provenance come from here). */
@@ -81,12 +82,13 @@ export function buildEvidence(
       sourceRef: {
         eventId: event.id,
         sourceId: event.sourceId,
-        pointer: `${event.sourcePointer}/body`,
-        ...(obs.start !== null ? { start: obs.start } : {}),
-        ...(obs.end !== null ? { end: obs.end } : {}),
-        excerpt: obs.excerpt.slice(0, 280),
+        pointer: sourcePointerFor(event, obs.field),
+        ...(obs.field !== null && obs.start !== null && obs.end !== null
+          ? { field: obs.field, start: obs.start, end: obs.end }
+          : {}),
+        excerpt: obs.excerpt.slice(0, MAX_EXCERPT_CHARS),
       },
-      excerpt: obs.excerpt.slice(0, 280),
+      excerpt: obs.excerpt.slice(0, MAX_EXCERPT_CHARS),
       observedAt: event.timestamp,
       confidence: clamp(
         STRENGTH_CONFIDENCE[signal.strength] * (obs.method === 'structured' ? 1 : 0.95),

@@ -31,8 +31,12 @@ import type { RequestContext } from '../../http/request-context';
  * content gives the same simulated numbers in every database. Every simulated figure moved once
  * (rollouts, confidence bands, skill baselines); stored runs are recomputed and the decisions on their
  * scenarios are reset (and audited) because the regenerated simulation differs.
+ * 2026.3.1: a source reference names the text its offsets count into (`SourceRef.field`: the title, the
+ * body, or both). Offsets of a match in the body now count from the start of the body instead of from the
+ * start of the title, and the pointer says which text that is. Every score, id, ranking and text is
+ * unchanged, so no simulated figure is redrawn; stored runs are recomputed once to carry the field.
  */
-export const ENGINE_VERSION = '2026.3.0';
+export const ENGINE_VERSION = '2026.3.1';
 
 /** Everything an analysis reads. Loaded once per run and never mutated. */
 export interface AnalysisInputs {

@@ -5,6 +5,7 @@ export * from './util/time';
 
 export * from './engine/temporal';
 export * from './engine/signals';
+export * from './engine/source-ref';
 export * from './engine/belief';
 export * from './engine/requirements';
 export * from './engine/context';

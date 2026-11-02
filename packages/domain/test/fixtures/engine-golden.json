@@ -1,0 +1,78 @@
+{
+  "about": "What the two synthetic samples produced under ENGINE_VERSION 2026.3.0, before a source reference named the text its offsets count into. Each digest is the hash of one part of the analysis with source locations (pointer, field, start, end) and evidence links removed (see withoutLinkage in ../engine-golden.ts). A change that only adds source linkage leaves every digest as it is; a digest that moves means a score, id, ranking or text moved. Regenerate only for an intended change of the engine's output, and say so in the commit.",
+  "engineVersion": "2026.3.0",
+  "cases": {
+    "one": {
+      "reference": "CG-SYN-1001",
+      "summary": {
+        "composite": 36,
+        "low": 32,
+        "high": 39.4,
+        "band": "poor",
+        "evidence": 26,
+        "claims": 61,
+        "forks": 9,
+        "warnings": 14,
+        "penalties": 6,
+        "improvements": 8,
+        "scenarios": 11,
+        "missing": 13,
+        "actions": 11,
+        "hypotheses": 9,
+        "earliest": "fork_85f167c1a22b7c2468301be4"
+      },
+      "digests": {
+        "evidence": "8cb3f6837ce49daa07ed04c38f3d25f08d2c54d3afa2a34a459442796501d2f7",
+        "claims": "a1b693dc153cd324f5092c93a44655ed2a229f6f04d8a3b04a389929d00bce45",
+        "hypotheses": "587af3a0570bd57a45dceb6752f29eba509cd56ab2b827bcc21d3fafa8d9c581",
+        "hypothesisLinks": "343d65b5fc1779cf385940beafd7f03f1573f6ffcbe8757bd9594599bf984ebc",
+        "missing": "9b37fcf7aaf61f51176e93d8075d78a346ff196a1c4fcbcd175336844fbcafee",
+        "actions": "b980a9d7b67090482d4d288c2b1ac0a24b3d8c6fc227b88b22bf706a3110210f",
+        "forks": "ea139bb3262abb80ae2fef49f8d57e4ef220419ac677e2efe6490d9f162c3bf1",
+        "timeline": "734393cfcd78a95ac32a839352678921ba0c04d3ee5752b33885ff2cd1eb4715",
+        "twin": "4c60a2b1afd732d71574c032d93644f3599c7fb0e05618ea2fd04d53818ccd29",
+        "scenarios": "f497eae0a1c0f593f704f29b1697b7749a427589e8e767c4946191c06f4201cc",
+        "quality": "b3ac9bba7e2b3372dbdf16e126a6f967b42e83509b2c34d14dc1ac1e2f9f817f",
+        "metrics": "72a4527842e11bbb605efd2b03a8422fff889317f0c77709235b2df7cd6f95bf",
+        "warnings": "f2cb9af23b72e3f2aa103d233e0539e765bbe55c928582d5aa1b70de609fcea6",
+        "coaching": "9ec413f92bbcad0e9155f755d2b50a612133486f2a11cbccb23ca1b279215d48"
+      }
+    },
+    "two": {
+      "reference": "CG-SYN-1002",
+      "summary": {
+        "composite": 99.1,
+        "low": 95.1,
+        "high": 99.7,
+        "band": "strong",
+        "evidence": 12,
+        "claims": 31,
+        "forks": 0,
+        "warnings": 0,
+        "penalties": 0,
+        "improvements": 0,
+        "scenarios": 0,
+        "missing": 11,
+        "actions": 5,
+        "hypotheses": 9,
+        "earliest": null
+      },
+      "digests": {
+        "evidence": "0e06694cae8b2604ddda995f2a6aebfb78ffa39ff64bc11ac4afbe619bbaaa5e",
+        "claims": "1500ca84f78eb50360faa1afa419b61acb21a724808febba3e6c3c69ff225e31",
+        "hypotheses": "e4e095216645bb1a78878359b9c8fe1ef9360fd40a90a001e9b65d87fc176630",
+        "hypothesisLinks": "bae2405aa1857042f8d4d23726a905b9173a8b7e7bcde73398e92f98c50970ff",
+        "missing": "2ae073719632162d97ad99b879dba9d974b8798456ef7ee2507200b47bf805a4",
+        "actions": "85ceebaa1750bdfaaadba1e1ae81c718a7bdf3eaccd4d8b6b3dd3ee57ec7ba1f",
+        "forks": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "timeline": "402c7a0b0e4289074d62c285b4e10f567f4921960c8235af2050d2558fe17ef1",
+        "twin": "dfd14fb546aa2928cd5a1baa9fd609774ed034c63fc462060d501e8e856760d0",
+        "scenarios": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "quality": "9a79e078331777dfa3a0cf933a0da3b40017724dffcd37fa62a5e3d8a026da8b",
+        "metrics": "724d073eeb095e3af310db86a9398c8786dacffe4edad4e9e4e822deb46c121a",
+        "warnings": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "coaching": "844a8fb72c6d4ad0d00394c56c33a500a552e7fcf20eeb8c556369f6ec76c4ee"
+      }
+    }
+  }
+}
