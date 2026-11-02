@@ -230,11 +230,13 @@ const DERIVED_TYPES: ReadonlySet<LinkType> = new Set([
   'requirement',
 ]);
 
-const NOTHING_TO_COMPARE: ExcerptCheck = {
+const unchecked = (reason: ExcerptCheck['reason']): ExcerptCheck => ({
   verification: 'not_checkable',
-  reason: 'no_location',
+  reason,
   context: null,
-};
+});
+
+const NOTHING_TO_COMPARE = unchecked('no_location');
 
 /**
  * Where a quotation came from: the event, the field and offsets recorded, the recorded excerpt, whether
@@ -265,10 +267,11 @@ function sourceOf(
 }
 
 type Found = Omit<ProvenanceItem, 'link'>;
-type Resolved = { readonly item: Found } | { readonly reason: ProvenanceUnresolved['reason'] };
+// `missing` carries the `reason` of a ProvenanceUnresolved: response data, not a Problem Details reason token.
+type Resolved = { readonly item: Found } | { readonly missing: ProvenanceUnresolved['reason'] };
 
-const NOT_FOUND: Resolved = { reason: 'not_found' };
-const NOT_YET_KNOWN: Resolved = { reason: 'not_yet_known' };
+const NOT_FOUND: Resolved = { missing: 'not_found' };
+const NOT_YET_KNOWN: Resolved = { missing: 'not_yet_known' };
 
 /**
  * Resolves evidence links to what they point at, in the view the caller asks for. Evidence and claims
@@ -441,7 +444,7 @@ export async function resolveProvenance(
   for (const link of links) {
     const resolved = await resolveOne(link);
     if ('item' in resolved) items.push({ link, ...resolved.item });
-    else unresolved.push({ link, reason: resolved.reason });
+    else unresolved.push({ link, reason: resolved.missing });
   }
   return { caseId, asOf, items, unresolved };
 }
