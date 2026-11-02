@@ -1,4 +1,4 @@
-import type { CaseEvent, SignalDetector } from '@caseguard/schemas';
+import type { CaseEvent, SignalDetector, SourceField } from '@caseguard/schemas';
 import type { CompiledDetector, CompiledPack } from '../knowledge/compile';
 import { stableId } from '../util/ids';
 import type { TemporalView } from './temporal';
@@ -17,6 +17,8 @@ export interface Observation {
   repeatIndex: number;
   /** False for validation/closure events: they may satisfy requirements but never move beliefs. */
   affectsBelief: boolean;
+  /** Which stored text `start` and `end` count into. Null exactly when there are no offsets (structured values). */
+  field: SourceField | null;
   start: number | null;
   end: number | null;
 }
@@ -26,11 +28,44 @@ const NON_BELIEF_EVENT_TYPES: ReadonlySet<string> = new Set([
   'resolution_note',
   'status_change',
 ]);
-const MAX_SCAN_CHARS = 20_000;
+/** Longest text of one event the detectors read. */
+export const MAX_SCAN_CHARS = 20_000;
+/** Characters of the scanned text an excerpt keeps before and after a match, before whitespace is folded. */
+export const EXCERPT_CHARS_BEFORE = 50;
+export const EXCERPT_CHARS_AFTER = 70;
+/** Longest excerpt kept on evidence and claims. */
+export const MAX_EXCERPT_CHARS = 280;
 
-export function eventText(event: CaseEvent): string {
+/** The text the detectors read: the title, a line break and the body (just the body when there is no title). */
+export function eventText(event: Pick<CaseEvent, 'title' | 'body'>): string {
   const text = event.title ? `${event.title}\n${event.body}` : event.body;
   return text.length > MAX_SCAN_CHARS ? text.slice(0, MAX_SCAN_CHARS) : text;
+}
+
+/** A span of the stored event text, counted from the start of the named field. */
+export interface LocatedSpan {
+  field: SourceField;
+  start: number;
+  end: number;
+}
+
+/**
+ * Where a span of `eventText(event)` lies in the stored event. Offsets found in the scanned text count
+ * from the start of the title, which is not where the body starts: a span inside the body is moved to
+ * count from the start of the body, one inside the title stays as it is, and one that crosses the line
+ * break between them keeps counting into the whole scanned text (`titleAndBody`).
+ */
+export function locateInEvent(
+  event: Pick<CaseEvent, 'title'>,
+  start: number,
+  end: number,
+): LocatedSpan {
+  const title = event.title;
+  if (!title) return { field: 'body', start, end };
+  const bodyStart = title.length + 1;
+  if (end <= title.length) return { field: 'title', start, end };
+  if (start >= bodyStart) return { field: 'body', start: start - bodyStart, end: end - bodyStart };
+  return { field: 'titleAndBody', start, end };
 }
 
 function passesFilters(detector: SignalDetector, event: CaseEvent): boolean {
@@ -118,8 +153,8 @@ export function matchDetector(
   if (!match) return null;
   const start = match.index;
   const end = start + match[0].length;
-  const from = Math.max(0, start - 50);
-  const to = Math.min(haystack.length, end + 70);
+  const from = Math.max(0, start - EXCERPT_CHARS_BEFORE);
+  const to = Math.min(haystack.length, end + EXCERPT_CHARS_AFTER);
   const excerpt = haystack.slice(from, to).replace(/\s+/g, ' ').trim();
   return {
     excerpt: (from > 0 ? '…' : '') + excerpt + (to < haystack.length ? '…' : ''),
@@ -155,6 +190,10 @@ export function detectObservations(
     for (const signal of pack.pack.signals) {
       const match = firstDetectorMatch(pack.signalDetectors.get(signal.id), event, text);
       if (!match) continue;
+      const where =
+        match.start !== null && match.end !== null
+          ? locateInEvent(event, match.start, match.end)
+          : null;
       const repeatIndex = seenCount.get(signal.id) ?? 0;
       seenCount.set(signal.id, repeatIndex + 1);
       out.push({
@@ -163,12 +202,13 @@ export function detectObservations(
         eventId: event.id,
         eventIndex,
         timestamp: event.timestamp,
-        excerpt: match.excerpt.slice(0, 280),
+        excerpt: match.excerpt.slice(0, MAX_EXCERPT_CHARS),
         method: match.method,
         repeatIndex,
         affectsBelief: !NON_BELIEF_EVENT_TYPES.has(event.type),
-        start: match.start,
-        end: match.end,
+        field: where?.field ?? null,
+        start: where?.start ?? null,
+        end: where?.end ?? null,
       });
     }
   });

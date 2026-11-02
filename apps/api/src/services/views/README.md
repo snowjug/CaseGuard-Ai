@@ -104,6 +104,12 @@ did not know.
 - Pagination: opaque keyset cursors (`db/cursor.ts`); a cursor from another list is a 422.
 - `compare.cases` takes exactly two case ids of the tenant, compares stored estimates and never ranks
   people.
+- `provenance.resolve` (`provenance.ts`) resolves `type:id` links to the stored record they point at, and
+  knows a record by the rule of `events.get`: one that only exists later is `not_yet_known` and never
+  shown. The whole record reads the stored artefacts; an `asOf` reads the engine's analysis of the window
+  (never a filtered copy of the stored one). Evidence and claims are checked against the immutable stored
+  event on every read (`verifyExcerpt`) and are quoted only when verified. It writes nothing, audits nothing
+  and logs no case text; a link that resolves to nothing is reported in `unresolved`, never dropped.
 
 ## Tests
 
@@ -116,3 +122,4 @@ did not know.
 | `views-units.test.ts`           | Overlays, paging, filters, LRU, helpers                                                                                                                             |
 | `views-overrides.test.ts`       | The override scan (no database): list and window, latest per pair, the same answer with or without later overrides, malformed decisions, the 200 and 25-page bounds |
 | `engine-budget.test.ts`         | The token bucket                                                                                                                                                    |
+| `provenance.test.ts`            | `provenance.resolve`: every link type, as of an instant, tenant isolation, the three verification states, limits and malformed links, nothing written or logged     |

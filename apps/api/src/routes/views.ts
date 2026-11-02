@@ -1,5 +1,4 @@
 import type { HandlerMap } from '../http/route-binder';
-import { NotImplementedError } from '../errors';
 import type { Infrastructure } from '../infrastructure';
 import {
   compareCases,
@@ -19,16 +18,18 @@ import {
   listWarnings,
   overrideAction,
   rankActions,
+  resolveProvenance,
   reviewClaim,
   viewDepsFor,
 } from '../services/views';
 
 /**
- * Read and review views over a stored analysis: twin.get, timeline.get, events.get, evidence.list,
- * claims.review, hypotheses.list, actions.list, actionValue.rank, actionValue.override, forks.list,
- * forks.get, graph.get, quality.get, metrics.get, warnings.list, warnings.dismiss, coaching.get,
- * compare.cases. Owner: API views workstream. The routes only map HTTP to `services/views`; the
- * binder enforces each route's permission and validates its parameters, query and body.
+ * Read and review views over a stored analysis: twin.get, timeline.get, events.get,
+ * provenance.resolve, evidence.list, claims.review, hypotheses.list, actions.list, actionValue.rank,
+ * actionValue.override, forks.list, forks.get, graph.get, quality.get, metrics.get, warnings.list,
+ * warnings.dismiss, coaching.get, compare.cases. Owner: API views workstream. The routes only map
+ * HTTP to `services/views`; the binder enforces each route's permission and validates its
+ * parameters, query and body.
  *
  * Every view that accepts `asOf` recomputes the engine on what was known then (never a filtered copy
  * of the final analysis). One engine pass serves every instant of a window between two events and is
@@ -43,8 +44,8 @@ export function viewsRoutes(infra: Infrastructure): HandlerMap {
     'timeline.get': ({ params, query, ctx }) => getTimeline(ctx, deps, params.caseId, query),
     'events.get': ({ params, query, ctx }) =>
       getEventDetail(ctx, deps, params.caseId, params.eventId, query),
-    // Contract first: the handler arrives with the provenance workstream.
-    'provenance.resolve': () => Promise.reject(new NotImplementedError('provenance.resolve')),
+    'provenance.resolve': ({ params, query, ctx }) =>
+      resolveProvenance(ctx, deps, params.caseId, query),
     'evidence.list': ({ params, query, ctx }) => listLedger(ctx, deps, params.caseId, query),
     'claims.review': ({ params, body, ctx }) =>
       reviewClaim(ctx, params.caseId, params.claimId, body),

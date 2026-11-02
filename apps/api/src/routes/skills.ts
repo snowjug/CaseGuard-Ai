@@ -1,19 +1,22 @@
 import type { HandlerMap } from '../http/route-binder';
-import { NotImplementedError } from '../errors';
 import type { Infrastructure } from '../infrastructure';
 import { engineBudgetFor, type EngineBudgetCaller } from '../services/engine-budget';
+import { resolveSkillOverlay } from '../services/skills/overlay';
+import { viewDepsFor } from '../services/views';
 
 /**
- * skillMatches.list, skillMatches.apply, skills.list, skills.get, skills.versions, skills.diff,
- * skills.extract, skills.transition, skills.simulationTest, skills.proposeMutation,
+ * skillMatches.list, skillMatches.apply, skillOverlay.get, skills.list, skills.get, skills.versions,
+ * skills.diff, skills.extract, skills.transition, skills.simulationTest, skills.proposeMutation,
  * skills.versionDecision, skills.rollback, skills.apply. Thin: the work lives in `services/skills`.
  *
  * Matching and applying run the engine on what was known at an instant. Every pass that no cache
  * serves spends one unit of the caller's engine budget, the same bucket the views draw from (429
- * with Retry-After when it is empty); the services announce such a pass before it starts.
+ * with Retry-After when it is empty); the services announce such a pass before it starts. The overlay
+ * reads the same matches and, for an instant, the decision points the views share.
  */
 export function skillsRoutes(infra: Infrastructure): HandlerMap {
   const budget = engineBudgetFor(infra);
+  const viewDeps = viewDepsFor(infra);
   const metered = (caller: EngineBudgetCaller) => ({
     beforeColdPass: () => budget.charge(caller),
   });
@@ -29,8 +32,11 @@ export function skillsRoutes(infra: Infrastructure): HandlerMap {
     'skillMatches.apply': ({ params, ctx }) =>
       ctx.services.skills.applyMatch(ctx, params.caseId, params.matchId, metered(ctx)),
 
-    // Contract first: the handler arrives with the SkillDNA overlay workstream.
-    'skillOverlay.get': () => Promise.reject(new NotImplementedError('skillOverlay.get')),
+    'skillOverlay.get': ({ params, query, ctx }) =>
+      resolveSkillOverlay(ctx, viewDeps, params.caseId, params.matchId, {
+        asOf: query.asOf,
+        ...metered(ctx),
+      }),
 
     'skills.list': ({ query, ctx }) => ctx.services.skills.list(ctx, query),
 

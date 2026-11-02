@@ -19,6 +19,8 @@ import { knownAt } from './as-of';
 import { isCustomerSide, type EngineContext } from './context';
 import { sentencesOf } from './claims';
 import type { DeterministicAnalysis } from './pipeline';
+import { MAX_EXCERPT_CHARS } from './signals';
+import { sourcePointerFor } from './source-ref';
 
 export interface TwinInput {
   caseRecord: Pick<
@@ -49,13 +51,17 @@ export function buildDigitalTwin(input: TwinInput): DigitalTwin {
   const visibleIds = new Set(visible.map((e) => e.id));
   const fields: TwinField[] = [];
 
-  const refOf = (event: CaseEvent, excerpt?: string, start?: number, end?: number): SourceRef => ({
+  const refOf = (
+    event: CaseEvent,
+    excerpt?: string,
+    /** Counted from the start of the event body; leave out when the excerpt is not one span of it. */
+    span?: { start: number; end: number },
+  ): SourceRef => ({
     eventId: event.id,
     sourceId: event.sourceId,
-    pointer: `${event.sourcePointer}/body`,
-    ...(start !== undefined ? { start } : {}),
-    ...(end !== undefined ? { end } : {}),
-    excerpt: (excerpt ?? event.body).slice(0, 280),
+    pointer: sourcePointerFor(event, span ? 'body' : null),
+    ...(span ? { field: 'body' as const, start: span.start, end: span.end } : {}),
+    excerpt: (excerpt ?? event.body).slice(0, MAX_EXCERPT_CHARS),
   });
   const add = (
     section: TwinSection,
@@ -96,14 +102,21 @@ export function buildDigitalTwin(input: TwinInput): DigitalTwin {
       .slice(0, 3);
     const text = spans.map((s) => s.text).join(' ');
     if (text) {
-      const start = spans[0]?.start;
+      // Several sentences are joined into one statement, so they are one span of the body only when there is one.
+      const only = spans.length === 1 ? spans[0] : undefined;
       add(
         'problem_statement',
         'initial-report',
         'Reported problem',
         text,
         text,
-        [refOf(firstCustomer, text, start, start !== undefined ? start + text.length : undefined)],
+        [
+          refOf(
+            firstCustomer,
+            text,
+            only && { start: only.offset, end: only.offset + only.text.length },
+          ),
+        ],
         0.9,
         'rule',
         firstCustomer.timestamp,
@@ -151,12 +164,12 @@ export function buildDigitalTwin(input: TwinInput): DigitalTwin {
       latestCount.timestamp,
     );
   }
-  const impactSentences = new Map<string, { event: CaseEvent; text: string; start: number }>();
+  const impactSentences = new Map<string, { event: CaseEvent; text: string; offset: number }>();
   for (const event of visible) {
     if (!isCustomerSide(event.participantRole)) continue;
     for (const s of sentencesOf(event.body)) {
       if (IMPACT_CUE.test(s.text) && s.text.length >= 25 && !impactSentences.has(s.text)) {
-        impactSentences.set(s.text, { event, text: s.text, start: s.start });
+        impactSentences.set(s.text, { event, text: s.text, offset: s.offset });
       }
     }
   }
@@ -167,7 +180,7 @@ export function buildDigitalTwin(input: TwinInput): DigitalTwin {
       'Business impact statement',
       s.text,
       s.text,
-      [refOf(s.event, s.text, s.start, s.start + s.text.length)],
+      [refOf(s.event, s.text, { start: s.offset, end: s.offset + s.text.length })],
       0.7,
       'rule',
       s.event.timestamp,
@@ -234,12 +247,10 @@ export function buildDigitalTwin(input: TwinInput): DigitalTwin {
       sitePhrase.m[1] ?? '',
       `Affected sites: ${sitePhrase.m[1]}`,
       [
-        refOf(
-          sitePhrase.e,
-          sitePhrase.m[0],
-          sitePhrase.m.index,
-          sitePhrase.m.index + sitePhrase.m[0].length,
-        ),
+        refOf(sitePhrase.e, sitePhrase.m[0], {
+          start: sitePhrase.m.index,
+          end: sitePhrase.m.index + sitePhrase.m[0].length,
+        }),
       ],
       0.75,
       'pattern',
@@ -277,7 +288,12 @@ export function buildDigitalTwin(input: TwinInput): DigitalTwin {
       'Client version',
       version.m[1] ?? '',
       `Client version ${version.m[1]}`,
-      [refOf(version.e, version.m[0], version.m.index, version.m.index + version.m[0].length)],
+      [
+        refOf(version.e, version.m[0], {
+          start: version.m.index,
+          end: version.m.index + version.m[0].length,
+        }),
+      ],
       0.7,
       'pattern',
       version.e.timestamp,

@@ -6,6 +6,7 @@ import {
   type Evidence,
   type EvidenceCategory,
   type ExtractionMethod,
+  type SourceField,
 } from '@caseguard/schemas';
 import type { CompiledPack } from '../knowledge/compile';
 import { stableId } from '../util/ids';
@@ -15,7 +16,8 @@ import { type Belief, type BeliefTimeline, topHypotheses } from './belief';
 import { type EngineContext, isCustomerSide, metaOf } from './context';
 import type { RequirementState } from './requirements';
 import { isSatisfiedAt } from './requirements';
-import type { Observation } from './signals';
+import { MAX_EXCERPT_CHARS, type Observation } from './signals';
+import { sourcePointerFor } from './source-ref';
 import type { TemporalView } from './temporal';
 
 export interface AnchorInfo {
@@ -110,7 +112,13 @@ export function statedHypothesis(text: string, pack: CompiledPack): string | nul
 
 interface SentenceSpan {
   text: string;
+  /**
+   * Where the sentence's piece of its line begins, before the spaces around it were trimmed. Claim ids
+   * are made from it, so it must never change; use `offset` to point at the text itself.
+   */
   start: number;
+  /** Offset of `text` in the string it was cut from: `source.slice(offset, offset + text.length) === text`. */
+  offset: number;
 }
 
 const LABELLED_STATEMENT = /^(root cause|workaround|permanent fix|validation)\s*:/i;
@@ -148,7 +156,10 @@ export function sentencesOf(text: string): SentenceSpan[] {
       const idx = line.indexOf(part, cursor);
       cursor = idx + part.length;
       const trimmed = part.trim();
-      if (trimmed) out.push({ text: trimmed, start: lineStart + Math.max(0, idx) });
+      if (trimmed) {
+        const start = lineStart + Math.max(0, idx);
+        out.push({ text: trimmed, start, offset: start + (part.length - part.trimStart().length) });
+      }
     }
   }
   return out;
@@ -207,8 +218,8 @@ export function buildClaims(input: ClaimsInput): ClaimsOutput {
       flags?: ClaimFlag[];
       method?: ExtractionMethod;
       subject?: string | null;
-      sourceStart?: number;
-      sourceEnd?: number;
+      /** Where in the stored event text the claim was found; absent for derived claims. */
+      span?: { field: SourceField; start: number; end: number };
       excerpt?: string;
       missingEvidenceId?: string | null;
     },
@@ -232,10 +243,9 @@ export function buildClaims(input: ClaimsInput): ClaimsOutput {
       ? {
           eventId: fields.event.id,
           sourceId: fields.event.sourceId,
-          pointer: `${fields.event.sourcePointer}/body`,
-          ...(fields.sourceStart !== undefined ? { start: fields.sourceStart } : {}),
-          ...(fields.sourceEnd !== undefined ? { end: fields.sourceEnd } : {}),
-          excerpt: (fields.excerpt ?? fields.text).slice(0, 280),
+          pointer: sourcePointerFor(fields.event, fields.span?.field ?? null),
+          ...(fields.span ?? {}),
+          excerpt: (fields.excerpt ?? fields.text).slice(0, MAX_EXCERPT_CHARS),
         }
       : null,
     timestamp: fields.timestamp,
@@ -275,8 +285,13 @@ export function buildClaims(input: ClaimsInput): ClaimsOutput {
         supporting: [ev.id],
         related,
         method: ev.method === 'structured' ? 'structured' : 'pattern',
-        ...(ev.sourceRef.start !== undefined ? { sourceStart: ev.sourceRef.start } : {}),
-        ...(ev.sourceRef.end !== undefined ? { sourceEnd: ev.sourceRef.end } : {}),
+        ...(ev.sourceRef.field !== undefined &&
+        ev.sourceRef.start !== undefined &&
+        ev.sourceRef.end !== undefined
+          ? {
+              span: { field: ev.sourceRef.field, start: ev.sourceRef.start, end: ev.sourceRef.end },
+            }
+          : {}),
         excerpt: ev.excerpt,
       }),
     );
@@ -444,8 +459,7 @@ export function buildClaims(input: ClaimsInput): ClaimsOutput {
           contradicting: contradictedHere ? effects.contradicting.slice(0, 3).map((e) => e.id) : [],
           related: mentioned ? [mentioned] : [],
           flags,
-          sourceStart: span.start,
-          sourceEnd: span.start + text.length,
+          span: { field: 'body', start: span.offset, end: span.offset + text.length },
           excerpt: text,
         }),
       );
@@ -501,8 +515,7 @@ export function buildClaims(input: ClaimsInput): ClaimsOutput {
           'Value stated by the customer; kept as an attribute so contradicting statements can be detected.',
         confidence: 0.8,
         subject: pattern.subject,
-        sourceStart: match.index,
-        sourceEnd: match.index + match[0].length,
+        span: { field: 'body', start: match.index, end: match.index + match[0].length },
         excerpt: match[0],
       });
       claims.push(claim);

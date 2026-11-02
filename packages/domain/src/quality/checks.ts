@@ -23,6 +23,10 @@ export function makeCheck(input: {
   /** 0-1; ignored (neutral) when the check is not determinable. */
   score: number;
   note: string;
+  /**
+   * What the note rests on, so that it can be checked: the offenders when there are any, otherwise the
+   * instances that earn the pass. A check that passes only because nothing went wrong has nothing to cite.
+   */
   evidence?: readonly EvidenceLink[];
   determinable?: boolean;
 }): SubCheck {

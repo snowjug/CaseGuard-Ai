@@ -11,4 +11,5 @@ export { listLedger } from './ledger';
 export { getCoaching, getMetrics, getQuality } from './quality';
 export { getTimeline } from './timeline';
 export { getTwin } from './twin';
+export { parseProvenanceLinks, resolveProvenance, type RequestedLink } from './provenance';
 export { dismissWarning, listWarnings } from './warnings';

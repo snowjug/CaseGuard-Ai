@@ -126,3 +126,11 @@ export {
   type SkillUsagePrecedent,
   type SkillUsageRecord,
 } from './effectiveness';
+export {
+  buildSkillOverlay,
+  chooseDecisionPoint,
+  firstRecommendedStep,
+  subtractSaving,
+  type RecordedPathInput,
+  type SkillOverlayInput,
+} from './overlay';

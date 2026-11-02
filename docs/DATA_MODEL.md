@@ -286,6 +286,17 @@ re-analysis.
 | `metric_estimates`                          | `key` (unique per case), `value`, `unit`, `status`, `confidence`, `synthetic`                                                         | Every row is an estimate; `synthetic` says whether the case was.                                                                 |
 | `case_warnings`                             | `rule_id`, `category`, `priority`, `fingerprint` (unique per case), `raised_at`, `resolved_at`, `state`                               | `fingerprint` is the dedupe key (`#n` suffix for a re-occurrence). Partial index on `state = 'open'`.                            |
 
+**Source references.** The `data` JSON of an `evidence` or `claims` row keeps where the item was found as a `SourceRef`:
+`eventId`, `sourceId` (the `case_sources` row the event came from), `pointer`, `field`, `start`, `end`, and the item's
+`excerpt` beside it. `field` is `title`, `body` or `titleAndBody` and names the stored text that `start` and `end` count
+characters into (`event.title`, `event.body`, or the title, a line break and the body together); `pointer` is true for that
+field (`<source pointer>/title`, `/body`, or the event itself). A structured detector or a derived claim has no location:
+`field`, `start` and `end` are null. A row stored by an engine before `2026.3.1` has no `field` either, and stays
+`not_checkable` until the case is re-analysed. Nothing is added to the schema for this, and a verification is never stored:
+`provenance.resolve` re-derives it on every read from the immutable `case_events` row and returns it with the SHA-256 of the
+stored payload of the case source (`case_sources.stored_sha256`), so a citation names its exact source. See
+[DOMAIN_ENGINE.md section 5.1](DOMAIN_ENGINE.md#51-source-references-and-checking-a-citation-provenance).
+
 ### 4.4 Counterfactuals and SkillDNA (0005)
 
 | Table                      | Key columns                                                                                                                           | App role                       | Notes                                                                                                                                                            |

@@ -180,7 +180,7 @@ Confidence is **always a model estimate** driven by authored likelihoods; it is 
   `lte`). A signal yields at most one observation per event; `repeatIndex` counts how many earlier events showed it. Each
   observation becomes an `Evidence` item with a category (`confirmed_fact`, `customer_reported`, `engineer_assumption`,
   `diagnostic_evidence`, `ai_inference`, `conflicting_evidence`, `missing_evidence`, `simulated_outcome`), a strength and
-  an excerpt.
+  an excerpt, and a source reference that says where in the stored record it was found (section 5.1).
 - **Claims** are statement-level assertions with flags (`unsupported_root_cause`, `assumption_as_fact`,
   `ignored_contradiction`, `template_without_evidence`, `contradicted`, `unvalidated_closure`). At most 12 statement
   claims per event and 1,500 per case are kept, strongest signal first (definitive, root-cause or labelled wording, then
@@ -190,6 +190,47 @@ Confidence is **always a model estimate** driven by authored likelihoods; it is 
   failure timestamps, server-side correlation, fix validation). A requirement is satisfied by an action that produces it or
   by a signal linked to it, and the satisfaction time is recorded.
 - Missing evidence is derived from unsatisfied requirements at each point in time.
+
+### 5.1 Source references, and checking a citation (provenance)
+
+Every piece of evidence and every claim that was found in the text of a message says where. Its `sourceRef` is
+`{ eventId, sourceId, pointer, field, start, end }`, and the item keeps the `excerpt` the engine recorded.
+
+- **An offset counts into a named text.** The detectors read an event as its title, a line break and its body
+  (`eventText`), so a raw offset means nothing without saying which text it counts in. `field` says: `title`
+  (`start` and `end` count into `event.title`), `body` (into `event.body`) or `titleAndBody` (a match that crosses the
+  line break: into the title, the line break and the body together). `pointer` is true for that field
+  (`<source pointer>/title`, `/body`, or the event itself for `titleAndBody` and for a reference that has no field).
+  Statement claims point at the exact trimmed sentence (not at the margin that is kept in the claim id), attribute claims
+  at the body, and a claim that restates evidence points where the evidence does. A structured detector, a derived claim
+  and a twin field joined from several sentences have no location: `field`, `start` and `end` are null, and nothing is
+  cited that could not be quoted.
+- **The excerpt is a window.** For evidence it is the scanned text from 50 characters before the match to 70 after,
+  whitespace folded, with `…` where the text goes on, at most 280 characters. A statement claim's excerpt is the sentence.
+- **Verification** (`verifyExcerpt` in `engine/verify-excerpt.ts`) is pure and never trusts the record: it takes the
+  stored event and the reference and re-derives the excerpt from the stored text, in the window shape or the sentence
+  shape. `verified` means the stored text cut at the recorded place gives exactly the recorded excerpt (markers aside);
+  `mismatch` means a place was recorded and the text there is not that (tampered excerpt, wrong offsets, wrong field,
+  another event); `not_checkable` means there is nothing to compare (no field, offsets or excerpt, an empty span), for
+  example an analysis stored before `2026.3.1`, until it is re-analysed. It never answers `verified` when it did not
+  compare, and a reason code (`matches`, `no_location`, `no_excerpt`, `empty_span`, `wrong_event`, `out_of_range`,
+  `text_differs`) says why, without any case text. Only a verified citation carries a `context { before, match, after }`:
+  verbatim stored text, at most 200 characters on each side and 800 for the span, cut at word boundaries and never
+  through a surrogate pair, so an unchecked excerpt is never shown as a quotation.
+- **The route** `provenance.resolve` resolves up to 40 links of every type (event, evidence, claim, fork, action,
+  hypothesis, requirement, scenario) with their verification, their context and the SHA-256 of the stored source payload
+  the event came from (`case_sources.stored_sha256`). As of an instant it resolves against the engine's analysis of what
+  was known then; a record that only exists later is `not_yet_known`, never shown. A link that resolves to nothing is
+  listed in `unresolved`; it is never dropped. It writes nothing and logs no case text.
+- **Recommendations point at their basis.** Every sub-check, penalty, improvement, warning and coaching item carries
+  `evidence` links to the events, evidence, claims, forks or requirements it rests on, where the engine has one: a pass is
+  cited by what it passed on (the messages that set expectations, the requirements that were met) as a failure is by what
+  it failed on. Where there is nothing to cite (a check that passes only because something did not happen, a check that
+  does not apply, general guidance) the item cites nothing and says so; those items are listed, each with its reason, in
+  the allow-list of `apps/api/test/recommendations-support.ts`. The API invariant test (`recommendations-evidence.test.ts`)
+  asserts that every item has a link or is on the list, that every link resolves through the route and that every citation
+  of text verifies, for both samples, whole and as of their messages; the domain test of the same name checks the links
+  against the engine's own artefacts.
 
 ## 6. Actions and the action-value model
 
@@ -479,6 +520,32 @@ recorded path of the case the skill came from, which is like-for-like because bo
 decision point; `proposeMutations` suggests changes from new cases (always a
 proposal that goes through the lifecycle); `diffSkillVersions` and `rollbackSkill` support versioning.
 
+**Recorded versus with the skill** (`buildSkillOverlay`, served by `skillOverlay.get`) sets what a matched skill would have
+changed beside what the case recorded. It is a comparison laid over the analysis, not a second analysis: it is built from
+stored data only (the match as the list route returns it, the version of the skill, the decision points, and the engine's
+own figures for the path the case took), it writes nothing and records no audit event, and adopting the plan stays the
+separate, governed `skillMatches.apply`.
+
+- **The decision point** is a decision point at which the skill's first recommended action (the first step of its plan that
+  names one) was an open alternative, safe and not blocked: the one the skill was distilled from when it qualifies (its
+  saving was estimated at exactly that moment), otherwise the earliest where the case did something else, otherwise the
+  earliest. None qualifies: there is none, and the overlay says so (Case Two has no decision point of its own).
+- **The figures.** A skill states its saving in time to **diagnosis**, customer effort and tokens, each measured from the
+  decision point of the case it came from, so each row sets the engine's figure for the recorded path from the decision point
+  in that same measure beside it. `withSkill` is the recorded range minus the skill's saving, range against range
+  (`low = recorded low - saving high`, `mid = recorded mid - saving mid`, `high = recorded high - saving low`), never below
+  zero (a result held at zero says so in the row's `basis`); for the case the skill came from this reproduces the skill's own
+  replay, for another case the saving is assumed to carry over, and the overlay says that too. Time to useful evidence is
+  shown as recorded and nothing more: the skill states no saving for it. A row whose input is missing says which one, and its
+  `withSkill` is null.
+- **Nothing is estimated** where the skill does not apply to the case, where the case already did what the skill recommends at
+  the decision point, where the skill states no saving, where no decision point relates to the skill, and where the engine
+  stored no simulation of it.
+- **Hindsight is withheld.** The path from a decision point includes events that come later, so its figures are shown only when
+  no event of the case lies after the instant of the match (the whole record). As of an earlier instant the rows have no
+  recorded and no with-skill figure and say why; and the API does not match the skill extracted from the case itself as of
+  an earlier instant at all, because its triggers were learned partly from what happened later.
+
 ## 14. Hardening notes
 
 - **As-of views.** `buildTimelineResponse` ranks hypotheses by the last belief step known at `asOf`, never by final
@@ -503,7 +570,7 @@ proposal that goes through the lifecycle); `diffSkillVersions` and `rollbackSkil
   alone. `packages/domain/test/determinism-across-ids.test.ts` runs both samples under four sets of generated ids and
   compares every figure after replacing ids by what they stand for (so a different order of the same things fails too);
   `apps/api/test/determinism-across-ids.int.test.ts` does the same through two fresh databases.
-- **Engine version.** `ENGINE_VERSION` (`apps/api/src/services/analysis/inputs.ts`, currently `2026.3.0`) is part of the
+- **Engine version.** `ENGINE_VERSION` (`apps/api/src/services/analysis/inputs.ts`, currently `2026.3.1`) is part of the
   analysis input hash, so a change of meaning re-analyses stored cases instead of reusing them. `2026.2.0`: a view's belief is
   one number (the last step of its own timeline), scenario summaries are written from the decision instant and the simulated
   path alone, and the "Retrospectively produced little information" note needs a complete case with a recorded resolution
@@ -511,7 +578,12 @@ proposal that goes through the lifecycle); `diffSkillVersions` and `rollbackSkil
   "measured" (text only: the `basis` field and every number are unchanged, and real cases keep "measured"). `2026.3.0`:
   the reproducibility rule above; every simulated figure (rollout metrics and ranges, the Avoidable Support Effort and the
   token figures derived from it, confidence bands, skill baselines) moved once, and the order of claims, improvements and
-  skill matches that were tied by a generated id changed. After a version
+  skill matches that were tied by a generated id changed. `2026.3.1`: source offsets name the text they count into
+  (section 5.1) and the quality sub-checks, and so the coaching items built from them, cite more of their basis; **no
+  detection, id, score, band, fork or simulated figure changed** (`packages/domain/test/engine-golden.ts` and
+  `fixtures/engine-golden.json` pin the digests of both samples as `2026.3.0` produced them, with only the source
+  linkage and the citation lists left out of the comparison). Stored artefacts are replaced at the next analysis; until
+  then a stored citation has no field and is `not_checkable`. After a version
   change a reviewer's decision on a counterfactual scenario survives only if the regenerated simulation is identical;
   otherwise it is reset and the reset is audited. Because the seed no longer covers the engine version, the skill library or
   the provider, a change of the library or the provider, or a release that changes no number, re-runs the analysis (new

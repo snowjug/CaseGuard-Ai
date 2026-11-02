@@ -28,6 +28,14 @@ export function evidenceIntegrity(f: QualityFacts): DimensionDraft {
   const statements = f.statementClaims;
   const flagged = statements.filter((c) => hasFlag(c, ASSERTION_FLAGS));
   const asFact = statements.filter((c) => hasFlag(c, AS_FACT_FLAGS));
+  // What carries a pass when nothing was flagged: the conclusions that cite diagnostic evidence, and
+  // the statements that said they were assumptions.
+  const backed = statements.filter(
+    (c) => c.category === 'confirmed_fact' && c.supportingEvidenceIds.length > 0,
+  );
+  const labelled = statements.filter(
+    (c) => c.category === 'engineer_assumption' && c.flags.length === 0,
+  );
   const anchorEvents = [...new Set(f.analysis.anchors.map((a) => a.eventId))];
   const haveStatements = statements.length > 0;
 
@@ -41,7 +49,7 @@ export function evidenceIntegrity(f: QualityFacts): DimensionDraft {
           flagged.length === 0
             ? 'No statement presented a cause or a checklist result as established without evidence.'
             : `${plural(flagged.length, 'statement')} presented a cause or a checklist result as established without cited diagnostic evidence.`,
-        evidence: flagged.slice(0, 4).map(claimLink),
+        evidence: (flagged.length > 0 ? flagged.slice(0, 4) : backed.slice(0, 3)).map(claimLink),
       })
     : undecided(
         'EI-1',
@@ -79,7 +87,7 @@ export function evidenceIntegrity(f: QualityFacts): DimensionDraft {
         weight: 0.15,
         score: 1 - asFact.length / statements.length,
         note: `${asFact.length} of ${statements.length} engineer statements were written as established fact without support; the rest were hedged or backed by evidence.`,
-        evidence: asFact.slice(0, 3).map(claimLink),
+        evidence: (asFact.length > 0 ? asFact.slice(0, 3) : labelled.slice(0, 3)).map(claimLink),
       })
     : undecided(
         'EI-3',
@@ -96,6 +104,21 @@ export function evidenceIntegrity(f: QualityFacts): DimensionDraft {
     (c) =>
       c.category === 'confirmed_fact' && !hasFlag(c, [...ASSERTION_FLAGS, 'unvalidated_closure']),
   );
+  const unsupported = closureClaims.filter((c) => !supported.includes(c));
+  // A supported conclusion rests on the validation on record: the messages that state it and the
+  // requirement that was met, not the sentences themselves (those are in the messages).
+  const validationId = f.pack.pack.policies.validationRequirementId;
+  const supportingLinks = [
+    ...new Set(supported.flatMap((c) => (c.eventId === null ? [] : [c.eventId]))),
+  ].flatMap((id) => {
+    const event = f.events[f.indexOf.get(id) ?? -1];
+    return event ? [eventLink(event)] : [];
+  });
+  if (validationId) {
+    supportingLinks.push(
+      evidenceLink('requirement', validationId, f.pack.requirements.get(validationId)?.label),
+    );
+  }
   const conclusionCheck =
     closureClaims.length > 0
       ? makeCheck({
@@ -104,10 +127,12 @@ export function evidenceIntegrity(f: QualityFacts): DimensionDraft {
           weight: 0.3,
           score: supported.length / closureClaims.length,
           note: `${supported.length} of ${closureClaims.length} closure statements were backed by validation evidence on record.`,
-          evidence: closureClaims
-            .filter((c) => !supported.includes(c))
-            .slice(0, 3)
-            .map(claimLink),
+          evidence:
+            unsupported.length > 0
+              ? unsupported.slice(0, 3).map(claimLink)
+              : supported.length > 0
+                ? supportingLinks
+                : [],
         })
       : undecided(
           'EI-4',
@@ -138,6 +163,14 @@ export function diagnosticReasoning(f: QualityFacts): DimensionDraft {
     return fork ? [fork] : [];
   });
   const impact = forked.reduce((s, fork) => s + fork.impactScore, 0);
+  // With no decision point to point at, the decisions that came closest to the best safe alternative.
+  const soundest = [...f.actions]
+    .filter((a) => a.relativeValueAtDecision !== null && !f.forksByEvent.has(a.eventId))
+    .sort(
+      (a, b) =>
+        (b.relativeValueAtDecision ?? 0) - (a.relativeValueAtDecision ?? 0) ||
+        a.sequence - b.sequence,
+    );
 
   const decisionsCheck =
     decisionIds.size > 0
@@ -147,10 +180,13 @@ export function diagnosticReasoning(f: QualityFacts): DimensionDraft {
           weight: 0.4,
           score: 1 - impact / decisionIds.size,
           note: `${forked.length} of ${decisionIds.size} decision points had a clearly better safe alternative on record at that moment (impact-weighted).`,
-          evidence: [...forked]
-            .sort((a, b) => b.impactScore - a.impactScore)
-            .slice(0, 4)
-            .map((fork) => evidenceLink('fork', fork.id, fork.title)),
+          evidence:
+            forked.length > 0
+              ? [...forked]
+                  .sort((a, b) => b.impactScore - a.impactScore)
+                  .slice(0, 4)
+                  .map((fork) => evidenceLink('fork', fork.id, fork.title))
+              : soundest.slice(0, 3).map((a) => evidenceLink('action', a.id, a.label)),
         })
       : undecided(
           'DR-1',
@@ -213,7 +249,9 @@ export function diagnosticReasoning(f: QualityFacts): DimensionDraft {
             risky.length === 0
               ? 'No risky or disruptive change was made.'
               : `${unjustified.length} of ${plural(risky.length, 'risky or disruptive step')} came before the targeted hypothesis was justified by evidence.`,
-          evidence: unjustified.slice(0, 4).map((a) => evidenceLink('action', a.id, a.label)),
+          evidence: (unjustified.length > 0 ? unjustified : risky)
+            .slice(0, 4)
+            .map((a) => evidenceLink('action', a.id, a.label)),
         })
       : undecided('DR-3', 'Risky changes followed a justified diagnosis', 0.3, 'No actions yet.');
 

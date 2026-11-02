@@ -30,6 +30,7 @@ const observation = (signalId: string, index: number, repeatIndex = 0): Observat
   method: 'pattern',
   repeatIndex,
   affectsBelief: true,
+  field: null,
   start: null,
   end: null,
 });
