@@ -20,6 +20,13 @@ const PAGES: readonly PageSpec[] = [
   { name: 'Cases', path: () => '/cases', persona: 'engineer' },
   { name: 'Ingest a case', path: () => '/cases/new', persona: 'engineer' },
   { name: 'Case overview', path: (ids) => `/cases/${ids.caseOneId}`, persona: 'engineer' },
+  { name: 'Guided review', path: (ids) => `/cases/${ids.caseOneId}/review`, persona: 'engineer' },
+  {
+    name: 'Guided review of the second case',
+    path: (ids) => `/cases/${ids.caseTwoId}/review`,
+    persona: 'engineer',
+  },
+  { name: 'Case report', path: (ids) => `/cases/${ids.caseOneId}/report`, persona: 'engineer' },
   { name: 'Case Timeline', path: (ids) => `/cases/${ids.caseOneId}/timeline`, persona: 'engineer' },
   {
     name: 'Evidence Ledger',
