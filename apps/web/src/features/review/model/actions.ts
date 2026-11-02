@@ -38,7 +38,7 @@ const SOURCE_RANK: Record<ActionSource, number> = {
 };
 
 /** Shown on a recommendation that has no case-specific evidence behind it. Never hidden, never given an invented link. */
-export const GENERAL_GUIDANCE = 'General guidance: no case-specific evidence';
+export const GENERAL_GUIDANCE = 'General guidance — no case-specific evidence';
 
 export interface NextAction {
   id: string;

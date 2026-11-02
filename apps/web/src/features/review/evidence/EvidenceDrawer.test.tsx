@@ -16,7 +16,7 @@ configure({ asyncUtilTimeout: 5000 });
 const CASE_ID = CASE_ONE.detail.id;
 const SUBJECT = 'Write causes as hypotheses until evidence supports them';
 /** claim, claim, event, event: the evidence of the first quality improvement, each with the label the engine gave it. */
-const LINKS: EvidenceLink[] = (CASE_ONE.quality.improvements[0]?.evidence ?? []) as EvidenceLink[];
+const LINKS: EvidenceLink[] = CASE_ONE.quality.improvements[0]?.evidence ?? [];
 
 function Harness({ links = LINKS }: { links?: readonly EvidenceLink[] }) {
   const titles = useLinkTitles(CASE_ID, links);

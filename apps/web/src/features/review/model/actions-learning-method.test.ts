@@ -69,7 +69,7 @@ describe('[REV-ACTIONS-01] the one ranked list of next actions', () => {
       hasEvidence: false,
       links: [],
     });
-    expect(GENERAL_GUIDANCE).toBe('General guidance: no case-specific evidence');
+    expect(GENERAL_GUIDANCE).toBe('General guidance — no case-specific evidence');
   });
 
   it('puts an open warning with its suggested action ahead of an improvement of the same priority', () => {
@@ -288,7 +288,9 @@ describe('[REV-METHOD-01] how it was calculated, in plain language', () => {
   });
 
   it('still explains itself when the role cannot read the quality result', () => {
-    const [quality] = methodNotes('verdict', { ...ctx, quality: null });
-    expect(quality?.paragraphs[0]).toContain('your role cannot read it');
+    const [quality] = methodNotes('verdict', { ...ctx, quality: null, qualityDenied: true });
+    expect(quality?.paragraphs.join(' ')).toContain('your role cannot read it');
+    const [loadingNote] = methodNotes('verdict', { ...ctx, quality: null });
+    expect(loadingNote?.paragraphs.join(' ')).not.toContain('your role');
   });
 });

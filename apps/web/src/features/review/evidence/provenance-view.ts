@@ -52,10 +52,7 @@ export interface ItemView {
 }
 
 /** The label of a link: the one the API gave, the one resolved by provenance, or the kind and a short id. */
-export function linkLabel(
-  link: EvidenceLink,
-  resolved?: ReadonlyMap<string, string> | undefined,
-): string {
+export function linkLabel(link: EvidenceLink, resolved?: ReadonlyMap<string, string>): string {
   return (
     link.label?.trim() ||
     resolved?.get(linkKey(link))?.trim() ||

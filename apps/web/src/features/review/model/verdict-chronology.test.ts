@@ -1,7 +1,7 @@
 import type { DecisionFork, ForkListResponse, TimelineEvent } from '@caseguard/schemas';
 import { describe, expect, it } from 'vitest';
 import { CASE_ONE, CASE_TWO } from '../../../../test/review-fixtures';
-import { chronologyRows, deriveChronology, laneOfRole } from './chronology';
+import { chronologyRows, compressedPositions, deriveChronology, laneOfRole } from './chronology';
 import { earliestFork, orderForks } from './forks';
 import { describeProducer, deriveEffort, deriveMissedMoment, deriveVerdict } from './verdict';
 
@@ -72,8 +72,7 @@ describe('[REV-VERDICT-01] the verdict', () => {
   it('reads the avoidable support effort with its own range and says how sure the analysis is', () => {
     expect(deriveEffort(CASE_ONE.metrics)).toEqual({
       display: '55% (estimate)',
-      low: 43.7,
-      high: 83.3,
+      rangeText: '44% to 83%',
       confidenceLabel: 'low confidence',
     });
     expect(deriveEffort([])).toBeNull();
@@ -215,7 +214,25 @@ describe('[REV-CHRONO-01] the chronology', () => {
       .slice(0, 2)
       .map((e) => ({ ...e, timestamp: at, isDelay: false }));
     const flat = deriveChronology(same, null);
-    expect(flat.events.map((e) => e.position)).toEqual([0.5, 0.5]);
+    expect(flat.events.map((e) => e.position)).toEqual([0, 1]);
+    expect(deriveChronology(same.slice(0, 1), null).events.map((e) => e.position)).toEqual([0.5]);
+  });
+
+  it('spaces the strip on a compressed scale: a burst stays readable and a long wait stays long, but not to scale', () => {
+    const positions = compressedPositions(
+      [...CASE_ONE.timeline.events].sort((a, b) => a.sequence - b.sequence),
+    );
+    const ids = CASE_ONE.timeline.events.map((e) => e.id);
+    const values = ids.map((id) => positions.get(id) ?? Number.NaN);
+    expect(values[0]).toBe(0);
+    expect(values.at(-1)).toBe(1);
+    expect(values.every((value, i) => i === 0 || value > (values[i - 1] ?? 0))).toBe(true);
+    const gap = (from: string, to: string): number =>
+      (positions.get(to) ?? 0) - (positions.get(from) ?? 0);
+    // e07, e08, e09 are 15 and 6 minutes apart: close, but apart. e14 to e15 is 910 minutes.
+    expect(gap('e07', 'e08')).toBeGreaterThan(0.01);
+    expect(gap('e14', 'e15')).toBeGreaterThan(gap('e07', 'e08') * 2);
+    expect(gap('e14', 'e15')).toBeLessThan(gap('e07', 'e08') * (910 / 15));
   });
 
   it('puts every role in the lane of its side', () => {

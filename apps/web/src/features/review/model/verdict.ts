@@ -9,7 +9,7 @@ import {
   type QualityAssessment,
   type QualityBand,
 } from '@caseguard/schemas';
-import type { BadgeStatus, ScoreStatus } from '@caseguard/ui';
+import { formatMetricValue, type BadgeStatus, type ScoreStatus } from '@caseguard/ui';
 import { betterAlternative, earliestFork } from './forks';
 import { evidenceLinks, eventLinks, uniqueLinks } from './links';
 import { plural } from './words';
@@ -89,8 +89,8 @@ export function deriveMissedMoment(forks: ForkListResponse): MissedMoment | null
 /** The avoidable support effort, read from the metric the engine computed (an estimate, with its own range). */
 export interface EffortFigure {
   display: string;
-  low: number | null;
-  high: number | null;
+  /** `44% to 83%`, or `null` when the engine gave no range. */
+  rangeText: string | null;
   confidenceLabel: string;
 }
 
@@ -99,8 +99,10 @@ export function deriveEffort(metrics: readonly MetricEstimate[]): EffortFigure |
   if (!metric || metric.value === null) return null;
   return {
     display: metric.display,
-    low: metric.low,
-    high: metric.high,
+    rangeText:
+      metric.low !== null && metric.high !== null
+        ? `${formatMetricValue(metric.low, metric.unit)} to ${formatMetricValue(metric.high, metric.unit)}`
+        : null,
     confidenceLabel: `${metric.confidence} confidence`,
   };
 }

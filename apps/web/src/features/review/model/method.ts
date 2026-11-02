@@ -27,6 +27,8 @@ export interface MethodNote {
 export interface MethodContext {
   run: AnalysisRun | null;
   quality: QualityAssessment | null;
+  /** True when the role may not read case quality, so the notes say why it is not described in full. */
+  qualityDenied?: boolean;
   coaching: CoachingReport | null;
   detail: CaseDetail | null;
   path: PathModel | null;
@@ -34,12 +36,13 @@ export interface MethodContext {
 
 const percent = (weight: number): string => `${Math.round(weight * 1000) / 10}%`;
 
-function qualityNote(quality: QualityAssessment | null): MethodNote {
+function qualityNote(quality: QualityAssessment | null, denied = false): MethodNote {
   if (!quality) {
     return {
       heading: 'Case quality',
       paragraphs: [
-        'Case quality is an estimate from 0 to 100 that checks the written record of the case in six areas. It is not shown here because your role cannot read it.',
+        'Case quality is an estimate from 0 to 100 that checks the written record of the case in six areas and combines them using fixed weights.',
+        ...(denied ? ['It is not shown here because your role cannot read it.'] : []),
       ],
       facts: [],
     };
@@ -93,7 +96,7 @@ export function methodNotes(section: MethodSection, ctx: MethodContext): MethodN
   switch (section) {
     case 'verdict':
       return [
-        qualityNote(ctx.quality),
+        qualityNote(ctx.quality, ctx.qualityDenied),
         {
           heading: 'The earliest important missed moment',
           paragraphs: [
@@ -178,7 +181,7 @@ export function methodNotes(section: MethodSection, ctx: MethodContext): MethodN
           ],
           facts: [],
         },
-        qualityNote(ctx.quality),
+        qualityNote(ctx.quality, ctx.qualityDenied),
       ];
       if (ctx.detail?.synthetic) {
         notes.push({

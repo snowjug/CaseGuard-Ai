@@ -7,7 +7,7 @@ import {
   type ParticipantRole,
   type TimelineEvent,
 } from '@caseguard/schemas';
-import { formatDateTimeUtc } from '@caseguard/ui';
+import { formatDateTimeUtc, formatDayMonthUtc } from '@caseguard/ui';
 import { minutesBetween } from '../../reasoning/time';
 import { orderForks } from './forks';
 import { describeSpan, plural } from './words';
@@ -51,7 +51,7 @@ export interface ChronologyEvent {
   roleLabel: string;
   typeLabel: string;
   title: string;
-  /** Position along the case, from 0 (first event) to 1 (last event). */
+  /** Position along the strip, from 0 (first event) to 1 (last event), on the compressed scale of `compressedPositions`. */
   position: number;
   reasons: KeyReason[];
   /** The numbers (from 1, earliest first) of the decision points taken at this event. */
@@ -87,6 +87,8 @@ export interface Chronology {
   decisionPoints: { number: number; forkId: string; eventId: string; at: string; title: string }[];
   /** True when the case has a recorded resolution or ended with one. */
   resolved: boolean;
+  /** Where each UTC day begins along the strip, for the axis. */
+  dayMarks: { label: string; position: number }[];
   /** The strip and the list in one paragraph, for people who do not see the strip. */
   summary: string;
 }
@@ -115,6 +117,32 @@ function waitSentence(waiter: Wait['waiter'], minutes: number): string {
 const timeOrder = (a: TimelineEvent, b: TimelineEvent): number =>
   Date.parse(a.timestamp) - Date.parse(b.timestamp) || a.sequence - b.sequence;
 
+/** A quarter of an hour is added to every gap before its square root is taken, so simultaneous events still part. */
+export const SPACING_FLOOR_MINUTES = 15;
+
+/**
+ * Where each event sits along the strip, from 0 to 1. The room a gap takes grows with the square root of its length (plus
+ * a quarter hour), not with the length itself: on a true time scale a burst of events within half an hour lands on top
+ * of each other beside a wait of a day. The strip says that its spacing is not to scale; the waits are shaded and named.
+ */
+export function compressedPositions(ordered: readonly TimelineEvent[]): Map<string, number> {
+  const weights = ordered.map((event, index) => {
+    const before = ordered[index - 1];
+    if (!before) return 0;
+    return Math.sqrt(
+      Math.max(0, minutesBetween(before.timestamp, event.timestamp)) + SPACING_FLOOR_MINUTES,
+    );
+  });
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  let run = 0;
+  return new Map(
+    ordered.map((event, index) => {
+      run += weights[index] ?? 0;
+      return [event.id, total === 0 ? 0.5 : run / total] as const;
+    }),
+  );
+}
+
 /**
  * The chronology of the case for the strip and its text alternative.
  *
@@ -142,12 +170,13 @@ export function deriveChronology(
       waits: [],
       decisionPoints: [],
       resolved: resolvedAt !== null,
+      dayMarks: [],
       summary: 'No events were recorded for this case.',
     };
   }
-  const start = Date.parse(first.timestamp);
-  const span = Date.parse(last.timestamp) - start;
-  const position = (at: string): number => (span <= 0 ? 0.5 : (Date.parse(at) - start) / span);
+  const span = Date.parse(last.timestamp) - Date.parse(first.timestamp);
+  const positions = compressedPositions(ordered);
+  const positionOf = (id: string): number => positions.get(id) ?? 0.5;
 
   const decisionPoints = orderForks(forks?.items ?? []).map((fork, index) => ({
     number: index + 1,
@@ -173,7 +202,7 @@ export function deriveChronology(
     if (event === last && !reasons.includes('resolution')) reasons.push('closed');
     const lane = laneOfRole(event.participantRole);
     if (reasons.length === 0) {
-      otherPositions.push({ id: event.id, lane, position: position(event.timestamp) });
+      otherPositions.push({ id: event.id, lane, position: positionOf(event.id) });
       continue;
     }
     keyEvents.push({
@@ -184,7 +213,7 @@ export function deriveChronology(
       roleLabel: PARTICIPANT_ROLE_LABELS[event.participantRole],
       typeLabel: EVENT_TYPE_LABELS[event.type],
       title: event.title?.trim() || EVENT_TYPE_LABELS[event.type],
-      position: position(event.timestamp),
+      position: positionOf(event.id),
       reasons,
       decisionNumbers: numbers,
     });
@@ -206,12 +235,20 @@ export function deriveChronology(
       minutes,
       waiter,
       text: waitSentence(waiter, minutes),
-      fromPosition: position(before.timestamp),
-      toPosition: position(event.timestamp),
+      fromPosition: positionOf(before.id),
+      toPosition: positionOf(event.id),
     });
   });
 
   const resolved = resolvedAt !== null || ordered.some((event) => event.type === 'resolution_note');
+  const dayMarks: Chronology['dayMarks'] = [];
+  let currentDay = '';
+  for (const event of ordered) {
+    const day = event.timestamp.slice(0, 10);
+    if (day === currentDay) continue;
+    currentDay = day;
+    dayMarks.push({ label: formatDayMonthUtc(event.timestamp), position: positionOf(event.id) });
+  }
   const longest = [...waits].sort((a, b) => b.minutes - a.minutes)[0];
   const parts = [
     `${plural(ordered.length, 'event')} over ${describeSpan(span / 60_000)}, from ${formatDateTimeUtc(first.timestamp)} to ${formatDateTimeUtc(last.timestamp)}.`,
@@ -234,6 +271,7 @@ export function deriveChronology(
     waits,
     decisionPoints,
     resolved,
+    dayMarks,
     summary: parts.join(' '),
   };
 }
