@@ -10,22 +10,35 @@ test inventory), [ACCESSIBILITY.md](ACCESSIBILITY.md), [PERFORMANCE.md](PERFORMA
 
 ## 1. The tiers
 
-| Tier                 | Command                                             | Lives in                                                      | What it proves                                                                                                                                                            | What it does not prove                                                                                                                                    |
-| -------------------- | --------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit and property    | `pnpm.cmd test:unit`                                | `packages/*/test`, `apps/*/src/**/*.test.ts(x)`               | Pure logic: schemas, config guards, security helpers, the domain engine (with `fast-check` properties), validators, UI primitives and web components in jsdom             | Anything that needs a real browser, real layout or a real network                                                                                         |
-| Integration          | `pnpm.cmd test:int`                                 | `*.int.test.ts`                                               | The API against a real (PGlite) database and HTTP server, and mock services                                                                                               | A real PostgreSQL (only with `TEST_DATABASE_URL`, never exercised here), any Azure service                                                                |
-| End-to-end           | `pnpm.cmd test:e2e`                                 | `e2e/**/*.spec.ts`                                            | The production build of the web app, in a real browser, against a real API with the deterministic engine and the seeded demo: every page, the demo story, ingestion       | Entra sign-in, Azure, a real model, other browsers than Chromium, real phones                                                                             |
-| Accessibility        | part of `test:e2e`                                  | `e2e/a11y.spec.ts`, `e2e/mobile.spec.ts`, `e2e/theme.spec.ts` | Zero axe violations (WCAG 2.1 A/AA and best practice) on every page and state in both themes, keyboard paths, reduced motion, no sideways scroll at 390 px                | Conformance: no screen reader, no real users ([ACCESSIBILITY.md](ACCESSIBILITY.md#4-what-was-not-done))                                                   |
-| Security (black box) | part of `test:e2e`                                  | `e2e/security-http.spec.ts`                                   | Headers and the nonce CSP on the real server, tenant isolation, role refusals, input limits, the client address the rate limiter sees, the refusal to start in production | Penetration testing, dependency or infrastructure security (see [SECURITY.md](SECURITY.md), [THREAT_MODEL.md](THREAT_MODEL.md))                           |
-| Resilience           | part of `test:e2e`                                  | `e2e/resilience.spec.ts`                                      | Problem answers shown in words with their request id, an API that is down, idempotent replays, optimistic locking                                                         | Load, partial failures of real cloud services                                                                                                             |
-| AI evaluation        | `pnpm.cmd exec vitest run` in `packages/ai`         | `packages/ai/test` (`evaluation.int.test.ts`)                 | The AI contracts, validators and the governor hold against 42 adversarial fixtures and 12 controls with the **deterministic** provider                                    | Anything about a live model: no real Azure OpenAI call has ever been made ([EVALUATION.md](EVALUATION.md#5-ai-evaluation-harness-deterministic-provider)) |
-| Benchmarks           | `pnpm.cmd bench`, `pnpm.cmd bench:api`, `PW_PERF=1` | `packages/domain`, `scripts/bench-api.ts`, `e2e/perf`         | How long the engine, the API calls and the timeline page take on one machine ([PERFORMANCE.md](PERFORMANCE.md))                                                           | A load test or an SLO. None is claimed                                                                                                                    |
-| Screenshots          | `pnpm.cmd screenshots`                              | `e2e/screenshots/screenshots.spec.ts`                         | The pages render with real data in light, dark and phone layouts; the PNGs in `docs/assets/screenshots/` come from here                                                   | Visual regression: nothing compares the images with earlier ones                                                                                          |
+| Tier                 | Command                                             | Lives in                                                                                  | What it proves                                                                                                                                                            | What it does not prove                                                                                                                                    |
+| -------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit and property    | `pnpm.cmd test:unit`                                | `packages/*/test`, `apps/*/src/**/*.test.ts(x)`                                           | Pure logic: schemas, config guards, security helpers, the domain engine (with `fast-check` properties), validators, UI primitives and web components in jsdom             | Anything that needs a real browser, real layout or a real network                                                                                         |
+| Integration          | `pnpm.cmd test:int`                                 | `*.int.test.ts`                                                                           | The API against a real (PGlite) database and HTTP server, and mock services                                                                                               | A real PostgreSQL (only with `TEST_DATABASE_URL`, never exercised here), any Azure service                                                                |
+| End-to-end           | `pnpm.cmd test:e2e`                                 | `e2e/**/*.spec.ts`                                                                        | The production build of the web app, in a real browser, against a real API with the deterministic engine and the seeded demo: every page, the demo story, ingestion       | Entra sign-in, Azure, a real model, other browsers than Chromium, real phones                                                                             |
+| Accessibility        | part of `test:e2e`                                  | `e2e/a11y.spec.ts`, `e2e/mobile.spec.ts`, `e2e/theme.spec.ts`, `e2e/pages/review.spec.ts` | Zero axe violations (WCAG 2.1 A/AA and best practice) on every page and state in both themes, keyboard paths, reduced motion, no sideways scroll at 390 px                | Conformance: no screen reader, no real users ([ACCESSIBILITY.md](ACCESSIBILITY.md#4-what-was-not-done))                                                   |
+| Security (black box) | part of `test:e2e`                                  | `e2e/security-http.spec.ts`                                                               | Headers and the nonce CSP on the real server, tenant isolation, role refusals, input limits, the client address the rate limiter sees, the refusal to start in production | Penetration testing, dependency or infrastructure security (see [SECURITY.md](SECURITY.md), [THREAT_MODEL.md](THREAT_MODEL.md))                           |
+| Resilience           | part of `test:e2e`                                  | `e2e/resilience.spec.ts`                                                                  | Problem answers shown in words with their request id, an API that is down, idempotent replays, optimistic locking                                                         | Load, partial failures of real cloud services                                                                                                             |
+| AI evaluation        | `pnpm.cmd exec vitest run` in `packages/ai`         | `packages/ai/test` (`evaluation.int.test.ts`)                                             | The AI contracts, validators and the governor hold against 42 adversarial fixtures and 12 controls with the **deterministic** provider                                    | Anything about a live model: no real Azure OpenAI call has ever been made ([EVALUATION.md](EVALUATION.md#5-ai-evaluation-harness-deterministic-provider)) |
+| Benchmarks           | `pnpm.cmd bench`, `pnpm.cmd bench:api`, `PW_PERF=1` | `packages/domain`, `scripts/bench-api.ts`, `e2e/perf`                                     | How long the engine, the API calls and the timeline page take on one machine ([PERFORMANCE.md](PERFORMANCE.md))                                                           | A load test or an SLO. None is claimed                                                                                                                    |
+| Screenshots          | `pnpm.cmd screenshots`                              | `e2e/screenshots/screenshots.spec.ts`                                                     | The pages render with real data in light, dark and phone layouts; the PNGs in `docs/assets/screenshots/` come from here                                                   | Visual regression: nothing compares the images with earlier ones                                                                                          |
 
 The unit, integration and AI-evaluation counts are in [EVALUATION.md](EVALUATION.md#2-test-inventory). **I did not re-run those
 tiers for this document**; only the end-to-end tiers below were run for it.
 
 ## 2. The last full run
+
+**The latest full run is CI's.** GitHub Actions run 41541778703 (commit `5d0d5ae` of `build/wave-1`, 2 November 2026, the last
+commit that changed code or tests) passed all 8 jobs: **6,151 unit tests** (256 files; 4 more are expected failures that pin
+known defects of the signal detectors), **1,033 integration tests on PostgreSQL 16** (56 files) and **374 Playwright tests**
+(desktop and mobile, axe checks included, 13.4 minutes), plus the compose smoke test (12 checks), the secret scan with gitleaks
+and the dependency audit. The 374 are the 342 of the run described below, the 29 of `pages/review.spec.ts` (the guided review and
+the report) and three phone-width checks of the review and the report added to `mobile.spec.ts`. **Locally** on the Linux VM of
+the wave (4 shared vCPU, the bundled Chromium, one worker) the review spec and the 26 phone-width tests ran twice: 62 of 63 passed
+the first time (the one failure was a locator that the report strip's new named region made ambiguous, fixed and seen to pass),
+and the 29 review tests passed in the second pass, which also took the screenshots that the docs were checked against. The
+static gates (format, lint, typecheck, generated files, docs check, secret scan) passed locally in one `scripts/verify.mjs` run.
+The record that follows is an **earlier local run on Windows** (31 October 2026, before the foundation work), kept for what it
+found and for how long the suite takes on a loaded machine.
 
 **Machine and tools.** Windows 10.0.26300 (x64); 11th Gen Intel Core i7-1185G7 at 3.00 GHz, 8 logical cores; 31.3 GiB of memory, of
 which about 2 to 3.5 GiB were free during the runs; Node v26.13.0; pnpm 10.34.7; Playwright 1.64.1; axe-core 4.14.0; Microsoft Edge
@@ -192,7 +205,7 @@ pnpm.cmd exec tsc -p e2e/tsconfig.json --noEmit    # type-check the e2e project
 CI (`.github/workflows/ci.yml`, job `e2e`, 45-minute timeout, Ubuntu): `node scripts/verify.mjs --only build`, then
 `pnpm exec playwright install --with-deps chromium`, then `node scripts/verify.mjs --only test:e2e`. With `CI` set Playwright
 uses the bundled Chromium, the built API (`apps/api/dist`) and the web build in `.next`, retries a failed test once, forbids
-`test.only`, and the report and traces are uploaded when the job fails. **That job has run on GitHub** (run 41495498658: all 342 tests
+`test.only`, and the report and traces are uploaded when the job fails. **That job has run on GitHub** (run 41541778703: all 374 tests
 passed, including the Case Two step of `e2e/demo-flow.spec.ts` that failed in run 41182982903; see
 [CI_CD.md](CI_CD.md#9-what-was-and-was-not-validated)); the CI path of the suite (Chromium, `dist` API, `.next`) was not exercised
 locally.
@@ -243,8 +256,9 @@ Stop what you started: a run that is killed can leave the API and the web server
 - **Other browsers and devices.** Chromium only (Microsoft Edge here); the phone layout is an emulated 390x844 viewport.
 - **Scale and load.** One user at a time on one machine. [PERFORMANCE.md](PERFORMANCE.md) says what the benchmarks do and do not measure.
 - **Visual regression.** The screenshots are looked at by a person; nothing diffs them.
-- **Demo numbers are not all fixed.** The case sizes, the evidence counts, the Case Quality Index and the first fork are the same in
-  every fresh seed and the specs assert them; the **Avoidable Support Effort of Case One is not** (section 7).
+- **Demo numbers are not all asserted.** The case sizes, the evidence counts, the Case Quality Index and the first fork are the same in
+  every fresh seed and the specs assert them; the **Avoidable Support Effort of Case One is a sampled estimate**, steady since engine
+  2026.3.0 but never asserted by value (section 7, finding 3).
 
 ## 7. Findings
 
@@ -270,6 +284,25 @@ hidden `status`, so it now finds the note by role and the status by its exact se
 the set-up read, so on a fast machine it served 29 once (the second full run): the bounds are now at least 25 and at most 30 plus
 what the loop could have earned in the time it took. One `waitForTimeout` (System Health, "Refresh reads the counters again") was
 replaced by a wait on the condition.
+
+**Findings of the guided-review wave** (all fixed; each is a way a test or a guard went wrong, not a defect of the engine):
+
+- A jsdom test that looks up an open Fluent dialog or drawer by its name must first remove the `aria-hidden` that Fluent's focus
+  manager (Tabster) puts on the open surface, or it passes or fails by the timing of that attribute. `apps/web/test/setup.ts`
+  does it for `.fui-DialogSurface` and `.fui-OverlayDrawer`; a control that waited 400 ms and then queried failed 6 of 6 times
+  before the fix and passed 6 of 6 after.
+- Every file of the PostgreSQL suite runs in a private schema of one shared database, so a query of the catalog (`pg_indexes`,
+  `information_schema`, a digest of the tables) has to be scoped with `current_schema()`; read across schemas it can fail with
+  `XX000 relation_open` while another file drops its own.
+- The Problem Details guard (`apps/api/test/problem-reasons.test.ts`) treats every `reason: '...'` literal of the API source as a
+  token that `docs/API.md` must list. Response data that is also called `reason` (the unresolved links of `provenance.resolve`)
+  has to be named otherwise in the code that builds it.
+- Playwright: a string `name` is a substring match (use `exact: true` or a whole-name pattern when another region contains the
+  word); a download is stored without an extension, so save it under its suggested name before opening it in a browser; a Next
+  prefetch of a page URL such as `/cases/<id>/quality` looks like an API call unless the filter requires `/api/`; and a 404 that
+  a test provokes on purpose has to be allowed with `diagnostics.allow`.
+- Running the touched spec locally before pushing found within a few minutes what the CI job took 15 to show (a locator made
+  ambiguous by a new named region): build once, then run the spec with `PW_WEB_REBUILD=0`.
 
 **Open** (reproductions; the lead routes them):
 

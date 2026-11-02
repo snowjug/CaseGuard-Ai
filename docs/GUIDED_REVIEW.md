@@ -20,8 +20,8 @@ and one link away; the review links into them ("Show in timeline", "Open in the 
 ## 1. The page, section by section
 
 The sections follow the order of a review: what the verdict is, how the case unfolded, where it went wrong, what a better path
-would have looked like, what to do, what to learn, how to share it. Each section ends with a closed "How this was calculated" note
-in plain words, and one note after the last section covers the whole review.
+would have looked like, what to do, what to learn, how to share it. Each section except Share ends with a closed "How this was
+calculated" note in plain words, and one note after the last section covers the whole review.
 
 | #   | Section                   | Answers                                                                                                  | Reads (permission)                                                                                                        | Writes (permission)                                                      |
 | --- | ------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
