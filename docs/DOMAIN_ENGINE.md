@@ -82,7 +82,11 @@ stay `...Z`, finer precision becomes `....mmmZ`). `CaseBundleSchema` rejects the
 **Knowledge pack.** The only authored pack is `kp.teams-authentication` v1.0.0 (`TEAMS_AUTH_PACK`): 9 hypotheses with
 priors, 30 signals with per-hypothesis likelihoods, 21 diagnostic actions (cost, risk, reliability, outcomes, prerequisites,
 produced requirements), 13 requirements and one inference. `getCompiledPack` precompiles keyword regular expressions and
-lexicon alternations once (patterns with `g` or `y` flags are rejected). Policy values in the shipped pack:
+lexicon alternations once (patterns with `g` or `y` flags are rejected). Every pattern scans up to 20,000 characters of an
+event on the API's event loop, so **repetition in a pattern must be bounded** (`[\w-]{0,40}`, not `[\w-]*` after a literal):
+`packages/domain/test/robustness.test.ts` fails a pattern that needs 100 ms of CPU on inputs derived from the pattern itself, and
+the redaction-pattern guard's static check rejects nested repetition and back-references in the shipped patterns. Policy values
+in the shipped pack:
 
 | Policy                           | Value                                                                                         |
 | -------------------------------- | --------------------------------------------------------------------------------------------- |

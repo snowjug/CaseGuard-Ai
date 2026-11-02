@@ -668,7 +668,7 @@ const signals: KnowledgeSignal[] = [
     detectors: [
       st('proxyNodesFailing', 'gt', 0),
       rx(
-        String.raw`\bproxy[- ]?[\w-]*\d?\b[^.\n]{0,60}\b(times? out|timeouts?|fails?|dropped)\b[^.\n]{0,60}\b(one in \w+|roughly|about|some|intermittent)`,
+        String.raw`\bproxy[- ]?[\w-]{0,40}\d?\b[^.\n]{0,60}\b(times? out|timeouts?|fails?|dropped)\b[^.\n]{0,60}\b(one in \w+|roughly|about|some|intermittent)`,
         { roles: ['customer_network_admin'] },
       ),
     ],
@@ -1650,7 +1650,8 @@ const requirements: KnowledgeRequirement[] = [
     askText: 'Please provide three sample affected users.',
     satisfiedBySignals: [],
     satisfiedByDetectors: [
-      rx(String.raw`\b[\w.-]+@[\w-]+(\.[\w-]+)+\b`, { roles: [...CUSTOMER_ROLES] }),
+      // Bounded, with no repeated group: the unbounded form scanned quadratically over a long run of dots or hyphens.
+      rx(String.raw`\b[\w.-]{1,64}@[\w-]{1,63}\.[\w.-]{1,200}\b`, { roles: [...CUSTOMER_ROLES] }),
     ],
   },
   {

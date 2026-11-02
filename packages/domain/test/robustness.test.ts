@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CaseBundleSchema, type CaseBundle } from '@caseguard/schemas';
+import { describeBacktrackingRisk } from '@caseguard/security';
 import { TEAMS_AUTH_PACK, compileKnowledgePack } from '../src';
 import { CASE_ONE, CASE_TWO, loadBundle, prepareBundle } from './helpers';
 
@@ -33,6 +34,17 @@ describe('[NFR-SEC-05] detectors cannot be used for denial of service (ReDoS)', 
     unicode: '\u200b\u202e'.repeat(8_000),
   };
 
+  /**
+   * CPU time of one call, not wall-clock time: a process that is descheduled on a busy machine must not look like a
+   * slow pattern, while a pattern that backtracks badly burns CPU and is still caught.
+   */
+  const cpuMs = (run: () => unknown): number => {
+    const before = process.cpuUsage();
+    run();
+    const spent = process.cpuUsage(before);
+    return (spent.user + spent.system) / 1000;
+  };
+
   it('has patterns to check', () => {
     expect(regexes.length).toBeGreaterThan(50);
   });
@@ -41,14 +53,123 @@ describe('[NFR-SEC-05] detectors cannot be used for denial of service (ReDoS)', 
     const slow: string[] = [];
     for (const { name, re } of regexes) {
       for (const [label, text] of Object.entries(hostile)) {
-        const start = performance.now();
-        re.lastIndex = 0;
-        re.test(text);
-        const elapsed = performance.now() - start;
+        const elapsed = cpuMs(() => {
+          re.lastIndex = 0;
+          re.test(text);
+        });
         if (elapsed >= 100) slow.push(`${name} on ${label}: ${Math.round(elapsed)} ms`);
       }
     }
     expect(slow).toEqual([]);
+  });
+
+  /**
+   * Inputs built from the pattern itself, in the way of the probe that guards customer-supplied redaction patterns:
+   * the characters and words the pattern mentions, run on, cut one character short (so a partial match fails at the
+   * very end) and spread over long gaps, plus every separator the pattern names (`.`, `-`, `@`, `_`, ...) alternating
+   * with a word character, which puts a word boundary at every other position. The generic inputs above never contain
+   * a pattern's own words or separators.
+   */
+  const derivedInputs = (re: RegExp): Record<string, string> => {
+    const words = [...new Set(re.source.replace(/\\./g, ' ').match(/[A-Za-z]{3,}/g) ?? [])].slice(
+      0,
+      6,
+    );
+    const chars = [...new Set(re.source.replace(/\\./g, '').match(/[A-Za-z0-9]/g) ?? [])].slice(
+      0,
+      6,
+    );
+    const separators = [
+      ...new Set([
+        ...(re.source.replace(/\\./g, '').match(/[.\-_@:,;/'"!#%&=<>~]/g) ?? []),
+        ...[...re.source.matchAll(/\\([.\-_@:,;/'"!#%&=<>~])/g)].map((match) => match[1] ?? ''),
+      ]),
+    ].slice(0, 6);
+    const fill = (unit: string): string =>
+      unit.repeat(Math.ceil(20_000 / unit.length)).slice(0, 20_000);
+    const inputs: Record<string, string> = {};
+    for (const char of chars) {
+      inputs[`run of ${char}`] = fill(char);
+      inputs[`run of ${char} then !`] = `${fill(char).slice(0, 19_999)}!`;
+    }
+    for (const separator of separators) {
+      inputs[`a and ${separator} alternating`] = fill(`a${separator}`);
+      inputs[`${separator} and a alternating`] = fill(`${separator}a`);
+      inputs[`ab and ${separator} alternating`] = fill(`ab${separator}`);
+      for (const word of words) inputs[`${word} and ${separator}`] = fill(`${word}${separator}`);
+    }
+    words.forEach((word, index) => {
+      inputs[`word ${index} repeated`] = fill(`${word} `);
+      inputs[`word ${index} cut short`] = fill(`${word.slice(0, -1)} `);
+      inputs[`word ${index} over long gaps`] = fill(`${word}${' '.repeat(60)}`);
+    });
+    if (words.length > 1) {
+      inputs['all words'] = fill(`${words.join(' ')} `);
+      inputs['all words cut short'] = fill(`${words.map((word) => word.slice(0, -1)).join(' ')} `);
+    }
+    return inputs;
+  };
+
+  it('every pattern finishes quickly on inputs derived from the pattern itself', () => {
+    const slow: string[] = [];
+    let probed = 0;
+    for (const { name, re } of regexes) {
+      for (const [label, text] of Object.entries(derivedInputs(re))) {
+        const elapsed = cpuMs(() => {
+          re.lastIndex = 0;
+          re.test(text);
+        });
+        probed += 1;
+        if (elapsed >= 100) slow.push(`${name} on ${label}: ${Math.round(elapsed)} ms`);
+      }
+    }
+    expect(probed).toBeGreaterThan(regexes.length * 5);
+    expect(slow).toEqual([]);
+  });
+
+  /**
+   * The static check of the guard for customer-supplied redaction patterns, applied to the shipped pack. It also
+   * rejects look-arounds, because a replacement next to a match could change later matches of such a pattern; the pack
+   * compiler wraps every lexicon phrase in a one-character look-behind as a word boundary (`(?<![\w])`), which is
+   * constant-time and not a backtracking risk, so that one reason is not counted here.
+   */
+  const WORD_BOUNDARY_WRAPPER = 'it uses a look-around assertion';
+  // Two patterns have more than four unbounded `\s+` runs. Each run sits between literal words and is followed by a
+  // bounded gap, so there is nothing to backtrack into; they take 0.2 ms on every input above.
+  const REVIEWED_RUNS = ['sig.no-server-side-failure-records', 'sig.resolver-inconsistent'];
+
+  it('no pattern has nested repetition, a back-reference or an unreviewed run of unbounded repetitions', () => {
+    const risky = regexes
+      .map(({ name, re }) => ({ name, why: describeBacktrackingRisk(re.source) }))
+      .filter((item) => item.why !== null && item.why !== WORD_BOUNDARY_WRAPPER)
+      .map((item) => `${item.name}: ${item.why}`);
+    expect(risky).toEqual(
+      REVIEWED_RUNS.map((name) => `${name}: it has too many unbounded repetitions`),
+    );
+  });
+
+  it('finds an e-mail address as before, and scans a long run of dots and hyphens in linear time', () => {
+    const detector = compiled.requirementDetectors
+      .get('req.sample-users')
+      ?.find((candidate) => candidate.regex)?.regex;
+    expect(detector).toBeDefined();
+    const previous = /\b[\w.-]+@[\w-]+(\.[\w-]+)+\b/i;
+    for (const text of [
+      'please use jan.kowalski@contoso-fictional.example for the lookup',
+      'users: a.kowal@example.org, m.nowak@sub.example.org and t.w@x.io',
+      'mail me at first-last@corp.example.co.uk.',
+      'user_name@my-host.example.net trailing',
+      '(jan@example.org) <jan@example.org>',
+      'Jan.Kowalski@Contoso.Example',
+      'a+b@example.com',
+      'no address here, user@host and @example.com',
+    ]) {
+      const expected = previous.exec(text);
+      const actual = detector?.exec(text);
+      expect(actual?.[0] ?? null, text).toBe(expected?.[0] ?? null);
+      expect(actual?.index ?? -1, text).toBe(expected?.index ?? -1);
+    }
+    expect(cpuMs(() => detector?.test('a.'.repeat(10_000)))).toBeLessThan(100);
   });
 });
 
