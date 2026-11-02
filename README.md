@@ -20,7 +20,7 @@ nodes for evidence, a decision fork and a hypothesis); besides the screenshots b
 are the workflows in [`.github/workflows`](.github/workflows) (`ci`, `codeql`, `dependency-review` and the manual `deploy`;
 `deploy-environment` is the reusable part of `deploy` and has no badge of its own). **A badge reports the latest run of its workflow
 on the default branch.** Before the foundation work all 27 CI runs failed; the first fully green run
-(41495498658) is on the unmerged branch `build/p0-foundation`, and `build/wave-1` is green too (run 41541778703 is the last that changed code), so
+(41495498658) is on the unmerged branch `build/p0-foundation`, and `build/wave-1` is green too (run 41546529865 is the last that changed code), so
 the CI badge cannot show a pass until that work reaches the default branch. Dependency review (13 runs, all failed) fails because the repository's
 Dependency graph setting is off. No CodeQL or Deploy run
 is recorded here (CodeQL runs on pushes and pull requests to `main`, which does not exist yet, on a weekly schedule and on demand), so those two badges say nothing yet.
@@ -31,11 +31,11 @@ is recorded here (CodeQL runs on pushes and pull requests to `main`, which does 
 > default and is what the demo uses**: no model is called and nothing leaves your machine. The Azure OpenAI, Microsoft Entra ID,
 > Azure Blob Storage, Azure AI Search and Azure Monitor integrations are **implemented but validated against local mocks only**.
 > **Nothing has been deployed to Azure.** Docker image builds were **not run** locally (no Docker daemon); CI builds both images and
-> smoke-tests them (run 41541778703: both were built and the compose smoke test passed 12 checks). The data tier is exercised on
+> smoke-tests them (run 41546529865: both were built and the compose smoke test passed 12 checks). The data tier is exercised on
 > **PGlite** locally and on PostgreSQL 16 in the CI integration job.
 > **CI was never fully green until the foundation branch**: all 27 earlier runs failed (the one on `2ecb454`, run 41182982903,
 > had only the production build fully green). The first fully green run is 41495498658 on the unmerged branch
-> `build/p0-foundation`; run 41541778703 on `build/wave-1` is the last that changed code (8 of 8 jobs: 6,151 unit tests, 1,033 integration tests on
+> `build/p0-foundation`; run 41546529865 on `build/wave-1` is the last that changed code (8 of 8 jobs: 6,152 unit tests, 1,033 integration tests on
 > PostgreSQL 16 and 374 end-to-end tests passed, none failed; see [Running tests](#running-tests)). None of this has reached the
 > default branch.
 > Every score is an **estimate**, shown with its basis and range. CaseGuard AI is not a Microsoft product.
@@ -862,8 +862,8 @@ deterministic results, retrying every 60 seconds. Full rules: [AI_ORCHESTRATION.
 ## Running tests
 
 Everything below runs offline. Counts, timings and coverage are not repeated here from memory: each result cell is the outcome of
-[GitHub Actions run 41541778703](https://github.com/snowjug/CaseGuard-Ai/actions/runs/41541778703) (the CI workflow on commit
-`5d0d5ae` of the unmerged branch `build/wave-1`, 2026-11-02, fully green; it is the last commit that changed code or tests, and
+[GitHub Actions run 41546529865](https://github.com/snowjug/CaseGuard-Ai/actions/runs/41546529865) (the CI workflow on commit
+`69c4c85` of the unmerged branch `build/wave-1`, 2026-11-02, fully green; it is the last commit that changed code or tests, and
 later commits change documents only), a local measurement that says so, or "NOT RUN in CI". The 27 runs before the foundation work
 all failed; run 41182982903 on `2ecb454` is the last one whose counts were recorded, and run 41495498658 on `build/p0-foundation`
 (5,843 unit, 1,011 integration and 342 end-to-end tests) was the first fully green
@@ -871,13 +871,13 @@ all failed; run 41182982903 on `2ecb454` is the last one whose counts were recor
 
 | Layer                        | Command                   | What it runs                                                                                                                                                                                                                                  | Result                                                                                                                                                                 |
 | ---------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit and property tests      | `pnpm test:unit`          | Every workspace except `*.int.test.ts`: schemas, config, security, observability, the domain engine (with `fast-check` property tests), the AI package, UI and web components (jsdom), API tests                                              | CI run 41541778703: 6,151 passed, 0 failed, 4 expected failures that pin known defects (256 files)                                                                     |
-| Integration tests            | `pnpm test:int`           | `*.int.test.ts`: database, HTTP and mock-service tests on PGlite (CI points them at a `postgres:16` service container)                                                                                                                        | CI run 41541778703, on PostgreSQL 16: 1,033 passed, 0 failed (56 files)                                                                                                |
+| Unit and property tests      | `pnpm test:unit`          | Every workspace except `*.int.test.ts`: schemas, config, security, observability, the domain engine (with `fast-check` property tests), the AI package, UI and web components (jsdom), API tests                                              | CI run 41546529865: 6,152 passed, 0 failed, 4 expected failures that pin known defects (256 files)                                                                     |
+| Integration tests            | `pnpm test:int`           | `*.int.test.ts`: database, HTTP and mock-service tests on PGlite (CI points them at a `postgres:16` service container)                                                                                                                        | CI run 41546529865, on PostgreSQL 16: 1,033 passed, 0 failed (56 files)                                                                                                |
 | Coverage                     | `pnpm test:coverage`      | `vitest run --coverage` (V8; HTML, lcov and a text summary under `coverage/`)                                                                                                                                                                 | NOT RUN in CI; no figure recorded ([TESTING.md](docs/TESTING.md#8-not-run-and-not-verifiable))                                                                         |
-| End-to-end and accessibility | `pnpm test:e2e`           | Playwright desktop and mobile projects against a real API (in-memory PGlite, deterministic AI, seeded demo) and a production build of the web app: every page, the demo flow, axe checks, themes, HTTP security headers and failure behaviour | CI run 41541778703: 374 passed (axe checks included), including the Case Two step of `demo-flow.spec.ts`, the guided review and report spec and the phone-width checks |
+| End-to-end and accessibility | `pnpm test:e2e`           | Playwright desktop and mobile projects against a real API (in-memory PGlite, deterministic AI, seeded demo) and a production build of the web app: every page, the demo flow, axe checks, themes, HTTP security headers and failure behaviour | CI run 41546529865: 374 passed (axe checks included), including the Case Two step of `demo-flow.spec.ts`, the guided review and report spec and the phone-width checks |
 | Domain benchmark             | `pnpm bench`              | The engine on the synthetic cases and scaled cases ([EVALUATION.md](docs/EVALUATION.md#6-performance))                                                                                                                                        | NOT RUN in CI; measured locally under load: Case One analysis mean 509.3 ms, p95 1242.5 ms ([EVALUATION.md](docs/EVALUATION.md#6-performance))                         |
 | API micro-benchmark          | `pnpm bench:api`          | One in-process API on in-memory PGlite with the seeded demo; writes `docs/PERFORMANCE.md` (`--no-write` prints only)                                                                                                                          | NOT RUN in CI; measured locally, noisy: timeline retrieval p50 34.53 ms, p95 41.76 ms ([PERFORMANCE.md](docs/PERFORMANCE.md))                                          |
-| Everything, as CI runs it    | `node scripts/verify.mjs` | Format, lint, typecheck, generated files, docs links, tests, build, e2e, secret scan, dependency audit, Bicep, images, demo replay; every step reports PASSED, FAILED or NOT RUN, never a silent pass                                         | CI runs it one step per job; run 41541778703: 8 of 8 jobs fully green                                                                                                  |
+| Everything, as CI runs it    | `node scripts/verify.mjs` | Format, lint, typecheck, generated files, docs links, tests, build, e2e, secret scan, dependency audit, Bicep, images, demo replay; every step reports PASSED, FAILED or NOT RUN, never a silent pass                                         | CI runs it one step per job; run 41546529865: 8 of 8 jobs fully green                                                                                                  |
 
 Use `node scripts/verify.mjs --list` to see the steps and `--only lint,typecheck` to run a subset. Exit code 3 of a step means it was
 **not run** (for example `docker:build` without a Docker daemon, or `infra:validate` without a Bicep CLI), never "passed". `pnpm
@@ -909,9 +909,10 @@ cases are in [docs/runbooks](docs/runbooks/README.md).
 ## CI/CD
 
 Five workflows exist in [`.github/workflows`](.github/workflows). **Two have run on GitHub; CI is green only on the unmerged
-branches**: `ci.yml` has run 39 times, 27 of them failing before the foundation work. Of the 12 runs since, 6 were fully green (1 on
-`build/p0-foundation`, 5 on `build/wave-1`; the last that changed code, run 41541778703: 8 jobs, all green), 2 failed on `build/wave-1` and were
-fixed there, and 4 were cancelled by newer pushes. `dependency-review.yml` has run 13 times and failed every
+branches**: `ci.yml` has run 43 times, 27 of them failing before the foundation work. Of the 16 runs since, 7 were fully green (1 on
+`build/p0-foundation`, 6 on `build/wave-1`; the last that changed code, run 41546529865: 8 jobs, all green), 2 failed on `build/wave-1` and were
+fixed there, and 7 were cancelled by newer pushes (one of them after its unit job had found a counterexample to a property test on a
+documents-only commit, fixed in `69c4c85`). `dependency-review.yml` has run 13 times and failed every
 time because the repository's Dependency graph setting is off. No CodeQL or deploy run is recorded here, so every statement about
 those two is a reading of the configuration, not an observed result ([CI_CD.md](docs/CI_CD.md#9-what-was-and-was-not-validated)).
 
@@ -924,7 +925,7 @@ those two is a reading of the configuration, not an observed result ([CI_CD.md](
 | `.github/dependabot.yml`                             | Weekly                                                                         | Version updates for npm, GitHub Actions, Docker and Compose                                                                                                                                                                                                                                                                                                                                                                                       |
 
 **Docker images were not built locally** (no Docker daemon was available); the `containers` job builds both Dockerfiles (in run
-41541778703 both images were built and the compose smoke test passed 12 checks).
+41546529865 both images were built and the compose smoke test passed 12 checks).
 Every gate runs through `scripts/verify.mjs`, so the local loop and CI share one runner and one honest status model.
 Secret scanning has three layers (a pre-commit hook, the repository scanner and gitleaks in CI, and GitHub push protection when
 enabled). The repository settings a person must apply (branch protection, required checks, environments) are listed in
@@ -1005,10 +1006,10 @@ How the product was evaluated, with the evidence for each layer in [EVALUATION.m
 | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Does the engine produce sensible results on the cases? | Calibration on the two synthetic cases: forks, the earliest meaningful fork, the Case Quality Index with range and band, Avoidable Support Effort, warnings, and a skill match as of the first email | The table in [End-to-end use case](#end-to-end-use-case) and EVALUATION.md section 3                                                                                        |
 | Does the engine read text it was not written for?      | 16 independent synthetic cases (paraphrased, noisy, negative controls, reordered) labelled before the engine ran, and a ReDoS probe over every shipped pattern                                       | 13 of 66 labelled signals read (recall 20 %, precision 76 %); the 4 false positives all deny the signal; two quadratic patterns found and bounded (EVALUATION.md section 7) |
-| Can the future leak into an earlier decision?          | Property tests (a prefix analysis equals the full analysis restricted to it), mutation tests that rewrite everything after a cut, a leak check on every scenario, AI-boundary validators             | Local runs passed (EVALUATION.md section 4); CI run 41541778703 unit tests: 6,151 passed, 0 failed                                                                          |
+| Can the future leak into an earlier decision?          | Property tests (a prefix analysis equals the full analysis restricted to it), mutation tests that rewrite everything after a cut, a leak check on every scenario, AI-boundary validators             | Local runs passed (EVALUATION.md section 4); CI run 41546529865 unit tests: 6,152 passed, 0 failed                                                                          |
 | Do the AI contracts hold?                              | `runEvaluation` over 42 adversarial fixtures and 12 controls, graded by 8 gates, with the deterministic provider on both cases                                                                       | Two local runs: 8 of 8 gates passed, 42 of 42 fixtures rejected, 12 of 12 controls accepted (EVALUATION.md section 5)                                                       |
 | Is it fast enough?                                     | The domain benchmark and the in-process API micro-benchmark (not a load test; machine and caveats are recorded with the numbers)                                                                     | NOT RUN in CI; local figures in the two benchmark rows above (EVALUATION.md section 6)                                                                                      |
-| Does it work end to end and is it accessible?          | Playwright against the real API and web build, with axe checks on every page, in light and dark themes, on desktop and a phone viewport                                                              | CI run 41541778703: 374 passed (axe checks included)                                                                                                                        |
+| Does it work end to end and is it accessible?          | Playwright against the real API and web build, with axe checks on every page, in light and dark themes, on desktop and a phone viewport                                                              | CI run 41546529865: 374 passed (axe checks included)                                                                                                                        |
 
 **What this evaluation cannot show.** There are two synthetic cases, written alongside the engine, plus an independent set of 16
 synthetic cases with one annotator (on which the detectors read 13 of 66 labelled signals: recall 20 percent, precision 76
@@ -1027,7 +1028,7 @@ The complete, graded list is [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md). 
 - **No real language model has ever been called**; the Azure OpenAI provider was exercised only against a local mock server.
 - **Microsoft Entra ID, Azure Blob Storage and Azure AI Search were validated against fakes only**; **nothing has been deployed to
   Azure**, no Docker image was built locally (CI builds them), and CI is green only on unmerged branches, not on the default branch.
-- **PostgreSQL ran only in the CI integration job**: local database tests run on PGlite (one connection), and CI run 41541778703 ran
+- **PostgreSQL ran only in the CI integration job**: local database tests run on PGlite (one connection), and CI run 41546529865 ran
   the integration tests on PostgreSQL 16 (1,033 passed, 0 failed), including the two-connection ingestion race (added in run
   41502284661), and a subset of the API suites also passed on a local PostgreSQL 16.15 server. No Azure Database for PostgreSQL was
   used: row-level-security parity on a managed server and locking behaviour are unvalidated.

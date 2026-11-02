@@ -30,8 +30,8 @@ builds and tests on the same machine during these runs**, so all timings are noi
 Counts are Vitest's own totals from `pnpm.cmd exec vitest run` inside each package (a "test" is one `it` after expansion of
 `it.each` and loops).
 
-**All workspaces together, as CI counted them** (GitHub Actions run 41541778703, commit `5d0d5ae` of `build/wave-1`): the unit and
-property tests are 256 files with 6,151 passed, 0 failed and 4 expected failures (`it.fails`: the three negation tests and the
+**All workspaces together, as CI counted them** (GitHub Actions run 41546529865, commit `69c4c85` of `build/wave-1`): the unit and
+property tests are 256 files with 6,152 passed, 0 failed and 4 expected failures (`it.fails`: the three negation tests and the
 parser-typing test of section 7), and the integration tests on PostgreSQL 16 are 56 files with 1,033 passed, 0 failed. The table
 below is a local count per package from an earlier revision; it is kept for its notes and no longer adds up to the CI totals.
 

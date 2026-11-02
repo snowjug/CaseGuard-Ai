@@ -27,10 +27,10 @@ tiers for this document**; only the end-to-end tiers below were run for it.
 
 ## 2. The last full run
 
-**The latest full run is CI's.** GitHub Actions run 41541778703 (commit `5d0d5ae` of `build/wave-1`, 2 November 2026, the last
-commit that changed code or tests) passed all 8 jobs: **6,151 unit tests** (256 files; 4 more are expected failures that pin
+**The latest full run is CI's.** GitHub Actions run 41546529865 (commit `69c4c85` of `build/wave-1`, 2 November 2026, the last
+commit that changed code or tests) passed all 8 jobs: **6,152 unit tests** (256 files; 4 more are expected failures that pin
 known defects of the signal detectors), **1,033 integration tests on PostgreSQL 16** (56 files) and **374 Playwright tests**
-(desktop and mobile, axe checks included, 13.4 minutes), plus the compose smoke test (12 checks), the secret scan with gitleaks
+(desktop and mobile, axe checks included, 15.5 minutes), plus the compose smoke test (12 checks), the secret scan with gitleaks
 and the dependency audit. The 374 are the 342 of the run described below, the 29 of `pages/review.spec.ts` (the guided review and
 the report) and three phone-width checks of the review and the report added to `mobile.spec.ts`. **Locally** on the Linux VM of
 the wave (4 shared vCPU, the bundled Chromium, one worker) the review spec and the 26 phone-width tests ran twice: 62 of 63 passed
@@ -205,7 +205,7 @@ pnpm.cmd exec tsc -p e2e/tsconfig.json --noEmit    # type-check the e2e project
 CI (`.github/workflows/ci.yml`, job `e2e`, 45-minute timeout, Ubuntu): `node scripts/verify.mjs --only build`, then
 `pnpm exec playwright install --with-deps chromium`, then `node scripts/verify.mjs --only test:e2e`. With `CI` set Playwright
 uses the bundled Chromium, the built API (`apps/api/dist`) and the web build in `.next`, retries a failed test once, forbids
-`test.only`, and the report and traces are uploaded when the job fails. **That job has run on GitHub** (run 41541778703: all 374 tests
+`test.only`, and the report and traces are uploaded when the job fails. **That job has run on GitHub** (run 41546529865: all 374 tests
 passed, including the Case Two step of `e2e/demo-flow.spec.ts` that failed in run 41182982903; see
 [CI_CD.md](CI_CD.md#9-what-was-and-was-not-validated)); the CI path of the suite (Chromium, `dist` API, `.next`) was not exercised
 locally.
@@ -303,6 +303,11 @@ replaced by a wait on the condition.
   a test provokes on purpose has to be allowed with `diagnostics.allow`.
 - Running the touched spec locally before pushing found within a few minutes what the CI job took 15 to show (a locator made
   ambiguous by a new named region): build once, then run the spec with `PW_WEB_REBUILD=0`.
+- A property test that rewrites its input has to rewrite it with the rule of the code under test. The line-ending property merged
+  `\r\n` pairs, which changed the meaning of a generated stray carriage return (`\r\r\n` is two breaks, `\r\n` one); a random seed
+  that had not been tried before found it on a documents-only commit, and the test now uses the parser's rule
+  (`packages/domain/test/ingest-parsers-properties.test.ts`). A failing run prints its seed and counterexample, so a red property
+  test is a finding to read, not a flake to retry.
 
 **Open** (reproductions; the lead routes them):
 

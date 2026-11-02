@@ -226,7 +226,7 @@ Here the reading may be a model's, the numbers are code's, and the authority is 
 At five layers: a branded `TemporalView` type, the engine (a prefix analysis equals the full analysis restricted to it), a leak
 check and eight validity checks on every simulated path, the AI boundary (validators reject identifiers and wording from the
 future) and the read path (views are recomputed as of the instant, not filtered). Property tests and mutation tests exercise it
-(they passed in the local runs; the CI unit run, 41541778703, had 6,151 pass and 0 fail); it is evidence for the tested paths
+(they passed in the local runs; the CI unit run, 41546529865, had 6,152 pass and 0 fail); it is evidence for the tested paths
 and the two cases, not a proof for any input
 ([EVALUATION.md](EVALUATION.md#4-temporal-integrity-evidence)).
 
@@ -260,7 +260,7 @@ every other case read (PL-15), so the audit log cannot say who read or exported 
 
 **Is it deployed on Azure?**
 No. The Bicep template is designed and was built and linted with 0 errors, but no what-if or deployment was ever run, and no Docker
-image was built locally. CI builds both images and pushes them nowhere; in run 41541778703 it passed its compose smoke test (12 checks)
+image was built locally. CI builds both images and pushes them nowhere; in run 41546529865 it passed its compose smoke test (12 checks)
 ([DEPLOYMENT.md](DEPLOYMENT.md), [CI_CD.md](CI_CD.md)).
 
 **What was validated against Azure?**
@@ -308,8 +308,8 @@ request 34.53 ms at p50 (p95 41.76 ms) in the API micro-benchmark (`pnpm bench` 
 micro-benchmarks on one machine, not a service-level objective.
 
 **How was it tested, and is it accessible?**
-Unit, property, integration and end-to-end tests, with axe checks on every page in light and dark themes: in CI run 41541778703,
-6,151 unit tests passed and none failed, 1,033 integration tests passed and none failed, and all 374 Playwright tests passed (the axe
+Unit, property, integration and end-to-end tests, with axe checks on every page in light and dark themes: in CI run 41546529865,
+6,152 unit tests passed and none failed, 1,033 integration tests passed and none failed, and all 374 Playwright tests passed (the axe
 checks are among them; no separate count was recorded). That run is on an unmerged branch, and the 27 runs before the foundation
 work all failed, so the default branch has no green run. The
 integration tests ran on PostgreSQL 16 in CI; locally the suites that use a database run on PGlite.
