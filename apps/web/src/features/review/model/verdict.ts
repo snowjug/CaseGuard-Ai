@@ -205,8 +205,10 @@ export function describeProducer(run: AnalysisRun | null): Producer {
       sentence: `Fixed rules produced this review (the ${pack} knowledge pack). No language model was involved.`,
     };
   }
+  // In this version a model's proposals are checked and recorded but never merged into the analysis, so every figure
+  // comes from the rules whichever provider the run was configured with (docs/AI_ORCHESTRATION.md, section 8).
   return {
     kind: 'model',
-    sentence: `A language model (${run.model}) produced parts of this review, checked against the ${pack} knowledge pack.`,
+    sentence: `Fixed rules produced every figure in this review (the ${pack} knowledge pack). This run was set up to ask a language model (${run.model}) for proposals; they are checked and recorded, and none of them is part of these results.`,
   };
 }

@@ -87,6 +87,10 @@ describe('[REV-VERDICT-01] the verdict', () => {
     const model = describeProducer({ ...CASE_ONE.run, provider: 'azure-openai', model: 'gpt-x' });
     expect(model.kind).toBe('model');
     expect(model.sentence).toContain('gpt-x');
+    // The rules produce every figure in either mode; a model's proposals are never described as part of the result.
+    expect(model.sentence).toMatch(/^Fixed rules produced every figure in this review/);
+    expect(model.sentence).toContain('none of them is part of these results');
+    expect(model.sentence).not.toMatch(/produced parts of this review/);
     expect(describeProducer(null).kind).toBe('unknown');
   });
 });
