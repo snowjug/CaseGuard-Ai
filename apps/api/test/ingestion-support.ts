@@ -137,21 +137,27 @@ export interface StatementLog extends Database {
  * Decorates a database so a test can see which statements a request ran (to prove there is no N+1).
  * `staleRead` may answer a SELECT with no rows instead of running it: what a request that checked
  * before a concurrent one committed would have seen. The statement is still recorded.
+ * `afterRead` runs once a statement has really been executed, with the number of rows it returned, before the
+ * caller gets the answer: a test can hold a request there until another request has caught up with it.
  */
 export function withStatementLog(
   database: Database,
   staleRead: (statement: RecordedStatement) => boolean = () => false,
+  afterRead?: (statement: RecordedStatement, rowCount: number) => Promise<void> | void,
 ): StatementLog {
   const statements: RecordedStatement[] = [];
   const record = (executor: SqlExecutor): SqlExecutor => ({
-    query: <T = Record<string, unknown>>(
+    query: async <T = Record<string, unknown>>(
       text: string,
       params?: readonly unknown[],
     ): Promise<QueryResult<T>> => {
       const statement = { sql: text, params: params ?? [] };
       statements.push(statement);
-      if (staleRead(statement)) return Promise.resolve({ rows: [], rowCount: 0 });
-      return executor.query<T>(text, params);
+      const result: QueryResult<T> = staleRead(statement)
+        ? { rows: [], rowCount: 0 }
+        : await executor.query<T>(text, params);
+      if (afterRead) await afterRead(statement, result.rowCount);
+      return result;
     },
   });
   return {

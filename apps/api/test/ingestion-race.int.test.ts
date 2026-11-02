@@ -148,3 +148,87 @@ describe('two creates for one new reference', () => {
     expect(await auditOf(h, 'case.ingested')).toHaveLength(1);
   });
 });
+
+/**
+ * `parties` requests meet here: each `arrive()` waits until all have arrived, and every later one passes at once.
+ * It gives up with a clear message instead of hanging, which is also what happens when the database cannot run the
+ * requests at the same time.
+ */
+function rendezvous(parties: number, timeoutMs: number) {
+  let arrived = 0;
+  let open!: () => void;
+  const opened = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  return {
+    arrive: async (): Promise<void> => {
+      arrived += 1;
+      if (arrived >= parties) open();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const late = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(
+              new Error(
+                `only ${arrived} of ${parties} requests reached the check in ${timeoutMs} ms`,
+              ),
+            ),
+          timeoutMs,
+        );
+      });
+      try {
+        await Promise.race([opened, late]);
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+    arrivals: (): number => arrived,
+  };
+}
+
+/*
+ * The same race, with nothing simulated. Each request runs its real lookup of the reference inside its own
+ * transaction, on its own connection, and finds nothing, because neither has committed. They then wait for each
+ * other at that point, so both are certain to INSERT and the unique index of migration 0010 has to choose. That
+ * needs a database that runs two transactions at once, which PGlite (one connection) cannot: the meeting would
+ * never complete. It runs against a real PostgreSQL (TEST_DATABASE_URL), as CI does.
+ */
+describe.skipIf(!process.env.TEST_DATABASE_URL)(
+  'two creates for one new reference on a real PostgreSQL',
+  () => {
+    it('both pass the check on their own connection and the unique index admits exactly one', async () => {
+      const lookups: number[] = [];
+      const meeting = rendezvous(2, 20_000);
+      const log = withStatementLog(
+        database,
+        () => false,
+        async (statement, rowCount) => {
+          if (!isReferenceLookup(statement)) return;
+          lookups.push(rowCount);
+          await meeting.arrive();
+        },
+      );
+      const { h } = await openHarness(log, harnesses);
+
+      const sent = await Promise.all([
+        createCase(h, engineer, withBody('The first version.'), { analyze: false }),
+        createCase(h, engineer, withBody('A second version.'), { analyze: false }),
+      ]);
+
+      // Both lookups really ran, concurrently, and really found nothing.
+      expect(meeting.arrivals()).toBeGreaterThanOrEqual(2);
+      expect(lookups.slice(0, 2)).toEqual([0, 0]);
+      // So both requests reached the INSERT: the index, not the check, decided.
+      expect(log.statements.filter(isCaseInsert)).toHaveLength(2);
+      expect(sent.map((res) => res.statusCode).sort()).toEqual([201, 409]);
+      const loser = sent.find((res) => res.statusCode === 409);
+      expect(loser?.data).toMatchObject({ status: 409, detail: referenceInUseMessage(REFERENCE) });
+
+      // One case, one stored payload, one audit row: the loser left nothing behind.
+      expect((await h.repos(CONTOSO).cases.list({ limit: 10 })).items).toHaveLength(1);
+      expect(storedObjects(h)).toHaveLength(1);
+      expect(await auditOf(h, 'case.ingested')).toHaveLength(1);
+      expect(h.logs().some((line) => line.event === 'ingest.orphaned_object')).toBe(false);
+    });
+  },
+);
