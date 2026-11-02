@@ -1,4 +1,9 @@
-import { verifyExcerpt, type DeterministicAnalysis, type ExcerptCheck } from '@caseguard/domain';
+import {
+  getCompiledPack,
+  verifyExcerpt,
+  type DeterministicAnalysis,
+  type ExcerptCheck,
+} from '@caseguard/domain';
 import {
   EVENT_TYPE_LABELS,
   EvidenceLinkSchema,
@@ -285,7 +290,9 @@ export async function resolveProvenance(
 ): Promise<ProvenanceResponse> {
   const asOf = query.asOf ?? null;
   const known = knownBy(asOf);
-  if ((await ctx.repos.cases.get(caseId)) === null) throw new NotFoundError('Case', caseId);
+  const caseRecord = await ctx.repos.cases.get(caseId);
+  if (caseRecord === null) throw new NotFoundError('Case', caseId);
+  const pack = getCompiledPack(caseRecord.workload);
   const links = parseProvenanceLinks(query.links);
 
   const events = new EventReader(ctx, caseId);
@@ -401,8 +408,8 @@ export async function resolveProvenance(
           (found) =>
             Promise.resolve({ title: clip(found.name, 300), at: null, event: null, source: null }),
         );
-      case 'requirement':
-        return derived(
+      case 'requirement': {
+        const record = await derived(
           (from) => from.requirement(link.id),
           async (found) => ({
             title: clip(found.label, 300),
@@ -411,6 +418,15 @@ export async function resolveProvenance(
             source: null,
           }),
         );
+        if ('item' in record) return record;
+        // A warning can name a requirement before the case has reached it (the minimum evidence for an
+        // escalation that is only being considered), so the case has no record of it yet. What the
+        // knowledge pack says it is does not depend on the case, and so on the instant.
+        const defined = pack?.requirements.get(link.id);
+        return defined === undefined
+          ? record
+          : { item: { title: clip(defined.label, 300), at: null, event: null, source: null } };
+      }
       case 'scenario': {
         const scenario = await ctx.repos.counterfactuals.get(caseId, link.id);
         if (scenario === null) return NOT_FOUND;

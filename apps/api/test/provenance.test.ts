@@ -515,7 +515,8 @@ describe('as of an instant, nothing recorded later is shown', () => {
       `claim:${laterClaim.id}`,
       `action:${laterAction.id}`,
       `fork:${laterFork?.id}`,
-      `requirement:${laterRequirement?.requirementId}`,
+      // By its record, which exists only once the case has reached the requirement.
+      `requirement:${laterRequirement?.id}`,
       `scenario:${laterScenario?.id}`,
     ];
     const res = await resolve(PERSONAS.engineer, ONE, links, asOf);
@@ -553,6 +554,23 @@ describe('as of an instant, nothing recorded later is shown', () => {
       if (same !== undefined) expect(item.title).toBe(same.label);
       expect(item.source.verification).toBe('verified');
     }
+  });
+
+  it('names a requirement the case has not reached from what the knowledge pack says, and nothing more', async () => {
+    const t = Date.parse(asOfEvent().timestamp);
+    const notReached = missing.find((m) => Date.parse(m.firstRelevantAt) > t) as MissingEvidence;
+    expect(notReached).toBeDefined();
+    const link = `requirement:${notReached.requirementId}`;
+    const inWindow = await resolve(PERSONAS.engineer, ONE, link, asOfEvent().timestamp);
+    // No time, no message: the case has not reached it, and when it will is not told.
+    expect(inWindow.data.items[0]).toMatchObject({
+      title: notReached.label,
+      at: null,
+      event: null,
+      source: null,
+    });
+    const whole = await resolve(PERSONAS.engineer, ONE, link);
+    expect(whole.data.items[0]).toMatchObject({ at: notReached.firstRelevantAt });
   });
 
   it('does not reveal that a requirement was satisfied later', async () => {
