@@ -1,5 +1,6 @@
 import {
   BeakerRegular,
+  ClipboardTaskListLtrRegular,
   DocumentBulletListRegular,
   FolderRegular,
   GaugeRegular,
@@ -14,7 +15,7 @@ import {
   type FluentIcon,
 } from '@fluentui/react-icons';
 
-/** The 12 destinations, in the order of UI_SPEC section 2. */
+/** The 13 destinations: the 12 of UI_SPEC section 2 and the guided review, which sits first among the case pages. */
 export interface NavContext {
   /** Case id found in the URL (`/cases/[caseId]/...`), or null. */
   pathCaseId: string | null;
@@ -64,6 +65,17 @@ export const NAV_ITEMS: readonly NavItem[] = [
     shortcutKey: 'c',
     href: () => '/cases',
     isActive: (p) => p === '/cases' || p === '/cases/new' || /^\/cases\/[^/]+$/.test(p),
+  },
+  {
+    id: 'guided-review',
+    label: 'Guided Review',
+    icon: ClipboardTaskListLtrRegular,
+    scope: 'case',
+    description: 'Verdict, chronology, what went wrong and what to do next',
+    shortcutKey: 'r',
+    href: caseHref('review'),
+    // The report is the printable end of the guided review, so it keeps this destination lit.
+    isActive: (p) => caseSection('review')(p) || caseSection('report')(p),
   },
   {
     id: 'timeline',
@@ -194,6 +206,8 @@ export interface Crumb {
 const SEGMENT_LABELS: Record<string, string> = {
   cases: 'Cases',
   new: 'New case',
+  review: 'Guided Review',
+  report: 'Report',
   timeline: 'Case Timeline',
   evidence: 'Evidence Ledger',
   hypotheses: 'Hypothesis Arena',

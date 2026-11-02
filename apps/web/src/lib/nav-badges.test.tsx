@@ -102,7 +102,7 @@ describe('[UX-NAV-BADGE-02] navigation badges in the shell', () => {
     ).toBeInTheDocument();
     expect(await navLink(/^Demo Guide.*\(4 of 13 demo steps complete\)/)).toBeInTheDocument();
     expect(await navLink(/^System Health.*\(System status: degraded\)/)).toBeInTheDocument();
-    expect(within(primaryNav()).getAllByRole('link')).toHaveLength(12);
+    expect(within(primaryNav()).getAllByRole('link')).toHaveLength(13);
   });
 
   it('does not ask for system health when the role may not read telemetry', async () => {

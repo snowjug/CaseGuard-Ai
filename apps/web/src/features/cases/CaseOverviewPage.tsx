@@ -9,7 +9,12 @@ import {
   cg,
 } from '@caseguard/ui';
 import { Button, makeStyles, mergeClasses } from '@fluentui/react-components';
-import { ArrowSyncRegular, FolderRegular, HistoryRegular } from '@fluentui/react-icons';
+import {
+  ArrowSyncRegular,
+  ClipboardTaskListLtrRegular,
+  FolderRegular,
+  HistoryRegular,
+} from '@fluentui/react-icons';
 import { useRouter } from 'next/navigation';
 import { AsOfPanel } from '../../components/case/AsOfPanel';
 import {
@@ -60,6 +65,10 @@ const PAGE_HELP = (
       Use the time cursor to see the case as it stood earlier. Everything on the page then shows
       only what was known at that moment, and the recorded resolution is hidden because it is
       hindsight.
+    </p>
+    <p>
+      To read the case from the verdict to what to do next, open the guided review; the other pages
+      are the detail behind it.
     </p>
   </>
 );
@@ -181,10 +190,17 @@ export function CaseOverviewPage({ caseId }: { caseId: string }) {
             </Button>
             <LinkButton
               href={`${caseHref(caseId, 'timeline')}${asOf ? `?asOf=${encodeURIComponent(asOf)}` : ''}`}
-              appearance="primary"
+              appearance="outline"
               icon={<HistoryRegular />}
             >
               Open the timeline
+            </LinkButton>
+            <LinkButton
+              href={caseHref(caseId, 'review')}
+              appearance="primary"
+              icon={<ClipboardTaskListLtrRegular />}
+            >
+              Open guided review
             </LinkButton>
           </div>
         }

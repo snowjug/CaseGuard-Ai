@@ -66,12 +66,12 @@ describe('[UX-SHELL-01] application shell landmarks', () => {
     expect(screen.getByRole('contentinfo')).toBeInTheDocument();
   });
 
-  it('lists all 12 destinations and marks the current page', () => {
+  it('lists all 13 destinations and marks the current page', () => {
     navigateTo('/cases/case_1/timeline');
     mount();
     const nav = screen.getByRole('navigation', { name: 'Primary' });
     const links = within(nav).getAllByRole('link');
-    expect(links).toHaveLength(12);
+    expect(links).toHaveLength(13);
     for (const item of NAV_ITEMS)
       expect(
         within(nav).getByRole('link', { name: new RegExp(`^${item.label}`) }),
@@ -162,7 +162,7 @@ describe('[UX-SHELL-02] header controls', () => {
     mount();
     fireEvent.click(screen.getByRole('button', { name: 'Open navigation', hidden: true }));
     const drawer = await screen.findByRole('dialog', { name: 'Navigation' });
-    expect(within(drawer).getAllByRole('link')).toHaveLength(12);
+    expect(within(drawer).getAllByRole('link')).toHaveLength(13);
   });
 });
 
