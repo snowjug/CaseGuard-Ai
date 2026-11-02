@@ -159,7 +159,9 @@ export function NewCasePage() {
     try {
       const checked =
         request.type === 'upload'
-          ? await previewFile.mutateAsync({ formData: uploadForm(request.file) })
+          ? await previewFile.mutateAsync({
+              formData: uploadForm(request.file, request.workload),
+            })
           : await previewJson.mutateAsync({ body: { source: request.source } });
       setPreview(checked);
       setStep('review');
@@ -182,7 +184,10 @@ export function NewCasePage() {
     try {
       const created =
         request.type === 'upload'
-          ? await createFile.mutateAsync({ formData: uploadForm(request.file), idempotencyKey })
+          ? await createFile.mutateAsync({
+              formData: uploadForm(request.file, request.workload),
+              idempotencyKey,
+            })
           : await createJson.mutateAsync({
               body: { source: request.source, options: { analyze } },
               idempotencyKey,

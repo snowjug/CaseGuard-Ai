@@ -98,6 +98,16 @@ export function draftProblems(draft: SourceDraft): DraftProblem[] {
           field: 'file',
           message: `Only ${ACCEPTED_EXTENSIONS.join(', ')} files are accepted.`,
         });
+      else if (fileNeedsWorkload(draft.file)) {
+        const workload = draft.workload.trim();
+        if (workload === '')
+          problems.push({ field: 'workload', message: 'Choose the workload of this file.' });
+        else if (workload.length > WORKLOAD_MAX)
+          problems.push({
+            field: 'workload',
+            message: `A workload key is limited to ${WORKLOAD_MAX} characters.`,
+          });
+      }
       break;
     case 'bundle': {
       if (draft.bundleText.trim() === '')
@@ -114,7 +124,15 @@ export function draftProblems(draft: SourceDraft): DraftProblem[] {
 
 /** A request the preview and create routes understand: a JSON source, or a multipart upload. */
 export type SourceRequest =
-  { type: 'json'; source: IngestRequest } | { type: 'upload'; file: File };
+  { type: 'json'; source: IngestRequest } | { type: 'upload'; file: File; workload: string | null };
+
+/**
+ * Whether the person has to choose a workload for this file. A JSON bundle states its own, so a different
+ * choice would only contradict it; a CSV or text file cannot state one, and CaseGuard does not guess.
+ */
+export function fileNeedsWorkload(file: File | null): boolean {
+  return file !== null && extensionOf(file.name) !== '.json';
+}
 
 /** The request for a draft, or null while the draft has problems. */
 export function buildSourceRequest(draft: SourceDraft): SourceRequest | null {
@@ -142,14 +160,19 @@ export function buildSourceRequest(draft: SourceDraft): SourceRequest | null {
         type: 'json',
         source: { type: 'bundle', bundle: JSON.parse(draft.bundleText) as unknown },
       };
-    case 'file':
-      return draft.file ? { type: 'upload', file: draft.file } : null;
+    case 'file': {
+      if (!draft.file) return null;
+      const workload = fileNeedsWorkload(draft.file) ? draft.workload.trim() : '';
+      return { type: 'upload', file: draft.file, workload: workload || null };
+    }
   }
 }
 
-/** Multipart body of an upload (the API reads the field named `file`). */
-export function uploadForm(file: File): FormData {
+/** Multipart body of an upload (the API reads the field named `file` and the optional text field `workload`). */
+export function uploadForm(file: File, workload: string | null = null): FormData {
   const form = new FormData();
+  // Sent before the file, so that a server reading the form in order has it first.
+  if (workload) form.append('workload', workload);
   form.append('file', file, file.name);
   return form;
 }

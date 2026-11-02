@@ -1185,11 +1185,13 @@ describe('[FR-ING-04] paste, upload and bundle sources', () => {
     const file = new File(['id,time\n1,2026-04-02'], 'events.csv', { type: 'text/csv' });
     await user.upload(input, file);
     expect(screen.getByText(/events\.csv · /)).toBeInTheDocument();
+    await user.selectOptions(await screen.findByLabelText(/^Workload/), 'teams-authentication');
     await press(user, 'Validate and preview');
     await screen.findByRole('heading', { name: /Step 2 of 4/ });
     const call = handler.call.mock.calls.find(([route]) => route === 'ingestion.previewFile');
     const form = (call?.[1] as { formData: FormData }).formData;
     expect((form.get('file') as File).name).toBe('events.csv');
+    expect(form.get('workload')).toBe('teams-authentication');
 
     await user.click(screen.getByRole('button', { name: 'Continue to confirm' }));
     expect(await screen.findByRole('checkbox', { name: /Start the analysis/ })).toBeChecked();
@@ -1215,6 +1217,7 @@ describe('[FR-ING-04] paste, upload and bundle sources', () => {
     const { container } = renderApp(<NewCasePage />, { api: handler });
     const input = await screen.findByLabelText('Choose a file');
     await user.upload(input, new File(['x'], 'events.csv', { type: 'text/csv' }));
+    await user.selectOptions(await screen.findByLabelText(/^Workload/), 'teams-authentication');
     await press(user, 'Validate and preview');
     const alert = await screen.findByRole('alert');
     expect(within(alert).getByText('The file was refused for safety reasons')).toBeInTheDocument();
@@ -1249,6 +1252,66 @@ describe('[FR-ING-04] paste, upload and bundle sources', () => {
     );
   });
 
+  it('asks for the workload of a CSV file, offers only the supported ones, and sends it before the file', async () => {
+    const user = userEvent.setup();
+    navigateTo('/cases/new?source=file');
+    const handler = api({
+      'ingestion.previewFile': () => preview({ sourceKind: 'uploaded_file' }),
+    });
+    renderApp(<NewCasePage />, { api: handler });
+    const input = await screen.findByLabelText('Choose a file');
+    await user.upload(
+      input,
+      new File(['id,time\n1,2026-04-02'], 'events.csv', { type: 'text/csv' }),
+    );
+
+    // Nothing is chosen for the person: the field starts empty and the supported workloads are the choices.
+    const workload = await screen.findByLabelText(/^Workload/);
+    expect(workload).toHaveValue('');
+    expect(
+      within(workload)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Choose a workload…', 'teams-authentication']);
+    expect(screen.getByText('Choose the workload of this file.')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(workload).toHaveAccessibleDescription(
+        /does not say which workload it belongs to, and CaseGuard does not guess/,
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Validate and preview' })).toBeDisabled(),
+    );
+
+    await user.selectOptions(workload, 'teams-authentication');
+    await press(user, 'Validate and preview');
+    await screen.findByRole('heading', { name: /Step 2 of 4/ });
+    const call = handler.call.mock.calls.find(([route]) => route === 'ingestion.previewFile');
+    const form = (call?.[1] as { formData: FormData }).formData;
+    expect([...form.keys()]).toEqual(['workload', 'file']);
+    expect(form.get('workload')).toBe('teams-authentication');
+  });
+
+  it('asks for no workload for a JSON bundle file, which states its own, and sends none', async () => {
+    const user = userEvent.setup();
+    navigateTo('/cases/new?source=file');
+    const handler = api({
+      'ingestion.previewFile': () => preview({ sourceKind: 'uploaded_file' }),
+    });
+    renderApp(<NewCasePage />, { api: handler });
+    const input = await screen.findByLabelText('Choose a file');
+    await user.upload(input, new File(['{}'], 'bundle.json', { type: 'application/json' }));
+
+    const workload = await screen.findByLabelText(/^Workload/);
+    expect(workload).toBeDisabled();
+    await waitFor(() => expect(workload).toHaveAccessibleDescription(/states its own workload/));
+    await press(user, 'Validate and preview');
+    await screen.findByRole('heading', { name: /Step 2 of 4/ });
+    const call = handler.call.mock.calls.find(([route]) => route === 'ingestion.previewFile');
+    const form = (call?.[1] as { formData: FormData }).formData;
+    expect(form.has('workload')).toBe(false);
+  });
+
   it('builds requests and problems from the draft (pure logic)', () => {
     expect(draftProblems({ ...EMPTY_DRAFT, choice: 'sample', sampleId: null })).toHaveLength(1);
     expect(buildSourceRequest({ ...EMPTY_DRAFT, choice: 'sample', sampleId: 's1' })).toEqual({
@@ -1267,6 +1330,32 @@ describe('[FR-ING-04] paste, upload and bundle sources', () => {
         workload: ' ',
       }),
     ).toEqual({ type: 'json', source: { type: 'paste', text: 'x' } });
+
+    const csv = new File(['a,b'], 'events.csv', { type: 'text/csv' });
+    const bundle = new File(['{}'], 'bundle.json', { type: 'application/json' });
+    // A CSV or text file cannot state its workload, so none is assumed for it: one has to be chosen.
+    expect(draftProblems({ ...EMPTY_DRAFT, choice: 'file', file: csv })).toEqual([
+      { field: 'workload', message: 'Choose the workload of this file.' },
+    ]);
+    expect(buildSourceRequest({ ...EMPTY_DRAFT, choice: 'file', file: csv })).toBeNull();
+    expect(
+      buildSourceRequest({
+        ...EMPTY_DRAFT,
+        choice: 'file',
+        file: csv,
+        workload: ' teams-authentication ',
+      }),
+    ).toEqual({ type: 'upload', file: csv, workload: 'teams-authentication' });
+    // A JSON bundle states its own, so nothing is asked for it and a leftover choice is not sent with it.
+    expect(draftProblems({ ...EMPTY_DRAFT, choice: 'file', file: bundle })).toEqual([]);
+    expect(
+      buildSourceRequest({
+        ...EMPTY_DRAFT,
+        choice: 'file',
+        file: bundle,
+        workload: 'teams-authentication',
+      }),
+    ).toEqual({ type: 'upload', file: bundle, workload: null });
   });
 });
 

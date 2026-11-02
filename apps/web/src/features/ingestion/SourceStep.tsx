@@ -16,6 +16,7 @@ import {
   Input,
   Radio,
   RadioGroup,
+  Select,
   Spinner,
   Tab,
   TabList,
@@ -47,6 +48,7 @@ import {
   WORKLOAD_MAX,
   draftProblems,
   extensionOf,
+  fileNeedsWorkload,
   formatBytes,
   type SourceChoice,
   type SourceDraft,
@@ -327,11 +329,25 @@ function PastePanel({
   );
 }
 
-function FilePanel({ draft, onDraftChange }: Pick<SourceStepProps, 'draft' | 'onDraftChange'>) {
+function FilePanel({
+  draft,
+  onDraftChange,
+  samples,
+}: Pick<SourceStepProps, 'draft' | 'onDraftChange' | 'samples'>) {
   const styles = useStyles();
   const inputId = useId();
   const file = draft.file;
-  const problem = draftProblems(draft).find((item) => item.field === 'file');
+  const problems = draftProblems(draft);
+  const problem = problems.find((item) => item.field === 'file');
+  const workloadProblem = problems.find((item) => item.field === 'workload');
+  const needsWorkload = fileNeedsWorkload(file);
+  const workloads = supportedWorkloads(samples);
+  const workloadHint =
+    file === null
+      ? 'Choose the workload the file belongs to. A JSON bundle states its own.'
+      : needsWorkload
+        ? `A ${extensionOf(file.name)} file does not say which workload it belongs to, and CaseGuard does not guess.`
+        : 'This JSON bundle states its own workload, so nothing is needed here.';
   return (
     <div className={styles.panel}>
       <p className={styles.hint}>
@@ -366,6 +382,35 @@ function FilePanel({ draft, onDraftChange }: Pick<SourceStepProps, 'draft' | 'on
           </p>
         ) : null}
       </div>
+      <Field
+        label="Workload"
+        required={needsWorkload}
+        hint={workloadHint}
+        validationState={needsWorkload && workloadProblem ? 'error' : 'none'}
+        validationMessage={needsWorkload ? workloadProblem?.message : undefined}
+      >
+        {workloads.length > 0 ? (
+          <Select
+            value={draft.workload}
+            disabled={file !== null && !needsWorkload}
+            onChange={(_event, data) => onDraftChange({ workload: data.value })}
+          >
+            <option value="">Choose a workload…</option>
+            {workloads.map((workload) => (
+              <option key={workload} value={workload}>
+                {workload}
+              </option>
+            ))}
+          </Select>
+        ) : (
+          <Input
+            value={draft.workload}
+            disabled={file !== null && !needsWorkload}
+            maxLength={WORKLOAD_MAX + 20}
+            onChange={(_event, data) => onDraftChange({ workload: data.value })}
+          />
+        )}
+      </Field>
       <Notice variant="info" compact title={null}>
         An uploaded file is analysed as soon as it is created; unlike pasted text or a bundle you
         cannot defer the analysis.
@@ -634,7 +679,11 @@ export function SourceStep(props: SourceStepProps) {
               />
             ) : null}
             {draft.choice === 'file' ? (
-              <FilePanel draft={draft} onDraftChange={props.onDraftChange} />
+              <FilePanel
+                draft={draft}
+                onDraftChange={props.onDraftChange}
+                samples={props.samples}
+              />
             ) : null}
             {draft.choice === 'bundle' ? (
               <BundlePanel
