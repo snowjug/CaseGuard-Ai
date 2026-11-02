@@ -147,17 +147,24 @@ describe('[FR-ING-01] the ingestion wizard, end to end', () => {
     );
     expect(await screen.findByText('Load the case record')).toBeInTheDocument();
     expect(screen.getByText('Save results')).toBeInTheDocument();
-    const finished = await screen.findByText('The analysis finished. The case is ready to open.');
+    const finished = await screen.findByText(
+      'The analysis finished. The guided review is ready to open.',
+    );
     expect(finished).toHaveAttribute('role', 'status');
-    const open = screen.getByRole('link', { name: 'Open the case' });
-    expect(open).toHaveAttribute('href', `/cases/${CASE_ID}`);
+    // One primary action, the guided review; the case page stays one link away.
+    const open = screen.getByRole('link', { name: 'Open guided review' });
+    expect(open).toHaveAttribute('href', `/cases/${CASE_ID}/review`);
+    expect(screen.getByRole('link', { name: 'Open the case' })).toHaveAttribute(
+      'href',
+      `/cases/${CASE_ID}`,
+    );
     await waitFor(() => expect(open).toHaveFocus());
     // Nothing navigates by itself (WCAG 2.2.1): the old wizard moved on 1.8 s after the analysis finished.
     await new Promise((resolve) => setTimeout(resolve, 2200));
     expect(router.push).not.toHaveBeenCalled();
     expect(screen.getByRole('heading', { name: 'Step 4 of 4: Create and analyse' })).toBeVisible();
     await user.click(open);
-    expect(router.push).toHaveBeenCalledWith(`/cases/${CASE_ID}`);
+    expect(router.push).toHaveBeenCalledWith(`/cases/${CASE_ID}/review`);
   });
 
   it('keeps the chosen source in the address', async () => {
@@ -1409,6 +1416,28 @@ describe('[FR-ING-05] analysis progress, replay and permissions', () => {
     expect(await screen.findByText('Analysing the case')).toBeInTheDocument();
   });
 
+  it('offers the guided review first when an identical case had already been analysed', async () => {
+    const user = userEvent.setup();
+    const handler = api({
+      'cases.create': () =>
+        ingestResult({
+          created: false,
+          analysisJob: null,
+          case: { ...ingestResult().case, analysisState: 'analyzed' },
+        }),
+    });
+    renderApp(<NewCasePage />, { api: handler });
+    await openReview(user);
+    await user.click(screen.getByRole('button', { name: 'Continue to confirm' }));
+    await user.click(await screen.findByRole('button', { name: 'Create case' }));
+    expect(await screen.findByText('This case already exists')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open guided review' })).toHaveAttribute(
+      'href',
+      `/cases/${CASE_ID}/review`,
+    );
+    expect(screen.getByRole('link', { name: 'Open the case' })).toBeInTheDocument();
+  });
+
   it('keeps the case reachable when the analysis fails', async () => {
     const user = userEvent.setup();
     const handler = api({
@@ -1426,6 +1455,8 @@ describe('[FR-ING-05] analysis progress, replay and permissions', () => {
     expect(await screen.findByText('The provider timed out.')).toBeInTheDocument();
     expect(screen.getByText('The analysis did not finish')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open the case' })).toBeInTheDocument();
+    // There is no analysis to review yet, so the guided review is not offered.
+    expect(screen.queryByRole('link', { name: 'Open guided review' })).not.toBeInTheDocument();
     expect(router.push).not.toHaveBeenCalled();
   });
 

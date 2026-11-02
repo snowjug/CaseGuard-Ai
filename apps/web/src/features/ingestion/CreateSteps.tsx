@@ -147,8 +147,9 @@ export interface ProgressStepProps {
 
 /**
  * Step 4: the case exists. Shows the real stages of its analysis job (cancellable), explains an idempotent replay or a
- * missing job honestly, and, when the analysis finishes, says so and puts the focus on "Open the case". Nothing
- * navigates by itself: a person who is still reading the result is never moved on (WCAG 2.2.1).
+ * missing job honestly, and, when the analysis finishes, says so and puts the focus on the one primary action: "Open
+ * guided review" once there is an analysis to review, "Open the case" until then. Nothing navigates by itself: a
+ * person who is still reading the result is never moved on (WCAG 2.2.1).
  */
 export function ProgressStep({ result, onAnotherCase }: ProgressStepProps) {
   const styles = useStyles();
@@ -158,6 +159,8 @@ export function ProgressStep({ result, onAnotherCase }: ProgressStepProps) {
   const [outcome, setOutcome] = useState<Job['status'] | null>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
   const job = started ?? result.analysisJob;
+  // The review reads a finished analysis: one that has just ended, or one that an identical, already analysed case has.
+  const reviewReady = outcome === 'succeeded' || (!job && result.case.analysisState === 'analyzed');
   const start = useApiMutation('analysis.start', {
     invalidate: ['cases.list', 'cases.get', 'analysis.latest'],
   });
@@ -236,7 +239,7 @@ export function ProgressStep({ result, onAnotherCase }: ProgressStepProps) {
 
       {outcome === 'succeeded' ? (
         <p className={styles.text} role="status">
-          The analysis finished. The case is ready to open.
+          The analysis finished. The guided review is ready to open.
         </p>
       ) : null}
       {outcome === 'failed' || outcome === 'cancelled' ? (
@@ -257,9 +260,20 @@ export function ProgressStep({ result, onAnotherCase }: ProgressStepProps) {
       ) : null}
 
       <div className={styles.actions} ref={actionsRef}>
-        <LinkButton href={caseHref(caseId)} appearance="primary">
-          Open the case
-        </LinkButton>
+        {reviewReady ? (
+          <>
+            <LinkButton href={caseHref(caseId, 'review')} appearance="primary">
+              Open guided review
+            </LinkButton>
+            <LinkButton href={caseHref(caseId)} appearance="outline">
+              Open the case
+            </LinkButton>
+          </>
+        ) : (
+          <LinkButton href={caseHref(caseId)} appearance="primary">
+            Open the case
+          </LinkButton>
+        )}
         <Button appearance="outline" onClick={onAnotherCase}>
           Ingest another case
         </Button>
