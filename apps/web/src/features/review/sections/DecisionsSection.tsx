@@ -209,7 +209,7 @@ function DecisionCard({
         <UiLink
           className={styles.link}
           href={evidenceLinkHref(caseId, { type: 'fork', id: point.forkId })}
-          aria-label={`Open decision point ${point.number} in the Counterfactual Lab`}
+          aria-label={`Open in the Counterfactual Lab: decision point ${point.number}`}
         >
           Open in the Counterfactual Lab
         </UiLink>

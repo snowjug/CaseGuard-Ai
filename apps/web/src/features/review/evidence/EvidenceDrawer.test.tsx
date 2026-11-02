@@ -247,7 +247,7 @@ describe('[REV-EVID-05] the chips', () => {
     const list = within(await screen.findByRole('list', { name: `Evidence for ${SUBJECT}` }));
     expect(list.getAllByRole('button')).toHaveLength(5);
     await user.click(
-      list.getByRole('button', { name: `Show 2 more pieces of evidence for ${SUBJECT}` }),
+      list.getByRole('button', { name: `and 2 more: show the other evidence for ${SUBJECT}` }),
     );
     const panel = within(await drawer());
     const headings = await panel.findAllByRole('heading', { level: 3, ...IN_DRAWER });

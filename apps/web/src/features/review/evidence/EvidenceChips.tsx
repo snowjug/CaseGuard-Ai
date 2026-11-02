@@ -111,7 +111,7 @@ export function EvidenceChips({ links, subject, titles, max = 4 }: EvidenceChips
             appearance="subtle"
             className={styles.chip}
             aria-haspopup="dialog"
-            aria-label={`Show ${hidden.length} more pieces of evidence for ${subject}`}
+            aria-label={`and ${hidden.length} more: show the other evidence for ${subject}`}
             onClick={() => open(firstHidden)}
           >
             and {hidden.length} more
