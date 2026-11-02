@@ -395,7 +395,8 @@ integration test with a fake `fetch` (`search-documents.test.ts`, `search-servic
 
 Every mutating route writes an audit event (a specific one such as `case.ingested`, `analysis.completed`,
 `roles.assigned`, or the fallback `api.<routeId>`); audited reads are `governance.audit` and `governance.users`; refusals are
-`access.denied`. Events form a per-tenant SHA-256 hash chain; the application role can insert and select only; a trigger
+`access.denied`. **Case reads are not audited**, including the later `provenance.resolve` and `skillOverlay.get`, and the report
+of the guided review is composed in the browser, so exporting it leaves no server record ([KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md), PL-15). Events form a per-tenant SHA-256 hash chain; the application role can insert and select only; a trigger
 rejects update and delete; `GET /api/v1/audit/verify` walks the chain. The chain is tamper-evident, not tamper-proof: a
 privileged database user can rewrite it consistently, and **no external anchor exists**. Details in
 [DATA_MODEL.md](DATA_MODEL.md#7-the-audit-hash-chain).
@@ -478,3 +479,30 @@ document; it sends the package list of the lockfile to a public vulnerability se
   the mitigation.
 - **Insecure defaults on a developer machine**: the API binds to `0.0.0.0:4000` by default (`API_HOST`, `API_PORT`), and persona
   login is unauthenticated. Do not expose a local instance to a network.
+
+## 13. Review of the guided-review wave
+
+The guided review, the report and the two reads behind them (`provenance.resolve`, `skillOverlay.get`) were reviewed as code, in
+one pass, by an automated security-review agent that read the diff from the audited foundation branch and ran read-only checks
+on the engine's regular expressions and on the excerpt arithmetic. **It reported no vulnerability.** What it examined and found
+clean:
+
+- **The two routes.** Every read goes through the tenant-bound repositories, so a link of another tenant or case resolves to
+  nothing; each route declares exactly one permission, checked before validation; the `links` query is bounded (4,000
+  characters, at most 40 distinct links, a fixed list of link types, ids of at most 120 ASCII characters passed only as bound
+  parameters); the as-of handling releases no record or text from after the instant; the new code logs nothing from a case.
+- **The engine's patterns.** All 61 knowledge-pack patterns and 133 others were timed on adversarial text up to 20,000
+  characters: growth was linear, the slowest 52 ms. No pattern beyond the two already fixed was quadratic or catastrophic, and
+  a fuzz of the excerpt arithmetic produced no out-of-range output.
+- **The workload field of an upload** is trimmed, capped, free of control characters, compared with the pack list and refused
+  when missing or unsupported, and it is part of the idempotency hash.
+- **The report and the evidence drawer.** Every case-derived string is escaped by React and the only raw markup is the constant
+  stylesheet; every link is built from the page origin and an encoded id; the file name admits only `[A-Za-z0-9._-]`; the
+  downloaded file carries `default-src 'none'` and no script.
+
+Two observations below its threshold: a hand-edited `?evidence=` address could name a type such as `constructor` (the API already
+answered 400; the browser now refuses it before a request), and `provenance.resolve` answers `not_yet_known`, not `not_found`,
+for a record that comes after the `asOf` instant, which tells the caller that the record exists (by design, see
+[API.md](API.md#temporal-reads-asof); the same caller may read the whole record).
+
+This is not a penetration test and not a human audit, and it says nothing about Azure, Entra or a deployed system.
