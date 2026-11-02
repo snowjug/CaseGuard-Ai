@@ -106,7 +106,11 @@ describe('pasted text (FR-ING-01, FR-ING-02)', () => {
       summary: { reference: 'CG-SYN-2001', eventCount: 15 },
     });
     const fromFile = await runPipeline(
-      { type: 'file', file: upload('events.csv', csv?.text ?? '', 'text/csv') },
+      {
+        type: 'file',
+        file: upload('events.csv', csv?.text ?? '', 'text/csv'),
+        workload: 'teams-authentication',
+      },
       env(),
     );
     expect(fromFile.preview).toMatchObject({

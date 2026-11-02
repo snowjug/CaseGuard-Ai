@@ -242,7 +242,8 @@ export const ROUTES = {
   'ingestion.previewFile': {
     method: 'POST',
     path: `${API_PREFIX}/ingestion/preview-file`,
-    summary: 'Preview an uploaded file (multipart/form-data, field "file")',
+    summary:
+      'Preview an uploaded file (multipart/form-data: field "file", optional text field "workload")',
     tags: ['Ingestion'],
     permission: 'case:ingest',
     multipart: true,
@@ -262,7 +263,8 @@ export const ROUTES = {
   'cases.createFromFile': {
     method: 'POST',
     path: `${API_PREFIX}/cases/upload`,
-    summary: 'Ingest an uploaded file (multipart/form-data, field "file")',
+    summary:
+      'Ingest an uploaded file (multipart/form-data: field "file", optional text field "workload")',
     tags: ['Cases'],
     permission: 'case:ingest',
     multipart: true,

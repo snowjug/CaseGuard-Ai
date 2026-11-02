@@ -337,7 +337,14 @@ export interface IngestUpload {
 }
 
 /** What can be ingested: a request payload (built-in sample, pasted text, JSON bundle) or an uploaded file. */
-export type IngestSource = IngestRequest | { readonly type: 'file'; readonly file: IngestUpload };
+export type IngestSource =
+  | IngestRequest
+  | {
+      readonly type: 'file';
+      readonly file: IngestUpload;
+      /** The workload the person chose for the file. A JSON bundle states its own; CSV and text need this. */
+      readonly workload?: string | undefined;
+    };
 
 export interface IngestInput {
   readonly source: IngestSource;

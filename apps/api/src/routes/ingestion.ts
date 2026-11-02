@@ -1,12 +1,20 @@
 import { checkFileName } from '@caseguard/security';
 import { NotFoundError } from '../errors';
-import { reply, type HandlerMap, type HttpReply } from '../http/route-binder';
+import { reply, type HandlerMap, type HttpReply, type UploadedFile } from '../http/route-binder';
 import type { Infrastructure } from '../infrastructure';
 import { findExample, listExampleInfos, listSampleInfos } from '../samples';
 import { loadSchemaDocuments, type SchemaDocuments } from '../samples/schemas';
+import type { IngestSource } from '../services/ports';
 
 /** The documents never change while the process runs, so browsers may keep them for a few minutes. */
 const STATIC_CACHE_CONTROL = 'private, max-age=300';
+
+/** An uploaded file as an ingestion source, carrying the workload the person chose for it, if any. */
+const fileSource = (file: UploadedFile): IngestSource => ({
+  type: 'file',
+  file,
+  ...(file.workload !== null ? { workload: file.workload } : {}),
+});
 
 /** `Content-Disposition` of a download. `fileName` must already be safe (letters, digits, dot, dash, underscore). */
 const attachment = (fileName: string): string => `attachment; filename="${fileName}"`;
@@ -46,7 +54,7 @@ export function ingestionRoutes(_infra: Infrastructure): HandlerMap {
     'ingestion.preview': ({ body, ctx }) => ctx.services.ingestion.preview(ctx, body.source),
 
     'ingestion.previewFile': ({ file, ctx }) =>
-      ctx.services.ingestion.preview(ctx, { type: 'file', file }),
+      ctx.services.ingestion.preview(ctx, fileSource(file)),
 
     'cases.create': ({ body, ctx, idempotencyKey }) =>
       ctx.services.ingestion.ingest(ctx, {
@@ -56,7 +64,7 @@ export function ingestionRoutes(_infra: Infrastructure): HandlerMap {
       }),
 
     'cases.createFromFile': ({ file, ctx, idempotencyKey }) =>
-      ctx.services.ingestion.ingest(ctx, { source: { type: 'file', file }, idempotencyKey }),
+      ctx.services.ingestion.ingest(ctx, { source: fileSource(file), idempotencyKey }),
 
     'schemas.caseBundle': async () =>
       reply(schemaDocuments().caseBundle, {

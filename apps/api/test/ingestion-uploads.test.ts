@@ -20,7 +20,11 @@ describe('uploads through the pipeline (FR-ING-05)', () => {
     );
 
     const odd = await runPipeline(
-      { type: 'file', file: uploadOf('My Export (1).csv', csvExample, 'application/vnd.ms-excel') },
+      {
+        type: 'file',
+        file: uploadOf('My Export (1).csv', csvExample, 'application/vnd.ms-excel'),
+        workload: 'teams-authentication',
+      },
       pipelineEnv(),
     );
     expect(odd.preview).toMatchObject({ ok: true, sourceKind: 'uploaded_file' });
@@ -101,7 +105,11 @@ describe('uploads through the pipeline (FR-ING-05)', () => {
     expect(infected.message).not.toContain('EICAR-STANDARD');
 
     const clean = await runPipeline(
-      { type: 'file', file: uploadOf('notes.txt', transcriptOf(['One.', 'Two.']), 'text/plain') },
+      {
+        type: 'file',
+        file: uploadOf('notes.txt', transcriptOf(['One.', 'Two.']), 'text/plain'),
+        workload: 'teams-authentication',
+      },
       pipelineEnv({ scanner: createMalwareScanner('eicar-test') }),
     );
     expect(clean.preview.ok).toBe(true);

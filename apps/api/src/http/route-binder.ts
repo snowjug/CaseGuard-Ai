@@ -387,7 +387,14 @@ export function registerRoutes(app: FastifyInstance, options: BindOptions): void
             params: request.params,
             query: request.query,
             body: request.body,
-            file: file === undefined ? undefined : { sha256: file.sha256, name: file.fileName },
+            file:
+              file === undefined
+                ? undefined
+                : {
+                    sha256: file.sha256,
+                    name: file.fileName,
+                    ...(file.workload !== null ? { workload: file.workload } : {}),
+                  },
           }),
           params: request.params,
           execute,

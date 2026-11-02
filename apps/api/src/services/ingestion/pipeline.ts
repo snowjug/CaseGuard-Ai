@@ -141,7 +141,7 @@ async function succeededOutcome(
     bundleSynthetic: bundle.synthetic,
     labelDerived: resolved.labelDerived,
   });
-  const workload = checkWorkload(parse, resolved.sourceKind);
+  const workload = checkWorkload(parse, resolved.sourceKind, resolved.chosenWorkload);
   const storedPayload = canonicalJson(redaction.bundle);
   const contentHash = sha256Hex(storedPayload);
   // Built from the redacted bundle, so no excerpt can carry a secret.

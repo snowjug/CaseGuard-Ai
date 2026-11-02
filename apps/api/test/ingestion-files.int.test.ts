@@ -5,6 +5,7 @@ import { TEST_DATABASE_STARTUP_TIMEOUT_MS } from '../src/db/testing';
 import { findExample } from '../src/samples';
 import { bundleOf, secrets } from './ingestion-fixtures';
 import {
+  CONTRACT_FIELDS,
   CREATE_FILE_URL,
   PREVIEW_FILE_URL,
   auditOf,
@@ -320,5 +321,128 @@ describe('cases.createFromFile (FR-ING-01, FR-ING-07, FR-ING-08)', () => {
     expect(
       res.data.issues.some((issue: { message: string }) => /formula/i.test(issue.message)),
     ).toBe(true);
+  });
+});
+
+describe('the workload of an uploaded file (FR-ING-01)', () => {
+  const NONE = {};
+  const csv = (
+    h: Harness,
+    url: string,
+    fields: Readonly<Record<string, string>>,
+    headers: Record<string, string> = {},
+  ) => upload(h, PERSONAS.engineer, url, 'events.csv', csvExample, 'text/csv', headers, fields);
+
+  it('refuses a CSV file that states no workload, in the preview and on create, and stores nothing', async () => {
+    const { h } = await openHarness(database, harnesses);
+
+    const preview = await csv(h, PREVIEW_URL, NONE);
+    expect(preview.statusCode).toBe(200);
+    expect(preview.data.ok).toBe(false);
+    const issue = preview.data.issues.find(
+      (item: { path: string }) => item.path === 'case.workload',
+    );
+    expect(issue).toMatchObject({ severity: 'error' });
+    expect(issue.message).toContain('Choose the workload for this file');
+
+    const create = await csv(h, CREATE_URL, NONE);
+    expect(create.statusCode).toBe(422);
+    expect(create.data.errors.map((error: { path: string }) => error.path)).toContain(
+      'case.workload',
+    );
+    expect(storedObjects(h)).toEqual([]);
+    expect((await h.repos(CONTOSO).cases.list({ limit: 10 })).items).toEqual([]);
+
+    // Blank is the same as absent: there is no silent default for it.
+    const blank = await csv(h, CREATE_URL, { workload: '   ' });
+    expect(blank.statusCode).toBe(422);
+  });
+
+  it('accepts the workload before or after the file part, and ignores any other text field', async () => {
+    const { h } = await openHarness(database, harnesses);
+    const sent = (parts: Parameters<typeof multipartBody>[0]) => {
+      const body = multipartBody(parts);
+      return h.call(PERSONAS.engineer, {
+        method: 'POST',
+        url: CREATE_URL,
+        payload: body.payload,
+        headers: body.headers,
+      });
+    };
+    const file = { name: 'file', filename: 'events.csv', type: 'text/csv', content: csvExample };
+
+    const before = await sent([{ name: 'workload', content: 'teams-authentication' }, file]);
+    expect(before.statusCode).toBe(201);
+    expect(before.data.case.workload).toBe('teams-authentication');
+
+    await resetDatabase(database);
+    const after = await sent([file, { name: 'workload', content: 'teams-authentication' }]);
+    expect(after.statusCode).toBe(201);
+    expect(after.data.case.workload).toBe('teams-authentication');
+
+    await resetDatabase(database);
+    const other = await sent([
+      { name: 'note', content: 'ignored' },
+      { name: 'workload', content: ' teams-authentication ' },
+      file,
+    ]);
+    expect(other.statusCode).toBe(201);
+  });
+
+  it('refuses an unsupported workload by name, and a workload that is not a short plain key', async () => {
+    const { h } = await openHarness(database, harnesses);
+
+    const unsupported = await csv(h, CREATE_URL, { workload: 'quantum-routing' });
+    expect(unsupported.statusCode).toBe(422);
+    expect(unsupported.data.errors[0]).toMatchObject({ path: 'case.workload' });
+    expect(unsupported.data.errors[0].message).toContain('"quantum-routing"');
+
+    for (const workload of ['x'.repeat(81), 'teams-authentication\u0007']) {
+      const res = await csv(h, CREATE_URL, { workload });
+      expect(res.statusCode, JSON.stringify(workload)).toBe(422);
+      expect(res.data.errors[0].path).toBe('workload');
+    }
+    expect(storedObjects(h)).toEqual([]);
+  });
+
+  it('counts the workload as part of what an Idempotency-Key covers', async () => {
+    const { h } = await openHarness(database, harnesses);
+    const headers = { 'idempotency-key': 'upload-workload-0001' };
+
+    const first = await csv(h, CREATE_URL, CONTRACT_FIELDS, headers);
+    expect(first.statusCode).toBe(201);
+    const replay = await csv(h, CREATE_URL, CONTRACT_FIELDS, headers);
+    expect(replay.headers['idempotent-replayed']).toBe('true');
+    expect(replay.data).toEqual(first.data);
+
+    const changed = await csv(h, CREATE_URL, { workload: 'quantum-routing' }, headers);
+    expect(changed.statusCode).toBe(422);
+    expect(changed.data.code ?? changed.data.type).toMatch(/idempotency/);
+  });
+
+  it('refuses a different workload for a JSON bundle file, which states its own', async () => {
+    const { h } = await openHarness(database, harnesses);
+    const bundle = JSON.stringify(bundleOf());
+    const send = (fields: Readonly<Record<string, string>>) =>
+      upload(
+        h,
+        PERSONAS.engineer,
+        CREATE_URL,
+        'bundle.json',
+        bundle,
+        'application/json',
+        {},
+        fields,
+      );
+
+    const own = await send(NONE);
+    expect(own.statusCode).toBe(201);
+
+    await resetDatabase(database);
+    const other = await send({ workload: 'quantum-routing' });
+    expect(other.statusCode).toBe(422);
+    expect(other.data.errors[0]).toMatchObject({ path: 'case.workload' });
+    expect(other.data.errors[0].message).toContain('"quantum-routing" was chosen');
+    expect((await h.repos(CONTOSO).cases.list({ limit: 10 })).items).toEqual([]);
   });
 });

@@ -14,7 +14,15 @@ export interface UploadedFile {
   readonly mediaType: string | null;
   readonly bytes: Buffer;
   readonly sha256: string;
+  /**
+   * The workload the person chose for the file (the optional `workload` text field of the form), trimmed.
+   * Null when none was sent. A CSV file cannot state its own, so the pipeline refuses one that has none.
+   */
+  readonly workload: string | null;
 }
+
+/** Longest workload key (the same bound the JSON sources use). */
+export const WORKLOAD_FIELD_MAX = 80;
 
 /** Room for the multipart framing (boundaries, part headers, the few small form fields) around the file. */
 const FRAMING_ALLOWANCE_BYTES = 32 * 1024;
@@ -38,8 +46,24 @@ function translateUploadError(error: unknown, refuse: () => PayloadTooLargeError
   return new MalformedRequestError('The multipart body could not be read');
 }
 
+/** The `workload` form field: trimmed; empty means none; anything that is not a short plain key is refused. */
+function workloadOf(value: unknown, truncated: boolean): string | null {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (text === '' && !truncated) return null;
+  if (truncated || text.length > WORKLOAD_FIELD_MAX || /\p{Cc}/u.test(text)) {
+    throw new ValidationFailedError('The workload is not valid', [
+      {
+        path: 'workload',
+        message: `A workload key is a short word of at most ${WORKLOAD_FIELD_MAX} characters`,
+      },
+    ]);
+  }
+  return text;
+}
+
 /**
- * Reads the single file of a multipart request into memory, never more than `maxBytes`.
+ * Reads the single file of a multipart request into memory, never more than `maxBytes`, together with its
+ * optional `workload` text field.
  *
  * - A declared `content-length` far beyond the limit is refused before a byte is read.
  * - The size limit is enforced by the parser, which truncates at the limit. `toBuffer` only throws
@@ -67,37 +91,38 @@ export async function readUpload(
   const declared = declaredLength(request);
   if (declared !== null && declared > maxBytes + FRAMING_ALLOWANCE_BYTES) throw refuse();
 
-  let part;
+  let file: { fileName: string; mediaType: string | null; bytes: Buffer } | undefined;
+  let workload: string | null = null;
   try {
-    part = await request.file({ limits: { fileSize: maxBytes, files: 1 } });
+    // Every part is read, in whatever order the client sent them, so that the optional `workload` text field may
+    // come before or after the file. Any other text field is ignored.
+    for await (const part of request.parts({ limits: { fileSize: maxBytes, files: 1 } })) {
+      if (part.type === 'field') {
+        if (part.fieldname === 'workload') workload = workloadOf(part.value, part.valueTruncated);
+        continue;
+      }
+      if (part.fieldname !== 'file') {
+        // Left unread, the stream would hold the connection open until the request times out.
+        part.file.destroy();
+        throw new ValidationFailedError('The file must be sent in the "file" field', [
+          { path: part.fieldname.slice(0, 40), message: 'Unexpected field name' },
+        ]);
+      }
+      const bytes = await part.toBuffer();
+      if (part.file.truncated) throw refuse();
+      file = {
+        fileName: part.filename,
+        mediaType: part.mimetype === '' ? null : part.mimetype,
+        bytes,
+      };
+    }
   } catch (error) {
     throw translateUploadError(error, refuse);
   }
-  if (part === undefined) {
+  if (file === undefined) {
     throw new ValidationFailedError('No file was uploaded', [
       { path: 'file', message: 'Attach one file in the "file" field' },
     ]);
   }
-  if (part.fieldname !== 'file') {
-    // Left unread, the stream would hold the connection open until the request times out.
-    part.file.destroy();
-    throw new ValidationFailedError('The file must be sent in the "file" field', [
-      { path: part.fieldname.slice(0, 40), message: 'Unexpected field name' },
-    ]);
-  }
-
-  let bytes: Buffer;
-  try {
-    bytes = await part.toBuffer();
-  } catch (error) {
-    throw translateUploadError(error, refuse);
-  }
-  if (part.file.truncated) throw refuse();
-
-  return {
-    fileName: part.filename,
-    mediaType: part.mimetype === '' ? null : part.mimetype,
-    bytes,
-    sha256: sha256Hex(bytes),
-  };
+  return { ...file, sha256: sha256Hex(file.bytes), workload };
 }

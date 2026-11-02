@@ -30,6 +30,11 @@ export interface ResolvedInput {
    * took the tenant's. The preview says so in a note; the policy has nothing further to add.
    */
   readonly labelDerived: boolean;
+  /**
+   * The workload the person chose for a JSON bundle file, which states its own and so cannot take another.
+   * Null everywhere else: the parsers already used a choice for pasted text, CSV and plain text.
+   */
+  readonly chosenWorkload: string | null;
   /** Remarks for the preview (derived labels, what the scanner did). */
   readonly notes: ValidationIssue[];
 }
@@ -70,15 +75,19 @@ function guarded(run: () => IngestParseResult): IngestParseResult {
   }
 }
 
-function parseUpload(upload: PreparedUpload, env: PipelineEnv): IngestParseResult {
+function parseUpload(
+  upload: PreparedUpload,
+  env: PipelineEnv,
+  workload: string | undefined,
+): IngestParseResult {
   switch (upload.kind) {
     case 'json':
       return parseCaseBundleJson(upload.text);
     case 'csv':
-      return guarded(() => parseCsvEvents(upload.text, draftOptions(env)));
+      return guarded(() => parseCsvEvents(upload.text, draftOptions(env, { workload })));
     case 'text':
     case 'markdown':
-      return guarded(() => parsePastedTranscript(upload.text, draftOptions(env)));
+      return guarded(() => parsePastedTranscript(upload.text, draftOptions(env, { workload })));
   }
 }
 
@@ -99,6 +108,7 @@ export async function resolveInput(source: IngestSource, env: PipelineEnv): Prom
         receivedHash: sha256Hex(sample.json),
         fileName: sample.fileName,
         labelDerived: false,
+        chosenWorkload: null,
         notes: [],
       };
     }
@@ -115,6 +125,7 @@ export async function resolveInput(source: IngestSource, env: PipelineEnv): Prom
         receivedHash: sha256Hex(source.text),
         fileName: null,
         labelDerived: true,
+        chosenWorkload: null,
         notes: [syntheticLabelNote(env.tenantSynthetic)],
       };
     case 'bundle': {
@@ -126,6 +137,7 @@ export async function resolveInput(source: IngestSource, env: PipelineEnv): Prom
         receivedHash: sha256Hex(json),
         fileName: null,
         labelDerived: false,
+        chosenWorkload: null,
         notes: [],
       };
     }
@@ -133,13 +145,16 @@ export async function resolveInput(source: IngestSource, env: PipelineEnv): Prom
       const upload = await prepareUpload(source.file, env);
       // A JSON bundle declares its own label; text and CSV inherit the tenant's.
       const labelDerived = upload.kind !== 'json';
+      const chosen = source.workload?.trim();
       return {
-        parse: parseUpload(upload, env),
+        parse: parseUpload(upload, env, chosen !== undefined && chosen !== '' ? chosen : undefined),
         sourceKind: 'uploaded_file',
         sizeBytes: source.file.bytes.length,
         receivedHash: sha256Hex(source.file.bytes),
         fileName: upload.safeFileName,
         labelDerived,
+        // Only a JSON bundle states a workload of its own, so only there can a choice contradict it.
+        chosenWorkload: upload.kind === 'json' && chosen ? chosen : null,
         notes: [
           ...upload.notes,
           ...(labelDerived ? [syntheticLabelNote(env.tenantSynthetic)] : []),

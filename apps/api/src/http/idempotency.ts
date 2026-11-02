@@ -43,7 +43,9 @@ export interface HashedRequest {
   readonly params: unknown;
   readonly query: unknown;
   readonly body: unknown;
-  readonly file: { readonly sha256: string; readonly name: string } | undefined;
+  /** `workload` is only present when one was chosen, so the hash of a request that names none is unchanged. */
+  readonly file:
+    { readonly sha256: string; readonly name: string; readonly workload?: string } | undefined;
 }
 
 /** Fingerprint of everything that decides what a request does; the same key must carry the same one. */

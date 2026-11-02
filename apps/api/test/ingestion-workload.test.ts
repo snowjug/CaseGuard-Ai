@@ -89,18 +89,91 @@ describe('[FR-ING-01] the workload is stated where it can be, or the case is ref
     expect(workloadIssues(accepted)).toEqual([]);
   });
 
-  it('keeps the parser default for an uploaded CSV file, which cannot state a workload, and says it was assumed', async () => {
+  it('refuses an uploaded CSV file that states no workload: a CSV file cannot carry one, so one must be chosen', async () => {
     const csv = findExample('events-teams-signin-proxy');
     const outcome = await runPipeline(
       { type: 'file', file: uploadOf('events.csv', csv?.text ?? '', 'text/csv') },
       pipelineEnv(),
     );
 
-    expect(outcome.preview).toMatchObject({
+    expect(outcome.preview.ok).toBe(false);
+    expect(outcome.prepared).toBeNull();
+    const issues = workloadIssues(outcome);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.severity).toBe('error');
+    expect(issues[0]?.message).toContain('does not guess');
+    expect(issues[0]?.message).toContain('Choose the workload for this file');
+    expect(issues[0]?.message).toContain('Supported workloads: teams-authentication');
+    // Nothing is assumed any more, so the preview no longer says that a workload was.
+    expect(mentionsAssumption(outcome)).toBe(false);
+  });
+
+  it('accepts an uploaded CSV file once a supported workload is chosen, and refuses an unsupported one by name', async () => {
+    const csv = findExample('events-teams-signin-proxy');
+    const file = uploadOf('events.csv', csv?.text ?? '', 'text/csv');
+
+    const chosen = await runPipeline(
+      { type: 'file', file, workload: 'teams-authentication' },
+      pipelineEnv(),
+    );
+    expect(chosen.preview).toMatchObject({
       ok: true,
       summary: { workload: 'teams-authentication' },
     });
-    expect(workloadIssues(outcome)).toEqual([]);
-    expect(mentionsAssumption(outcome)).toBe(true);
+    expect(workloadIssues(chosen)).toEqual([]);
+    expect(mentionsAssumption(chosen)).toBe(false);
+
+    const unsupported = await runPipeline(
+      { type: 'file', file, workload: 'quantum-routing' },
+      pipelineEnv(),
+    );
+    expect(unsupported.preview.ok).toBe(false);
+    expect(unsupported.prepared).toBeNull();
+    expect(workloadIssues(unsupported)[0]?.message).toContain('"quantum-routing"');
+  });
+
+  it('accepts an uploaded text file that carries its own Workload line, and refuses one that does not', async () => {
+    const transcript = findExample('transcript-teams-signin-proxy');
+    const stated = await runPipeline(
+      { type: 'file', file: uploadOf('chat.txt', transcript?.text ?? '', 'text/plain') },
+      pipelineEnv(),
+    );
+    expect(stated.preview).toMatchObject({
+      ok: true,
+      summary: { workload: 'teams-authentication' },
+    });
+    expect(workloadIssues(stated)).toEqual([]);
+
+    const silent = await runPipeline(
+      { type: 'file', file: uploadOf('chat.txt', transcriptOf(lines), 'text/plain') },
+      pipelineEnv(),
+    );
+    expect(silent.preview.ok).toBe(false);
+    expect(workloadIssues(silent)[0]?.message).toContain('Choose the workload for this file');
+  });
+
+  it('lets a JSON bundle file state its own workload, and refuses a different choice made for it', async () => {
+    const bundle = JSON.stringify(bundleOf());
+    const file = uploadOf('bundle.json', bundle, 'application/json');
+
+    const own = await runPipeline({ type: 'file', file }, pipelineEnv());
+    expect(own.preview).toMatchObject({ ok: true, summary: { workload: 'teams-authentication' } });
+    expect(workloadIssues(own)).toEqual([]);
+
+    const same = await runPipeline(
+      { type: 'file', file, workload: 'teams-authentication' },
+      pipelineEnv(),
+    );
+    expect(same.preview.ok).toBe(true);
+
+    const other = await runPipeline(
+      { type: 'file', file, workload: 'quantum-routing' },
+      pipelineEnv(),
+    );
+    expect(other.preview.ok).toBe(false);
+    expect(other.prepared).toBeNull();
+    const [conflict] = workloadIssues(other);
+    expect(conflict?.message).toContain('states the "teams-authentication" workload');
+    expect(conflict?.message).toContain('"quantum-routing" was chosen');
   });
 });

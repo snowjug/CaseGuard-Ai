@@ -47,7 +47,16 @@ export const previewCase = (
 export const PREVIEW_FILE_URL = '/api/v1/ingestion/preview-file';
 export const CREATE_FILE_URL = '/api/v1/cases/upload';
 
-/** Sends one file as multipart/form-data in the "file" field. */
+/** The text fields of a form from a client that follows the contract: a CSV or text file states its workload. */
+export const CONTRACT_FIELDS: Readonly<Record<string, string>> = {
+  workload: 'teams-authentication',
+};
+
+/**
+ * Sends one file as multipart/form-data in the "file" field. `fields` are the other text fields of the form,
+ * sent before the file as the web app does; by default the workload, which is the one a CSV or text file needs.
+ * Pass `{}` to send a file with no workload, as the refusal tests do.
+ */
 export function uploadFile(
   h: Harness,
   persona: string | null,
@@ -56,8 +65,12 @@ export function uploadFile(
   content: string | Buffer,
   type = 'text/plain',
   headers: Record<string, string> = {},
+  fields: Readonly<Record<string, string>> = CONTRACT_FIELDS,
 ): Promise<ApiResponse> {
-  const body = multipartBody([{ name: 'file', filename, type, content }]);
+  const body = multipartBody([
+    ...Object.entries(fields).map(([name, value]) => ({ name, content: value })),
+    { name: 'file', filename, type, content },
+  ]);
   return h.call(persona, {
     method: 'POST',
     url,

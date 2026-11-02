@@ -329,25 +329,25 @@ A trailing `?` marks a field that may be left out; path parameters are the `:nam
 
 ### Ingestion
 
-| Route id                | Request                                          | Permission    | Success | Input             | Summary                                                           |
-| ----------------------- | ------------------------------------------------ | ------------- | ------- | ----------------- | ----------------------------------------------------------------- |
-| `samples.list`          | `GET /api/v1/samples`                            | `case:read`   | 200     | none              | Built-in synthetic sample cases                                   |
-| `ingestion.preview`     | `POST /api/v1/ingestion/preview`                 | `case:ingest` | 200     | body: `source`    | Validate, redact and preview a case payload without persisting it |
-| `ingestion.previewFile` | `POST /api/v1/ingestion/preview-file`            | `case:ingest` | 200     | multipart: `file` | Preview an uploaded file (multipart/form-data, field "file")      |
-| `schemas.caseBundle`    | `GET /api/v1/schemas/case-bundle.schema.json`    | `case:read`   | 200     | none              | JSON Schema for case bundles                                      |
-| `schemas.knowledgePack` | `GET /api/v1/schemas/knowledge-pack.schema.json` | `case:read`   | 200     | none              | JSON Schema for workload knowledge packs                          |
-| `examples.list`         | `GET /api/v1/examples`                           | `case:read`   | 200     | none              | Downloadable example case bundles (synthetic)                     |
-| `examples.get`          | `GET /api/v1/examples/:exampleId`                | `case:read`   | 200     | none              | Download one example case bundle                                  |
+| Route id                | Request                                          | Permission    | Success | Input             | Summary                                                                                      |
+| ----------------------- | ------------------------------------------------ | ------------- | ------- | ----------------- | -------------------------------------------------------------------------------------------- |
+| `samples.list`          | `GET /api/v1/samples`                            | `case:read`   | 200     | none              | Built-in synthetic sample cases                                                              |
+| `ingestion.preview`     | `POST /api/v1/ingestion/preview`                 | `case:ingest` | 200     | body: `source`    | Validate, redact and preview a case payload without persisting it                            |
+| `ingestion.previewFile` | `POST /api/v1/ingestion/preview-file`            | `case:ingest` | 200     | multipart: `file` | Preview an uploaded file (multipart/form-data: field "file", optional text field "workload") |
+| `schemas.caseBundle`    | `GET /api/v1/schemas/case-bundle.schema.json`    | `case:read`   | 200     | none              | JSON Schema for case bundles                                                                 |
+| `schemas.knowledgePack` | `GET /api/v1/schemas/knowledge-pack.schema.json` | `case:read`   | 200     | none              | JSON Schema for workload knowledge packs                                                     |
+| `examples.list`         | `GET /api/v1/examples`                           | `case:read`   | 200     | none              | Downloadable example case bundles (synthetic)                                                |
+| `examples.get`          | `GET /api/v1/examples/:exampleId`                | `case:read`   | 200     | none              | Download one example case bundle                                                             |
 
 ### Cases
 
-| Route id               | Request                        | Permission    | Success         | Input                                                                      | Summary                                                     |
-| ---------------------- | ------------------------------ | ------------- | --------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `cases.create`         | `POST /api/v1/cases`           | `case:ingest` | 201, idempotent | body: `source`, `options?`                                                 | Ingest a case (idempotent) and optionally start analysis    |
-| `cases.createFromFile` | `POST /api/v1/cases/upload`    | `case:ingest` | 201, idempotent | multipart: `file`                                                          | Ingest an uploaded file (multipart/form-data, field "file") |
-| `cases.list`           | `GET /api/v1/cases`            | `case:read`   | 200             | query: `limit?`, `cursor?`, `status?`, `workload?`, `analysisState?`, `q?` | List cases (paginated)                                      |
-| `cases.get`            | `GET /api/v1/cases/:caseId`    | `case:read`   | 200             | none                                                                       | Case detail                                                 |
-| `cases.delete`         | `DELETE /api/v1/cases/:caseId` | `case:delete` | 200             | none                                                                       | Delete a case and all derived data (administrator)          |
+| Route id               | Request                        | Permission    | Success         | Input                                                                      | Summary                                                                                     |
+| ---------------------- | ------------------------------ | ------------- | --------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `cases.create`         | `POST /api/v1/cases`           | `case:ingest` | 201, idempotent | body: `source`, `options?`                                                 | Ingest a case (idempotent) and optionally start analysis                                    |
+| `cases.createFromFile` | `POST /api/v1/cases/upload`    | `case:ingest` | 201, idempotent | multipart: `file`                                                          | Ingest an uploaded file (multipart/form-data: field "file", optional text field "workload") |
+| `cases.list`           | `GET /api/v1/cases`            | `case:read`   | 200             | query: `limit?`, `cursor?`, `status?`, `workload?`, `analysisState?`, `q?` | List cases (paginated)                                                                      |
+| `cases.get`            | `GET /api/v1/cases/:caseId`    | `case:read`   | 200             | none                                                                       | Case detail                                                                                 |
+| `cases.delete`         | `DELETE /api/v1/cases/:caseId` | `case:delete` | 200             | none                                                                       | Delete a case and all derived data (administrator)                                          |
 
 ### Analysis
 
