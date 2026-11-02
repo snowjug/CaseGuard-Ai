@@ -20,7 +20,7 @@ nodes for evidence, a decision fork and a hypothesis); besides the screenshots b
 are the workflows in [`.github/workflows`](.github/workflows) (`ci`, `codeql`, `dependency-review` and the manual `deploy`;
 `deploy-environment` is the reusable part of `deploy` and has no badge of its own). **A badge reports the latest run of its workflow
 on the default branch.** Before the foundation work all 27 CI runs failed; the first fully green run
-(41495498658) is on the unmerged branch `build/p0-foundation`, and `build/wave-1` is green too (the latest run is 41541778703), so
+(41495498658) is on the unmerged branch `build/p0-foundation`, and `build/wave-1` is green too (run 41541778703 is the last that changed code), so
 the CI badge cannot show a pass until that work reaches the default branch. Dependency review (13 runs, all failed) fails because the repository's
 Dependency graph setting is off. No CodeQL or Deploy run
 is recorded here (CodeQL runs on pushes and pull requests to `main`, which does not exist yet, on a weekly schedule and on demand), so those two badges say nothing yet.
@@ -35,7 +35,7 @@ is recorded here (CodeQL runs on pushes and pull requests to `main`, which does 
 > **PGlite** locally and on PostgreSQL 16 in the CI integration job.
 > **CI was never fully green until the foundation branch**: all 27 earlier runs failed (the one on `2ecb454`, run 41182982903,
 > had only the production build fully green). The first fully green run is 41495498658 on the unmerged branch
-> `build/p0-foundation`; the latest is 41541778703 on `build/wave-1` (8 of 8 jobs: 6,151 unit tests, 1,033 integration tests on
+> `build/p0-foundation`; run 41541778703 on `build/wave-1` is the last that changed code (8 of 8 jobs: 6,151 unit tests, 1,033 integration tests on
 > PostgreSQL 16 and 374 end-to-end tests passed, none failed; see [Running tests](#running-tests)). None of this has reached the
 > default branch.
 > Every score is an **estimate**, shown with its basis and range. CaseGuard AI is not a Microsoft product.
@@ -910,7 +910,7 @@ cases are in [docs/runbooks](docs/runbooks/README.md).
 
 Five workflows exist in [`.github/workflows`](.github/workflows). **Two have run on GitHub; CI is green only on the unmerged
 branches**: `ci.yml` has run 39 times, 27 of them failing before the foundation work. Of the 12 runs since, 6 were fully green (1 on
-`build/p0-foundation`, 5 on `build/wave-1`; the latest, run 41541778703: 8 jobs, all green), 2 failed on `build/wave-1` and were
+`build/p0-foundation`, 5 on `build/wave-1`; the last that changed code, run 41541778703: 8 jobs, all green), 2 failed on `build/wave-1` and were
 fixed there, and 4 were cancelled by newer pushes. `dependency-review.yml` has run 13 times and failed every
 time because the repository's Dependency graph setting is off. No CodeQL or deploy run is recorded here, so every statement about
 those two is a reading of the configuration, not an observed result ([CI_CD.md](docs/CI_CD.md#9-what-was-and-was-not-validated)).
