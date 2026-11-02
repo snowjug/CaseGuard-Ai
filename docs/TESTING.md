@@ -281,13 +281,15 @@ replaced by a wait on the condition.
    `xz` in 3 of 6 runs here, and 5 of 6 on another page; with 20 ms between keys it was 0 of 6. The value shown comes from
    `useSearchParams`, which updates after the key press. Matters for dictation and assistive input. Affects the Cases and SkillDNA
    searches and every field built on `useUrlState`.
-3. **The Avoidable Support Effort of Case One differs between fresh seeds.** Five starts of the API with the seeded demo (the global
+3. **The Avoidable Support Effort of Case One differed between fresh seeds (addressed by `ENGINE_VERSION` 2026.3.0).** Before it,
+   five starts of the API with the seeded demo (the global
    setup prints the figure) gave 62.8, 56.3, 58.1, 61.5 and 62.8 percent; four creations of Case One's bundle under new references
    gave 57.2, 56.4, 56.4 and 57.2, and the same case analysed again three times gave 57.2 each time. The engine seeds its rollouts
    from the input hash (`computeInputHash` in `apps/api/src/services/analysis/inputs.ts`, which covers the stored payload and the
-   skill library with their ids), so any difference in those inputs moves the figure; I did not find which input differs between
-   two seeds of the demo. The documents quote 56.3 ([DEMO_SCRIPT.md](DEMO_SCRIPT.md)) and 58.2 ([EVALUATION.md](EVALUATION.md)); both
-   say to quote the figure on the screen, and the specs never assert the value, only that the UI equals the API.
+   skill library with their ids), so any difference in those inputs moved the figure. Since 2026.3.0 the rollout seed no longer
+   contains the generated fork id ([EVALUATION.md](EVALUATION.md#3-engine-calibration-on-the-two-synthetic-cases)), and the figure read 55 percent
+   (plausible range 44 to 83, low confidence) on each of the two fresh local starts made after that, in the guided review; the
+   evaluation tables give 55.3 (43.7 to 83.3). The specs never assert the value, only that the UI equals the API.
 4. **System Health lists `database` as a configured service, not as simulated**, although it is PGlite running in the API process
    (`apps/api/src/container.ts`, `registerStandard('database')` has no `simulated` flag).
 5. **The API's trend labels already contain the signed change** ("+63.1 points compared with ..."), while the UI contract treats a

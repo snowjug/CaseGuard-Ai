@@ -159,6 +159,11 @@ The web app has 13 destinations (`apps/web/src/lib/nav.ts`), all backed by the t
 | System Health      | `/system`                                          | Dependencies with simulated stand-ins labelled, migrations, the AI provider, request metrics, and a "What is real here" panel                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Demo Guide         | `/demo`                                            | The 13-step story with progress derived from stored data, presenter notes and (administrators only) seed and reset                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
+**Start with the Guided Review.** For an analysed case it is the one page to read: the verdict, the chronology, what went wrong,
+what a better-supported path would have looked like, what to do next and what to learn, each with its evidence one click away,
+and a report to print, copy or download. The other case pages are the drill-downs it links to. What each section reads for each
+role, how it degrades, and what it does not claim: [GUIDED_REVIEW.md](docs/GUIDED_REVIEW.md).
+
 Around them: **Presentation Mode** (`?present=1`: a presenter strip with the next action outlined, concise presenter notes and a
 guarded reset; development controls are hidden, the honesty labels stay), a command palette (Ctrl or Cmd + K), global search (`/`),
 and a persona switcher for the synthetic users of a local run.
@@ -194,7 +199,7 @@ conditions). Every figure is an **estimate** from an authored knowledge pack, wi
 | The case                 | Intermittent Teams sign-in failures for about 140 branch users; 31 events; closed after about 3 days | Related failure for about 60 users; 15 events; about 8.5 hours |
 | Decision forks           | 9; the earliest meaningful one is event e03, 9 March 2026 09:41 UTC                                  | 0                                                              |
 | Case Quality Index       | 36 of 100 (band: poor)                                                                               | 99.1 of 100 (band: strong)                                     |
-| Avoidable Support Effort | 56.3 percent (estimate)                                                                              | 0 percent (no decision forks)                                  |
+| Avoidable Support Effort | 55 percent (estimate; range 44 to 83, low confidence)                                                | 0 percent (no decision forks)                                  |
 | Customer effort          | 430 minutes (range 301 to 602)                                                                       | 50 minutes                                                     |
 | Token efficiency         | 0.029 bits per 1k tokens                                                                             | 0.158 bits per 1k tokens                                       |
 
@@ -1007,10 +1012,10 @@ synthetic cases with one annotator (on which the detectors read 13 of 66 labelle
 percent; EVALUATION.md section 7). There is one knowledge pack of authored
 priors, no real data, no second annotator and no user study. Every score is an estimate from those priors, and the AI
 gates check contracts with the deterministic provider, so no real model has been evaluated. A difference between the two cases
-demonstrates the pipeline, not real-world effectiveness. The Avoidable Support Effort of Case One reads 56.3 percent when the API
-serves the seeded demo and 58.2 percent (range 42.7 to 83.3, confidence low) in the calibration probe of EVALUATION.md: the
-rollouts are seeded, the API seeds them from the input hash and the probe used a fixed seed, so the two runs sample the same wide
-range differently.
+demonstrates the pipeline, not real-world effectiveness. The Avoidable Support Effort of Case One reads about 55 percent (55.3,
+range 43.7 to 83.3, confidence low) when the API serves the seeded demo and in the calibration tables of EVALUATION.md. The
+rollouts are seeded from the case content, and before engine 2026.3.0 the seed also held a generated id, which moved the figure
+by several points between starts (56.3 to 62.8 percent in five starts, recorded in TESTING.md); it is the same wide range either way.
 
 ## Known limitations
 

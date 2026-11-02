@@ -65,7 +65,7 @@ you will present from: the first start is the slow part.
 | Evidence ledger and hypotheses     | 61 claims in eight categories; 9 hypotheses, leading "DNS resolution failure for sign-in endpoints" at 92.6 percent (model estimate)                 | Leading: egress proxy or TLS inspection node, 92.6 percent                                                                   |
 | Decision forks                     | 9; the earliest meaningful one is **event e03, 9 March 2026 09:41 UTC**, impact 0.571                                                                | 0 (nothing to avoid)                                                                                                         |
 | Case Quality Index                 | **36 of 100** (band: poor)                                                                                                                           | **99.1 of 100** (band: strong)                                                                                               |
-| Avoidable Support Effort           | **56.3 percent** (estimate, shown with a range and a confidence)                                                                                     | **0 percent** (no decision forks)                                                                                            |
+| Avoidable Support Effort           | **About 55 percent** (estimate; the guided review shows 55 percent, range 44 to 83, low confidence)                                                  | **0 percent** (no decision forks)                                                                                            |
 | Customer effort                    | 430 minutes (range 301 to 602)                                                                                                                       | 50 minutes                                                                                                                   |
 | Token efficiency                   | 0.029 bits per 1k tokens                                                                                                                             | 0.158 bits per 1k tokens                                                                                                     |
 | Tokens, real process versus path   | 40,850 used against 7,900 on the simulated better path: an **estimated** saving of 80.7 percent                                                      | not applicable                                                                                                               |
@@ -74,9 +74,10 @@ you will present from: the first start is the slow part.
 | Comparison narrative               | -                                                                                                                                                    | "CG-SYN-1002 shows the stronger estimate on 6 of the 6 metrics where both cases have a value and differ."                    |
 
 The agents of the six analysis tasks used 77,251 tokens in total in the seeded run; those counts are **simulated** by the
-deterministic provider (characters divided by 4) and the cost is unknown because no unit prices are configured. The evaluation
-document reports 58.2 percent for Case One's Avoidable Support Effort because its probe used a fixed seed; the API seeds the
-rollouts from the input hash. Both are estimates of the same wide range, so quote the figure on the screen.
+deterministic provider (characters divided by 4) and the cost is unknown because no unit prices are configured. Case One's
+Avoidable Support Effort reads about 55 percent in the guided review and 55.3 percent (43.7 to 83.3) in the evaluation tables;
+before engine 2026.3.0 the seed held a generated id and the figure moved between starts, so if the screen shows another value,
+quote the screen.
 
 | Say                                                       | Do not say                                                              |
 | --------------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -100,6 +101,20 @@ every claim is traceable to what was known when."
 Seeded story, Presentation Mode, **Ava** throughout. One idea per screen. The "Moment" column refers to
 [section 8](#8-the-six-strongest-moments).
 
+**Recommended: through the guided review.** One page reads Case One from the verdict to what to do next, so the demo can stay on
+it. Every figure below was **observed in a local run**; compare with the screen before you present.
+
+| Time      | Screen                                             | Do                                                                                                                                                                                                                                                                                                                                | Say                                                                                                                                                                                                                                                                                   | Moment |
+| --------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 0:00-0:20 | Command Center (`g d`), then Cases                 | Point at "13 of 13 done" and the "Synthetic demo data" badge. Open CG-SYN-1001 and choose **Open guided review** (or press `g` then `r`)                                                                                                                                                                                          | "Everything is synthetic and every number is an estimate. This one page reads a case in the order you decide."                                                                                                                                                                        | -      |
+| 0:20-0:55 | Guided review: **Verdict**, **Chronology**         | The card "Case quality": 36 of 100, "Poor", plausible range 32 to 39. "The earliest important missed moment": "Heavy customer request when a lighter ask was available", 9 Mar 2026, 09:41 UTC. The chronology picture: nine numbered decision points, four meaningful waits                                                      | "Poor, about 36 out of 100, with its range. The earliest important missed moment: the engineer asked for traces, the full user list and every Conditional Access policy when two events and two pieces of evidence were on record. Nine such moments, and the customer left waiting." | 1      |
+| 0:55-1:35 | **What went wrong**, **What should have happened** | Decision point 1: "What was known then" beside "What was not yet known". Then the table "The recorded path and the better-supported path (simulated estimate)": time to diagnosis 2 d 1 h against 7 h 29 min (2 h 47 min to 10 h 59 min); "Low confidence (23%)"; "All 8 validity checks passed"; "Used only what was known then" | "Known then and not yet known sit side by side, so hindsight cannot leak in. The better path is a simulated estimate with ranges. Its confidence is low, 23 percent: it says how consistent the 200 simulated runs were. I would rather show that than hide it."                      | 2, 3   |
+| 1:35-2:10 | **Next actions**, the evidence drawer              | Open an evidence chip under a recommendation: the drawer shows the stored message with the badge "checked against the stored message". Press **Show in timeline**, then Back                                                                                                                                                      | "Every recommendation says what it rests on, one click away. A passage is shown as a quotation only if the server compared it with the stored message; otherwise the drawer says it could not check it."                                                                              | 3      |
+| 2:10-2:40 | **Learning**                                       | "This resembles Isolate a pre-authentication failure ...": 2,994 min recorded to diagnosis against 195 min with the skill (114.8 min to 352.5 min). Read "Limits of this comparison"                                                                                                                                              | "The recorded path against an explicit with-skill estimate. The base analysis is unchanged and nothing is applied by looking. Case One is where the skill came from, so this reproduces its own replay: an illustration, not a test."                                                 | 4      |
+| 2:40-3:00 | Cases, CG-SYN-1002: guided review, then Report     | "Strong", 99 of 100, "No decision point stood out"; in Learning "Match 75% (model estimate)" and "Plan adopted ... 4 of 4 steps followed". Then **Report**: Print, Copy summary, Download HTML                                                                                                                                    | "A related case with another cause: nothing stood out, and the skill's plan was followed in 4 of 4 steps. The report is the same figures as a page to print or send; it leaves out what a role may not read, and says so. Two synthetic cases: a demonstration, not evidence."        | 5      |
+
+**The same story through the specialist pages**, for a room that wants to see each tool:
+
 | Time      | Screen                                            | Do                                                                                                                                                                                             | Say                                                                                                                                                                                                                                                 | Moment |
 | --------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
 | 0:00-0:20 | Command Center (`g d`)                            | Point at the strip ("13 of 13 done"), the "Synthetic demo data" badge and the "Key metrics" panel                                                                                              | "The 13-step story has already been played through the real services as five synthetic people. Everything is synthetic; every number is labelled."                                                                                                  | -      |
@@ -111,8 +126,10 @@ Seeded story, Presentation Mode, **Ava** throughout. One idea per screen. The "M
 
 ## 5. The 5-minute demo
 
-The three-minute path with the evidence, the hypotheses, the governance trail and the time cursor added. Still **Ava**, seeded, in
-Presentation Mode.
+The three-minute path through the specialist pages (the second table of section 4) with the evidence, the hypotheses, the governance
+trail and the time cursor added. Still **Ava**, seeded, in Presentation Mode. If you would rather open with the guided review, do
+the first table of section 4 first and use the specialist pages below as its drill-downs: the review links into the timeline
+("Show in timeline") and the Counterfactual Lab ("Open in the Counterfactual Lab").
 
 | Time      | Screen                      | Do                                                                                                                                                                                                 | Say                                                                                                                                                                                                            |
 | --------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -150,7 +167,8 @@ jobs whose duration here is unmeasured, so rehearse it and keep the seeded demo 
 1. **Reset to step 1.** Stop the API, run `pnpm.cmd demo:seed --profile base` (or, as Alex, use **Start from step 1** on the Demo
    Guide, `g p`), and start the API again. The guide shows 0 of 13. Case data is erased; users, settings and the audit trail stay.
 2. **Ava imports Case One.** Cases, then **Use a sample**, the wizard **Ingest a case**, the sample CG-SYN-1001: preview, confirm,
-   create. Wait for the analysis. Steps 1 to 5 complete together because they are derived from the stored analysis. Show the
+   create. Wait for the analysis: when it finishes, **Open guided review** is the primary action (focused, and nothing navigates by
+   itself). Steps 1 to 5 complete together because they are derived from the stored analysis. Show the guided review, then the
    Timeline ("Showing 31 of 31 events."), the Evidence Ledger, the Hypothesis Arena and the Counterfactual Lab as in the demos above.
 3. **Riley accepts the path** (strip: **Switch to Riley ...**). Counterfactual Lab, tab **Review and SkillDNA**, **Accept this path**,
    a reason, **Accept path**: the toast says "Path accepted". As the engineer the same button was disabled.
@@ -178,6 +196,11 @@ Land these six, whatever the length of the demo.
 | 4   | SkillDNA is generated from validated reasoning                        | Counterfactual Lab: "Review and SkillDNA"; SkillDNA Library: Governance, Validation and Versions tabs   | "Only a reviewer-accepted path seeds a skill, and publication is a human act by a third person." |
 | 5   | A second case resolves more efficiently because of the learned skill  | Quality Review for Case Two: tabs "SkillDNA" and "Compare cases"; skill detail, tab "Cases"             | "Two synthetic cases: this shows the pipeline, not real-world effectiveness."                    |
 | 6   | Token and customer-effort improvement shown with estimated labels     | Efficiency Monitor: "Real process versus a simulated better path"; Quality Review: "Effort and metrics" | "The telemetry is simulated; the saving is an estimate, with a range."                           |
+
+Moments 1 to 3 are also on the guided review: "What went wrong" marks the earliest fork and shows what was known then, "What
+should have happened" sets the recorded path beside the simulated one, and the evidence drawer shows what each step rests on.
+Moments 4 and 5 are in its Learning section, and moment 6 in the customer-effort row of "What should have happened" and the
+tokens and customer-effort rows of the Learning comparison.
 
 ## 9. Questions judges are likely to ask
 
@@ -215,6 +238,25 @@ human-labelled ground truth ([DOMAIN_ENGINE.md](DOMAIN_ENGINE.md#9-case-quality-
 **Is the 80 percent saving real?**
 It is an estimate. It compares the tokens of the recorded process with those of a simulated better path on a synthetic case whose
 telemetry is itself simulated, so the interface says "simulated telemetry". Do not read it as a measured saving.
+
+**How do I know a quotation in the evidence drawer is real?**
+The server compared the excerpt the engine recorded with the stored message, at the recorded field and offsets, and says
+"checked against the stored message" only when they match; otherwise the drawer says it could not check it and shows no
+quotation. That proves the passage is a real quotation of that message, not that the evidence supports the conclusion. Evidence
+stored by an earlier engine version has no location until the case is analysed again, and reads "not checked"
+([GUIDED_REVIEW.md](GUIDED_REVIEW.md#2-evidence-one-interaction-away), PL-14).
+
+**Does the "with the skill" figure show that the skill works?**
+No. It is an explicit comparison laid over the analysis: what the case recorded from a decision point, minus the skill's own
+estimated saving, range against range. For Case One, the case the skill came from, it reproduces the skill's own replay, so it
+illustrates the skill; it is not an independent test. Case Two has no decision point, so its card shows the adopted plan (4 of 4
+steps followed) and only the skill's own saving. Nothing is applied by looking, and the base analysis is unchanged
+([GUIDED_REVIEW.md](GUIDED_REVIEW.md#3-recorded-versus-with-the-skill), PL-16).
+
+**Who can see the report, and is it logged?**
+Anyone who may read the case sees the sections their role may read; a section a role may not read is left out with a note that
+names the missing permission. The report is composed in the browser and no server stores it. **Reading it is not audited**, like
+every other case read (PL-15), so the audit log cannot say who read or exported a report.
 
 **Is it deployed on Azure?**
 No. The Bicep template is designed and was built and linted with 0 errors, but no what-if or deployment was ever run, and no Docker
@@ -287,6 +329,10 @@ real model against the harness; build a human-labelled evaluation set; then a du
 Say at least the first four before anyone asks.
 
 - **Everything is synthetic**, two cases written alongside the engine: the comparison is a demonstration of the pipeline (n = 2).
+- **The reuse of a skill is shown, not proved.** On the second case the guided review shows the matched skill, the adopted plan
+  (4 of 4 steps followed) and the skill's own saving; the recorded-against-with-skill figures exist only for the case the skill
+  came from and reproduce its own replay (PL-16).
+- **Reading a case review or exporting a report is not audited** (PL-15).
 - **Every score is an estimate** from authored priors; none has been validated against real cases or by human labellers.
 - **No real language model has been called**; Azure OpenAI, Entra, Blob, AI Search and Monitor were validated against mocks only.
 - **Nothing has been deployed to Azure**, no Docker image was built locally (CI builds them), and CI is green only on unmerged branches.
@@ -358,6 +404,7 @@ Demo Guide.
 | `/`                          | Global search (tenant-scoped)                                              |
 | `?`                          | The shortcut list, with the switch that turns the single-key shortcuts off |
 | `g` then `d` `c` `t` `e` `h` | Command Center, Cases, Case Timeline, Evidence Ledger, Hypothesis Arena    |
+| `g` then `r`                 | Guided Review (of the active case)                                         |
 | `g` then `l` `q` `s` `m`     | Counterfactual Lab, Quality Review, SkillDNA Library, Efficiency Monitor   |
 | `g` then `g` `y` `p`         | Governance, System Health, Demo Guide                                      |
 | `n` on the Demo Guide        | The next step                                                              |
