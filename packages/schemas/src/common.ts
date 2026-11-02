@@ -28,12 +28,25 @@ export const RecordMetaSchema = z.object({
 });
 export type RecordMeta = z.infer<typeof RecordMetaSchema>;
 
+/**
+ * Which stored text a `SourceRef` offset counts into. The engine reads an event as its title, a line break and
+ * its body, so an offset is only meaningful together with the text it was measured in.
+ */
+export const SourceFieldSchema = z.enum(['title', 'body', 'titleAndBody']);
+export type SourceField = z.infer<typeof SourceFieldSchema>;
+
 /** Pointer back to the immutable source text that supports a derived value. */
 export const SourceRefSchema = z.object({
   eventId: IdSchema.optional(),
   sourceId: IdSchema.optional(),
   /** JSON pointer into the stored source payload, e.g. `/events/4/body`. */
   pointer: z.string().max(300).optional(),
+  /**
+   * The stored text that `start` and `end` count into: the event title, its body, or both as
+   * `title + "\n" + body`. Absent on references made before offsets were tied to a field, and whenever
+   * there are no offsets (structured values, inferred statements).
+   */
+  field: SourceFieldSchema.optional(),
   start: z.number().int().min(0).optional(),
   end: z.number().int().min(0).optional(),
   excerpt: z.string().max(600).optional(),

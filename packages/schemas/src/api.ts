@@ -98,6 +98,8 @@ import {
   ProviderStatusSchema,
   PromptVersionSchema,
 } from './ai';
+import { ProvenanceQuerySchema, ProvenanceResponseSchema } from './provenance';
+import { SkillOverlaySchema } from './skill-overlay';
 import { SessionSchema, UserSchema, type Permission } from './identity';
 import { SampleBundleInfoSchema, IngestionPreviewSchema } from './bundle';
 
@@ -413,6 +415,16 @@ export const ROUTES = {
     query: AsOfQuerySchema,
     response: EventDetailSchema,
   },
+  'provenance.resolve': {
+    method: 'GET',
+    path: `${API_PREFIX}/cases/:caseId/provenance`,
+    summary: 'Resolve evidence links to the stored source text, checking each excerpt against it',
+    tags: ['Case analysis'],
+    permission: 'case:read',
+    params: CaseParams,
+    query: ProvenanceQuerySchema,
+    response: ProvenanceResponseSchema,
+  },
   'evidence.list': {
     method: 'GET',
     path: `${API_PREFIX}/cases/:caseId/evidence`,
@@ -620,6 +632,17 @@ export const ROUTES = {
     permission: 'skill:apply',
     params: CaseParams.extend({ matchId: IdSchema }),
     response: SkillMatchSchema,
+  },
+  'skillOverlay.get': {
+    method: 'GET',
+    path: `${API_PREFIX}/cases/:caseId/skill-matches/:matchId/overlay`,
+    summary:
+      'What a matched skill would have changed: the recorded path beside an explicit estimate',
+    tags: ['SkillDNA'],
+    permission: 'skill:read',
+    params: CaseParams.extend({ matchId: IdSchema }),
+    query: AsOfQuerySchema,
+    response: SkillOverlaySchema,
   },
   'compare.cases': {
     method: 'GET',

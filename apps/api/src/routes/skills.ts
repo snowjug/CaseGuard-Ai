@@ -1,4 +1,5 @@
 import type { HandlerMap } from '../http/route-binder';
+import { NotImplementedError } from '../errors';
 import type { Infrastructure } from '../infrastructure';
 import { engineBudgetFor, type EngineBudgetCaller } from '../services/engine-budget';
 
@@ -27,6 +28,9 @@ export function skillsRoutes(infra: Infrastructure): HandlerMap {
 
     'skillMatches.apply': ({ params, ctx }) =>
       ctx.services.skills.applyMatch(ctx, params.caseId, params.matchId, metered(ctx)),
+
+    // Contract first: the handler arrives with the SkillDNA overlay workstream.
+    'skillOverlay.get': () => Promise.reject(new NotImplementedError('skillOverlay.get')),
 
     'skills.list': ({ query, ctx }) => ctx.services.skills.list(ctx, query),
 

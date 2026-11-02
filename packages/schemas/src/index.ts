@@ -8,6 +8,8 @@ export * from './analysis';
 export * from './counterfactual';
 export * from './quality';
 export * from './skill';
+export * from './skill-overlay';
+export * from './provenance';
 export * from './ai';
 export * from './governance';
 export * from './views';

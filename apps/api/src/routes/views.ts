@@ -1,4 +1,5 @@
 import type { HandlerMap } from '../http/route-binder';
+import { NotImplementedError } from '../errors';
 import type { Infrastructure } from '../infrastructure';
 import {
   compareCases,
@@ -42,6 +43,8 @@ export function viewsRoutes(infra: Infrastructure): HandlerMap {
     'timeline.get': ({ params, query, ctx }) => getTimeline(ctx, deps, params.caseId, query),
     'events.get': ({ params, query, ctx }) =>
       getEventDetail(ctx, deps, params.caseId, params.eventId, query),
+    // Contract first: the handler arrives with the provenance workstream.
+    'provenance.resolve': () => Promise.reject(new NotImplementedError('provenance.resolve')),
     'evidence.list': ({ params, query, ctx }) => listLedger(ctx, deps, params.caseId, query),
     'claims.review': ({ params, body, ctx }) =>
       reviewClaim(ctx, params.caseId, params.claimId, body),
