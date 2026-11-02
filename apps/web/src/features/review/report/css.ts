@@ -113,8 +113,9 @@ const BASE = `
 const PRINT = `
 @page{margin:16mm 14mm}
 @media print{
-.cg-skip-link,body header:not(.cg-head),body nav,body aside,body footer:not(.cg-foot),.cg-no-print,[role="toolbar"],[data-cg-toast]{display:none!important}
-html,body{background:#fff!important;color:#000!important}
+.cg-skip-link,body header:not(.cg-head),body nav,body aside,body footer:not(.cg-foot),.cg-no-print,.fui-Toaster,[data-toaster-position]{display:none!important}
+html,body{background:#fff!important;color:#000!important;height:auto!important;overflow:visible!important}
+div:has(main#main-content){display:block!important;min-height:0!important;height:auto!important;overflow:visible!important}
 main#main-content{padding:0!important;margin:0!important;overflow:visible!important}
 .cg-report{${lightVariables};max-width:none;color:#000;font-size:11pt}
 .cg-contents{display:none}

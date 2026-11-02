@@ -277,5 +277,16 @@ describe('[REV-REPORT-11] the downloaded file is one self-contained document', (
     );
     // Print uses the light variables whatever theme the page is in.
     expect(print).toContain('--cgSurface:#FFFFFF');
+    // The application frame is a flex column of full height; on paper it must be plain blocks or pages are cut off.
+    expect(print).toContain('div:has(main#main-content){display:block!important');
+  });
+
+  it('is balanced CSS: every block that is opened is closed, in the stylesheet and in the theme variables', () => {
+    const count = (text: string, char: string): number => text.split(char).length - 1;
+    for (const css of [REPORT_CSS, STANDALONE_CSS]) {
+      expect(count(css, '{')).toBe(count(css, '}'));
+      expect(count(css, '(')).toBe(count(css, ')'));
+      expect(count(css, '"') % 2).toBe(0);
+    }
   });
 });

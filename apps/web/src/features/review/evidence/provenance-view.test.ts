@@ -62,6 +62,14 @@ describe('[REV-EVID-01] what the drawer shows for an item', () => {
     expect(view.body).toEqual({ kind: 'derived' });
   });
 
+  it('shows a quotation only for a verified answer, even when a passage came along with another one', () => {
+    const context = { before: 'Before. ', match: 'matched', after: ' After.' };
+    for (const verification of ['mismatch', 'not_checkable'] as const) {
+      const view = describeItem(withSource(verified, { verification, context }));
+      expect(view.body.kind, verification).not.toBe('quote');
+    }
+  });
+
   it('has nothing to quote for text without a recorded source, or for a kind of item that has no text', () => {
     expect(describeItem({ ...verified, source: null }).body).toEqual({ kind: 'derived' });
     expect(describeItem(eventItem).body).toEqual({ kind: 'none' });
