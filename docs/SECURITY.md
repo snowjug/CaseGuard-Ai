@@ -113,7 +113,7 @@ API ([Client address for rate limits](#client-address-for-rate-limits)).
 
 ## 3. Authorization
 
-- **Every route declares its permission** in the contract registry `ROUTES` (`packages/schemas/src/api.ts`, 75 routes): one
+- **Every route declares its permission** in the contract registry `ROUTES` (`packages/schemas/src/api.ts`, 77 routes): one
   permission, or `null`. Only `session.me`, `dev.personas` and `jobs.cancel` have none at the route (any authenticated caller;
   `dev.personas` needs no credentials at all). `jobs.cancel` is checked inside the job service instead: it requires the
   permission that starts that kind of job (`case:analyze`, `counterfactual:run`, `skill:extract`, `skill:mutate` or
