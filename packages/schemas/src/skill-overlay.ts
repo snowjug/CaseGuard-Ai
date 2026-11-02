@@ -16,8 +16,15 @@ import {
  * This is an explicit comparison, not a second analysis: the recorded analysis of the case is never altered by it
  * (`labels.recordedAnalysisUnchanged`). Every figure is computed on the server from stored data and labelled as an
  * estimate. A client shows these numbers as they are and does no arithmetic of its own.
+ *
+ * A skill states its saving in time to DIAGNOSIS (not in time to useful evidence), customer effort and tokens:
+ * the figures it was distilled with, measured from the decision point of the case it came from. So the time
+ * saving has a row of its own (`time_to_diagnosis_minutes`); subtracting it from the time to useful evidence
+ * would set two different measures against each other. The time to useful evidence is shown as recorded,
+ * with no estimate of what the skill would have made of it.
  */
 export const SKILL_OVERLAY_METRICS = [
+  'time_to_diagnosis_minutes',
   'time_to_useful_evidence_minutes',
   'customer_effort_minutes',
   'tokens',
