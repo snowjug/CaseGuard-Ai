@@ -62,7 +62,20 @@ describe('[REV-LINK-01] evidence links', () => {
       type: 'requirement',
       id: 'req.server-side-correlation',
     });
-    for (const bad of [null, undefined, '', 'evidence', ':id', 'bogus:1', 'event:a,b', 'event:a b'])
+    for (const bad of [
+      null,
+      undefined,
+      '',
+      'evidence',
+      ':id',
+      'bogus:1',
+      'event:a,b',
+      'event:a b',
+      // Names every object has: a type is one of the eight kinds, not whatever the prototype holds.
+      'constructor:1',
+      'toString:1',
+      '__proto__:1',
+    ])
       expect(parseLinkKey(bad), String(bad)).toBeNull();
     expect(parseLinkKey(`event:${'x'.repeat(121)}`)).toBeNull();
   });

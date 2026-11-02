@@ -31,7 +31,12 @@ export function parseLinkKey(key: string | null | undefined): EvidenceLink | nul
   if (colon <= 0) return null;
   const type = key.slice(0, colon);
   const id = key.slice(colon + 1);
-  if (!(type in LINK_TYPE_WORDS) || id.length === 0 || id.length > 120 || /[\s,]/.test(id)) {
+  if (
+    !Object.hasOwn(LINK_TYPE_WORDS, type) ||
+    id.length === 0 ||
+    id.length > 120 ||
+    /[\s,]/.test(id)
+  ) {
     return null;
   }
   return { type: type as EvidenceLink['type'], id };
