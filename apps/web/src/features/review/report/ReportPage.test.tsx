@@ -126,7 +126,7 @@ describe('[REV-REPORT-21] sections the reader may not read are left out, and the
     const top = screen.getByRole('region', { name: 'Left out of this report' });
     expect(within(top).getByText(/1 section could not be included/)).toBeVisible();
     // The sections the curator may read are all there.
-    expect(screen.getByRole('region', { name: /Chronology/ })).toBeVisible();
+    expect(screen.getByRole('region', { name: /^2\. Chronology$/ })).toBeVisible();
     expect(
       await screen.findByRole('list', { name: 'Skills that resemble this case' }),
     ).toBeVisible();

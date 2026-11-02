@@ -26,7 +26,7 @@ const BASE = `
 .cg-report ul,.cg-report ol{margin:.4rem 0;padding-left:1.4rem}
 .cg-report li{margin:.25rem 0}
 .cg-report a{color:var(--cgTextLink);text-underline-offset:2px}
-.cg-report a:focus-visible{outline:3px solid var(--cgFocus);outline-offset:2px}
+.cg-report a:focus-visible,.cg-report .cg-strip-wrap:focus-visible{outline:3px solid var(--cgFocus);outline-offset:2px}
 .cg-report :target{scroll-margin-top:80px}
 .cg-report small,.cg-muted{color:var(--cgTextSecondary)}
 .cg-print-only{display:none}

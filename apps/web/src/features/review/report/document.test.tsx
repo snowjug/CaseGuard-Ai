@@ -154,7 +154,7 @@ describe('[REV-REPORT-10] the report document', () => {
       /Left out of this report\. Your role \(Support engineer\) does not include the “quality:read” permission/,
     );
     // The other sections are still there.
-    expect(view.getByRole('region', { name: /Chronology/ })).toBeVisible();
+    expect(view.getByRole('region', { name: /^2\. Chronology$/ })).toBeVisible();
     await expectNoAxeViolations(container);
   });
 

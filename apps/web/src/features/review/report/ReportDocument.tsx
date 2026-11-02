@@ -186,7 +186,14 @@ function Marker({ marker }: { marker: StripMarker }) {
 function Strip({ chronology, geometry }: { chronology: Chronology; geometry: StripGeometry }) {
   const { rows, plot, axis } = geometry;
   return (
-    <div className="cg-strip-wrap">
+    <div
+      className="cg-strip-wrap"
+      // The picture scrolls sideways on a narrow screen, so a keyboard must be able to reach it.
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+      tabIndex={0}
+      role="region"
+      aria-label="Chronology strip, scrollable"
+    >
       <svg
         className="cg-strip"
         role="img"
