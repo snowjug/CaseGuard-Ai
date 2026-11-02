@@ -138,6 +138,13 @@ export interface OverlayRowView {
   basis: string;
 }
 
+/** What the skill saved on the case it came from, for a case that has nothing recorded to set it against. */
+export interface SavingOnlyView {
+  rows: { key: string; label: string; saved: string; basis: string }[];
+  /** The one sentence that explains every row when they all share it (it is then said once); otherwise `null`. */
+  sharedBasis: string | null;
+}
+
 export interface OverlayView {
   matchId: string;
   decision: { forkId: string; eventId: string; at: string; title: string; summary: string } | null;
@@ -147,6 +154,11 @@ export interface OverlayView {
   rows: OverlayRowView[];
   /** True when no row could compare the recorded path with the skill (the API left `withSkill` empty everywhere). */
   nothingToCompare: boolean;
+  /**
+   * When the case has no recorded figure and no with-skill figure at all, only the rows that carry the skill's own
+   * saving (so the screen does not show a table of empty cells); otherwise `null`.
+   */
+  savingOnly: SavingOnlyView | null;
   assumptions: string[];
   limitations: string[];
   links: EvidenceLink[];
@@ -175,6 +187,17 @@ export function describeOverlay(overlay: SkillOverlay): OverlayView {
     basis: row.basis,
   }));
   const cheaper = overlay.withSkill.cheaperAlternative;
+  const savings = rows.flatMap((row) =>
+    row.saved === null
+      ? []
+      : [{ key: row.key, label: row.label, saved: row.saved, basis: row.basis }],
+  );
+  const nothingRecorded = rows.every((row) => row.recorded === null && row.withSkill === null);
+  const firstBasis = savings[0]?.basis;
+  const sharedBasis =
+    firstBasis !== undefined && savings.every((row) => row.basis === firstBasis)
+      ? firstBasis
+      : null;
   return {
     matchId: overlay.matchId,
     decision: overlay.decisionPoint
@@ -210,6 +233,7 @@ export function describeOverlay(overlay: SkillOverlay): OverlayView {
       : null,
     rows,
     nothingToCompare: rows.every((row) => row.withSkill === null),
+    savingOnly: nothingRecorded && savings.length > 0 ? { rows: savings, sharedBasis } : null,
     assumptions: overlay.assumptions,
     limitations: overlay.limitations,
     links: uniqueLinks(overlay.evidence),

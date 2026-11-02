@@ -214,6 +214,33 @@ describe('[REV-LEARN-02] recorded against with the skill, as the server computed
     expect(none.nothingToCompare).toBe(true);
     expect(none.decision).toBeNull();
     expect(none.recorded.followed).toBe(true);
+    // Nothing recorded and nothing with the skill: only the rows that carry the skill's own saving are kept, and the
+    // sentence they share is said once.
+    expect(none.savingOnly?.rows.map((row) => row.key)).toEqual([
+      'time_to_useful_evidence_minutes',
+    ]);
+    expect(none.savingOnly?.sharedBasis).toBe(none.rows[0]?.basis);
+    expect(describeOverlay(OVERLAY_ONE).savingOnly).toBeNull();
+  });
+
+  it('says a basis that every saving shares once, and keeps the basis of each row when they differ', () => {
+    const [row] = OVERLAY_TWO.comparison;
+    const base = row as NonNullable<typeof row>;
+    const same = describeOverlay({
+      ...OVERLAY_TWO,
+      comparison: [base, { ...base, key: 'customer_effort_minutes', label: 'Customer effort' }],
+    });
+    expect(same.savingOnly?.rows).toHaveLength(2);
+    expect(same.savingOnly?.sharedBasis).toBe(base.basis);
+    const differ = describeOverlay({
+      ...OVERLAY_TWO,
+      comparison: [base, { ...base, key: 'tokens', unit: 'tokens', basis: 'Another reason.' }],
+    });
+    expect(differ.savingOnly?.sharedBasis).toBeNull();
+    expect(differ.savingOnly?.rows.map((entry) => entry.basis)).toEqual([
+      base.basis,
+      'Another reason.',
+    ]);
   });
 
   it('keeps fractions as the server sent them, to two places, and a missing range as nothing', () => {

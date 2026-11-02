@@ -747,33 +747,73 @@ function OverlayBlock({ view }: { view: OverlayView }) {
           {view.cheaper.minutesSaved ? ` ${view.cheaper.minutesSaved}.` : ''}
         </p>
       ) : null}
-      <div className="cg-table-wrap">
-        <table className="cg-table">
-          <caption>Recorded against with the skill (estimates worked out by the server)</caption>
-          <thead>
-            <tr>
-              <th scope="col">Measure</th>
-              <th scope="col">Recorded</th>
-              <th scope="col">With the skill (estimate)</th>
-              <th scope="col">The skill’s own saving (estimate)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.rows.map((row) => (
-              <tr key={row.key}>
-                <th scope="row">
-                  {row.label}
-                  <br />
-                  <small className="cg-muted">{row.basis}</small>
-                </th>
-                <td>{row.recorded ?? 'Not available'}</td>
-                <td>{row.withSkill ?? 'Not available'}</td>
-                <td>{row.saved ?? 'Not available'}</td>
+      {view.savingOnly ? (
+        <>
+          {view.savingOnly.sharedBasis ? (
+            <p>
+              <small className="cg-muted">{view.savingOnly.sharedBasis}</small>
+            </p>
+          ) : null}
+          <div className="cg-table-wrap">
+            <table className="cg-table">
+              <caption>
+                What the skill saved on the case it came from (estimates; there is nothing on this
+                case to set it against)
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Measure</th>
+                  <th scope="col">The skill’s own saving (estimate)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {view.savingOnly.rows.map((row) => (
+                  <tr key={row.key}>
+                    <th scope="row">
+                      {row.label}
+                      {view.savingOnly?.sharedBasis ? null : (
+                        <>
+                          <br />
+                          <small className="cg-muted">{row.basis}</small>
+                        </>
+                      )}
+                    </th>
+                    <td>{row.saved}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <div className="cg-table-wrap">
+          <table className="cg-table">
+            <caption>Recorded against with the skill (estimates worked out by the server)</caption>
+            <thead>
+              <tr>
+                <th scope="col">Measure</th>
+                <th scope="col">Recorded</th>
+                <th scope="col">With the skill (estimate)</th>
+                <th scope="col">The skill’s own saving (estimate)</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {view.rows.map((row) => (
+                <tr key={row.key}>
+                  <th scope="row">
+                    {row.label}
+                    <br />
+                    <small className="cg-muted">{row.basis}</small>
+                  </th>
+                  <td>{row.recorded ?? 'Not available'}</td>
+                  <td>{row.withSkill ?? 'Not available'}</td>
+                  <td>{row.saved ?? 'Not available'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       {view.assumptions.length > 0 ? (
         <>
           <h4>Assumptions</h4>

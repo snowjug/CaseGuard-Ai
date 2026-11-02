@@ -188,42 +188,81 @@ function Overlay({ view }: { view: OverlayView }) {
           {view.cheaper.minutesSaved ? ` ${view.cheaper.minutesSaved}.` : ''}
         </p>
       ) : null}
-      <ScrollRegion label="Recorded against with the skill, scrollable">
-        <table className={styles.table}>
-          <caption className={styles.caption}>
-            Recorded against with the skill (estimates worked out by the server)
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col" className={styles.th}>
-                Measure
-              </th>
-              <th scope="col" className={styles.th}>
-                Recorded
-              </th>
-              <th scope="col" className={styles.th}>
-                With the skill (estimate)
-              </th>
-              <th scope="col" className={styles.th}>
-                The skill’s own saving (estimate)
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.rows.map((row) => (
-              <tr key={row.key}>
-                <th scope="row" className={styles.td}>
-                  {row.label}
-                  <span className={styles.basis}>{row.basis}</span>
+      {view.savingOnly ? (
+        <>
+          {view.savingOnly.sharedBasis ? (
+            <p className={styles.basis}>{view.savingOnly.sharedBasis}</p>
+          ) : null}
+          <ScrollRegion label="What the skill saved on the case it came from, scrollable">
+            <table className={styles.table}>
+              <caption className={styles.caption}>
+                What the skill saved on the case it came from (estimates; there is nothing on this
+                case to set it against)
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col" className={styles.th}>
+                    Measure
+                  </th>
+                  <th scope="col" className={styles.th}>
+                    The skill’s own saving (estimate)
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {view.savingOnly.rows.map((row) => (
+                  <tr key={row.key}>
+                    <th scope="row" className={styles.td}>
+                      {row.label}
+                      {view.savingOnly?.sharedBasis ? null : (
+                        <span className={styles.basis}>{row.basis}</span>
+                      )}
+                    </th>
+                    <td className={styles.td}>{row.saved}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </ScrollRegion>
+        </>
+      ) : (
+        <ScrollRegion label="Recorded against with the skill, scrollable">
+          <table className={styles.table}>
+            <caption className={styles.caption}>
+              Recorded against with the skill (estimates worked out by the server)
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" className={styles.th}>
+                  Measure
                 </th>
-                <td className={styles.td}>{row.recorded ?? NOT_AVAILABLE}</td>
-                <td className={styles.td}>{row.withSkill ?? NOT_AVAILABLE}</td>
-                <td className={styles.td}>{row.saved ?? NOT_AVAILABLE}</td>
+                <th scope="col" className={styles.th}>
+                  Recorded
+                </th>
+                <th scope="col" className={styles.th}>
+                  With the skill (estimate)
+                </th>
+                <th scope="col" className={styles.th}>
+                  The skill’s own saving (estimate)
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </ScrollRegion>
+            </thead>
+            <tbody>
+              {view.rows.map((row) => (
+                <tr key={row.key}>
+                  <th scope="row" className={styles.td}>
+                    {row.label}
+                    <span className={styles.basis}>{row.basis}</span>
+                  </th>
+                  <td className={styles.td}>{row.recorded ?? NOT_AVAILABLE}</td>
+                  <td className={styles.td}>{row.withSkill ?? NOT_AVAILABLE}</td>
+                  <td className={styles.td}>{row.saved ?? NOT_AVAILABLE}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ScrollRegion>
+      )}
       {view.steps.length > 0 ? (
         <details className={styles.details}>
           <summary className={styles.summary}>

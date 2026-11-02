@@ -361,6 +361,29 @@ describe('[REV-LRN-01] learning', () => {
     expect(screen.queryByRole('button', { name: /^Adopt this plan:/ })).toBeNull();
   });
 
+  it('shows only the skill’s own saving, not a table of empty cells, when the case has nothing to set it against', async () => {
+    installMatchMedia();
+    const { container } = renderSection(<LearningSection caseId={CASE_TWO.detail.id} />, {
+      fixture: CASE_TWO,
+    });
+    const table = await screen.findByRole('table', {
+      name: /^What the skill saved on the case it came from/,
+    });
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((cell) => cell.textContent),
+    ).toEqual(['Measure', 'The skill’s own saving (estimate)']);
+    expect(within(table).getByText('90 min (30 min to 150 min)')).toBeVisible();
+    expect(within(table).queryByText('Not available')).toBeNull();
+    expect(
+      screen.queryByRole('table', {
+        name: 'Recorded against with the skill (estimates worked out by the server)',
+      }),
+    ).toBeNull();
+    await expectNoAxeViolations(container);
+  });
+
   it('lets an engineer extract a reusable skill from the accepted path and follows the job', async () => {
     installMatchMedia();
     const user = userEvent.setup();

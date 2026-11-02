@@ -5,6 +5,7 @@ import {
   CASE_ONE,
   CASE_TWO,
   OVERLAY_ONE,
+  OVERLAY_TWO,
   type CaseFixture,
 } from '../../../../test/review-fixtures';
 import { denied, ready } from '../model/sources';
@@ -135,6 +136,22 @@ describe('[REV-REPORT-10] the report document', () => {
     expect(within(row).getByText('240 min (120 min to 480 min)')).toBeVisible();
     expect(within(row).getByText('150 min (0 min to 450 min)')).toBeVisible();
     expect(within(row).getByText('90 min (30 min to 150 min)')).toBeVisible();
+  });
+
+  it('shows only the skill’s own saving when the case has nothing to set it against', () => {
+    const report = reportOf(CASE_TWO, { overlays: { [OVERLAY_TWO.matchId]: ready(OVERLAY_TWO) } });
+    const { container } = render(
+      <ReportDocument report={report} caseId={CASE_TWO.detail.id} origin={ORIGIN} />,
+    );
+    const table = within(container).getByRole('table', {
+      name: /^What the skill saved on the case it came from/,
+    });
+    expect(within(table).getByText('90 min (30 min to 150 min)')).toBeVisible();
+    expect(
+      within(container).queryByRole('table', {
+        name: 'Recorded against with the skill (estimates worked out by the server)',
+      }),
+    ).toBeNull();
   });
 
   it('puts the explicit note in place of a section the reader may not read, and at the top', async () => {
