@@ -101,6 +101,25 @@ application is a human decision, so it also survives the skill: when the skill i
 (no longer matchable) the stored match is kept, flagged by the skill's current `lifecycle`, and the
 whole-case list still shows it. As-of lists never offer a skill that cannot be matched.
 
+## The overlay: recorded versus with the skill
+
+`skillOverlay.get` (`overlay.ts`) sets what a matched skill would have changed beside what the case recorded. It
+reads, it never writes: no row is stored and no audit event is recorded (adopting the plan stays the explicit,
+governed `skillMatches.apply`), which `apps/api/test/skill-overlay.int.test.ts` proves by comparing a digest of every
+table before and after. The arithmetic and the wording are the domain's (`buildSkillOverlay`, with the rules for the
+decision point and the formula in its header); this file only gathers what it is given:
+
+- **The match** is the one `skillMatches.list` returns for the same `asOf` (same matcher, same cache, same
+  budget), looked up by its id: 404 when the case has no such match then (also across tenants, and for the skill
+  extracted from the case itself as of an earlier instant).
+- **The decision points** are the engine's: stored for the whole record, recomputed from only what was known for an
+  `asOf` (the views' shared, metered pass, `listForks`). Decision-time fields only are used.
+- **The figures for the recorded path** are the ones the engine stored with its simulations of that decision point
+  (`actualMetrics`), read only when no event of the case lies after the instant of the match; otherwise they are
+  hindsight and the overlay withholds them, whatever is passed to the builder.
+- **Cost.** The match is metered like a list; an `asOf` adds the view pass for its decision points, which is shared
+  with every other view of that instant and so free when somebody has looked at it.
+
 ## What matching reads of a skill, and the hindsight notice
 
 A skill's provenance lists the parts that were derived with knowledge of the source case's recorded
