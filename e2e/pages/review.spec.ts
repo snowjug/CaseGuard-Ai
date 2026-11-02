@@ -328,7 +328,8 @@ test.describe('[FR-REV-03] a section the role may not read degrades on its own',
     await expect(section(page, /Verdict/)).toContainText(
       'Left out of this report. Your role (Knowledge / Skill Curator)',
     );
-    await expect(section(page, /Chronology/)).toBeVisible();
+    // The strip inside the chronology is a named region too, so the section is matched by its whole name.
+    await expect(section(page, /^2\. Chronology$/)).toBeVisible();
   });
 });
 
