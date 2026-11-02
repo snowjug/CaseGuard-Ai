@@ -23,7 +23,7 @@
 #   - Authoring note: this file has NOT been built with Docker in the environment where it was written
 #     (no daemon available). CI builds this image.
 
-FROM node:24.22.2-trixie-slim AS base
+FROM node:26.13.0-trixie-slim AS base
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
     CI=true \
     HUSKY=0 \
@@ -59,7 +59,7 @@ RUN test -f apps/web/.next/standalone/apps/web/server.js || { \
       exit 1; \
     }
 
-FROM node:24.22.2-trixie-slim AS runtime
+FROM node:26.13.0-trixie-slim AS runtime
 ARG GIT_COMMIT=unknown
 ARG NEXT_PUBLIC_AUTH_MODE=dev
 ARG NEXT_PUBLIC_APP_ENV=local
