@@ -18,7 +18,7 @@ const SECTIONS = [
   'Share',
 ] as const;
 
-configure({ asyncUtilTimeout: 15_000 });
+configure({ asyncUtilTimeout: 5000 });
 
 function renderReview(options: ReviewApiOptions = {}) {
   const fixture = options.fixture ?? CASE_ONE;

@@ -16,9 +16,7 @@ import { DecisionsSection } from './sections/DecisionsSection';
 import { LearningSection } from './sections/LearningSection';
 import { PathsSection } from './sections/PathsSection';
 
-// A drawer opens through Fluent's motion and Tabster's focus handling, which take several seconds when the machine is
-// busy (it opened in under a second alone and missed 5 s while two other test runs shared the CPU).
-configure({ asyncUtilTimeout: 15_000 });
+configure({ asyncUtilTimeout: 5000 });
 
 function renderSection(node: ReactNode, options: ReviewApiOptions = {}) {
   const fixture = options.fixture ?? CASE_ONE;

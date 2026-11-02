@@ -29,9 +29,14 @@ function clearCookies(): void {
 
 // Tabster's modalizer marks a Fluent dialog `aria-hidden` until focus moves into it, and in jsdom (no layout, so no
 // "first focusable") that never happens. A real browser activates it; Playwright covers that. Removing the attribute
-// here lets role/name queries and axe see the dialog the way a browser's accessibility tree does.
+// here lets role/name queries and axe see the dialog the way a browser's accessibility tree does. The name of an
+// `aria-hidden` element computes to the empty string even for a query with `hidden: true`, so a query by name only
+// found an overlay drawer (class `fui-OverlayDrawer`, not `fui-DialogSurface`) in the moment before Tabster hid it:
+// whether it won that race depended on timing, and it lost it now and then on a busy machine.
 new MutationObserver(() => {
-  for (const surface of document.querySelectorAll('.fui-DialogSurface[aria-hidden="true"]'))
+  for (const surface of document.querySelectorAll(
+    '.fui-DialogSurface[aria-hidden="true"], .fui-OverlayDrawer[aria-hidden="true"]',
+  ))
     surface.removeAttribute('aria-hidden');
 }).observe(document.documentElement, {
   attributes: true,
