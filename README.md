@@ -19,8 +19,10 @@ The logo is the name in text plus the web app's own mark ([`apps/web/src/app/ico
 nodes for evidence, a decision fork and a hypothesis); besides the screenshots below, no other image asset is shipped. The badges
 are the workflows in [`.github/workflows`](.github/workflows) (`ci`, `codeql`, `dependency-review` and the manual `deploy`;
 `deploy-environment` is the reusable part of `deploy` and has no badge of its own). **A badge reports the latest run of its workflow
-on the default branch.** CI has run 25 times and Dependency review 12 times, and **no CI run has been fully green yet**, so the CI
-badge cannot show a pass; Dependency review fails because the repository's Dependency graph setting is off. No CodeQL or Deploy run
+on the default branch.** Before the foundation work all 27 CI runs failed; the first fully green run
+(41495498658) is on the unmerged branch `build/p0-foundation`, and `build/wave-1` has been green since, so the CI badge cannot
+show a pass until that work reaches the default branch. Dependency review (13 runs, all failed) fails because the repository's
+Dependency graph setting is off. No CodeQL or Deploy run
 is recorded here (CodeQL runs on pushes and pull requests to `main`, which does not exist yet, on a weekly schedule and on demand), so those two badges say nothing yet.
 
 **Hackathon track: C+AI Hack for Quality.**
@@ -29,11 +31,13 @@ is recorded here (CodeQL runs on pushes and pull requests to `main`, which does 
 > default and is what the demo uses**: no model is called and nothing leaves your machine. The Azure OpenAI, Microsoft Entra ID,
 > Azure Blob Storage, Azure AI Search and Azure Monitor integrations are **implemented but validated against local mocks only**.
 > **Nothing has been deployed to Azure.** Docker image builds were **not run** locally (no Docker daemon); CI builds both images and
-> smoke-tests them (run 41182982903: both were built and the compose smoke test passed 12 checks, but the job failed in a
-> cache-saving post step). The data tier is exercised on **PGlite** locally and on PostgreSQL 16 in the CI integration job.
-> **CI has run 25 times and no run has been fully green yet**: in run 41182982903 only the production build job was fully green;
-> 5,829 unit tests passed and 1 failed, 1,008 integration tests passed and 3 failed, and 335 of 342 end-to-end tests passed
-> ([Running tests](#running-tests)).
+> smoke-tests them (run 41495498658: both were built and the compose smoke test passed 12 checks). The data tier is exercised on
+> **PGlite** locally and on PostgreSQL 16 in the CI integration job.
+> **CI was never fully green until the foundation branch**: all 27 earlier runs failed (the one on `2ecb454`, run 41182982903,
+> had only the production build fully green). The first fully green run is 41495498658 on the unmerged branch
+> `build/p0-foundation` (8 of 8 jobs: 5,843 unit tests, 1,011 integration tests on PostgreSQL 16 and 342 end-to-end tests
+> passed, none failed), and `build/wave-1` has been green since ([Running tests](#running-tests)). None of this has reached the
+> default branch.
 > Every score is an **estimate**, shown with its basis and range. CaseGuard AI is not a Microsoft product.
 > The repository is **UNLICENSED** (the owner has to choose a license). One known HIGH advisory (`@azure/msal-node`, reached through
 > `@azure/identity`) is carried as a time-boxed exception until 2027-01-15 and needs a human to accept the risk or upgrade.
@@ -353,16 +357,16 @@ simulated better path, an estimated saving of 80.7 percent.
 
 ## Trust, security, and responsible AI
 
-| Control                  | What it does                                                                                                                                                                               | Status                                                                                                          |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| Tenant isolation         | The tenant comes from the credential only; tenant-scoped repositories, composite keys and forced row-level security                                                                        | Tested on PGlite; CI on PostgreSQL 16: 1,008 passed, 3 failed; **not verified on a managed server**             |
-| Identity                 | Development persona login only for `APP_ENV` local or test (refused elsewhere); Microsoft Entra JWT validation for deployed environments                                                   | Persona login tested. Entra validation tested with locally generated keys only, never against a live tenant     |
-| Authorization            | Five roles, 30 permissions, one declared permission per route, checked before the body is parsed                                                                                           | Implemented and tested                                                                                          |
-| Input handling           | Size and type checks from the bytes, redaction of secrets and personal data (a tenant pattern that cannot be applied fails closed), prompt-injection screening that flags and never blocks | Redaction is pattern-based. The malware scanner is a stub (`not_scanned`): nothing scans uploads for malware    |
-| AI boundary              | Minimised, redacted, delimited context; no tools; strict JSON; seven validators; repair once, then the deterministic result; a circuit breaker and token budgets                           | Tested with the deterministic provider and a mock Azure server; **no real model was ever called**               |
-| Audit                    | Per-tenant append-only hash chain, verified from the Governance page                                                                                                                       | Tamper-evident, not tamper-proof (no external anchor)                                                           |
-| Web and API hardening    | Nonce-based CSP in the web tier, security headers, CORS allow-list, rate limits applied before authentication, idempotency keys                                                            | Tested locally; the client address behind the web tier is tested with simulated headers only                    |
-| Secrets and supply chain | No secrets in the repository (scanner in the pre-commit hook and CI, gitleaks in CI), managed identity by design, CodeQL, dependency review and an audit gate in CI                        | No CI run is green; one time-boxed advisory exception for `@azure/msal-node` that needs a human risk acceptance |
+| Control                  | What it does                                                                                                                                                                               | Status                                                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Tenant isolation         | The tenant comes from the credential only; tenant-scoped repositories, composite keys and forced row-level security                                                                        | Tested on PGlite; CI on PostgreSQL 16: 1,011 passed, 0 failed; **not verified on a managed server**                                |
+| Identity                 | Development persona login only for `APP_ENV` local or test (refused elsewhere); Microsoft Entra JWT validation for deployed environments                                                   | Persona login tested. Entra validation tested with locally generated keys only, never against a live tenant                        |
+| Authorization            | Five roles, 30 permissions, one declared permission per route, checked before the body is parsed                                                                                           | Implemented and tested                                                                                                             |
+| Input handling           | Size and type checks from the bytes, redaction of secrets and personal data (a tenant pattern that cannot be applied fails closed), prompt-injection screening that flags and never blocks | Redaction is pattern-based. The malware scanner is a stub (`not_scanned`): nothing scans uploads for malware                       |
+| AI boundary              | Minimised, redacted, delimited context; no tools; strict JSON; seven validators; repair once, then the deterministic result; a circuit breaker and token budgets                           | Tested with the deterministic provider and a mock Azure server; **no real model was ever called**                                  |
+| Audit                    | Per-tenant append-only hash chain, verified from the Governance page                                                                                                                       | Tamper-evident, not tamper-proof (no external anchor)                                                                              |
+| Web and API hardening    | Nonce-based CSP in the web tier, security headers, CORS allow-list, rate limits applied before authentication, idempotency keys                                                            | Tested locally; the client address behind the web tier is tested with simulated headers only                                       |
+| Secrets and supply chain | No secrets in the repository (scanner in the pre-commit hook and CI, gitleaks in CI), managed identity by design, CodeQL, dependency review and an audit gate in CI                        | CI is green only on unmerged branches; one time-boxed advisory exception for `@azure/msal-node` that needs a human risk acceptance |
 
 **Responsible AI.** Synthetic data only: the product says so everywhere, a tenant flagged synthetic refuses a payload declaring
 `"synthetic": false`, and redaction runs as a safety net, but nothing can prove that a payload is fictional (it is self-attested).
@@ -456,7 +460,7 @@ staging or production, an API-key credential for Azure OpenAI in a deployed envi
 | Status                                    | Components                                                                                                                                                                                                                                                                                               |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Implemented and tested locally            | Domain engine and all computed outputs; ingestion; redaction and injection screening; the deterministic AI provider, orchestrator and validators; RBAC; tenant isolation and RLS on PGlite; audit chain; idempotency; jobs; PostgreSQL full-text search; local object store; the API; the web app        |
-| Implemented, validated against mocks only | Azure OpenAI provider; Entra JWT validation and just-in-time user provisioning; MSAL browser sign-in; Azure Blob adapter; Azure AI Search adapter; the optional Application Insights export. The `pg` driver ran on PostgreSQL 16 only in CI (1,008 passed, 3 failed), and **never on a managed server** |
+| Implemented, validated against mocks only | Azure OpenAI provider; Entra JWT validation and just-in-time user provisioning; MSAL browser sign-in; Azure Blob adapter; Azure AI Search adapter; the optional Application Insights export. The `pg` driver ran on PostgreSQL 16 only in CI (1,011 passed, 0 failed), and **never on a managed server** |
 | Designed only                             | Everything in Azure (Bicep, Key Vault references, managed identities, private networking, alerts, budget); a Redis cache; Content Safety; real malware scanning; retention enforcement; external anchoring of the audit chain; a durable multi-replica job queue                                         |
 
 **Failure modes** ([ARCHITECTURE.md](docs/ARCHITECTURE.md#14-failure-modes-and-degradation)): a provider that is down, slow or
@@ -852,19 +856,20 @@ deterministic results, retrying every 60 seconds. Full rules: [AI_ORCHESTRATION.
 ## Running tests
 
 Everything below runs offline. Counts, timings and coverage are not repeated here from memory: each result cell is the outcome of
-[GitHub Actions run 41182982903](https://github.com/snowjug/CaseGuard-Ai/actions/runs/41182982903) (the CI workflow on commit
-`2ecb454`, pushed 2026-10-31), a local measurement that says so, or "NOT RUN in CI". **No CI run has been fully green yet**, so the
-counts below include failing tests. [EVALUATION.md](docs/EVALUATION.md#2-test-inventory) records how the earlier local counts were taken.
+[GitHub Actions run 41495498658](https://github.com/snowjug/CaseGuard-Ai/actions/runs/41495498658) (the CI workflow on commit
+`8a19fc5` of the unmerged branch `build/p0-foundation`, 2026-11-02, fully green), a local measurement that says so, or "NOT RUN in
+CI". The 27 runs before it all failed; run 41182982903 on `2ecb454` is the last one whose counts were recorded
+([CI_CD.md](docs/CI_CD.md#9-what-was-and-was-not-validated)). [EVALUATION.md](docs/EVALUATION.md#2-test-inventory) records how the earlier local counts were taken.
 
 | Layer                        | Command                   | What it runs                                                                                                                                                                                                                                  | Result                                                                                                                                         |
 | ---------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit and property tests      | `pnpm test:unit`          | Every workspace except `*.int.test.ts`: schemas, config, security, observability, the domain engine (with `fast-check` property tests), the AI package, UI and web components (jsdom), API tests                                              | CI run 41182982903: 5,829 passed, 1 failed (234 files)                                                                                         |
-| Integration tests            | `pnpm test:int`           | `*.int.test.ts`: database, HTTP and mock-service tests on PGlite (CI points them at a `postgres:16` service container)                                                                                                                        | CI run 41182982903, on PostgreSQL 16: 1,008 passed, 3 failed (55 files)                                                                        |
+| Unit and property tests      | `pnpm test:unit`          | Every workspace except `*.int.test.ts`: schemas, config, security, observability, the domain engine (with `fast-check` property tests), the AI package, UI and web components (jsdom), API tests                                              | CI run 41495498658: 5,843 passed, 0 failed (235 files)                                                                                         |
+| Integration tests            | `pnpm test:int`           | `*.int.test.ts`: database, HTTP and mock-service tests on PGlite (CI points them at a `postgres:16` service container)                                                                                                                        | CI run 41495498658, on PostgreSQL 16: 1,011 passed, 0 failed (55 files)                                                                        |
 | Coverage                     | `pnpm test:coverage`      | `vitest run --coverage` (V8; HTML, lcov and a text summary under `coverage/`)                                                                                                                                                                 | NOT RUN in CI; no figure recorded ([TESTING.md](docs/TESTING.md#8-not-run-and-not-verifiable))                                                 |
-| End-to-end and accessibility | `pnpm test:e2e`           | Playwright desktop and mobile projects against a real API (in-memory PGlite, deterministic AI, seeded demo) and a production build of the web app: every page, the demo flow, axe checks, themes, HTTP security headers and failure behaviour | CI run 41182982903: 335 of 342 passed (axe checks included), 1 failed (`demo-flow.spec.ts`), 6 not run                                         |
+| End-to-end and accessibility | `pnpm test:e2e`           | Playwright desktop and mobile projects against a real API (in-memory PGlite, deterministic AI, seeded demo) and a production build of the web app: every page, the demo flow, axe checks, themes, HTTP security headers and failure behaviour | CI run 41495498658: 342 passed (axe checks included), including the Case Two step of `demo-flow.spec.ts`                                       |
 | Domain benchmark             | `pnpm bench`              | The engine on the synthetic cases and scaled cases ([EVALUATION.md](docs/EVALUATION.md#6-performance))                                                                                                                                        | NOT RUN in CI; measured locally under load: Case One analysis mean 509.3 ms, p95 1242.5 ms ([EVALUATION.md](docs/EVALUATION.md#6-performance)) |
 | API micro-benchmark          | `pnpm bench:api`          | One in-process API on in-memory PGlite with the seeded demo; writes `docs/PERFORMANCE.md` (`--no-write` prints only)                                                                                                                          | NOT RUN in CI; measured locally, noisy: timeline retrieval p50 34.53 ms, p95 41.76 ms ([PERFORMANCE.md](docs/PERFORMANCE.md))                  |
-| Everything, as CI runs it    | `node scripts/verify.mjs` | Format, lint, typecheck, generated files, docs links, tests, build, e2e, secret scan, dependency audit, Bicep, images, demo replay; every step reports PASSED, FAILED or NOT RUN, never a silent pass                                         | CI runs it one step per job; run 41182982903: 8 jobs, only Production build fully green                                                        |
+| Everything, as CI runs it    | `node scripts/verify.mjs` | Format, lint, typecheck, generated files, docs links, tests, build, e2e, secret scan, dependency audit, Bicep, images, demo replay; every step reports PASSED, FAILED or NOT RUN, never a silent pass                                         | CI runs it one step per job; run 41495498658: 8 of 8 jobs fully green                                                                          |
 
 Use `node scripts/verify.mjs --list` to see the steps and `--only lint,typecheck` to run a subset. Exit code 3 of a step means it was
 **not run** (for example `docker:build` without a Docker daemon, or `infra:validate` without a Bicep CLI), never "passed". `pnpm
@@ -895,9 +900,10 @@ cases are in [docs/runbooks](docs/runbooks/README.md).
 
 ## CI/CD
 
-Five workflows exist in [`.github/workflows`](.github/workflows). **Two have run on GitHub and none is fully green**: `ci.yml` has run
-25 times and `dependency-review.yml` 12 times (CI run 41182982903: 8 jobs, only the production build fully green; dependency review
-fails because the repository's Dependency graph setting is off). No CodeQL or deploy run is recorded here, so every statement about
+Five workflows exist in [`.github/workflows`](.github/workflows). **Two have run on GitHub; CI is green only on the unmerged
+branches**: `ci.yml` has run 31 times, 27 of them failing before the foundation work, and since then 3 times successfully
+(run 41495498658 on `build/p0-foundation`: 8 jobs, all green), while `dependency-review.yml` has run 13 times and failed every
+time because the repository's Dependency graph setting is off. No CodeQL or deploy run is recorded here, so every statement about
 those two is a reading of the configuration, not an observed result ([CI_CD.md](docs/CI_CD.md#9-what-was-and-was-not-validated)).
 
 | Workflow                                             | Trigger                                                                        | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -909,7 +915,7 @@ those two is a reading of the configuration, not an observed result ([CI_CD.md](
 | `.github/dependabot.yml`                             | Weekly                                                                         | Version updates for npm, GitHub Actions, Docker and Compose                                                                                                                                                                                                                                                                                                                                                                                       |
 
 **Docker images were not built locally** (no Docker daemon was available); the `containers` job builds both Dockerfiles (in run
-41182982903 both images were built and the compose smoke test passed 12 checks, but the job failed in a cache-saving post step).
+41495498658 both images were built and the compose smoke test passed 12 checks).
 Every gate runs through `scripts/verify.mjs`, so the local loop and CI share one runner and one honest status model.
 Secret scanning has three layers (a pre-commit hook, the repository scanner and gitleaks in CI, and GitHub push protection when
 enabled). The repository settings a person must apply (branch protection, required checks, environments) are listed in
@@ -986,16 +992,19 @@ credential, never from the request.
 
 How the product was evaluated, with the evidence for each layer in [EVALUATION.md](docs/EVALUATION.md):
 
-| Question                                               | Method                                                                                                                                                                                               | Result                                                                                                                |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Does the engine produce sensible results on the cases? | Calibration on the two synthetic cases: forks, the earliest meaningful fork, the Case Quality Index with range and band, Avoidable Support Effort, warnings, and a skill match as of the first email | The table in [End-to-end use case](#end-to-end-use-case) and EVALUATION.md section 3                                  |
-| Can the future leak into an earlier decision?          | Property tests (a prefix analysis equals the full analysis restricted to it), mutation tests that rewrite everything after a cut, a leak check on every scenario, AI-boundary validators             | Local runs passed (EVALUATION.md section 4); CI run 41182982903 unit tests: 5,829 passed, 1 failed                    |
-| Do the AI contracts hold?                              | `runEvaluation` over 42 adversarial fixtures and 12 controls, graded by 8 gates, with the deterministic provider on both cases                                                                       | Two local runs: 8 of 8 gates passed, 42 of 42 fixtures rejected, 12 of 12 controls accepted (EVALUATION.md section 5) |
-| Is it fast enough?                                     | The domain benchmark and the in-process API micro-benchmark (not a load test; machine and caveats are recorded with the numbers)                                                                     | NOT RUN in CI; local figures in the two benchmark rows above (EVALUATION.md section 6)                                |
-| Does it work end to end and is it accessible?          | Playwright against the real API and web build, with axe checks on every page, in light and dark themes, on desktop and a phone viewport                                                              | CI run 41182982903: 335 of 342 passed (axe checks included), 1 failed, 6 not run                                      |
+| Question                                               | Method                                                                                                                                                                                               | Result                                                                                                                                                                      |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Does the engine produce sensible results on the cases? | Calibration on the two synthetic cases: forks, the earliest meaningful fork, the Case Quality Index with range and band, Avoidable Support Effort, warnings, and a skill match as of the first email | The table in [End-to-end use case](#end-to-end-use-case) and EVALUATION.md section 3                                                                                        |
+| Does the engine read text it was not written for?      | 16 independent synthetic cases (paraphrased, noisy, negative controls, reordered) labelled before the engine ran, and a ReDoS probe over every shipped pattern                                       | 13 of 66 labelled signals read (recall 20 %, precision 76 %); the 4 false positives all deny the signal; two quadratic patterns found and bounded (EVALUATION.md section 7) |
+| Can the future leak into an earlier decision?          | Property tests (a prefix analysis equals the full analysis restricted to it), mutation tests that rewrite everything after a cut, a leak check on every scenario, AI-boundary validators             | Local runs passed (EVALUATION.md section 4); CI run 41495498658 unit tests: 5,843 passed, 0 failed                                                                          |
+| Do the AI contracts hold?                              | `runEvaluation` over 42 adversarial fixtures and 12 controls, graded by 8 gates, with the deterministic provider on both cases                                                                       | Two local runs: 8 of 8 gates passed, 42 of 42 fixtures rejected, 12 of 12 controls accepted (EVALUATION.md section 5)                                                       |
+| Is it fast enough?                                     | The domain benchmark and the in-process API micro-benchmark (not a load test; machine and caveats are recorded with the numbers)                                                                     | NOT RUN in CI; local figures in the two benchmark rows above (EVALUATION.md section 6)                                                                                      |
+| Does it work end to end and is it accessible?          | Playwright against the real API and web build, with axe checks on every page, in light and dark themes, on desktop and a phone viewport                                                              | CI run 41495498658: 342 passed (axe checks included)                                                                                                                        |
 
-**What this evaluation cannot show.** There are two synthetic cases, written alongside the engine, one knowledge pack of authored
-priors, no held-out data, no human-labelled ground truth and no user study. Every score is an estimate from those priors, and the AI
+**What this evaluation cannot show.** There are two synthetic cases, written alongside the engine, plus an independent set of 16
+synthetic cases with one annotator (on which the detectors read 13 of 66 labelled signals: recall 20 percent, precision 76
+percent; EVALUATION.md section 7). There is one knowledge pack of authored
+priors, no real data, no second annotator and no user study. Every score is an estimate from those priors, and the AI
 gates check contracts with the deterministic provider, so no real model has been evaluated. A difference between the two cases
 demonstrates the pipeline, not real-world effectiveness. The Avoidable Support Effort of Case One reads 56.3 percent when the API
 serves the seeded demo and 58.2 percent (range 42.7 to 83.3, confidence low) in the calibration probe of EVALUATION.md: the
@@ -1008,10 +1017,14 @@ The complete, graded list is [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md). 
 
 - **No real language model has ever been called**; the Azure OpenAI provider was exercised only against a local mock server.
 - **Microsoft Entra ID, Azure Blob Storage and Azure AI Search were validated against fakes only**; **nothing has been deployed to
-  Azure**, no Docker image was built locally (CI builds them), and no CI run has been fully green yet.
-- **PostgreSQL ran only in the CI integration job**: local database tests run on PGlite (one connection), and CI run 41182982903 ran
-  the integration tests on PostgreSQL 16 (1,008 passed, 3 failed). No Azure Database for PostgreSQL was used: row-level-security
+  Azure**, no Docker image was built locally (CI builds them), and CI is green only on unmerged branches, not on the default branch.
+- **PostgreSQL ran only in the CI integration job**: local database tests run on PGlite (one connection), and CI run 41495498658 ran
+  the integration tests on PostgreSQL 16 (1,011 passed, 0 failed; run 41502284661 added the two-connection ingestion race, which
+  passed). No Azure Database for PostgreSQL was used: row-level-security
   parity on a managed server and locking behaviour are unvalidated.
+- **Signal detection is tied to wording and ignores negation**: on independently worded synthetic text the deterministic detectors
+  read 13 of 66 labelled signals, and every false positive was a sentence that denies the signal (PL-12 in
+  [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md)).
 - **Estimates, not measurements**: every score comes from authored priors on two synthetic cases written alongside the engine.
 - **One workload** (Microsoft Teams sign-in); a second needs a new knowledge pack.
 - **Synthetic data only, and the label is self-attested**; redaction is pattern-based, malware scanning is a stub, and prompt-injection
@@ -1026,7 +1039,7 @@ The complete, graded list is [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md). 
 
 [ROADMAP.md](docs/ROADMAP.md) orders the work by what removes the largest unknown first. In short:
 
-1. **Prove what exists**: get CI fully green (no run has been yet); deploy a dev environment from the Bicep; validate Entra, Blob and AI Search for real;
+1. **Prove what exists**: merge the green foundation work so the default branch is green (it is green only on unmerged branches); deploy a dev environment from the Bicep; validate Entra, Blob and AI Search for real;
    evaluate a real model; build a human-labelled evaluation set; observe the telemetry (and bridge the AI package's own metrics into
    the product registry).
 2. **Remove single points of failure**: a durable job queue with separate workers, shared limiters and caches, finished tenant

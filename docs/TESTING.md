@@ -192,8 +192,8 @@ pnpm.cmd exec tsc -p e2e/tsconfig.json --noEmit    # type-check the e2e project
 CI (`.github/workflows/ci.yml`, job `e2e`, 45-minute timeout, Ubuntu): `node scripts/verify.mjs --only build`, then
 `pnpm exec playwright install --with-deps chromium`, then `node scripts/verify.mjs --only test:e2e`. With `CI` set Playwright
 uses the bundled Chromium, the built API (`apps/api/dist`) and the web build in `.next`, retries a failed test once, forbids
-`test.only`, and the report and traces are uploaded when the job fails. **That job has run on GitHub** (run 41182982903: of 342 tests, 335
-passed, 1 failed (`e2e/demo-flow.spec.ts`, step "the engineer imports Case Two") and 6 did not run; see
+`test.only`, and the report and traces are uploaded when the job fails. **That job has run on GitHub** (run 41495498658: all 342 tests
+passed, including the Case Two step of `e2e/demo-flow.spec.ts` that failed in run 41182982903; see
 [CI_CD.md](CI_CD.md#9-what-was-and-was-not-validated)); the CI path of the suite (Chromium, `dist` API, `.next`) was not exercised
 locally.
 
@@ -236,8 +236,9 @@ Stop what you started: a run that is killed can leave the API and the web server
 - **Azure.** Nothing ran against Azure, Azure OpenAI, Azure Database for PostgreSQL, Key Vault or any other service; storage is a
   local folder, the database is in-memory PGlite, the AI provider is the deterministic offline engine. The answers are what the
   engine computes; they say nothing about a language model.
-- **Accuracy of the analysis.** There are two synthetic cases and no human-labelled ground truth; every score is an estimate
-  ([EVALUATION.md](EVALUATION.md#7-limits-of-this-evaluation)). The suite checks that the product shows the engine's numbers and
+- **Accuracy of the analysis.** There are two synthetic cases written with the engine, a small independent set of 16 synthetic
+  cases with one annotator, and no real data; every score is an estimate
+  ([EVALUATION.md](EVALUATION.md#8-limits-of-this-evaluation)). The suite checks that the product shows the engine's numbers and
   labels them as estimates, not that they are right.
 - **Other browsers and devices.** Chromium only (Microsoft Edge here); the phone layout is an emulated 390x844 viewport.
 - **Scale and load.** One user at a time on one machine. [PERFORMANCE.md](PERFORMANCE.md) says what the benchmarks do and do not measure.
