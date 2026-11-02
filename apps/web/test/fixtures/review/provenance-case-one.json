@@ -1,0 +1,99 @@
+{
+  "caseId": "case_00000000000000000000000002",
+  "asOf": null,
+  "items": [
+    {
+      "link": {
+        "type": "claim",
+        "id": "clm_3abfa6d712cd5f44c6eb2a93",
+        "label": "Root cause is the Conditional Access policy 'Require MFA for Teams', which forces interactive MFA that Teams desktop cannot complete reliably."
+      },
+      "title": "Root cause is the Conditional Access policy 'Require MFA for Teams', which forces interactive MFA that Teams desktop cannot complete reliably.",
+      "at": "2026-03-09T12:10:00Z",
+      "event": {
+        "id": "e07",
+        "title": "Findings from sign-in logs",
+        "type": "case_note",
+        "participantRole": "support_engineer",
+        "timestamp": "2026-03-09T12:10:00Z"
+      },
+      "source": {
+        "eventId": "e07",
+        "sourceId": "src_00000000000000000000000003",
+        "field": "body",
+        "start": 105,
+        "end": 118,
+        "excerpt": "…ed by Conditional Access) for the affected users. Root cause is the Conditional Access policy 'Require MFA for Teams', which forces i…",
+        "verification": "verified",
+        "contentHash": "65066b12c9db48b68db927e6b35c77876d4f7fc39a90ee7ae0625f214376b4f1",
+        "context": {
+          "before": "Findings: the sign-in logs show AADSTS50076 (MFA required by Conditional Access) for the affected users. ",
+          "match": "Root cause is",
+          "after": " the Conditional Access policy 'Require MFA for Teams', which forces interactive MFA that Teams desktop cannot complete reliably. Confirmed. Next: ask the customer to exclude the affected users from that policy and revoke their sessions."
+        }
+      }
+    },
+    {
+      "link": {
+        "type": "claim",
+        "id": "clm_d3fec9cf5731dce623095ea0",
+        "label": "Based on the sign-in logs the Conditional Access policy 'Require MFA for Teams' is the cause."
+      },
+      "title": "Based on the sign-in logs the Conditional Access policy 'Require MFA for Teams' is the cause.",
+      "at": "2026-03-09T12:25:00Z",
+      "event": {
+        "id": "e08",
+        "title": "Proposed change: exclude affected users from the MFA policy",
+        "type": "engineer_email",
+        "participantRole": "support_engineer",
+        "timestamp": "2026-03-09T12:25:00Z"
+      },
+      "source": {
+        "eventId": "e08",
+        "sourceId": "src_00000000000000000000000003",
+        "field": "body",
+        "start": 88,
+        "end": 100,
+        "excerpt": "…Conditional Access policy 'Require MFA for Teams' is the cause. Please temporarily exclude the affected users (all 140) from that po…",
+        "verification": "verified",
+        "contentHash": "65066b12c9db48b68db927e6b35c77876d4f7fc39a90ee7ae0625f214376b4f1",
+        "context": {
+          "before": "Hello,\n\nBased on the sign-in logs the Conditional Access policy 'Require MFA for Teams' ",
+          "match": "is the cause",
+          "after": ". Please temporarily exclude the affected users (all 140) from that policy and confirm once done. I will revoke their sessions at the same time so everyone signs in again.\n\nRegards"
+        }
+      }
+    },
+    {
+      "link": { "type": "event", "id": "e07", "label": "Findings from sign-in logs" },
+      "title": "Findings from sign-in logs",
+      "at": "2026-03-09T12:10:00Z",
+      "event": {
+        "id": "e07",
+        "title": "Findings from sign-in logs",
+        "type": "case_note",
+        "participantRole": "support_engineer",
+        "timestamp": "2026-03-09T12:10:00Z"
+      },
+      "source": null
+    },
+    {
+      "link": {
+        "type": "event",
+        "id": "e08",
+        "label": "Proposed change: exclude affected users from the MFA policy"
+      },
+      "title": "Proposed change: exclude affected users from the MFA policy",
+      "at": "2026-03-09T12:25:00Z",
+      "event": {
+        "id": "e08",
+        "title": "Proposed change: exclude affected users from the MFA policy",
+        "type": "engineer_email",
+        "participantRole": "support_engineer",
+        "timestamp": "2026-03-09T12:25:00Z"
+      },
+      "source": null
+    }
+  ],
+  "unresolved": []
+}

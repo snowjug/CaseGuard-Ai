@@ -1,0 +1,157 @@
+{
+  "caseOne": {
+    "caseId": "case_00000000000000000000000002",
+    "matchId": "smt_486c8153f61750354cffaf29",
+    "asOf": "2026-03-12T10:20:00Z",
+    "skill": {
+      "id": "skl_395b6f4ea3abba33c5c45c7d",
+      "versionId": "skv_f53e82ae5918554a1a40b15b",
+      "name": "Isolate a pre-authentication failure before pursuing identity policy",
+      "version": "1.0.0",
+      "lifecycle": "published"
+    },
+    "score": 1,
+    "applicability": "applies",
+    "applied": false,
+    "decisionPoint": {
+      "forkId": "fork_7a45ac8d2e2ff51dfbae5b44",
+      "eventId": "e03",
+      "at": "2026-03-09T09:41:00Z",
+      "title": "Heavy customer request when a lighter ask was available",
+      "summary": "The skill's first step, asking for minimal scoping data, was an available alternative to the heavy request that was made."
+    },
+    "recorded": {
+      "actionKey": "act.request-har-capture",
+      "actionLabel": "Request HAR and Fiddler traces, full user list and Conditional Access export",
+      "followedRecommendedStep": false,
+      "note": "The case asked for HAR and Fiddler traces first. The skill's first step was skipped."
+    },
+    "withSkill": {
+      "steps": [
+        {
+          "stepId": "step-1-request-minimal-scoping",
+          "title": "Ask for minimal scoping data",
+          "instruction": "Ask the customer for the exact client error text or code, three failing sample users with UTC failure times, and which sites or networks are affected.",
+          "actionKey": "act.request-minimal-scoping",
+          "status": "recommended_next",
+          "rationale": "Cheapest first step that unlocks sign-in log correlation.",
+          "actionValue": 1.3319
+        },
+        {
+          "stepId": "step-3-signin-log-correlation",
+          "title": "Correlate failing attempts with Entra sign-in logs",
+          "instruction": "Look up each failing attempt in the sign-in logs. No matching record means the attempt never reached the identity service.",
+          "actionKey": "act.signin-log-correlation",
+          "status": "pending",
+          "rationale": "Separates a pre-authentication failure from an identity-policy failure.",
+          "actionValue": null
+        }
+      ],
+      "cheaperAlternative": {
+        "insteadOfActionKey": "act.request-har-capture",
+        "insteadOfLabel": "Request HAR and Fiddler traces, full user list and Conditional Access export",
+        "useActionKey": "act.request-minimal-scoping",
+        "useLabel": "Ask for minimal scoping data",
+        "rationale": "Comparable information for much less customer effort.",
+        "estimatedCustomerMinutesSaved": 150,
+        "estimated": true
+      }
+    },
+    "comparison": [
+      {
+        "key": "time_to_useful_evidence_minutes",
+        "label": "Time to useful evidence",
+        "unit": "minutes",
+        "recorded": { "low": 120, "mid": 240, "high": 480 },
+        "withSkill": { "low": 0, "mid": 150, "high": 450 },
+        "saved": { "low": 30, "mid": 90, "high": 150 },
+        "basis": "Recorded range minus the skill's own estimated saving (low minus high, mid minus mid, high minus low), never below zero."
+      },
+      {
+        "key": "customer_effort_minutes",
+        "label": "Customer effort",
+        "unit": "minutes",
+        "recorded": { "low": 410, "mid": 410, "high": 410 },
+        "withSkill": { "low": 260, "mid": 320, "high": 380 },
+        "saved": { "low": 30, "mid": 90, "high": 150 },
+        "basis": "Recorded range minus the skill's own estimated saving (low minus high, mid minus mid, high minus low), never below zero."
+      },
+      {
+        "key": "tokens",
+        "label": "Estimated tokens",
+        "unit": "tokens",
+        "recorded": null,
+        "withSkill": null,
+        "saved": { "low": 1000, "mid": 3000, "high": 5000 },
+        "basis": "The analysis has no recorded token figure for this decision point, so there is nothing to subtract the skill's saving from."
+      }
+    ],
+    "evidence": [
+      {
+        "type": "fork",
+        "id": "fork_7a45ac8d2e2ff51dfbae5b44",
+        "label": "Heavy customer request when a lighter ask was available"
+      },
+      {
+        "type": "evidence",
+        "id": "evd_d3340201da14f37674629ae2",
+        "label": "Failures are intermittent"
+      }
+    ],
+    "assumptions": [
+      "The skill's estimated saving applies to this case in the same way it applied to the case it came from.",
+      "The recorded figures are the analysis's own estimates for the step that was taken."
+    ],
+    "limitations": [
+      "This skill was extracted from this case, so the comparison is not independent evidence that the skill works.",
+      "Estimates only: nothing here was measured, and the recorded analysis is unchanged."
+    ],
+    "labels": { "estimated": true, "simulated": true, "recordedAnalysisUnchanged": true }
+  },
+  "caseTwo": {
+    "caseId": "case_00000000000000000000000045",
+    "matchId": "smt_b0fa800a0f4b8bf4760aad4c",
+    "asOf": "2026-04-14T16:10:00Z",
+    "skill": {
+      "id": "skl_395b6f4ea3abba33c5c45c7d",
+      "versionId": "skv_f53e82ae5918554a1a40b15b",
+      "name": "Isolate a pre-authentication failure before pursuing identity policy",
+      "version": "1.0.0",
+      "lifecycle": "published"
+    },
+    "score": 0.754,
+    "applicability": "applies",
+    "applied": true,
+    "decisionPoint": null,
+    "recorded": {
+      "actionKey": null,
+      "actionLabel": null,
+      "followedRecommendedStep": true,
+      "note": "The case already followed the skill's recommended steps (4 of 4). There was no decision point where it would have changed course."
+    },
+    "withSkill": { "steps": [], "cheaperAlternative": null },
+    "comparison": [
+      {
+        "key": "time_to_useful_evidence_minutes",
+        "label": "Time to useful evidence",
+        "unit": "minutes",
+        "recorded": null,
+        "withSkill": null,
+        "saved": { "low": 30, "mid": 90, "high": 150 },
+        "basis": "This case has no decision point where the skill would have changed what was done, so there is no recorded figure to compare."
+      }
+    ],
+    "evidence": [
+      {
+        "type": "evidence",
+        "id": "evd_4f853d05e78b144e8ce2ae9d",
+        "label": "Failures are intermittent"
+      }
+    ],
+    "assumptions": [],
+    "limitations": [
+      "Estimates only: nothing here was measured, and the recorded analysis is unchanged."
+    ],
+    "labels": { "estimated": true, "simulated": true, "recordedAnalysisUnchanged": true }
+  }
+}
