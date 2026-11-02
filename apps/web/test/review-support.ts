@@ -103,6 +103,16 @@ export function reviewApi(options: ReviewApiOptions = {}): FakeApi {
     'actionValue.rank': () => fixture.ranking,
     'actions.list': () => ({ items: fixture.actions }),
     'skillMatches.list': () => ({ items: fixture.matches }),
+    // The samples have no human claim review, so every reviewed-state filter of the ledger is empty.
+    'evidence.list': () => ({
+      items: [],
+      nextCursor: null,
+      total: 0,
+      asOf: null,
+      counts: {},
+      evidence: [],
+      missing: [],
+    }),
     'skillOverlay.get': (input) => {
       const matchId = (input as { params: { matchId: string } }).params.matchId;
       const overlay = overlays[matchId];

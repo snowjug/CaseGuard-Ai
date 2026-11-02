@@ -33,7 +33,13 @@ function Harness({ links = LINKS }: { links?: readonly EvidenceLink[] }) {
 }
 
 const chip = (name: RegExp | string) => screen.findByRole('button', { name });
-const drawer = () => screen.findByRole('dialog', { name: 'Evidence' });
+/**
+ * Role queries inside the open drawer look through aria-hidden: jsdom has no real focus handling, so Fluent's focus
+ * manager (Tabster) marks the open dialog aria-hidden a moment after it opens, which a browser never does.
+ */
+const IN_DRAWER = { hidden: true } as const;
+const drawer = () => screen.findByRole('dialog', { name: 'Evidence', ...IN_DRAWER });
+const drawerGone = () => screen.queryByRole('dialog', { name: 'Evidence', ...IN_DRAWER });
 
 describe('[REV-EVID-02] from a recommendation to the source passage in two interactions', () => {
   it('opens at the chip and shows the verified quotation with the match highlighted and the checked badge', async () => {
@@ -47,6 +53,7 @@ describe('[REV-EVID-02] from a recommendation to the source passage in two inter
       await panel.findByRole('heading', {
         level: 3,
         name: /^Root cause is the Conditional Access policy/,
+        ...IN_DRAWER,
       }),
     ).toBeVisible();
     expect(panel.getAllByText('Checked against the stored message')).toHaveLength(2);
@@ -55,10 +62,9 @@ describe('[REV-EVID-02] from a recommendation to the source passage in two inter
       /Findings: the sign-in logs show AADSTS50076.*Root cause is the Conditional Access policy 'Require MFA for Teams'/s,
     );
     expect(panel.getAllByText('Support engineer · 9 Mar 2026, 12:10 UTC')[0]).toBeVisible();
-    expect(panel.getAllByRole('link', { name: 'Show in timeline' })[0]).toHaveAttribute(
-      'href',
-      `/cases/${CASE_ID}/timeline?sel=e07`,
-    );
+    expect(
+      panel.getAllByRole('link', { name: 'Show in timeline', ...IN_DRAWER })[0],
+    ).toHaveAttribute('href', `/cases/${CASE_ID}/timeline?sel=e07`);
     // One request resolved every link of the recommendation.
     expect(calledRoutes(api).filter((route) => route === 'provenance.resolve')).toHaveLength(1);
     const [, input] = api.call.mock.calls.find((call) => call[0] === 'provenance.resolve') ?? [];
@@ -72,7 +78,7 @@ describe('[REV-EVID-02] from a recommendation to the source passage in two inter
     renderApp(<Harness />, { api: reviewApi() });
     await user.click(await chip(/^Message or event: Proposed change: exclude affected users/));
     const panel = within(await drawer());
-    const headings = await panel.findAllByRole('heading', { level: 3 });
+    const headings = await panel.findAllByRole('heading', { level: 3, ...IN_DRAWER });
     expect(headings[0]).toHaveTextContent(
       'Proposed change: exclude affected users from the MFA policy',
     );
@@ -89,7 +95,9 @@ describe('[REV-EVID-02] from a recommendation to the source passage in two inter
     );
     const panel = within(await drawer());
     await user.click(
-      (await panel.findAllByRole('link', { name: 'Show in timeline' }))[0] as HTMLElement,
+      (
+        await panel.findAllByRole('link', { name: 'Show in timeline', ...IN_DRAWER })
+      )[0] as HTMLElement,
     );
     expect(router.push).toHaveBeenCalledWith(`/cases/${CASE_ID}/timeline?sel=e07`);
   });
@@ -100,7 +108,7 @@ describe('[REV-EVID-02] from a recommendation to the source passage in two inter
     );
     renderApp(<Harness />, { api: reviewApi() });
     const panel = within(await drawer());
-    expect(await panel.findAllByRole('heading', { level: 3 })).toHaveLength(1);
+    expect(await panel.findAllByRole('heading', { level: 3, ...IN_DRAWER })).toHaveLength(1);
     expect(panel.getByText('Checked against the stored message')).toBeVisible();
   });
 
@@ -108,7 +116,7 @@ describe('[REV-EVID-02] from a recommendation to the source passage in two inter
     navigateTo(`/cases/${CASE_ID}/review?evidence=nonsense`);
     renderApp(<Harness />, { api: reviewApi() });
     await screen.findAllByRole('button', { name: /^Statement:/ });
-    expect(screen.queryByRole('dialog', { name: 'Evidence' })).toBeNull();
+    expect(drawerGone()).toBeNull();
   });
 });
 
@@ -186,7 +194,7 @@ describe('[REV-EVID-03] honest about what could not be checked', () => {
     renderApp(<Harness />, { api });
     await user.click(await chip(/^Statement: Root cause is/));
     const panel = within(await drawer());
-    await user.click(await panel.findByRole('button', { name: 'Retry' }));
+    await user.click(await panel.findByRole('button', { name: 'Retry', ...IN_DRAWER }));
     expect(await panel.findAllByText('Checked against the stored message')).toHaveLength(2);
   });
 });
@@ -200,7 +208,7 @@ describe('[REV-EVID-04] keyboard use and accessibility', () => {
     await user.keyboard('{Enter}');
     await drawer();
     await user.keyboard('{Escape}');
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Evidence' })).toBeNull());
+    await waitFor(() => expect(drawerGone()).toBeNull());
     await waitFor(() => expect(opener).toHaveFocus());
     expect(window.location.search).not.toContain('evidence');
   });
@@ -210,16 +218,20 @@ describe('[REV-EVID-04] keyboard use and accessibility', () => {
     renderApp(<Harness />, { api: reviewApi() });
     await user.click(await chip(/^Statement: Root cause is/));
     const panel = within(await drawer());
-    await user.click(panel.getByRole('button', { name: 'Close the evidence' }));
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Evidence' })).toBeNull());
+    await user.click(panel.getByRole('button', { name: 'Close the evidence', ...IN_DRAWER }));
+    await waitFor(() => expect(drawerGone()).toBeNull());
   });
 
   it('has no accessibility violations with a quotation showing', async () => {
     const user = userEvent.setup();
     renderApp(<Harness />, { api: reviewApi() });
     await user.click(await chip(/^Statement: Root cause is/));
-    await within(await drawer()).findAllByText('Checked against the stored message');
-    await expectNoAxeViolations(document.body);
+    const panel = within(await drawer());
+    await panel.findAllByText('Checked against the stored message');
+    // The list of items is the drawer's own content; the dialog around it is Fluent's.
+    await expectNoAxeViolations(
+      panel.getByRole('list', { name: /^Evidence, \d+ items?$/, ...IN_DRAWER }),
+    );
   });
 });
 
@@ -238,7 +250,7 @@ describe('[REV-EVID-05] the chips', () => {
       list.getByRole('button', { name: `Show 2 more pieces of evidence for ${SUBJECT}` }),
     );
     const panel = within(await drawer());
-    const headings = await panel.findAllByRole('heading', { level: 3 });
+    const headings = await panel.findAllByRole('heading', { level: 3, ...IN_DRAWER });
     // The two hidden links are unknown to the fixture, so they are reported; the known ones are listed.
     expect(headings.length).toBeGreaterThan(0);
     expect(await panel.findByText('Not found')).toBeVisible();

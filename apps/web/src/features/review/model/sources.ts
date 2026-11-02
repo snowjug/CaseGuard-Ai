@@ -1,4 +1,4 @@
-import type { Permission } from '@caseguard/schemas';
+import type { Permission, ReviewState, TimelineEvent } from '@caseguard/schemas';
 
 /**
  * What one read of the guided review is, from the point of view of the part of the page that shows it. A part never
@@ -48,4 +48,22 @@ export function missingPermissions(sources: readonly Source<unknown>[]): Permiss
   const missing = new Set<Permission>();
   for (const source of sources) if (source.kind === 'denied') missing.add(source.permission);
   return [...missing];
+}
+
+/** The whole timeline of a case as the review reads it. */
+export interface TimelineBundle {
+  events: TimelineEvent[];
+  total: number;
+  /** True when the case has more events than were read. */
+  truncated: boolean;
+}
+
+/** What a person decided about one claim: who, when and why. Claims nobody reviewed are not listed. */
+export interface ClaimReviewRecord {
+  id: string;
+  text: string;
+  state: Exclude<ReviewState, 'pending'>;
+  by: string | null;
+  at: string | null;
+  reason: string | null;
 }
