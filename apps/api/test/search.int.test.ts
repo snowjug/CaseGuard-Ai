@@ -627,8 +627,11 @@ describe('[FR-UX-04] global search: the indexes behind it', () => {
   ];
 
   it('every searched table has a GIN index on its search vector (warnings: open ones only)', async () => {
+    // pg_indexes is database-wide and each test file migrates a private schema of its own on a real server, so the same
+    // six names come back once per schema in use. Besides being redundant, evaluating the definition of an index in
+    // another file's schema fails (XX000 relation_open) when that file drops its schema at that moment.
     const result = await h.database.query<{ indexname: string; indexdef: string }>(
-      "SELECT indexname, indexdef FROM pg_indexes WHERE indexname LIKE '%\\_search\\_idx'",
+      "SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = current_schema() AND indexname LIKE '%\\_search\\_idx'",
     );
     const defs = new Map(result.rows.map((row) => [row.indexname, row.indexdef]));
     for (const [table, index] of INDEXES) {
@@ -692,7 +695,7 @@ describe('[FR-UX-04] global search: the indexes behind it', () => {
       expect(plan).toContain(`Bitmap Index Scan on ${index}`);
       // The rollback left the schema as it was.
       const left = await h.database.query<{ n: number }>(
-        'SELECT count(*)::int AS n FROM pg_indexes WHERE tablename = $1',
+        'SELECT count(*)::int AS n FROM pg_indexes WHERE schemaname = current_schema() AND tablename = $1',
         [table],
       );
       expect(left.rows[0]?.n).toBeGreaterThan(1);

@@ -91,10 +91,13 @@ const minus = (recorded: Range, saved: Range): Range => ({
   high: round1(Math.max(0, recorded.high - saved.low)),
 });
 
-/** Every table of the database as a row count and a digest of its rows: what a read must leave as it was. */
+/**
+ * Every table of the database as a row count and a digest of its rows: what a read must leave as it was. On a real
+ * server each test file migrates a private schema of its own, so the tables are the ones of the current schema.
+ */
 async function databaseDigest(): Promise<Record<string, string>> {
   const tables = await h.infra.database.query<{ tablename: string }>(
-    `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`,
+    `SELECT tablename FROM pg_tables WHERE schemaname = current_schema() ORDER BY tablename`,
   );
   const digest: Record<string, string> = {};
   for (const { tablename } of tables.rows) {
