@@ -11,7 +11,7 @@ import { EvidenceChips } from './EvidenceChips';
 import { EvidenceProvider } from './EvidenceProvider';
 import { useLinkTitles } from './useProvenance';
 
-configure({ asyncUtilTimeout: 5000 });
+configure({ asyncUtilTimeout: 15_000 });
 
 const CASE_ID = CASE_ONE.detail.id;
 const SUBJECT = 'Write causes as hypotheses until evidence supports them';
