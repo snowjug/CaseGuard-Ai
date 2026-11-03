@@ -1,0 +1,32 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-v-011-new-proxy-next-month",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T23:10:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [],
+      "actions": [],
+      "absent": [
+        { "event": "ev01", "id": "sig.recent-network-change-reported", "reason": "future_intent", "note": "a proxy replacement planned for next month" },
+        { "event": "ev02", "id": "act.bypass-proxy-inspection", "reason": "future_intent", "note": "advice for the planned proxy, not a step taken for a fault" },
+        { "event": "ev03", "id": "sig.recent-network-change-reported", "reason": "future_intent", "note": "a test-group rollout that has not been scheduled" },
+        { "event": "ev04", "id": "sig.error-timeout", "reason": "conditional", "note": "if sign-in time-outs show up after the rollout" },
+        { "event": "ev04", "id": "act.proxy-node-comparison", "reason": "conditional", "note": "only if time-outs show up, and no output is wanted now" }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": null,
+      "causes": [],
+      "rationale": "Preparation for a planned proxy replacement. The change has not happened, the exemption is advice for it, and a time-out test is a conditional suggestion for later, so every phrase that sounds like a signal or an action is planned or conditional and none of it is a fact of this case. Nothing is broken.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

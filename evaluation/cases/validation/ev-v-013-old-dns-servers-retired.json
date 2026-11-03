@@ -1,0 +1,69 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-v-013-old-dns-servers-retired",
+  "split": "validation",
+  "family": "fam-113",
+  "title": "Which names must the new DNS servers resolve for Teams",
+  "scenario": "An infrastructure engineer plans to switch off two DNS servers on a Saturday and asks which names matter; the switch, a name check and a Monday report are all planned or conditional, and nothing is broken.",
+  "categories": ["negative-control"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-09-10T08:30:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Which names must the new DNS servers resolve",
+      "text": "Good morning. Next Saturday we are switching off our two old DNS servers and the DHCP scopes will point to two new servers from then on. Nothing is broken today. Which names does Teams need to resolve, so that we can test the new servers before Saturday? Bram, infrastructure"
+    },
+    {
+      "key": "ev02",
+      "at": 25,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Which names must the new DNS servers resolve",
+      "text": "Good morning Bram. The core names are login.microsoftonline.com, teams.microsoft.com and the CDN names in Microsoft's endpoint list, which is published, and I will send you the link. Please check the names yourselves after the new servers are up. If a name fails, the Teams client typically shows the code caa82ee7, and then I need the output."
+    },
+    {
+      "key": "ev03",
+      "at": 70,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Which names must the new DNS servers resolve",
+      "text": "OK. One more thing: the old servers carry a filter for some websites and the new ones have none. Is that a problem for Teams?"
+    },
+    {
+      "key": "ev04",
+      "at": 85,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Which names must the new DNS servers resolve",
+      "text": "A filter is not a problem for Teams as long as it does not block the Microsoft names. As the new servers have no filter, nothing has to be exempted."
+    },
+    {
+      "key": "ev05",
+      "at": 140,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Which names must the new DNS servers resolve",
+      "text": "Great. We will start on Saturday at 06:00 UTC. I will write on Monday if anything is wrong."
+    },
+    {
+      "key": "ev06",
+      "at": 150,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Which names must the new DNS servers resolve",
+      "text": "Thank you, Bram. I will close the case and watch for your message on Monday."
+    }
+  ]
+}

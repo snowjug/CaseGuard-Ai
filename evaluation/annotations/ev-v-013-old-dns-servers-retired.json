@@ -1,0 +1,31 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-v-013-old-dns-servers-retired",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T23:30:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [],
+      "actions": [],
+      "absent": [
+        { "event": "ev01", "id": "sig.recent-network-change-reported", "reason": "future_intent", "note": "a switch of the DNS servers planned for next Saturday" },
+        { "event": "ev02", "id": "act.dns-resolver-comparison", "reason": "conditional", "note": "the customer checks the names after the switch, and output is wanted only if a name fails" },
+        { "event": "ev02", "id": "sig.error-name-not-resolved", "reason": "conditional", "note": "the code would show only if a name fails after the switch" },
+        { "event": "ev05", "id": "sig.recent-network-change-reported", "reason": "future_intent", "note": "the switch starts on Saturday" }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": null,
+      "causes": [],
+      "rationale": "Preparation for a planned switch of the DNS servers. The change has not happened and the name check is the customer's own and conditional, so every phrase that sounds like a signal or an action is planned or conditional and no fact of a fault exists.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

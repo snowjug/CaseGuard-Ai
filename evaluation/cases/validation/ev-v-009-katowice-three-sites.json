@@ -1,0 +1,330 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-v-009-katowice-three-sites",
+  "split": "validation",
+  "family": "fam-109",
+  "title": "Teams sign-in fails for lots of people in Silesia",
+  "scenario": "A long case in which the customer first believes that all sites are affected and that a policy was changed, which is later corrected; the engineer tries two policy detours before the per-site pattern points to one DNS resolver, and a static setting on two laptops brings the problem back.",
+  "categories": ["noisy", "contradiction"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-09-01T08:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams sign-in problem for lots of people",
+      "text": "Hello, Teams sign-in fails for a lot of people since yesterday evening. I think all our sites are affected, around 200 people. The message is 'Teams cannot connect' with the code caa82ee7.\n\nDariusz Wrona | Network & Systems | Silesia Packaging Example\nPlease consider the environment before printing this e-mail."
+    },
+    {
+      "key": "ev02",
+      "at": 12,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "Hello Dariusz, thank you. I need three names of affected people with a UTC moment for each, the sites without trouble and the sites with trouble, and a list of what was changed in identity, network, DNS or proxy configuration over the last two days."
+    },
+    {
+      "key": "ev03",
+      "at": 70,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "Names and moments: w.kowal Mon 21:05 UTC, e.zajac Mon 21:40 UTC, b.sikora Tue 06:50 UTC. All sites fail as far as I know. Changes: on Monday at 16:00 UTC we changed the MFA rule in Conditional Access. Nothing in DNS or proxy that I am aware of."
+    },
+    {
+      "key": "ev04",
+      "at": 90,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Log search",
+      "text": "Sign-in logs for w.kowal Mon 21:05, e.zajac Mon 21:40 and b.sikora Tue 06:50 UTC: none of the three attempts has a failed row."
+    },
+    {
+      "key": "ev05",
+      "at": 95,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Provider status",
+      "text": "Provider status at 09:35 UTC: Teams and Entra ID show no open incident."
+    },
+    {
+      "key": "ev06",
+      "at": 120,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "Our CIO says he read on social media that Microsoft has an outage today. I have not verified that."
+    },
+    {
+      "key": "ev07",
+      "at": 130,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Provider status, second look",
+      "text": "Provider status, second look at 10:10 UTC: still no open incident for Teams and Entra ID."
+    },
+    {
+      "key": "ev08",
+      "at": 140,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "Dariusz, thank you. As a first test, please exclude w.kowal, e.zajac and b.sikora from the MFA policy you changed on Monday, and tell me the time."
+    },
+    {
+      "key": "ev09",
+      "at": 180,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams does not sign in",
+      "text": "Hi, I work in Gliwice and Teams will not let me in since last night, it shows caa82ee7."
+    },
+    {
+      "key": "ev10",
+      "at": 200,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "The three users were excluded at 10:40 UTC and still fail with caa82ee7."
+    },
+    {
+      "key": "ev11",
+      "at": 215,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "Thank you. Next, please revoke the sessions of those same three users, let them log in again, and give me the time."
+    },
+    {
+      "key": "ev12",
+      "at": 300,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "Sessions revoked at 12:05 UTC. The three tried again and failed again, no change."
+    },
+    {
+      "key": "ev13",
+      "at": 330,
+      "who": "customer",
+      "type": "customer_call",
+      "channel": "phone",
+      "title": "Call from Dariusz Wrona",
+      "text": "Call note, 13:30 UTC: Dariusz phoned, management is asking. He said the number is now about 260 people and that Zabrze 'seems fine', which he heard from the Zabrze manager and has not checked."
+    },
+    {
+      "key": "ev14",
+      "at": 345,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "Dariusz, thank you for calling. Please send me a list of your sites with the number of people failing at each, and the DNS servers that each site receives by DHCP."
+    },
+    {
+      "key": "ev15",
+      "at": 420,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "Katowice 150 people fail, Gliwice 110, Zabrze none. Katowice and Gliwice receive 10.60.0.2, 10.60.0.3 and 10.60.0.4 by DHCP, Zabrze receives 10.61.0.2 and 10.61.0.3."
+    },
+    {
+      "key": "ev16",
+      "at": 440,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "Thanks. Katowice and Gliwice share three resolvers and Zabrze does not, so please let your network admin query statics.teams.cdn.office.net and login.microsoftonline.com on every one of those servers with Resolve-DnsName, from a Katowice machine. A reinstall of Teams is not needed for any of this."
+    },
+    {
+      "key": "ev17",
+      "at": 520,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "From a Katowice machine at 16:25 UTC. 10.60.0.2: both names answered. 10.60.0.3: both names answered. 10.60.0.4: login.microsoftonline.com answered, statics.teams.cdn.office.net returned NXDOMAIN in 5 of 10 queries."
+    },
+    {
+      "key": "ev18",
+      "at": 535,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "About the Conditional Access change I wrote about: I was wrong, that change was made in our test tenant, not in production. Sorry for the confusion."
+    },
+    {
+      "key": "ev19",
+      "at": 550,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "No problem, thank you for saying so. Please take 10.60.0.4 out of the DHCP scope of Katowice for now and tell me the time, and let somebody measure a sign-in request through every proxy node from Katowice to rule the proxy out."
+    },
+    {
+      "key": "ev20",
+      "at": 650,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "10.60.0.4 was removed from the Katowice scope at 17:40 UTC. Proxy test from Katowice at 18:00 UTC: the three nodes answered within 0.7 s, five of five tries each."
+    },
+    {
+      "key": "ev21",
+      "at": 700,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "Update 19:40 UTC: Katowice works for most people since about 17:50 UTC. Gliwice still has many people failing."
+    },
+    {
+      "key": "ev22",
+      "at": 710,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "Thank you. Gliwice receives the same three servers, so please remove 10.60.0.4 from the Gliwice scope as well and tell me the time."
+    },
+    {
+      "key": "ev23",
+      "at": 730,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "10.60.0.4 was removed from the Gliwice scope at 20:00 UTC."
+    },
+    {
+      "key": "ev24",
+      "at": 1420,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "Wednesday 07:40 UTC: Katowice and Gliwice both report no problems since last evening."
+    },
+    {
+      "key": "ev25",
+      "at": 1440,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "Good. Pulling the resolver out is a stop-gap. The lasting fix is to repair the filtering rule that makes it fail on the Microsoft CDN names: the rule needs an allowance for the endpoints Microsoft publishes for Microsoft 365, and the change should follow your usual change process. Please tell me when it is planned."
+    },
+    {
+      "key": "ev26",
+      "at": 1500,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "The security team says the filtering vendor needs until Friday to correct the rule.\n\nDariusz Wrona | Network & Systems | Silesia Packaging Example\nPlease consider the environment before printing this e-mail."
+    },
+    {
+      "key": "ev27",
+      "at": 1510,
+      "who": "engineer",
+      "type": "case_note",
+      "channel": "internal",
+      "title": "Internal note",
+      "text": "Internal note: stable on the workaround, next check on Friday after the vendor's change."
+    },
+    {
+      "key": "ev28",
+      "at": 1950,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "Wednesday 16:30 UTC: two people in Gliwice have the error again, caa82ee7."
+    },
+    {
+      "key": "ev29",
+      "at": 2000,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "Found it: both laptops have 10.60.0.4 typed in as a static DNS server, so they ignore DHCP. I set both to automatic at 17:10 UTC."
+    },
+    {
+      "key": "ev30",
+      "at": 2010,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "Both users sign in now."
+    },
+    {
+      "key": "ev31",
+      "at": 4440,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "Friday 10:00 UTC: the filtering vendor corrected the rule at 09:15 UTC and added an allowance for the Microsoft 365 hosts, and we put 10.60.0.4 back into the scopes at 09:45 UTC."
+    },
+    {
+      "key": "ev32",
+      "at": 4480,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem for lots of people",
+      "text": "Comparison from Katowice at 10:30 UTC after the correction: all three servers answer both names in 10 of 10 queries each."
+    },
+    {
+      "key": "ev33",
+      "at": 4500,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Numbers before and after",
+      "text": "Teams sign-in tickets per day at the helpdesk: Tuesday 183, Wednesday 7, Thursday 0, and 0 on Friday until 11:00 UTC. At 10:55 UTC I let three sampled users sign in, and none of them got an error."
+    },
+    {
+      "key": "ev34",
+      "at": 4510,
+      "who": "engineer",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Resolution note",
+      "text": "Resolution: workaround on Tuesday at 17:40 UTC (Katowice) and 20:00 UTC (Gliwice), permanent fix on Friday at 09:15 UTC; both are written up as separate items for the customer. Closing the case."
+    },
+    {
+      "key": "ev35",
+      "at": 4520,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Closing summary",
+      "text": "Dariusz, closing summary: the failures came from one resolver in the Katowice and Gliwice scopes. Workaround Tuesday, permanent fix Friday 09:15 UTC. Two laptops with a typed-in DNS server returned on Wednesday and were set to automatic. Should anything return, just answer on this case."
+    }
+  ]
+}

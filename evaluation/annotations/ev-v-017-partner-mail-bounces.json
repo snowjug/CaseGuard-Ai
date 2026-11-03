@@ -1,0 +1,18 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-v-017-partner-mail-bounces",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T00:45:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [],
+      "rationale": "A mail-flow case with a broken sender-check record. It speaks of DNS and of sign-in in passing, but the workload has no knowledge pack, so nothing in it is a signal of the vocabulary and the engine has to refuse the case.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

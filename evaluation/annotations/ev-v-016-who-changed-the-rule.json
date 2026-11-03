@@ -1,0 +1,50 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-v-016-who-changed-the-rule",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T00:30:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.error-name-not-resolved" },
+        { "event": "ev01", "id": "sig.recent-network-change-reported", "uncertainty": "low", "note": "relayed from the security team; the time is disputed later" },
+        { "event": "ev03", "id": "sig.site-correlated" },
+        { "event": "ev03", "id": "sig.recent-network-change-reported" },
+        { "event": "ev04", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev05", "id": "sig.recent-network-change-reported", "uncertainty": "low", "note": "from the audit export" },
+        { "event": "ev07", "id": "sig.resolver-inconsistent" },
+        { "event": "ev07", "id": "sig.error-name-not-resolved", "note": "non-existent domain" },
+        { "event": "ev09", "id": "sig.dns-fix-resolved" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes", "uncertainty": "medium", "note": "asks for the exact time of the filtering change" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev06", "id": "act.dns-resolver-comparison" },
+        { "event": "ev08", "id": "act.remove-resolver-from-service" },
+        { "event": "ev10", "id": "act.communicate-status" },
+        { "event": "ev12", "id": "act.restore-dns-policy" },
+        { "event": "ev12", "id": "act.communicate-status" }
+      ],
+      "absent": [],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [
+        { "class": "source_disagreement", "events": ["ev01", "ev03"], "subject": "time of the filtering change", "note": "the security team says Monday night, the network admin says Tuesday 06:30 UTC" },
+        { "class": "source_disagreement", "events": ["ev03", "ev05"], "subject": "time of the filtering change", "note": "the admin says Tuesday 06:30 UTC, the audit export says created Monday 22:10 and enabled Tuesday 05:55 UTC" },
+        { "class": "unresolved_conflict", "events": ["ev05", "ev09"], "subject": "whether the rule was active on Monday", "note": "the export says disabled until Tuesday, the security team says active since Monday; the log is not kept, so it is never settled" }
+      ],
+      "qualityBand": "strong",
+      "causes": ["hyp.dns-resolution"],
+      "rationale": "A name-resolution story with three accounts of one change. The security team says Monday night, the network admin says Tuesday at 06:30 UTC, and the audit export shows a rule created on Monday in a disabled state and enabled on Tuesday at 05:55 UTC. Whether the rule was active on Monday is never settled because the enforcement log is not kept. The engineer states what the export shows and what cannot be told, finds the failing resolver by comparison, takes it out and asks for the same permanent fix whatever the history.",
+      "uncertainty": "medium"
+    }
+  ],
+  "adjudication": null
+}

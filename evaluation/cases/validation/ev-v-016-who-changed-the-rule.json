@@ -1,0 +1,123 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-v-016-who-changed-the-rule",
+  "split": "validation",
+  "family": "fam-116",
+  "title": "Teams cannot connect in the Vilnius office since Tuesday",
+  "scenario": "The security team and the network team name different times for a filtering change, the audit export shows a third picture, and whether the rule was active on Monday is never settled; the resolver that fails is found and taken out regardless.",
+  "categories": ["contradiction"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-09-17T08:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams cannot connect, Vilnius",
+      "text": "Hello, Teams cannot connect in our Vilnius office since Tuesday morning, around 70 people, the client shows caa82ee7. The security team told me that they rolled out a new DNS filtering rule on Monday night. Agne"
+    },
+    {
+      "key": "ev02",
+      "at": 15,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Vilnius",
+      "text": "Hello Agne, thanks. Please name three affected people with one UTC moment each, tell me which offices work, and ask your network team for the exact time of the filtering change."
+    },
+    {
+      "key": "ev03",
+      "at": 60,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Vilnius",
+      "text": "Names and moments: s.petraitis Tue 07:10 UTC, l.kazlauskiene Tue 07:30 UTC, d.stankus Tue 08:15 UTC. The Kaunas office works, Vilnius does not. The filtering change on the resolvers was made on Tuesday at 06:30 UTC, I did it myself. The security team is mistaken about Monday."
+    },
+    {
+      "key": "ev04",
+      "at": 80,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Log search",
+      "text": "Sign-in logs for s.petraitis Tue 07:10, l.kazlauskiene Tue 07:30 and d.stankus Tue 08:15 UTC: no failed row exists for any of the three."
+    },
+    {
+      "key": "ev05",
+      "at": 100,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Audit export of the filtering appliance",
+      "text": "The audit export of the filtering appliance that you sent shows the rule 'Block uncategorised' created on Monday at 22:10 UTC in state disabled, and set to enabled on Tuesday at 05:55 UTC."
+    },
+    {
+      "key": "ev06",
+      "at": 115,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Vilnius",
+      "text": "Thank you. Could your network admin query login.microsoftonline.com and a few of the Microsoft CDN hostnames on each resolver of the Vilnius scopes, from a Vilnius machine, and send me the answers?"
+    },
+    {
+      "key": "ev07",
+      "at": 190,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Vilnius",
+      "text": "From a Vilnius machine at 10:50 UTC. Resolver A: all names answered. Resolver B: login.microsoftonline.com answered, the CDN names failed with 'non-existent domain' in 7 of 10 queries. Resolver C: all names answered."
+    },
+    {
+      "key": "ev08",
+      "at": 205,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Vilnius",
+      "text": "Thanks. Please take resolver B out of the Vilnius DHCP scopes for now and tell me the time."
+    },
+    {
+      "key": "ev09",
+      "at": 290,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Vilnius",
+      "text": "Resolver B was removed at 12:20 UTC and Vilnius works for the people I asked. But the security team insists that the rule cannot be the cause: it was active since Monday night and Vilnius still worked on Monday."
+    },
+    {
+      "key": "ev10",
+      "at": 305,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Vilnius",
+      "text": "I cannot tell from here whether the rule was active on Monday: the export shows it disabled until Tuesday 05:55 UTC, your security team says it was active. Please ask them to check the enforcement log for Monday. The workaround stays in place meanwhile."
+    },
+    {
+      "key": "ev11",
+      "at": 400,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Vilnius",
+      "text": "The enforcement log of the appliance is not kept for Monday, so nobody can say. We will correct the rule on Friday and I will tell you."
+    },
+    {
+      "key": "ev12",
+      "at": 410,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Vilnius",
+      "text": "Understood. The lasting fix is the same in both cases: repair the filtering rule so that it allows the hosts Microsoft publishes for Microsoft 365, through your usual change process. Tell me when that is done and I will check the numbers."
+    }
+  ]
+}

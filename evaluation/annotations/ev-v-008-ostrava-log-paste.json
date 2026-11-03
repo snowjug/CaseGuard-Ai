@@ -1,0 +1,50 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-v-008-ostrava-log-paste",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T22:10:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.error-name-not-resolved" },
+        { "event": "ev01", "id": "sig.site-correlated" },
+        { "event": "ev01", "id": "sig.web-client-also-fails", "uncertainty": "medium", "note": "the pasted browser console shows the same name errors" },
+        { "event": "ev03", "id": "sig.ca-config-unchanged" },
+        { "event": "ev03", "id": "sig.recent-network-change-reported", "note": "a firewall firmware update the night before" },
+        { "event": "ev04", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev05", "id": "sig.policy-events-outside-failure-window" },
+        { "event": "ev07", "id": "sig.resolver-inconsistent" },
+        { "event": "ev07", "id": "sig.error-name-not-resolved", "note": "DNS name does not exist" },
+        { "event": "ev09", "id": "sig.dns-fix-resolved" },
+        { "event": "ev11", "id": "sig.resolvers-consistent" },
+        { "event": "ev11", "id": "sig.dns-fix-resolved", "uncertainty": "low", "note": "before and after counts" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.review-ca-policy-config", "uncertainty": "low", "note": "an audit log query for policy changes" },
+        { "event": "ev06", "id": "act.dns-resolver-comparison" },
+        { "event": "ev08", "id": "act.remove-resolver-from-service" },
+        { "event": "ev08", "id": "act.communicate-status", "uncertainty": "low" },
+        { "event": "ev11", "id": "act.validate-fix" },
+        { "event": "ev12", "id": "act.communicate-status" }
+      ],
+      "absent": [],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.dns-resolution"],
+      "rationale": "A name-resolution story inside a paste of unrelated log lines: print and update messages, a VPN note and the browser console. The relevant parts are the name-resolution errors in the client and the console, the other site that works, and the firewall update the night before. Correlation finds no failure row, the audit query has no row inside the failure window, and the per-server test finds the one resolver that fails. The workaround, the correction and the validation follow.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

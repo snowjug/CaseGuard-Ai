@@ -1,0 +1,69 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-v-011-new-proxy-next-month",
+  "split": "validation",
+  "family": "fam-111",
+  "title": "What must we exempt on the new proxy for Teams",
+  "scenario": "A network team asks how to prepare a planned proxy replacement with encrypted-traffic inspection; the change, the advice to exempt endpoints and a possible later time-out test are all planned or conditional, and nothing is broken.",
+  "categories": ["negative-control"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-09-08T09:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "What must we exempt on the new proxy",
+      "text": "Hello support. We plan to replace our proxy with a new product next month, including inspection of encrypted traffic. Nothing is wrong at the moment, Teams works well everywhere. My question is what we must exempt for Microsoft 365 so that Teams keeps working. Henrik, network team"
+    },
+    {
+      "key": "ev02",
+      "at": 25,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: What must we exempt on the new proxy",
+      "text": "Hello Henrik, good that you ask before the change. Microsoft publishes the list of endpoints for Microsoft 365 with categories and ports, and the sign-in and media endpoints should not be inspected. I will send you the link and a checklist."
+    },
+    {
+      "key": "ev03",
+      "at": 70,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: What must we exempt on the new proxy",
+      "text": "Thanks. We will deploy it on a test group first. Is there something we should check after the rollout? We have not decided on the date yet."
+    },
+    {
+      "key": "ev04",
+      "at": 90,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: What must we exempt on the new proxy",
+      "text": "If sign-in time-outs appear at one site after the rollout, time a sign-in request through every proxy node and compare the results. Until then nothing is needed from you, and I do not need any output."
+    },
+    {
+      "key": "ev05",
+      "at": 150,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: What must we exempt on the new proxy",
+      "text": "Understood. The change board meets next week and I will tell you the date."
+    },
+    {
+      "key": "ev06",
+      "at": 160,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: What must we exempt on the new proxy",
+      "text": "Thank you Henrik. The case stays open for two weeks on my side and I close it if I hear nothing."
+    }
+  ]
+}

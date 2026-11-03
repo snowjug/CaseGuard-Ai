@@ -1,0 +1,47 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-v-018-two-dsregcmd-outputs",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T01:10:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.prt-healthy" },
+        { "event": "ev03", "id": "sig.prt-missing" },
+        { "event": "ev04", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev08", "id": "sig.prt-healthy" },
+        { "event": "ev10", "id": "sig.cache-clear-resolved" },
+        { "event": "ev11", "id": "sig.cache-clear-resolved" },
+        { "event": "ev13", "id": "sig.cache-clear-resolved" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.device-registration-check" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev07", "id": "act.device-registration-check", "note": "asks to run it again in a normal prompt" },
+        { "event": "ev09", "id": "act.clear-teams-cache" },
+        { "event": "ev12", "id": "act.clear-teams-cache" },
+        { "event": "ev14", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        { "event": "ev01", "id": "sig.web-client-also-fails", "reason": "negated", "note": "Teams in the browser works fine" },
+        { "event": "ev06", "id": "sig.prt-missing", "reason": "corrected", "note": "the NO values came from an elevated admin session, not from the users' sessions" }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [
+        { "class": "direct_contradiction", "events": ["ev01", "ev03"], "subject": "AzureAdPrt state of k.horvat's laptop", "note": "YES in one output, NO in another" },
+        { "class": "corrected_information", "events": ["ev03", "ev06"], "subject": "AzureAdPrt state of k.horvat's laptop", "note": "the NO values were from an elevated admin session and are withdrawn" }
+      ],
+      "qualityBand": "strong",
+      "causes": ["hyp.client-cache"],
+      "rationale": "Two opposite device outputs for the same laptop. The first, run in the user's session, says the token is there; the second, from an elevated admin session, says it is missing, and the administrator withdraws it. After a normal-prompt run both laptops show a healthy token, the browser works, the log rows show silent sign-in requests without a user, and clearing the cache on each laptop fixes the morning prompt. The engineer notices the disagreement and asks the right question.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

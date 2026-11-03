@@ -1,0 +1,69 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-v-010-webinar-licence-question",
+  "split": "validation",
+  "family": "fam-110",
+  "title": "Which licence do we need for webinars in Teams",
+  "scenario": "A licensing question about webinars with no fault at all; words such as session, sign-out and access rules appear only in passing.",
+  "categories": ["negative-control"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-09-07T10:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Which licence do we need for webinars",
+      "text": "Hello, a question, not a problem. Our marketing team would like to use the webinar features of Teams. Which licence do we need to assign, and can we do it per group or must we do it on every account? Everything works fine for us at the moment. Thanks, Monika"
+    },
+    {
+      "key": "ev02",
+      "at": 20,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Which licence do we need for webinars",
+      "text": "Hello Monika, thanks for the question. Webinars need a licence level that includes them, and group-based licensing in the admin centre lets you assign it to a whole group once. I will send you the page with the steps."
+    },
+    {
+      "key": "ev03",
+      "at": 65,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Which licence do we need for webinars",
+      "text": "Thanks. Does assigning the licence interrupt anything? We do not want people to be thrown out of their meetings during the day. Our security team handles the access rules separately, so that part is not part of this question."
+    },
+    {
+      "key": "ev04",
+      "at": 80,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Which licence do we need for webinars",
+      "text": "No, assigning a licence does not end anybody's session. The new features appear after a few hours, or after Teams is restarted. No downtime is needed and nothing has to change in your access rules."
+    },
+    {
+      "key": "ev05",
+      "at": 140,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Which licence do we need for webinars",
+      "text": "Great, we will assign it to the marketing group tomorrow morning. Thank you!"
+    },
+    {
+      "key": "ev06",
+      "at": 150,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Which licence do we need for webinars",
+      "text": "You are welcome. I will close the case now. If the webinar option is still missing after a day, reply here."
+    }
+  ]
+}

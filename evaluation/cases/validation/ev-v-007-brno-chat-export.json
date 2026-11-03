@@ -1,0 +1,123 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-v-007-brno-chat-export",
+  "split": "validation",
+  "family": "fam-107",
+  "title": "Chat export: Teams will not sign in, Brno",
+  "scenario": "The customer pastes chat transcripts with abbreviations, typos and guesses; a provider incident explains the time-outs, the engineer keeps the customer informed and a late chat line only guesses that the incident is over.",
+  "categories": ["noisy"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-08-24T12:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "chat export, teams signin brno",
+      "text": "pasting our helpdesk chat below, sorry for the format\n\n[11:02] Jana: ppl in brno say teams wont sign in again, since ~10:45\n[11:03] Petr: same here lol, 'timed out' on the screen\n[11:05] Jana: whole floor 1 and 2 at least, maybe 60 ppl\n[11:06] Petr: did u restart the router??\n[11:06] Jana: yes, no change\n[11:09] Petr: ostrava is OK tho\n[11:10] Jana: ok sending to MS support ppl"
+    },
+    {
+      "key": "ev02",
+      "at": 12,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: chat export, teams signin brno",
+      "text": "Hello Jana, thanks for the export. Could you give me three names with the UTC time of a failed sign-in each, and tell me if your team changed anything in DNS, the proxy, the firewall or identity?"
+    },
+    {
+      "key": "ev03",
+      "at": 45,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: chat export, teams signin brno",
+      "text": "more chat, hope its ok\n\n[11:40] Petr: users: o.novak 10:55 UTC, z.cerny 11:01 UTC, m.dvorak 11:12 UTC\n[11:41] Jana: nothing changed on our side since 2 weeks ago\n[11:42] Petr: i think so?? Lukas said maybe he touched the firewall, not sure :/\n[11:43] Jana: lets just send it"
+    },
+    {
+      "key": "ev04",
+      "at": 60,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Log search",
+      "text": "Sign-in logs for o.novak 10:55, z.cerny 11:01 and m.dvorak 11:12 UTC: no failed row exists for any of the three."
+    },
+    {
+      "key": "ev05",
+      "at": 65,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Provider status",
+      "text": "Provider status at 13:05 UTC: an active incident for sign-in connectivity of Teams and Entra ID in Central Europe, start 10:40 UTC, impact: users may see time-outs, mitigation in progress."
+    },
+    {
+      "key": "ev06",
+      "at": 75,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: chat export, teams signin brno",
+      "text": "Hello Jana, the provider has an active incident for sign-in connectivity in Central Europe since 10:40 UTC, and it fits what you describe. You do not need to change anything. Expect my next message at 14:30 UTC, or earlier if the provider reports it resolved."
+    },
+    {
+      "key": "ev07",
+      "at": 110,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: chat export, teams signin brno",
+      "text": "[13:30] Petr: some ppl say it works now?\n[13:31] Jana: not for me, still failing\n[13:35] Petr: maybe the incident is over?? idk"
+    },
+    {
+      "key": "ev08",
+      "at": 160,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: chat export, teams signin brno",
+      "text": "Update at 14:30 UTC: the provider says the mitigation is rolling out in stages and some users may still see time-outs. Please do not restart anything for now. I will write again at 16:00 UTC."
+    },
+    {
+      "key": "ev09",
+      "at": 235,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Provider status, second look",
+      "text": "Provider status at 15:50 UTC: the incident is still listed as active, with a note that the mitigation has reached all regions and that resolution is expected within the hour."
+    },
+    {
+      "key": "ev10",
+      "at": 280,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: chat export, teams signin brno",
+      "text": "[16:25] Jana: all ok now in brno\n[16:26] Petr: finally lol\n[16:27] Jana: tell the engineer pls"
+    },
+    {
+      "key": "ev11",
+      "at": 330,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Check after the incident",
+      "text": "Check at 17:30 UTC: the provider marked the incident resolved at 16:10 UTC, three sample users signed in without delay, and the Brno ticket counts are 61 between 11:00 and 15:30 UTC and 0 after 16:00 UTC."
+    },
+    {
+      "key": "ev12",
+      "at": 340,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Closing summary",
+      "text": "Hello Jana, closing summary: the time-outs came from the provider's sign-in incident between 10:40 and 16:10 UTC, and no change was needed on your side. Should it return, give me one UTC moment of a failure and I will take another look."
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-v-009-katowice-three-sites",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T22:40:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.error-name-not-resolved" },
+        { "event": "ev03", "id": "sig.recent-ca-change-reported" },
+        { "event": "ev04", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev05", "id": "sig.service-health-clear" },
+        { "event": "ev07", "id": "sig.service-health-clear" },
+        { "event": "ev08", "id": "sig.recent-ca-change-reported", "uncertainty": "low", "note": "restated by the engineer" },
+        { "event": "ev09", "id": "sig.error-name-not-resolved" },
+        { "event": "ev10", "id": "sig.ca-exclusion-no-effect" },
+        { "event": "ev10", "id": "sig.error-name-not-resolved" },
+        { "event": "ev12", "id": "sig.revoke-sessions-no-effect" },
+        { "event": "ev13", "id": "sig.multiple-users-affected", "uncertainty": "low", "note": "restated with a new count" },
+        { "event": "ev15", "id": "sig.site-correlated" },
+        { "event": "ev15", "id": "sig.multiple-users-affected", "uncertainty": "low", "note": "restated per site" },
+        { "event": "ev17", "id": "sig.resolver-inconsistent" },
+        { "event": "ev17", "id": "sig.error-name-not-resolved", "note": "NXDOMAIN" },
+        { "event": "ev20", "id": "sig.proxy-nodes-consistent" },
+        { "event": "ev21", "id": "sig.dns-fix-resolved", "note": "for Katowice" },
+        { "event": "ev24", "id": "sig.dns-fix-resolved" },
+        { "event": "ev28", "id": "sig.error-name-not-resolved" },
+        { "event": "ev32", "id": "sig.resolvers-consistent" },
+        { "event": "ev33", "id": "sig.dns-fix-resolved", "uncertainty": "low", "note": "before and after counts" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.check-service-health" },
+        { "event": "ev07", "id": "act.check-service-health" },
+        { "event": "ev08", "id": "act.exclude-users-from-mfa-ca" },
+        { "event": "ev11", "id": "act.revoke-user-sessions" },
+        { "event": "ev14", "id": "act.request-minimal-scoping", "uncertainty": "medium", "note": "asks for the site pattern and the resolver list" },
+        { "event": "ev16", "id": "act.dns-resolver-comparison" },
+        { "event": "ev19", "id": "act.remove-resolver-from-service" },
+        { "event": "ev19", "id": "act.proxy-node-comparison" },
+        { "event": "ev22", "id": "act.remove-resolver-from-service" },
+        { "event": "ev25", "id": "act.restore-dns-policy" },
+        { "event": "ev25", "id": "act.communicate-status" },
+        { "event": "ev33", "id": "act.validate-fix" },
+        { "event": "ev35", "id": "act.communicate-status" }
+      ],
+      "absent": [
+        { "event": "ev01", "id": "sig.site-correlated", "reason": "speculative", "note": "I think all our sites are affected" },
+        { "event": "ev03", "id": "sig.site-correlated", "reason": "speculative", "note": "all sites fail as far as I know" },
+        { "event": "ev06", "id": "sig.service-health-incident", "reason": "attributed", "note": "the CIO read on social media that there is an outage, not verified" },
+        { "event": "ev13", "id": "sig.site-correlated", "reason": "attributed", "note": "Zabrze seems fine, heard from its manager and not checked" },
+        { "event": "ev16", "id": "act.reinstall-teams", "reason": "negated", "note": "a reinstall is not needed" },
+        { "event": "ev18", "id": "sig.recent-ca-change-reported", "reason": "corrected", "note": "the change was made in a test tenant, not in production" }
+      ],
+      "forks": [
+        { "event": "ev08", "category": "low_value_action", "note": "a policy exclusion test although no failure record exists" },
+        { "event": "ev11", "category": "low_value_action", "note": "revoking sessions although no failure record exists" }
+      ],
+      "earliestMissed": "ev08",
+      "counterfactualDirection": "better",
+      "conflicts": [
+        { "class": "direct_contradiction", "events": ["ev01", "ev13"], "subject": "which sites are affected", "note": "all sites, then Zabrze seems fine" },
+        { "class": "corrected_information", "events": ["ev01", "ev15"], "subject": "which sites are affected", "note": "all sites, corrected to two sites with the numbers per site" },
+        { "class": "corrected_information", "events": ["ev03", "ev18"], "subject": "sig.recent-ca-change-reported", "note": "a production change, corrected to a change in a test tenant" },
+        { "class": "temporal_update", "events": ["ev24", "ev28"], "subject": "sig.dns-fix-resolved", "note": "no problems on Wednesday morning, the error is back for two people in the afternoon" }
+      ],
+      "qualityBand": "needs_attention",
+      "causes": ["hyp.dns-resolution"],
+      "rationale": "A long case with a customer who guesses at first. All sites affected is a guess, a policy change turns out to have been made in a test tenant, a social-media claim of an outage is unverified, and Zabrze seems fine is hearsay. The engineer sends two policy detours (an exclusion test, a session revocation) although no failure record exists, which costs several hours, and only then asks for the site pattern, which shows that two sites share a resolver. The per-server comparison finds the resolver, the proxy nodes are consistent, the workaround goes site by site and two laptops with a typed-in server bring the problem back. The permanent fix and the before and after counts close the case.",
+      "uncertainty": "medium"
+    }
+  ],
+  "adjudication": null
+}

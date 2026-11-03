@@ -1,0 +1,47 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-v-004-porto-handed-over-laptop",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T20:55:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.single-user-scope" },
+        { "event": "ev01", "id": "sig.web-client-also-fails" },
+        { "event": "ev03", "id": "sig.prt-missing" },
+        { "event": "ev04", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev06", "id": "sig.cache-clear-no-effect" },
+        { "event": "ev06", "id": "sig.web-client-also-fails", "uncertainty": "low", "note": "restated" },
+        { "event": "ev08", "id": "sig.prt-missing", "note": "after a restart" },
+        { "event": "ev11", "id": "sig.prt-healthy" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.device-registration-check" },
+        { "event": "ev02", "id": "act.request-minimal-scoping", "uncertainty": "medium", "note": "asks for one UTC failure time and the device output only" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.clear-teams-cache" },
+        { "event": "ev07", "id": "act.device-registration-check", "note": "asks to run it again after a restart" },
+        { "event": "ev09", "id": "act.escalate-to-identity-team" },
+        { "event": "ev09", "id": "act.communicate-status" },
+        { "event": "ev10", "id": "act.communicate-status" },
+        { "event": "ev12", "id": "act.validate-fix" }
+      ],
+      "absent": [],
+      "forks": [
+        { "event": "ev05", "category": "low_value_action", "note": "a cache clear although the browser fails too and the token is missing" }
+      ],
+      "earliestMissed": "ev05",
+      "counterfactualDirection": "better",
+      "conflicts": [],
+      "qualityBand": "adequate",
+      "causes": ["hyp.device-state"],
+      "rationale": "One device on a handed-over laptop. The browser version fails as well and the device output has no token, so the desktop cache is not the issue and the cache clear is a low-value step. The device list shows an old activity time, the engineer escalates with the evidence and the identity team removes the stale record. The customer re-joins the laptop and a healthy token appears. The next-morning check validates the fix.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

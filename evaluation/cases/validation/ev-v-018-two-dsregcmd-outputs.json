@@ -1,0 +1,141 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-v-018-two-dsregcmd-outputs",
+  "split": "validation",
+  "family": "fam-118",
+  "title": "Two different dsregcmd answers for the same laptop",
+  "scenario": "Two people paste opposite device outputs for one laptop; the second was run in an elevated admin session and is withdrawn, the device tokens are healthy, and a cache clear fixes the morning prompts one laptop at a time.",
+  "categories": ["contradiction"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-09-22T09:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Credentials prompt every morning, Zagreb",
+      "text": "Hello, three people of our sales team in Zagreb are asked for credentials every morning at the first start of Teams, since last week. Teams in the browser works fine for them. Prompts this morning: k.horvat 07:58 UTC, m.babic 08:12 UTC, d.juric 08:20 UTC. I ran dsregcmd /status on k.horvat's laptop and it says AzureAdPrt : YES, so I think the device is fine. Ivana, helpdesk"
+    },
+    {
+      "key": "ev02",
+      "at": 15,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt every morning, Zagreb",
+      "text": "Hello Ivana, thanks, that helps. Please let your system administrator run dsregcmd /status on k.horvat's laptop and on m.babic's laptop and paste both SSO State blocks."
+    },
+    {
+      "key": "ev03",
+      "at": 45,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt every morning, Zagreb",
+      "text": "Tomislav here, the system administrator. At 09:30 UTC: k.horvat's laptop shows AzureAdPrt : NO and m.babic's laptop shows AzureAdPrt : NO. That does not fit what Ivana saw on k.horvat's laptop."
+    },
+    {
+      "key": "ev04",
+      "at": 60,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Log search",
+      "text": "Sign-in logs for k.horvat 07:58, m.babic 08:12 and d.juric 08:20 UTC: a failed interactive row exists for each of them, error 50058, a silent sign-in request was sent but no user is signed in."
+    },
+    {
+      "key": "ev05",
+      "at": 75,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt every morning, Zagreb",
+      "text": "Tomislav, which account did you run the command under, and was the prompt elevated? An elevated prompt under an admin account shows the state of that admin session and not of the user."
+    },
+    {
+      "key": "ev06",
+      "at": 95,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt every morning, Zagreb",
+      "text": "I used my admin account in an elevated prompt, so the NO values I sent do not come from the users' sessions. Sorry."
+    },
+    {
+      "key": "ev07",
+      "at": 110,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt every morning, Zagreb",
+      "text": "Thank you. Please run it again on both laptops in a normal prompt while the user is signed in, and paste the SSO State blocks."
+    },
+    {
+      "key": "ev08",
+      "at": 170,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt every morning, Zagreb",
+      "text": "Normal prompts at 10:55 UTC. k.horvat: AzureAdPrt : YES. m.babic: AzureAdPrt : YES."
+    },
+    {
+      "key": "ev09",
+      "at": 185,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt every morning, Zagreb",
+      "text": "Thank you. Next, empty the Teams cache on k.horvat's laptop, start Teams once more and report back what you see."
+    },
+    {
+      "key": "ev10",
+      "at": 240,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt every morning, Zagreb",
+      "text": "The cache was cleared on k.horvat's laptop at 12:30 UTC and Teams opened without a credentials prompt."
+    },
+    {
+      "key": "ev11",
+      "at": 1480,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt every morning, Zagreb",
+      "text": "Wednesday 09:40 UTC: k.horvat's laptop did not ask for credentials this morning. The other two did again."
+    },
+    {
+      "key": "ev12",
+      "at": 1495,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt every morning, Zagreb",
+      "text": "Please empty the Teams cache on the other two laptops in the same way."
+    },
+    {
+      "key": "ev13",
+      "at": 2900,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt every morning, Zagreb",
+      "text": "Thursday 09:20 UTC: all three laptops started Teams without a prompt this morning."
+    },
+    {
+      "key": "ev14",
+      "at": 2910,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Check after the cache clears",
+      "text": "Check on Thursday at 09:30 UTC: no credentials prompt has been reported for the three people since the cache was cleared on each laptop. Closing the case."
+    }
+  ]
+}

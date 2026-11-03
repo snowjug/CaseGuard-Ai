@@ -1,0 +1,141 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-v-002-linz-warehouse-node",
+  "split": "validation",
+  "family": "fam-102",
+  "title": "Teams waits and then times out in the Linz warehouse",
+  "scenario": "One proxy node that got a renewed inspection certificate times out for sign-in hosts; the engineer compares the nodes, has the node pulled as a short-term measure and the inspection bypassed as the permanent fix.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-08-05T13:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams time-outs in the Linz warehouse",
+      "text": "Hi, our warehouse in Linz has had Teams time-outs since lunchtime on Wednesday: the client shows caa82ee2 after a long wait. Around 35 people on the warehouse network. The office building next door is OK. A retry works about one time in three."
+    },
+    {
+      "key": "ev02",
+      "at": 14,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams time-outs in the Linz warehouse",
+      "text": "Hello, thanks for writing. To check the logs I need three affected people and, for each of them, the time of a failure in UTC. Please also tell me which locations work normally, and whether the network, proxy or identity team changed anything in the last 48 hours."
+    },
+    {
+      "key": "ev03",
+      "at": 55,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams time-outs in the Linz warehouse",
+      "text": "Names and times: d.mayer Wed 11:10 UTC, k.steiner Wed 11:44 UTC, j.berger Wed 12:30 UTC. The office next door works. Our network team renewed the certificate used for traffic inspection on one of the proxies on Tuesday afternoon, I cannot say which one. Nothing else was changed."
+    },
+    {
+      "key": "ev04",
+      "at": 75,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log check",
+      "text": "Looked for the three attempts in the sign-in logs: nothing is recorded for d.mayer at 11:10, k.steiner at 11:44 or j.berger at 12:30 UTC."
+    },
+    {
+      "key": "ev05",
+      "at": 80,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Provider status",
+      "text": "Provider status at 14:20 UTC: no incident is open for Teams or for sign-in."
+    },
+    {
+      "key": "ev06",
+      "at": 95,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams time-outs in the Linz warehouse",
+      "text": "Thank you. Please let your network colleague time a sign-in request through each of the proxy nodes, from the warehouse, and send me the numbers per node."
+    },
+    {
+      "key": "ev07",
+      "at": 170,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams time-outs in the Linz warehouse",
+      "text": "Test from the warehouse at 15:35 UTC through all four nodes: three nodes answer in about 0.5 seconds. Node 2, the one with the new certificate, ran into the 20 second limit three times in a row."
+    },
+    {
+      "key": "ev08",
+      "at": 185,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams time-outs in the Linz warehouse",
+      "text": "That fits. Please take node 2 out of the pool at the load balancer for now and tell me the time. As a side check, please also run the name resolution test for the sign-in host against each of your DNS servers from the warehouse."
+    },
+    {
+      "key": "ev09",
+      "at": 260,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams time-outs in the Linz warehouse",
+      "text": "Node 2 is out of the pool since 16:10 UTC. DNS test from the warehouse at 16:20 UTC: both DNS servers resolve the sign-in host and the CDN names within 40 ms, every time."
+    },
+    {
+      "key": "ev10",
+      "at": 330,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams time-outs in the Linz warehouse",
+      "text": "18:30 UTC: the warehouse reports that Teams signs in without waiting since about 16:15 UTC."
+    },
+    {
+      "key": "ev11",
+      "at": 345,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams time-outs in the Linz warehouse",
+      "text": "Good. Pulling the node is the short-term measure. For the permanent fix, please stop inspecting traffic to the hosts that Microsoft publishes for Microsoft 365, on every node, following the endpoint list that Microsoft maintains, through your normal change process, and then re-add node 2. Tell me the date of the change and I will check the numbers after it."
+    },
+    {
+      "key": "ev12",
+      "at": 1700,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams time-outs in the Linz warehouse",
+      "text": "Done on Thursday at 06:30 UTC for all four nodes, and node 2 is back. The warehouse started at 07:00 and there were no complaints at all."
+    },
+    {
+      "key": "ev13",
+      "at": 1720,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Check after the change",
+      "text": "Check on Thursday at 17:30 UTC: a repeated test through all four nodes from the warehouse gives 0.4 to 0.6 seconds for each, and the ticket count for Linz is Wednesday 31, Thursday 0."
+    },
+    {
+      "key": "ev14",
+      "at": 6040,
+      "who": "system",
+      "type": "system_event",
+      "channel": "tool",
+      "title": "Helpdesk tool",
+      "text": "ALERT (helpdesk tool): this case had no activity for 72 hours and was closed by the automatic rule."
+    }
+  ]
+}

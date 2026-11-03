@@ -1,0 +1,43 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-v-003-bergen-second-factor",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T20:40:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.site-correlated" },
+        { "event": "ev03", "id": "sig.recent-ca-change-reported" },
+        { "event": "ev04", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev04", "id": "sig.mfa-ca-events-in-logs" },
+        { "event": "ev05", "id": "sig.recent-ca-change-reported", "uncertainty": "low", "note": "from the audit log" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.review-ca-policy-config" },
+        { "event": "ev06", "id": "act.exclude-users-from-mfa-ca" },
+        { "event": "ev08", "id": "act.communicate-status" },
+        { "event": "ev10", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        { "event": "ev10", "id": "sig.mfa-ca-events-in-logs", "reason": "negated", "note": "no failed Conditional Access rows after the change" }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.conditional-access"],
+      "rationale": "A policy story. The customer volunteers the new policy, the sign-in logs carry second-factor and Conditional Access rows, and the audit log shows the policy with an empty trusted-location list. The test exclusion is justified because failure records exist, it works, and the policy is corrected and the exclusion removed. The closing check says that no failed rows exist after the change, which denies the signal and must not be read as a presence.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

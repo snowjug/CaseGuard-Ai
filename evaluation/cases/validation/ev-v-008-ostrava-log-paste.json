@@ -1,0 +1,123 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-v-008-ostrava-log-paste",
+  "split": "validation",
+  "family": "fam-108",
+  "title": "Teams not reachable in Ostrava, logs inside",
+  "scenario": "The customer pastes unrelated log lines together with the relevant ones; an audit query shows no policy event inside the failure window, a per-server name test finds one resolver that fails, and the forwarders it lost after a firewall update are restored.",
+  "categories": ["noisy"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-08-26T08:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams not reachable in Ostrava, logs inside",
+      "text": "Hello support,\n\nsince Tuesday morning about 40 people at our Ostrava site cannot reach Teams, the client says caa82ee7. Brno works fine. Our admin collected some output from one laptop and I paste all of it, I do not know what matters:\n\n--- DNS Client operational log, laptop OST-LT-0412 ---\nTue 08:12:41 Event 1014: Name resolution for the name statics.teams.cdn.office.net timed out after none of the configured DNS servers responded.\nTue 08:12:43 Event 1014: Name resolution for the name teams.microsoft.com timed out after none of the configured DNS servers responded.\nTue 08:13:02 Event 1015: The DNS client changed the server order after repeated failures.\n--- Print Spooler ---\nTue 08:14:10 Warning 372: The document 'Quarterly plan.docx' failed to print, the printer was offline.\n--- Windows Update ---\nTue 08:20:00 Information 19: Installation successful: Definition update for Microsoft Defender Antivirus - KB2267602.\n--- Browser console (Teams web) ---\nGET https://statics.teams.cdn.office.net/hashed/app.js net::ERR_NAME_NOT_RESOLVED\nGET https://teams.microsoft.com/api/mt/emea/beta/users/me net::ERR_NAME_NOT_RESOLVED\nGET https://login.microsoftonline.com/common/oauth2/v2.0/authorize 200\n--- VPN client ---\nTue 08:30:11 Info: tunnel not used, device is on the corporate network.\n\nRegards,\nRadim"
+    },
+    {
+      "key": "ev02",
+      "at": 20,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams not reachable in Ostrava, logs inside",
+      "text": "Hello Radim, thank you, that is a lot of material. To keep it simple: please give me three names plus the UTC moment of a failure for each, and say what changed in your network, identity or proxy settings in the last two days."
+    },
+    {
+      "key": "ev03",
+      "at": 75,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams not reachable in Ostrava, logs inside",
+      "text": "Names and times: j.svoboda Tue 07:41 UTC, a.horak Tue 08:02 UTC, t.blaha Tue 08:33 UTC. Conditional Access: our security team did not change anything since spring. Network: on Monday night the Ostrava datacentre firewall got a firmware update, that is all I know."
+    },
+    {
+      "key": "ev04",
+      "at": 95,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Log search",
+      "text": "Sign-in logs for j.svoboda Tue 07:41, a.horak Tue 08:02 and t.blaha Tue 08:33 UTC: no failed row exists for any of the three attempts."
+    },
+    {
+      "key": "ev05",
+      "at": 100,
+      "who": "engineer",
+      "type": "query_output",
+      "channel": "tool",
+      "title": "Policy change search",
+      "text": "Policy changes found in the audit between Sunday 00:00 UTC and Wednesday 08:00 UTC: 6 rows, 5 group membership changes and 1 licence assignment. None of the rows falls inside the failure window of Tuesday 06:00 to 08:30 UTC."
+    },
+    {
+      "key": "ev06",
+      "at": 110,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams not reachable in Ostrava, logs inside",
+      "text": "Radim, thank you. Could your network admin query statics.teams.cdn.office.net, teams.microsoft.com and login.microsoftonline.com on each DNS server of the Ostrava scopes, with Resolve-DnsName, from an Ostrava machine, and forward the raw output?"
+    },
+    {
+      "key": "ev07",
+      "at": 190,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams not reachable in Ostrava, logs inside",
+      "text": "From OST-LT-0388 at 10:55 UTC, Resolve-DnsName for the three hosts against the three servers:\n\n-Server 10.50.0.2\nstatics.teams.cdn.office.net : answered\nteams.microsoft.com : answered\nlogin.microsoftonline.com : answered\n\n-Server 10.50.0.3\nstatics.teams.cdn.office.net : DNS name does not exist\nteams.microsoft.com : answered\nlogin.microsoftonline.com : answered\n\n-Server 10.50.0.4\nstatics.teams.cdn.office.net : answered\nteams.microsoft.com : answered\nlogin.microsoftonline.com : answered\n\nI ran it five times per server. 10.50.0.3 failed for statics.teams.cdn.office.net in 3 of 5 runs, the other two servers never failed."
+    },
+    {
+      "key": "ev08",
+      "at": 205,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams not reachable in Ostrava, logs inside",
+      "text": "Thank you. Please take 10.50.0.3 out of the DHCP scopes for Ostrava for now, so that clients only get the two other servers, and tell me the time. I will ask you about a lasting correction once we know why that server failed after the firewall update."
+    },
+    {
+      "key": "ev09",
+      "at": 290,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams not reachable in Ostrava, logs inside",
+      "text": "10.50.0.3 was removed from the scopes at 11:40 UTC. Since 12:00 UTC nobody in Ostrava has reported the error again."
+    },
+    {
+      "key": "ev10",
+      "at": 1500,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams not reachable in Ostrava, logs inside",
+      "text": "Cause found: the firewall update reset the forwarders of the 10.50.0.3 resolver to an address that does not answer. The forwarders are restored and the server is back in the scopes since 08:20 UTC today."
+    },
+    {
+      "key": "ev11",
+      "at": 1530,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Check after the correction",
+      "text": "Check at 09:30 UTC: the repeated comparison shows all three servers answering all three hosts in 10 of 10 runs, and the Ostrava ticket count for today is 0."
+    },
+    {
+      "key": "ev12",
+      "at": 1540,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Closing summary",
+      "text": "Radim, closing summary: Tuesday and Wednesday the failures came from one resolver that lost its forwarders in the firewall update. Workaround Wednesday 11:40 UTC, correction Thursday 08:20 UTC. If it returns, give me one UTC moment of a failure and I will check again."
+    }
+  ]
+}

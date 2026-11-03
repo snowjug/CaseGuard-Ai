@@ -1,0 +1,53 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-v-014-not-dns-we-think",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T23:50:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.error-name-not-resolved" },
+        { "event": "ev01", "id": "sig.site-correlated", "uncertainty": "medium", "note": "one department, not the whole company" },
+        { "event": "ev04", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev05", "id": "sig.service-health-clear" },
+        { "event": "ev07", "id": "sig.proxy-node-inconsistent" },
+        { "event": "ev10", "id": "sig.proxy-fix-resolved" },
+        { "event": "ev11", "id": "sig.proxy-fix-resolved", "uncertainty": "low", "note": "before and after counts" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.check-service-health" },
+        { "event": "ev06", "id": "act.proxy-node-comparison" },
+        { "event": "ev09", "id": "act.remove-proxy-node-from-rotation" },
+        { "event": "ev11", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        { "event": "ev01", "id": "sig.error-timeout", "reason": "negated", "note": "it is not a time-out, nothing says timed out" },
+        { "event": "ev01", "id": "sig.cache-clear-no-effect", "reason": "negated", "note": "no cache was cleared yet" },
+        { "event": "ev01", "id": "sig.cache-clear-resolved", "reason": "negated", "note": "no cache was cleared yet" },
+        { "event": "ev03", "id": "sig.resolvers-consistent", "reason": "attributed", "note": "the network admin says the resolvers are fine, he looked yesterday" },
+        { "event": "ev03", "id": "sig.ca-config-unchanged", "reason": "speculative", "note": "I do not think anything changed, but I cannot confirm" },
+        { "event": "ev03", "id": "sig.recent-network-change-reported", "reason": "speculative", "note": "the parent company's network team may have touched something, I do not know" },
+        { "event": "ev08", "id": "sig.recent-network-change-reported", "reason": "speculative", "note": "I do not know whether anybody changed anything on node 3" },
+        { "event": "ev09", "id": "act.clear-teams-cache", "reason": "negated", "note": "no cache clearing is needed" },
+        { "event": "ev09", "id": "act.reinstall-teams", "reason": "negated", "note": "no reinstall is needed" }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.proxy-egress"],
+      "rationale": "A customer who describes what the problem is not. The time-out is denied, the cache has not been cleared, the resolvers are fine according to an old check by somebody else, a policy change cannot be confirmed and a change at the parent company is only a possibility. The facts that remain are one department with the name-resolution tag, no failure row, clear provider status and, after a per-node test, one proxy node that times out. The engineer asks for the right evidence, rules out client steps explicitly and validates with counts.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

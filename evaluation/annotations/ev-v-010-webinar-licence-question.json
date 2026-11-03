@@ -1,0 +1,26 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-v-010-webinar-licence-question",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T23:00:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [],
+      "actions": [],
+      "absent": [],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": null,
+      "causes": [],
+      "rationale": "A licensing question and nothing else: there is no failure, no log, no change and no remedy. Words such as session, thrown out and access rules appear only in an explanation of what a licence assignment does not do, so no signal of the vocabulary is stated.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

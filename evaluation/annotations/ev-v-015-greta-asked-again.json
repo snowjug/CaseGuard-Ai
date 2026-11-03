@@ -1,0 +1,44 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-v-015-greta-asked-again",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T00:10:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.single-user-scope", "uncertainty": "medium", "note": "I think it is only me" },
+        { "event": "ev03", "id": "sig.web-client-also-fails" },
+        { "event": "ev04", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev04", "id": "sig.token-expiry-errors" },
+        { "event": "ev07", "id": "sig.token-expiry-errors", "uncertainty": "low", "note": "the engineer restates the cause" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping", "uncertainty": "medium", "note": "asks for the user name, one UTC moment and the web client" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.request-recent-changes", "uncertainty": "medium", "note": "asks about a change of the password" },
+        { "event": "ev07", "id": "act.communicate-status", "uncertainty": "medium", "note": "tells what was found and what to do next" },
+        { "event": "ev09", "id": "act.validate-fix" },
+        { "event": "ev10", "id": "act.communicate-status" }
+      ],
+      "absent": [
+        { "event": "ev01", "id": "sig.multiple-users-affected", "reason": "negated", "note": "it is not many people" },
+        { "event": "ev01", "id": "sig.cache-clear-resolved", "reason": "speculative", "note": "it seemed to help for a while, but I am not sure" },
+        { "event": "ev01", "id": "sig.error-timeout", "reason": "speculative", "note": "the message might have been a time-out" },
+        { "event": "ev01", "id": "sig.ca-config-unchanged", "reason": "speculative", "note": "I believe nobody changed any policy" }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.token-session"],
+      "rationale": "A user who guesses at everything. It is only me is a belief, not many people is denied, a cache clear that seemed to help is a guess, a possible time-out is a guess and nobody changed any policy is a belief. The facts are the browser that also fails, the failed log row with a grant that expired after a password change, and the clean check after signing in again on every device.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

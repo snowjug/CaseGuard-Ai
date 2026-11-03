@@ -1,0 +1,78 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-v-017-partner-mail-bounces",
+  "split": "validation",
+  "family": "fam-117",
+  "title": "Mail to a partner domain bounces with a policy error",
+  "scenario": "Outbound mail to one partner domain bounces after a change of the sender-check DNS record; the text mentions DNS and sign-in in passing, but this is mail flow, for which no knowledge pack exists, and the engine must decline to analyse it.",
+  "categories": ["unsupported"],
+  "workload": "exchange-mailflow",
+  "openedAt": "2026-09-21T09:30:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Mail to Nordwind bounces",
+      "text": "Hello, since this morning mail from our company to the partner domain nordwind.example bounces with the error 550 5.7.1, message rejected as unauthenticated. Mail to all other domains is fine and people can sign in to webmail without any problem. It started after we changed our DNS records on Friday. About 15 people write to that partner every day."
+    },
+    {
+      "key": "ev02",
+      "at": 15,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Mail to Nordwind bounces",
+      "text": "Hello, thanks. Please send me one full bounce message with the headers, and tell me exactly which DNS records you changed on Friday, in particular the SPF and DKIM records."
+    },
+    {
+      "key": "ev03",
+      "at": 60,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Mail to Nordwind bounces",
+      "text": "The bounce is attached. On Friday our DNS provider replaced the SPF record with a new one that lists only our new relay. We did not touch DKIM."
+    },
+    {
+      "key": "ev04",
+      "at": 80,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Record check",
+      "text": "The SPF record of your domain now lists only the new relay and not the Microsoft 365 sending hosts. The bounce says the partner's gateway checked SPF and found the sending host missing."
+    },
+    {
+      "key": "ev05",
+      "at": 90,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "SPF record",
+      "text": "The new SPF record is missing the include for Microsoft 365. Please add the include for the Microsoft 365 sending hosts next to your relay in the record, and let me know when it is saved. Then send one test mail to the partner."
+    },
+    {
+      "key": "ev06",
+      "at": 150,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: SPF record",
+      "text": "The record was corrected at 11:40 UTC. A test mail to the partner was delivered at 11:55 UTC."
+    },
+    {
+      "key": "ev07",
+      "at": 170,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Check after the change",
+      "text": "Check at 12:20 UTC: the delivery log shows no bounce for the partner domain since 11:55 UTC. Closing the case."
+    }
+  ]
+}
