@@ -315,7 +315,7 @@ export function reviewInput(over: Partial<ReviewInput> = {}): ReviewInput {
 /** The conclusions the critic will be asked about, for the reply `validReply()`. */
 export function conclusionsOf(reply: unknown = validReply()): ReviewConclusion[] {
   const kept: KeptProposal[] = validateReasoner(reply).proposals?.reasoner ?? [];
-  return buildConclusions(deterministicFactsOf(one.analysis, {}, { view }), kept);
+  return buildConclusions(deterministicFactsOf(one.analysis, { pack: one.pack }, { view }), kept);
 }
 
 export { CASE_ONE };

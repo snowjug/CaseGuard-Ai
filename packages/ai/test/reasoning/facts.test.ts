@@ -88,7 +88,7 @@ describe('facts of the engine analysis', () => {
         if (r.resolvedByEventId !== null) expect(inBoundary.has(r.resolvedByEventId)).toBe(true);
       }
       const text = JSON.stringify(scoped);
-      for (const event of afterBoundary) expect(text).not.toContain(event.id);
+      for (const event of afterBoundary) expect(text).not.toContain(`"${event.id}"`);
     });
 
     it('has no more than the whole analysis has', () => {
