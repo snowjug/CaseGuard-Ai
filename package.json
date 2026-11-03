@@ -30,6 +30,7 @@
     "db:migrate": "pnpm --filter @caseguard/api db:migrate",
     "bench": "pnpm --filter @caseguard/domain bench --",
     "bench:api": "tsx scripts/bench-api.ts",
+    "bench:engine": "tsx scripts/bench-engine.ts",
     "secrets:scan": "node scripts/scan-secrets.mjs",
     "audit:deps": "node scripts/audit-deps.mjs",
     "infra:validate": "node scripts/infra-validate.mjs",
