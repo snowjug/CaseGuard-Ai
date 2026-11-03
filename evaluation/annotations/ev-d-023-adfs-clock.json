@@ -14,11 +14,31 @@
         { "event": "ev01", "id": "sig.intermittent-failures" },
         { "event": "ev03", "id": "sig.federation-node-error" },
         { "event": "ev04", "id": "sig.server-side-failure-records-present" },
-        { "event": "ev04", "id": "sig.intermittent-failures", "uncertainty": "low", "note": "successes minutes before or after the failures" },
-        { "event": "ev04", "id": "sig.federation-node-error", "uncertainty": "low", "note": "tokens rejected as not yet valid in the Entra logs" },
+        {
+          "event": "ev04",
+          "id": "sig.intermittent-failures",
+          "uncertainty": "low",
+          "note": "successes minutes before or after the failures"
+        },
+        {
+          "event": "ev04",
+          "id": "sig.federation-node-error",
+          "uncertainty": "low",
+          "note": "tokens rejected as not yet valid in the Entra logs"
+        },
         { "event": "ev05", "id": "sig.federation-node-error" },
-        { "event": "ev05", "id": "sig.intermittent-failures", "uncertainty": "low", "note": "why a second try often works" },
-        { "event": "ev09", "id": "sig.federation-node-error", "uncertainty": "low", "note": "restated in the closing note" }
+        {
+          "event": "ev05",
+          "id": "sig.intermittent-failures",
+          "uncertainty": "low",
+          "note": "why a second try often works"
+        },
+        {
+          "event": "ev09",
+          "id": "sig.federation-node-error",
+          "uncertainty": "low",
+          "note": "restated in the closing note"
+        }
       ],
       "actions": [
         { "event": "ev02", "id": "act.check-federation-health" },

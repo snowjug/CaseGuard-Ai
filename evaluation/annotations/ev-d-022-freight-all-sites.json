@@ -33,11 +33,36 @@
         { "event": "ev14", "id": "act.validate-fix", "uncertainty": "low" }
       ],
       "absent": [
-        { "event": "ev01", "id": "sig.recent-network-change-reported", "reason": "negated", "note": "we changed nothing this week" },
-        { "event": "ev04", "id": "act.signin-log-correlation", "reason": "future_intent", "note": "I will look at the sign-in logs" },
-        { "event": "ev08", "id": "sig.service-health-incident", "reason": "speculative", "note": "maybe it is a Microsoft outage" },
-        { "event": "ev10", "id": "act.clear-teams-cache", "reason": "corrected", "note": "please stop both" },
-        { "event": "ev10", "id": "act.request-har-capture", "reason": "corrected", "note": "please stop both" }
+        {
+          "event": "ev01",
+          "id": "sig.recent-network-change-reported",
+          "reason": "negated",
+          "note": "we changed nothing this week"
+        },
+        {
+          "event": "ev04",
+          "id": "act.signin-log-correlation",
+          "reason": "future_intent",
+          "note": "I will look at the sign-in logs"
+        },
+        {
+          "event": "ev08",
+          "id": "sig.service-health-incident",
+          "reason": "speculative",
+          "note": "maybe it is a Microsoft outage"
+        },
+        {
+          "event": "ev10",
+          "id": "act.clear-teams-cache",
+          "reason": "corrected",
+          "note": "please stop both"
+        },
+        {
+          "event": "ev10",
+          "id": "act.request-har-capture",
+          "reason": "corrected",
+          "note": "please stop both"
+        }
       ],
       "forks": [
         { "event": "ev02", "category": "low_value_action" },
@@ -47,8 +72,18 @@
       "earliestMissed": "ev02",
       "counterfactualDirection": "better",
       "conflicts": [
-        { "class": "temporal_update", "events": ["ev06", "ev09"], "subject": "sig.service-health-incident", "note": "no incident at 11:12, an incident at 12:05" },
-        { "class": "corrected_information", "events": ["ev07", "ev10"], "subject": "sig.service-health-incident", "note": "the engineer withdraws the not-an-outage view" }
+        {
+          "class": "temporal_update",
+          "events": ["ev06", "ev09"],
+          "subject": "sig.service-health-incident",
+          "note": "no incident at 11:12, an incident at 12:05"
+        },
+        {
+          "class": "corrected_information",
+          "events": ["ev07", "ev10"],
+          "subject": "sig.service-health-incident",
+          "note": "the engineer withdraws the not-an-outage view"
+        }
       ],
       "qualityBand": "needs_attention",
       "causes": ["hyp.service-incident"],

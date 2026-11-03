@@ -1,0 +1,527 @@
+{
+  "schema": "caseguard.eval-manifest/1",
+  "datasetVersion": "2.0.0",
+  "annotationVersion": 1,
+  "splits": {
+    "dev": [
+      "ev-d-001-p1-warsaw-resolver",
+      "ev-d-002-p2-utrecht-proxy",
+      "ev-d-003-p3-lisbon-access-rule",
+      "ev-d-004-p4-hourly-signout",
+      "ev-d-005-p5-single-laptop",
+      "ev-d-006-p6-vendor-incident",
+      "ev-d-007-n1-warsaw-noisy",
+      "ev-d-008-n2-utrecht-chat",
+      "ev-d-009-n3-lisbon-mixed-language",
+      "ev-d-010-z1-scheduling",
+      "ev-d-011-z2-licence-question",
+      "ev-d-012-z3-printer-lookalike",
+      "ev-d-013-z4-negations",
+      "ev-d-014-r1-warsaw-shuffled",
+      "ev-d-015-r2-utrecht-reversed",
+      "ev-d-016-r3-warsaw-noisy-swapped",
+      "ev-d-017-lyon-forwarder",
+      "ev-d-018-gothenburg-timeouts",
+      "ev-d-019-field-staff-mfa-loop",
+      "ev-d-020-shutdown-tablets",
+      "ev-d-021-accounting-laptop",
+      "ev-d-022-freight-all-sites",
+      "ev-d-023-adfs-clock",
+      "ev-d-024-restored-profiles",
+      "ev-d-025-chat-risky-signins",
+      "ev-d-026-bucharest-forward",
+      "ev-d-027-phones-after-reset",
+      "ev-d-028-expired-signing-cert",
+      "ev-d-029-dsregcmd-paste",
+      "ev-d-030-mailbox-misfiled",
+      "ev-d-031-exclude-group-howto",
+      "ev-d-032-recordings-retention",
+      "ev-d-033-hedging-admin",
+      "ev-d-034-plan-heavy-dns",
+      "ev-d-035-hearsay-proxy",
+      "ev-d-036-fix-came-back",
+      "ev-d-037-too-many-theories",
+      "ev-d-038-session-limit-dispute",
+      "ev-d-039-incident-or-not",
+      "ev-d-040-rotterdam-prt-restart",
+      "ev-d-041-second-floor-print-queue",
+      "ev-d-042-vpn-drops-half-hourly",
+      "ev-d-043-call-audio-drops",
+      "ev-d-044-tallinn-three-days",
+      "ev-d-045-tartu-one-laptop",
+      "ev-d-046-kaunas-filtering-rule"
+    ],
+    "validation": [
+      "ev-v-001-graz-new-filter",
+      "ev-v-002-linz-warehouse-node",
+      "ev-v-003-bergen-second-factor",
+      "ev-v-004-porto-handed-over-laptop",
+      "ev-v-005-split-farm-clock",
+      "ev-v-006-tromso-forwarded-chain",
+      "ev-v-007-brno-chat-export",
+      "ev-v-008-ostrava-log-paste",
+      "ev-v-009-katowice-three-sites",
+      "ev-v-010-webinar-licence-question",
+      "ev-v-011-new-proxy-next-month",
+      "ev-v-012-helpdesk-training-notes",
+      "ev-v-013-old-dns-servers-retired",
+      "ev-v-014-not-dns-we-think",
+      "ev-v-015-greta-asked-again",
+      "ev-v-016-who-changed-the-rule",
+      "ev-v-017-partner-mail-bounces",
+      "ev-v-018-two-dsregcmd-outputs"
+    ],
+    "test": []
+  },
+  "cases": {
+    "ev-d-001-p1-warsaw-resolver": {
+      "split": "dev",
+      "family": "fam-001",
+      "derivedFrom": null,
+      "eventsSha256": "6224a5a5d176bbb2250b3a47487627c7dfb66d2909398d75fc3cbc3d43816c4a",
+      "annotationsSha256": "012102ee87a410db97018bf501d7c3b9da1455a1732386a493fec60642ee7dd5"
+    },
+    "ev-d-002-p2-utrecht-proxy": {
+      "split": "dev",
+      "family": "fam-002",
+      "derivedFrom": null,
+      "eventsSha256": "6b41937ea12e11470b9687fdb2ee4dc84194ce04fc094237df8d637f8e2a9f5b",
+      "annotationsSha256": "96adb5a768735e1b9db9ab17163de086348a4663c2c688ba99882575a65af90b"
+    },
+    "ev-d-003-p3-lisbon-access-rule": {
+      "split": "dev",
+      "family": "fam-003",
+      "derivedFrom": null,
+      "eventsSha256": "118bf4d1fa9d9a2cf370fc2ab8e62ca86abe06933d818e751e72dd9a683b515c",
+      "annotationsSha256": "5f0ca9ad068a2dcf229206c4e5f63d2a2c42fa216f223646220a2cfed6ece25e"
+    },
+    "ev-d-004-p4-hourly-signout": {
+      "split": "dev",
+      "family": "fam-004",
+      "derivedFrom": null,
+      "eventsSha256": "fba13d3c3d3d1b533c31b149003b730ceedc65c120acafccd4f878c66cde01f4",
+      "annotationsSha256": "d1e17c449412eb83d30c022dcc4e2158c6809baa5e768f2906c05a235c17eef8"
+    },
+    "ev-d-005-p5-single-laptop": {
+      "split": "dev",
+      "family": "fam-005",
+      "derivedFrom": null,
+      "eventsSha256": "1cb8fee66d2ac0b73dd7e2b28e6de7eb0d6f7a34f7fa58844cb8caebf07d7c24",
+      "annotationsSha256": "a7daf8534d58925f2a0e09fb1aa246cb0b14d7e6ca6cef1ca6e786261d1e10f9"
+    },
+    "ev-d-006-p6-vendor-incident": {
+      "split": "dev",
+      "family": "fam-006",
+      "derivedFrom": null,
+      "eventsSha256": "704c0dcd0d0f673f0956565c20ed9a79c546876004736999ba6956e250b85b33",
+      "annotationsSha256": "6fd46cafea6449bc19b98144f4d173114c52586856e9491cf3d0c0078c1ffa2c"
+    },
+    "ev-d-007-n1-warsaw-noisy": {
+      "split": "dev",
+      "family": "fam-001",
+      "derivedFrom": null,
+      "eventsSha256": "4f7e593a761bec44ac5ee4725a96860d0c4af814f3ff11f01877a9536a3099d5",
+      "annotationsSha256": "4e63fa25efec119bda6e2833fb85be9b03c44be773f98bdfc157132feb61a998"
+    },
+    "ev-d-008-n2-utrecht-chat": {
+      "split": "dev",
+      "family": "fam-002",
+      "derivedFrom": null,
+      "eventsSha256": "3916a1638954399ecacf6c8a7b4ef6cd025cbe7e1c616909c82cf97a8015434d",
+      "annotationsSha256": "01d7ee30e1c2ef23403701bf78df1ef779c819258a398aa362e1fedd89ad269c"
+    },
+    "ev-d-009-n3-lisbon-mixed-language": {
+      "split": "dev",
+      "family": "fam-003",
+      "derivedFrom": null,
+      "eventsSha256": "ce67fd5d4cf312d5ea76860df6d2e3e06113995fbed222e2377b3288f88080bd",
+      "annotationsSha256": "07ee3754616d5f2a32b7f9e0f75810584176a6f15ee1421d98b7688e80761929"
+    },
+    "ev-d-010-z1-scheduling": {
+      "split": "dev",
+      "family": "fam-007",
+      "derivedFrom": null,
+      "eventsSha256": "4b5de5e6317d6948993f009ca1f510136569c813f7affd4fbf4ff901ecf6c103",
+      "annotationsSha256": "bb2a59447f473e835ed81230046eee4dbb515e806d1c004f9c1eff7ca57356d9"
+    },
+    "ev-d-011-z2-licence-question": {
+      "split": "dev",
+      "family": "fam-008",
+      "derivedFrom": null,
+      "eventsSha256": "3c1a026ba5bddf8d69ffa66a5b7a516d633f13a0f5decca51b3d79a220d738c8",
+      "annotationsSha256": "727b8c3e5af33524c0e75b83ce7640eb43ef8c393eb2a4ed2f6b7d06628726e0"
+    },
+    "ev-d-012-z3-printer-lookalike": {
+      "split": "dev",
+      "family": "fam-009",
+      "derivedFrom": null,
+      "eventsSha256": "048039420d5c596a3399e2bb2904814f05b081a2cea872649915c92ade5787cd",
+      "annotationsSha256": "0f30d4e1c5ea66052f83abd2533e15ef78dc4889f2a1b8889e13c6f2567c6208"
+    },
+    "ev-d-013-z4-negations": {
+      "split": "dev",
+      "family": "fam-010",
+      "derivedFrom": null,
+      "eventsSha256": "341fc30e6454a352254e70c7824c5f1b5389838de534fee518aedcb453ef715c",
+      "annotationsSha256": "841ca3cb60461b179474643acbced0a00ba33e269d23872e6c511581124aa1df"
+    },
+    "ev-d-014-r1-warsaw-shuffled": {
+      "split": "dev",
+      "family": "fam-001",
+      "derivedFrom": "ev-d-001-p1-warsaw-resolver",
+      "eventsSha256": "6cb80ba6bd01c765edc815f69a8289f03b23e88e06f81dcc3dcbf8898dcfcde8",
+      "annotationsSha256": null
+    },
+    "ev-d-015-r2-utrecht-reversed": {
+      "split": "dev",
+      "family": "fam-002",
+      "derivedFrom": "ev-d-002-p2-utrecht-proxy",
+      "eventsSha256": "a5c011298a34abd7f194fb84c789c8959dbdff1e68052ddb4129c0519ce02f99",
+      "annotationsSha256": null
+    },
+    "ev-d-016-r3-warsaw-noisy-swapped": {
+      "split": "dev",
+      "family": "fam-001",
+      "derivedFrom": "ev-d-007-n1-warsaw-noisy",
+      "eventsSha256": "dbd6a9abfbf927bcbd17bd62821c4439af5b61b038e45d2e4002cef71a141f92",
+      "annotationsSha256": null
+    },
+    "ev-d-017-lyon-forwarder": {
+      "split": "dev",
+      "family": "fam-011",
+      "derivedFrom": null,
+      "eventsSha256": "382aa3b26d46d8267c9a6905e23a5951f7684929444b63b6b84b445a8f442e6e",
+      "annotationsSha256": "72a2c39d79c37e9a47833d8428b7107c8e646071c493506ce73f6cebc0fe1e4a"
+    },
+    "ev-d-018-gothenburg-timeouts": {
+      "split": "dev",
+      "family": "fam-012",
+      "derivedFrom": null,
+      "eventsSha256": "97fe173f6a0f0cd1476c1b789f4571577fe015b4944737f7f3f170b55c792fcd",
+      "annotationsSha256": "80314e86db81227fd0b6badd1fef33e6fc39d430a5c085d3163f537ae0b198de"
+    },
+    "ev-d-019-field-staff-mfa-loop": {
+      "split": "dev",
+      "family": "fam-013",
+      "derivedFrom": null,
+      "eventsSha256": "e54b52d210e47e69a8115a20e5fff9a7198de2ec6dd883dd48beef9146516ed7",
+      "annotationsSha256": "7f1870b76184d4f3eb511ba47212f7b0299c99f5bafc306d854718c52cb1caec"
+    },
+    "ev-d-020-shutdown-tablets": {
+      "split": "dev",
+      "family": "fam-014",
+      "derivedFrom": null,
+      "eventsSha256": "a6a5c4b609502fb22c588fb48363b847fe378be74e1eef433c18e2be970473bf",
+      "annotationsSha256": "1b338a860175969f70d3c308edb531dc0ecf5a68be9960276059e204d466df18"
+    },
+    "ev-d-021-accounting-laptop": {
+      "split": "dev",
+      "family": "fam-015",
+      "derivedFrom": null,
+      "eventsSha256": "7c2fc7abe5e3a7805ed03a2e00cc9ccba755c17e311abdd1e6e555df16cd6484",
+      "annotationsSha256": "f01984b33a5508b8ab1086d88bfc31c810659de22c153b946ac2f15860e8fb1a"
+    },
+    "ev-d-022-freight-all-sites": {
+      "split": "dev",
+      "family": "fam-016",
+      "derivedFrom": null,
+      "eventsSha256": "335edcf1ed41198f23e0d4230664a8914f95100ea304427286edd63516e1ba91",
+      "annotationsSha256": "cd19717158817f3257976b4bcecc404c87d0fe49e8dfdfbd6d01eb0adaaf3afb"
+    },
+    "ev-d-023-adfs-clock": {
+      "split": "dev",
+      "family": "fam-017",
+      "derivedFrom": null,
+      "eventsSha256": "6dc588372aac9a941c360648e8ff12475f78094738a4863a814a0bb319de871b",
+      "annotationsSha256": "93ad96629353896f4d60aba6b38956351d269532d0132f10e5e92aed4d086234"
+    },
+    "ev-d-024-restored-profiles": {
+      "split": "dev",
+      "family": "fam-018",
+      "derivedFrom": null,
+      "eventsSha256": "77e21acbc40efefcbc8484b6831bb816052bad65345514662131818baf037680",
+      "annotationsSha256": "ea030277ae83025c7003b9a3f4b759666a7cd7821494994bd0b2f585c3097c1b"
+    },
+    "ev-d-025-chat-risky-signins": {
+      "split": "dev",
+      "family": "fam-019",
+      "derivedFrom": null,
+      "eventsSha256": "23072d61ffb30fa2da87281e83ced297a94142e4b00bfc420e15bf89ea6b6c4e",
+      "annotationsSha256": "1bd30125d5f322ffc0e0ded2a1b8055292c04c788fc76437c6ad5423faff3a37"
+    },
+    "ev-d-026-bucharest-forward": {
+      "split": "dev",
+      "family": "fam-020",
+      "derivedFrom": null,
+      "eventsSha256": "b2cc7a54ba9be92c292de4e93dce3591b2b7d53367fd48e5beb7fe34f1e9b74e",
+      "annotationsSha256": "cd5bc7563d7e646ecd176dba546248c4783375b908103ff6bd1e1aa68de0ead5"
+    },
+    "ev-d-027-phones-after-reset": {
+      "split": "dev",
+      "family": "fam-021",
+      "derivedFrom": null,
+      "eventsSha256": "f6d85148fc5df75227e9e451a3d939f620ad8928db9f7e48a830491f35d1b75c",
+      "annotationsSha256": "0326e2b5577889d3f43d0d8849279d12f12a52b458dd0b5b5b8ab7be7aab1347"
+    },
+    "ev-d-028-expired-signing-cert": {
+      "split": "dev",
+      "family": "fam-022",
+      "derivedFrom": null,
+      "eventsSha256": "97191c43078b05ae26fa38cca7f99bc918da117b300055fe59a2afaa197a6539",
+      "annotationsSha256": "107aa95a9259e6d4d8e4814ac3cb511f5f4c7cc695cee9427a88e46ab9d25e61"
+    },
+    "ev-d-029-dsregcmd-paste": {
+      "split": "dev",
+      "family": "fam-023",
+      "derivedFrom": null,
+      "eventsSha256": "93f7de1c558cd7b1ee51605770ea3937eba01af754afbe64490ab04fbbc503c1",
+      "annotationsSha256": "5011662b532e5c2e88e3730cbefe3b4eb6a839257ea2a665a35412a32c4dfe27"
+    },
+    "ev-d-030-mailbox-misfiled": {
+      "split": "dev",
+      "family": "fam-024",
+      "derivedFrom": null,
+      "eventsSha256": "decbc838b4cf9e8a913527b5bf7d7c145dab7e1803b2e905c4fefc9237a9a501",
+      "annotationsSha256": "9cd3a9aacdc7b571fe066fcc177ee0b9efbc1f1830ba7d0843aad2984894c7d3"
+    },
+    "ev-d-031-exclude-group-howto": {
+      "split": "dev",
+      "family": "fam-025",
+      "derivedFrom": null,
+      "eventsSha256": "bb9b7bd319590c7d4a27283c63cce160dedde66902ae253808be43443b6b699e",
+      "annotationsSha256": "aa42d70abaa6b321a324019d99baa193cb452ca74b443e5c154d6e46cc78d8e9"
+    },
+    "ev-d-032-recordings-retention": {
+      "split": "dev",
+      "family": "fam-026",
+      "derivedFrom": null,
+      "eventsSha256": "bb234143e753e27b949806b2ba9d7ca7df3706ec5019f1ff556e384bfd411b81",
+      "annotationsSha256": "c6d70e7ea3edc334d90710d9215594c828949c52175fbefdfe43064f1aac49cb"
+    },
+    "ev-d-033-hedging-admin": {
+      "split": "dev",
+      "family": "fam-027",
+      "derivedFrom": null,
+      "eventsSha256": "910b5ab5975a6377724f2a35fd2f5a0e1caa286847191b8854e8ccf416884271",
+      "annotationsSha256": "0f1fb6c5752b917626a96b13488a75b99da873dfd053c8bf6ab64c32c259f3bd"
+    },
+    "ev-d-034-plan-heavy-dns": {
+      "split": "dev",
+      "family": "fam-028",
+      "derivedFrom": null,
+      "eventsSha256": "ac383ae39e66b967f65848ec4c0899fd0571653b23bd9981deef3583850be8f6",
+      "annotationsSha256": "3dbe11942613fb23d878164daab5515756cb8a3b71171ee556d7453aadaa6ef0"
+    },
+    "ev-d-035-hearsay-proxy": {
+      "split": "dev",
+      "family": "fam-029",
+      "derivedFrom": null,
+      "eventsSha256": "6f945ec8d853a8a686a079ac9e712dd0f025896fdeb8c15b7af15bbe5455e7cb",
+      "annotationsSha256": "7abc149de29a5b4a2ff7a1f087032f72b452119836960cb089109d1d3f9e0a9a"
+    },
+    "ev-d-036-fix-came-back": {
+      "split": "dev",
+      "family": "fam-030",
+      "derivedFrom": null,
+      "eventsSha256": "51c08b1080af998b690ffc2519f9a42b2c218dc71f8ffa6963ea4b4678783e77",
+      "annotationsSha256": "d7ebf83882084cbd9bda42f27fd78d69449105e06aecbfee69f5352f07a45b75"
+    },
+    "ev-d-037-too-many-theories": {
+      "split": "dev",
+      "family": "fam-031",
+      "derivedFrom": null,
+      "eventsSha256": "a90fd7bc1393a6bf56277a7455ba2450661779d9925bd742cde2f23acea1b541",
+      "annotationsSha256": "4b0cf1ff764d639684c500c407587623fbbba16e4dbe90303ccc00cb6cba791e"
+    },
+    "ev-d-038-session-limit-dispute": {
+      "split": "dev",
+      "family": "fam-032",
+      "derivedFrom": null,
+      "eventsSha256": "35e68fe7c0ef2a5331830e31417a66a8671b905c58355c945c06c90879c06810",
+      "annotationsSha256": "0db1afc4e8f5e998e500cdbc51917a864196ef049f8cf1e68f5ea2c602050bd3"
+    },
+    "ev-d-039-incident-or-not": {
+      "split": "dev",
+      "family": "fam-033",
+      "derivedFrom": null,
+      "eventsSha256": "9b28000fb2abce29a431af5fa441c92bb6445dba2de55bb5002749b89a4b1314",
+      "annotationsSha256": "d7da3923a97c8d691d003fd243ee7f8b621901a92920cc667a1ecf1a5174b114"
+    },
+    "ev-d-040-rotterdam-prt-restart": {
+      "split": "dev",
+      "family": "fam-034",
+      "derivedFrom": null,
+      "eventsSha256": "46d1468b9b211b7edfa67ae36c75108ae516d0cd756dc90e8fa0f97b616b9f65",
+      "annotationsSha256": "9addf7d930e6154b2ae0568dd4a4dfe467d361f0f83d8cc0756c8e3cc609bf0f"
+    },
+    "ev-d-041-second-floor-print-queue": {
+      "split": "dev",
+      "family": "fam-035",
+      "derivedFrom": null,
+      "eventsSha256": "364fea61bbdcd74cd38f1615194d84584995f61f6018383d29cdedcd15f5b480",
+      "annotationsSha256": "a13762839ba1770471a3a2987f135b6c6e7e79969243f917629539758008ad8f"
+    },
+    "ev-d-042-vpn-drops-half-hourly": {
+      "split": "dev",
+      "family": "fam-036",
+      "derivedFrom": null,
+      "eventsSha256": "30252e6da88ea9fcaafa2ab5bf2362a1b19151f4c3a4db2165bb93fcdc059ef8",
+      "annotationsSha256": "1b10fc351cdc71b6ec6aa778f7a597aba52b19d79e39e80c2884e5f90c0648ec"
+    },
+    "ev-d-043-call-audio-drops": {
+      "split": "dev",
+      "family": "fam-038",
+      "derivedFrom": null,
+      "eventsSha256": "2284095232865dd6c919d46823e8696b199a98636ae662d44b9374770779c13d",
+      "annotationsSha256": "34b6aeb87916702e87c51708733221eb0ee5067a84a258befa9bf1f49905b2c7"
+    },
+    "ev-d-044-tallinn-three-days": {
+      "split": "dev",
+      "family": "fam-037",
+      "derivedFrom": null,
+      "eventsSha256": "9fae0a2f4de32a54dc57496c74f52324b17bb6ceca8cb160082b2821cbc62d3d",
+      "annotationsSha256": "ce5e79cfc0a8615df8c1a173305dbda1a6e995aa20906e8a3322b84838461c41"
+    },
+    "ev-d-045-tartu-one-laptop": {
+      "split": "dev",
+      "family": "fam-039",
+      "derivedFrom": null,
+      "eventsSha256": "de8879fadaf488359c0686cd1a83e4f7107fd93aab33f5d03c7231db06539201",
+      "annotationsSha256": "541c9b7b54a7e3674041e2571cdaa7ceb6c56308725d9e1daf2612e56a28dde3"
+    },
+    "ev-d-046-kaunas-filtering-rule": {
+      "split": "dev",
+      "family": "fam-040",
+      "derivedFrom": null,
+      "eventsSha256": "2cd4c6efc3bfade75145492a94320bc54cf85ed27af4af2ea296201feca15ff2",
+      "annotationsSha256": "f2f76c5b19a5f474b66c3a5d5d46e7bbcef5eb5ff760c9dd2ba050a014d0a719"
+    },
+    "ev-v-001-graz-new-filter": {
+      "split": "validation",
+      "family": "fam-101",
+      "derivedFrom": null,
+      "eventsSha256": "cea1d19f2b58fa7ae910a5a2a14a06299481056079728124f4156b529db63b3f",
+      "annotationsSha256": "729776c16c86815ca809179b00a103615a69d80b0dc26009ff6b9a361f335e38"
+    },
+    "ev-v-002-linz-warehouse-node": {
+      "split": "validation",
+      "family": "fam-102",
+      "derivedFrom": null,
+      "eventsSha256": "bc61c1e1572b84839ed44c91222f75af123d31a6d6e91a6e2efe012e57812e0a",
+      "annotationsSha256": "8bdf8cdfbd730a72ec7237e790c2ffa1cd1fe37b3238a9116e3ffd4827d55b71"
+    },
+    "ev-v-003-bergen-second-factor": {
+      "split": "validation",
+      "family": "fam-103",
+      "derivedFrom": null,
+      "eventsSha256": "1bef56d5b8b7722fd7930da34b5ea9b6e6ebf7169effc9164840da75f4cbb835",
+      "annotationsSha256": "e4f45da4d3eb54ee115268ef30d3f8745b43b266819b05595b5b1e0573641124"
+    },
+    "ev-v-004-porto-handed-over-laptop": {
+      "split": "validation",
+      "family": "fam-104",
+      "derivedFrom": null,
+      "eventsSha256": "5fd219359d3ff09076483b51922953dc3fc4daeefba55a3df15ea3ccb26e1409",
+      "annotationsSha256": "5032ac09ef572ce74338658ec07edde905332c8e7fc924472669fe3bb76b5537"
+    },
+    "ev-v-005-split-farm-clock": {
+      "split": "validation",
+      "family": "fam-105",
+      "derivedFrom": null,
+      "eventsSha256": "2fed07f1fa839833f89bdf98302cef0b56a31d495123499064b35b89731e8eaa",
+      "annotationsSha256": "5a094df5ac720ea63823ffa63fd4cc4cc0b28aa3a873f8223a225ae9f22b9487"
+    },
+    "ev-v-006-tromso-forwarded-chain": {
+      "split": "validation",
+      "family": "fam-106",
+      "derivedFrom": null,
+      "eventsSha256": "b1075cc7cdf7e6c7c013e9440c5605f02fae2517794ee2deee93bc6905968f99",
+      "annotationsSha256": "c673e780f02022b04f3c5e6074f34e70f4eb7eae0f1dc5eb0859bef492a2f479"
+    },
+    "ev-v-007-brno-chat-export": {
+      "split": "validation",
+      "family": "fam-107",
+      "derivedFrom": null,
+      "eventsSha256": "ac3c8bda20254cee5626b38e70b0d50e900808e6cdda3a0c12059d51a4c971fd",
+      "annotationsSha256": "036b05eafaa8aa1e493d175d02727dc3d84fc5371706ad19ac96a2a5cf8ec9f2"
+    },
+    "ev-v-008-ostrava-log-paste": {
+      "split": "validation",
+      "family": "fam-108",
+      "derivedFrom": null,
+      "eventsSha256": "c04d432723e6cd91e89cb8d38b564eecec77903b24e400d9745717ae970df498",
+      "annotationsSha256": "1f8bf853db778aa9e67abdc69512af1afdbfd9b34a1cbe2690aaedbe6609de0d"
+    },
+    "ev-v-009-katowice-three-sites": {
+      "split": "validation",
+      "family": "fam-109",
+      "derivedFrom": null,
+      "eventsSha256": "f215254a5dea8593dd01da9dcd6ebc428c2f0c80f5671776dd2f1d6ada9832d1",
+      "annotationsSha256": "e183d101996fc06055091bdb6f39b7aa14e1741969d12d04ad62f8b9472823e7"
+    },
+    "ev-v-010-webinar-licence-question": {
+      "split": "validation",
+      "family": "fam-110",
+      "derivedFrom": null,
+      "eventsSha256": "f3ad756c6820a2593e9e2ea441cfdc8d050633daff82f9235f2c50b842012049",
+      "annotationsSha256": "00b7d2956715e331740ad8ac2f07c9d1b5c53a67705cc2c707c205c4dc8ae7ce"
+    },
+    "ev-v-011-new-proxy-next-month": {
+      "split": "validation",
+      "family": "fam-111",
+      "derivedFrom": null,
+      "eventsSha256": "d46128b9de333e8c7372fe58a852102339b952feedda8cfe7f10bc4bf208b0bd",
+      "annotationsSha256": "af7af490ac18a31f4d4d6416b67b4578f235a541531ba2849dc6ce5b457d5bdc"
+    },
+    "ev-v-012-helpdesk-training-notes": {
+      "split": "validation",
+      "family": "fam-112",
+      "derivedFrom": null,
+      "eventsSha256": "aab00f64879f6b36acd89cc34f66be552257950b8c8c60e7adec1d9fef4895cb",
+      "annotationsSha256": "c37f0782a0a77512c7d51d9e2a7524c66c0f5340f52a5ef118fb94c4840d6384"
+    },
+    "ev-v-013-old-dns-servers-retired": {
+      "split": "validation",
+      "family": "fam-113",
+      "derivedFrom": null,
+      "eventsSha256": "74ca273f7fba665e8419f045a2c63f9f919624aa4328fd6f5114e79cf7298e83",
+      "annotationsSha256": "07dee4b91bafcbb9654f555b18f372d463ba14ae90220d7876e7e71d64aa07a6"
+    },
+    "ev-v-014-not-dns-we-think": {
+      "split": "validation",
+      "family": "fam-114",
+      "derivedFrom": null,
+      "eventsSha256": "932d4f9bb5b557ba27f0407dab74996699a0329a515d880444d4aa99d1891520",
+      "annotationsSha256": "897848e295179fd486bdb15e65bdc04f2820ea18a3a87a67db8abca663d31eda"
+    },
+    "ev-v-015-greta-asked-again": {
+      "split": "validation",
+      "family": "fam-115",
+      "derivedFrom": null,
+      "eventsSha256": "2c027ddddd4339f7ada60302a592e316dd1a6ab8cd79aeea6af0a7316cd0caed",
+      "annotationsSha256": "4c588867ff2fbb18cbce11d902b7d0088a745e2c2acf7dc503db6677ad353698"
+    },
+    "ev-v-016-who-changed-the-rule": {
+      "split": "validation",
+      "family": "fam-116",
+      "derivedFrom": null,
+      "eventsSha256": "31f668960387131721fce084b3f69e101646ed5cb79e10825492792fe740879e",
+      "annotationsSha256": "ca34f1ed9109e3ae80cc4b52bd8cfe836c0f83b1c7ef17e730b6c1dbd0adda80"
+    },
+    "ev-v-017-partner-mail-bounces": {
+      "split": "validation",
+      "family": "fam-117",
+      "derivedFrom": null,
+      "eventsSha256": "d1186251829b0f5d99378e108565f7a7a916ab4c254e1bb78e1d63529911489e",
+      "annotationsSha256": "80e1ccebe8988f383331bfc629f03dc3ca45314b178fae23986b0e9298f09d81"
+    },
+    "ev-v-018-two-dsregcmd-outputs": {
+      "split": "validation",
+      "family": "fam-118",
+      "derivedFrom": null,
+      "eventsSha256": "26fc61db0134a39ae0c0f997299d4a0d3a7d435c32ce5e04a0f98546609025bf",
+      "annotationsSha256": "57104e2bc4197d11ec789b5c5441acc8eb24caac9cd9149ee8b2962c6ee1e23b"
+    }
+  },
+  "locked": null
+}

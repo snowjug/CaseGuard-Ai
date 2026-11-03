@@ -15,7 +15,12 @@
         { "event": "ev01", "id": "sig.site-correlated" },
         { "event": "ev04", "id": "sig.no-server-side-failure-records" },
         { "event": "ev05", "id": "sig.service-health-incident" },
-        { "event": "ev06", "id": "sig.service-health-incident", "uncertainty": "low", "note": "restated" },
+        {
+          "event": "ev06",
+          "id": "sig.service-health-incident",
+          "uncertainty": "low",
+          "note": "restated"
+        },
         { "event": "ev09", "id": "sig.service-health-incident" }
       ],
       "actions": [
@@ -30,8 +35,18 @@
         { "event": "ev12", "id": "act.communicate-status" }
       ],
       "absent": [
-        { "event": "ev03", "id": "sig.recent-network-change-reported", "reason": "speculative", "note": "Lukas said maybe he touched the firewall, not sure" },
-        { "event": "ev07", "id": "sig.service-health-clear", "reason": "speculative", "note": "maybe the incident is over, idk" }
+        {
+          "event": "ev03",
+          "id": "sig.recent-network-change-reported",
+          "reason": "speculative",
+          "note": "Lukas said maybe he touched the firewall, not sure"
+        },
+        {
+          "event": "ev07",
+          "id": "sig.service-health-clear",
+          "reason": "speculative",
+          "note": "maybe the incident is over, idk"
+        }
       ],
       "forks": [],
       "earliestMissed": null,

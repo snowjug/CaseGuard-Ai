@@ -17,7 +17,12 @@
         { "event": "ev06", "id": "sig.no-server-side-failure-records" },
         { "event": "ev07", "id": "sig.prt-missing" },
         { "event": "ev07", "id": "sig.prt-healthy" },
-        { "event": "ev07", "id": "sig.no-server-side-failure-records", "uncertainty": "low", "note": "the logs are clean" },
+        {
+          "event": "ev07",
+          "id": "sig.no-server-side-failure-records",
+          "uncertainty": "low",
+          "note": "the logs are clean"
+        },
         { "event": "ev08", "id": "sig.prt-missing" },
         { "event": "ev09", "id": "sig.prt-healthy" },
         { "event": "ev10", "id": "sig.prt-healthy", "uncertainty": "low" }
@@ -30,8 +35,18 @@
         { "event": "ev10", "id": "act.validate-fix", "uncertainty": "low" }
       ],
       "absent": [
-        { "event": "ev02", "id": "sig.web-client-also-fails", "reason": "requested", "note": "asked whether the browser lets her in" },
-        { "event": "ev03", "id": "sig.web-client-also-fails", "reason": "negated", "note": "the browser works" }
+        {
+          "event": "ev02",
+          "id": "sig.web-client-also-fails",
+          "reason": "requested",
+          "note": "asked whether the browser lets her in"
+        },
+        {
+          "event": "ev03",
+          "id": "sig.web-client-also-fails",
+          "reason": "negated",
+          "note": "the browser works"
+        }
       ],
       "forks": [],
       "earliestMissed": null,

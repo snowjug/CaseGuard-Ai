@@ -12,11 +12,36 @@
       "signals": [],
       "actions": [],
       "absent": [
-        { "event": "ev01", "id": "sig.error-timeout", "reason": "other", "note": "a mail bounce, not a Teams client message" },
-        { "event": "ev01", "id": "sig.error-name-not-resolved", "reason": "other", "note": "a mail bounce, not a Teams client message" },
-        { "event": "ev03", "id": "sig.error-timeout", "reason": "other", "note": "the bounce text" },
-        { "event": "ev05", "id": "sig.error-timeout", "reason": "other", "note": "the handover note quotes the bounce" },
-        { "event": "ev05", "id": "sig.error-name-not-resolved", "reason": "other", "note": "the handover note quotes the bounce" }
+        {
+          "event": "ev01",
+          "id": "sig.error-timeout",
+          "reason": "other",
+          "note": "a mail bounce, not a Teams client message"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.error-name-not-resolved",
+          "reason": "other",
+          "note": "a mail bounce, not a Teams client message"
+        },
+        {
+          "event": "ev03",
+          "id": "sig.error-timeout",
+          "reason": "other",
+          "note": "the bounce text"
+        },
+        {
+          "event": "ev05",
+          "id": "sig.error-timeout",
+          "reason": "other",
+          "note": "the handover note quotes the bounce"
+        },
+        {
+          "event": "ev05",
+          "id": "sig.error-name-not-resolved",
+          "reason": "other",
+          "note": "the handover note quotes the bounce"
+        }
       ],
       "forks": [],
       "earliestMissed": null,

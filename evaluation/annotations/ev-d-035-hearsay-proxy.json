@@ -17,13 +17,28 @@
         { "event": "ev05", "id": "sig.service-health-clear" },
         { "event": "ev06", "id": "sig.resolvers-consistent" },
         { "event": "ev07", "id": "sig.proxy-node-inconsistent" },
-        { "event": "ev08", "id": "sig.resolvers-consistent", "uncertainty": "low", "note": "DNS is fine, restated" },
-        { "event": "ev08", "id": "sig.service-health-clear", "uncertainty": "low", "note": "service health is clear, restated" },
+        {
+          "event": "ev08",
+          "id": "sig.resolvers-consistent",
+          "uncertainty": "low",
+          "note": "DNS is fine, restated"
+        },
+        {
+          "event": "ev08",
+          "id": "sig.service-health-clear",
+          "uncertainty": "low",
+          "note": "service health is clear, restated"
+        },
         { "event": "ev08", "id": "sig.proxy-node-inconsistent" },
         { "event": "ev09", "id": "sig.recent-network-change-reported" },
         { "event": "ev10", "id": "sig.proxy-fix-resolved" },
         { "event": "ev11", "id": "sig.proxy-fix-resolved" },
-        { "event": "ev12", "id": "sig.proxy-node-inconsistent", "uncertainty": "low", "note": "restated in the closing note" }
+        {
+          "event": "ev12",
+          "id": "sig.proxy-node-inconsistent",
+          "uncertainty": "low",
+          "note": "restated in the closing note"
+        }
       ],
       "actions": [
         { "event": "ev02", "id": "act.request-minimal-scoping" },
@@ -35,18 +50,53 @@
         { "event": "ev11", "id": "act.validate-fix" }
       ],
       "absent": [
-        { "event": "ev01", "id": "sig.resolvers-consistent", "reason": "attributed", "note": "the network team says all three DNS servers answer fine" },
-        { "event": "ev01", "id": "sig.proxy-nodes-consistent", "reason": "attributed", "note": "all four proxy nodes are green on their dashboard" },
-        { "event": "ev01", "id": "sig.service-health-clear", "reason": "attributed", "note": "our helpdesk says the status page is green" },
-        { "event": "ev01", "id": "sig.prt-healthy", "reason": "attributed", "note": "the desktop team says the token state is healthy" },
-        { "event": "ev01", "id": "sig.recent-network-change-reported", "reason": "attributed", "note": "the network team says nothing was changed" }
+        {
+          "event": "ev01",
+          "id": "sig.resolvers-consistent",
+          "reason": "attributed",
+          "note": "the network team says all three DNS servers answer fine"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.proxy-nodes-consistent",
+          "reason": "attributed",
+          "note": "all four proxy nodes are green on their dashboard"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.service-health-clear",
+          "reason": "attributed",
+          "note": "our helpdesk says the status page is green"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.prt-healthy",
+          "reason": "attributed",
+          "note": "the desktop team says the token state is healthy"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.recent-network-change-reported",
+          "reason": "attributed",
+          "note": "the network team says nothing was changed"
+        }
       ],
       "forks": [],
       "earliestMissed": null,
       "counterfactualDirection": "none",
       "conflicts": [
-        { "class": "source_disagreement", "events": ["ev01", "ev07"], "subject": "sig.proxy-nodes-consistent", "note": "the dashboard says all four nodes are green, the engineer's test finds one timing out" },
-        { "class": "corrected_information", "events": ["ev01", "ev09"], "subject": "sig.recent-network-change-reported", "note": "nothing was changed, then a TLS inspection profile pushed last Thursday" }
+        {
+          "class": "source_disagreement",
+          "events": ["ev01", "ev07"],
+          "subject": "sig.proxy-nodes-consistent",
+          "note": "the dashboard says all four nodes are green, the engineer's test finds one timing out"
+        },
+        {
+          "class": "corrected_information",
+          "events": ["ev01", "ev09"],
+          "subject": "sig.recent-network-change-reported",
+          "note": "nothing was changed, then a TLS inspection profile pushed last Thursday"
+        }
       ],
       "qualityBand": "strong",
       "causes": ["hyp.proxy-egress"],

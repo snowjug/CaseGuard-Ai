@@ -45,7 +45,7 @@
       "type": "engineer_email",
       "channel": "email",
       "title": "Re: Teams timeouts Gothenburg",
-      "text": "Thank you, and sorry for the effort. While I go through the file, please clear the Teams cache on those three computers and, if the problem is still there, reinstall the Teams app, then test again."
+      "text": "Thank you, and sorry for the effort. While I go through the file, please empty the Teams cache folder on those three computers and, if the problem is still there, reinstall the Teams app, then test again."
     },
     {
       "key": "ev05",

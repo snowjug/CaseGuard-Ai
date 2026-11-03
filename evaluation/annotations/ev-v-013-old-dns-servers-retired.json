@@ -12,10 +12,30 @@
       "signals": [],
       "actions": [],
       "absent": [
-        { "event": "ev01", "id": "sig.recent-network-change-reported", "reason": "future_intent", "note": "a switch of the DNS servers planned for next Saturday" },
-        { "event": "ev02", "id": "act.dns-resolver-comparison", "reason": "conditional", "note": "the customer checks the names after the switch, and output is wanted only if a name fails" },
-        { "event": "ev02", "id": "sig.error-name-not-resolved", "reason": "conditional", "note": "the code would show only if a name fails after the switch" },
-        { "event": "ev05", "id": "sig.recent-network-change-reported", "reason": "future_intent", "note": "the switch starts on Saturday" }
+        {
+          "event": "ev01",
+          "id": "sig.recent-network-change-reported",
+          "reason": "future_intent",
+          "note": "a switch of the DNS servers planned for next Saturday"
+        },
+        {
+          "event": "ev02",
+          "id": "act.dns-resolver-comparison",
+          "reason": "conditional",
+          "note": "the customer checks the names after the switch, and output is wanted only if a name fails"
+        },
+        {
+          "event": "ev02",
+          "id": "sig.error-name-not-resolved",
+          "reason": "conditional",
+          "note": "the code would show only if a name fails after the switch"
+        },
+        {
+          "event": "ev05",
+          "id": "sig.recent-network-change-reported",
+          "reason": "future_intent",
+          "note": "the switch starts on Saturday"
+        }
       ],
       "forks": [],
       "earliestMissed": null,

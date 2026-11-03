@@ -20,12 +20,21 @@
         { "event": "ev04", "id": "sig.no-server-side-failure-records" },
         { "event": "ev05", "id": "sig.service-health-clear" },
         { "event": "ev07", "id": "sig.resolver-inconsistent" },
-        { "event": "ev07", "id": "sig.error-name-not-resolved", "note": "non-existent domain answers" },
+        {
+          "event": "ev07",
+          "id": "sig.error-name-not-resolved",
+          "note": "non-existent domain answers"
+        },
         { "event": "ev09", "id": "sig.proxy-nodes-consistent" },
         { "event": "ev10", "id": "sig.dns-fix-resolved" },
         { "event": "ev12", "id": "sig.dns-fix-resolved" },
         { "event": "ev13", "id": "sig.resolvers-consistent" },
-        { "event": "ev13", "id": "sig.dns-fix-resolved", "uncertainty": "low", "note": "before and after counts" }
+        {
+          "event": "ev13",
+          "id": "sig.dns-fix-resolved",
+          "uncertainty": "low",
+          "note": "before and after counts"
+        }
       ],
       "actions": [
         { "event": "ev02", "id": "act.request-minimal-scoping" },

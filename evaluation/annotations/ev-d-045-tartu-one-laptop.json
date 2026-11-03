@@ -17,13 +17,23 @@
       ],
       "actions": [
         { "event": "ev02", "id": "act.device-registration-check" },
-        { "event": "ev02", "id": "act.request-minimal-scoping", "uncertainty": "medium", "note": "asks for one UTC failure time and the device output only" },
+        {
+          "event": "ev02",
+          "id": "act.request-minimal-scoping",
+          "uncertainty": "medium",
+          "note": "asks for one UTC failure time and the device output only"
+        },
         { "event": "ev04", "id": "act.signin-log-correlation" },
         { "event": "ev05", "id": "act.clear-teams-cache" },
         { "event": "ev07", "id": "act.validate-fix" }
       ],
       "absent": [
-        { "event": "ev01", "id": "sig.web-client-also-fails", "reason": "negated", "note": "Teams in her browser works" }
+        {
+          "event": "ev01",
+          "id": "sig.web-client-also-fails",
+          "reason": "negated",
+          "note": "Teams in her browser works"
+        }
       ],
       "forks": [],
       "earliestMissed": null,

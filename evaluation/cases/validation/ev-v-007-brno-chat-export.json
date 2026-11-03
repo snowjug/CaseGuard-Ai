@@ -27,7 +27,7 @@
       "type": "engineer_email",
       "channel": "email",
       "title": "Re: chat export, teams signin brno",
-      "text": "Hello Jana, thanks for the export. Could you give me three names with the UTC time of a failed sign-in each, and tell me if your team changed anything in DNS, the proxy, the firewall or identity?"
+      "text": "Hello Jana, thanks for the export. Could you name three people who failed to sign in, each with a time in UTC, and tell me if your team changed anything in DNS, the proxy, the firewall or identity?"
     },
     {
       "key": "ev03",
@@ -54,7 +54,7 @@
       "type": "diagnostic_result",
       "channel": "tool",
       "title": "Provider status",
-      "text": "Provider status at 13:05 UTC: an active incident for sign-in connectivity of Teams and Entra ID in Central Europe, start 10:40 UTC, impact: users may see time-outs, mitigation in progress."
+      "text": "Provider status at 13:05 UTC: one incident is open for the sign-in connectivity of Teams and Entra ID in Central Europe, start 10:40 UTC, impact: users may see time-outs, mitigation in progress."
     },
     {
       "key": "ev06",
@@ -63,7 +63,7 @@
       "type": "engineer_email",
       "channel": "email",
       "title": "Re: chat export, teams signin brno",
-      "text": "Hello Jana, the provider has an active incident for sign-in connectivity in Central Europe since 10:40 UTC, and it fits what you describe. You do not need to change anything. Expect my next message at 14:30 UTC, or earlier if the provider reports it resolved."
+      "text": "Hello Jana, the provider lists an open incident about sign-in connectivity in Central Europe since 10:40 UTC, and it fits what you describe. You do not need to change anything. Expect my next message at 14:30 UTC, or earlier if the provider reports it resolved."
     },
     {
       "key": "ev07",

@@ -15,7 +15,12 @@
         { "event": "ev03", "id": "sig.recent-ca-change-reported" },
         { "event": "ev04", "id": "sig.server-side-failure-records-present" },
         { "event": "ev04", "id": "sig.mfa-ca-events-in-logs" },
-        { "event": "ev05", "id": "sig.recent-ca-change-reported", "uncertainty": "low", "note": "from the audit log" }
+        {
+          "event": "ev05",
+          "id": "sig.recent-ca-change-reported",
+          "uncertainty": "low",
+          "note": "from the audit log"
+        }
       ],
       "actions": [
         { "event": "ev02", "id": "act.request-minimal-scoping" },
@@ -27,7 +32,12 @@
         { "event": "ev10", "id": "act.validate-fix" }
       ],
       "absent": [
-        { "event": "ev10", "id": "sig.mfa-ca-events-in-logs", "reason": "negated", "note": "no failed Conditional Access rows after the change" }
+        {
+          "event": "ev10",
+          "id": "sig.mfa-ca-events-in-logs",
+          "reason": "negated",
+          "note": "no failed Conditional Access rows after the change"
+        }
       ],
       "forks": [],
       "earliestMissed": null,

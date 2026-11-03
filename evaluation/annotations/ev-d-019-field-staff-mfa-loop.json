@@ -11,12 +11,22 @@
       "exclusionReason": null,
       "signals": [
         { "event": "ev01", "id": "sig.multiple-users-affected" },
-        { "event": "ev01", "id": "sig.site-correlated", "uncertainty": "low", "note": "by location of sign-in rather than by office" },
+        {
+          "event": "ev01",
+          "id": "sig.site-correlated",
+          "uncertainty": "low",
+          "note": "by location of sign-in rather than by office"
+        },
         { "event": "ev03", "id": "sig.service-health-clear" },
         { "event": "ev04", "id": "sig.recent-ca-change-reported" },
         { "event": "ev05", "id": "sig.server-side-failure-records-present" },
         { "event": "ev05", "id": "sig.mfa-ca-events-in-logs" },
-        { "event": "ev10", "id": "sig.recent-ca-change-reported", "uncertainty": "low", "note": "restated in the closing note" }
+        {
+          "event": "ev10",
+          "id": "sig.recent-ca-change-reported",
+          "uncertainty": "low",
+          "note": "restated in the closing note"
+        }
       ],
       "actions": [
         { "event": "ev02", "id": "act.request-minimal-scoping" },
@@ -27,7 +37,12 @@
         { "event": "ev09", "id": "act.validate-fix" }
       ],
       "absent": [
-        { "event": "ev02", "id": "act.check-service-health", "reason": "future_intent", "note": "I will check service health first" }
+        {
+          "event": "ev02",
+          "id": "act.check-service-health",
+          "reason": "future_intent",
+          "note": "I will check service health first"
+        }
       ],
       "forks": [],
       "earliestMissed": null,

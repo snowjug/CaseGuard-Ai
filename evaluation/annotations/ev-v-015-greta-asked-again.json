@@ -10,25 +10,70 @@
       "excluded": false,
       "exclusionReason": null,
       "signals": [
-        { "event": "ev01", "id": "sig.single-user-scope", "uncertainty": "medium", "note": "I think it is only me" },
+        {
+          "event": "ev01",
+          "id": "sig.single-user-scope",
+          "uncertainty": "medium",
+          "note": "I think it is only me"
+        },
         { "event": "ev03", "id": "sig.web-client-also-fails" },
         { "event": "ev04", "id": "sig.server-side-failure-records-present" },
         { "event": "ev04", "id": "sig.token-expiry-errors" },
-        { "event": "ev07", "id": "sig.token-expiry-errors", "uncertainty": "low", "note": "the engineer restates the cause" }
+        {
+          "event": "ev07",
+          "id": "sig.token-expiry-errors",
+          "uncertainty": "low",
+          "note": "the engineer restates the cause"
+        }
       ],
       "actions": [
-        { "event": "ev02", "id": "act.request-minimal-scoping", "uncertainty": "medium", "note": "asks for the user name, one UTC moment and the web client" },
+        {
+          "event": "ev02",
+          "id": "act.request-minimal-scoping",
+          "uncertainty": "medium",
+          "note": "asks for the user name, one UTC moment and the web client"
+        },
         { "event": "ev04", "id": "act.signin-log-correlation" },
-        { "event": "ev05", "id": "act.request-recent-changes", "uncertainty": "medium", "note": "asks about a change of the password" },
-        { "event": "ev07", "id": "act.communicate-status", "uncertainty": "medium", "note": "tells what was found and what to do next" },
+        {
+          "event": "ev05",
+          "id": "act.request-recent-changes",
+          "uncertainty": "medium",
+          "note": "asks about a change of the password"
+        },
+        {
+          "event": "ev07",
+          "id": "act.communicate-status",
+          "uncertainty": "medium",
+          "note": "tells what was found and what to do next"
+        },
         { "event": "ev09", "id": "act.validate-fix" },
         { "event": "ev10", "id": "act.communicate-status" }
       ],
       "absent": [
-        { "event": "ev01", "id": "sig.multiple-users-affected", "reason": "negated", "note": "it is not many people" },
-        { "event": "ev01", "id": "sig.cache-clear-resolved", "reason": "speculative", "note": "it seemed to help for a while, but I am not sure" },
-        { "event": "ev01", "id": "sig.error-timeout", "reason": "speculative", "note": "the message might have been a time-out" },
-        { "event": "ev01", "id": "sig.ca-config-unchanged", "reason": "speculative", "note": "I believe nobody changed any policy" }
+        {
+          "event": "ev01",
+          "id": "sig.multiple-users-affected",
+          "reason": "negated",
+          "note": "it is not many people"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.cache-clear-resolved",
+          "reason": "speculative",
+          "note": "it seemed to help for a while, but I am not sure"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.error-timeout",
+          "reason": "speculative",
+          "note": "the message might have been a time-out"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.ca-config-unchanged",
+          "reason": "speculative",
+          "note": "I believe nobody changed any policy"
+        }
       ],
       "forks": [],
       "earliestMissed": null,

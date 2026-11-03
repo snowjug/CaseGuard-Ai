@@ -18,7 +18,7 @@
       "type": "customer_email",
       "channel": "email",
       "title": "Second factor over and over in Teams",
-      "text": "Hello. Since the early morning many colleagues in the Bergen head office are asked for the second factor again and again in Teams, and then Teams says 'Authentication failed'. The IT desk counts 80 tickets. People in the Stavanger office have no trouble. No code is shown, only the message."
+      "text": "Hello. Since the early morning many colleagues in the Bergen head office keep getting a second-factor request in Teams, over and over, and then Teams says 'Authentication failed'. The IT desk counts 80 tickets. People in the Stavanger office have no trouble. No code is shown, only the message."
     },
     {
       "key": "ev02",

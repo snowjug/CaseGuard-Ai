@@ -99,7 +99,7 @@
       "type": "customer_email",
       "channel": "email",
       "title": "Re: Teams sign-in problem Tallinn",
-      "text": "I cleared the Teams cache on k.saar's laptop at 15:10 UTC and she signed in again. The same error caa82ee2 appeared."
+      "text": "I emptied the Teams cache folder of k.saar's laptop at 15:10 UTC and she signed in again. The same error caa82ee2 appeared."
     },
     {
       "key": "ev11",

@@ -54,7 +54,7 @@
       "type": "diagnostic_result",
       "channel": "tool",
       "title": "Service health",
-      "text": "Service health at 10:25 UTC: no active incident for Teams or sign-in, nothing relevant in the Message center."
+      "text": "Service health at 10:25 UTC: Teams and sign-in show no open incident, and the Message center has nothing relevant."
     },
     {
       "key": "ev06",

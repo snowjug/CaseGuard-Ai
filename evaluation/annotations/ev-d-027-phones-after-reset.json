@@ -13,12 +13,27 @@
         { "event": "ev01", "id": "sig.multiple-users-affected" },
         { "event": "ev01", "id": "sig.intermittent-failures" },
         { "event": "ev03", "id": "sig.ca-config-unchanged" },
-        { "event": "ev03", "id": "sig.token-expiry-errors", "uncertainty": "low", "note": "the phone says the session expired" },
+        {
+          "event": "ev03",
+          "id": "sig.token-expiry-errors",
+          "uncertainty": "low",
+          "note": "the phone says the session expired"
+        },
         { "event": "ev04", "id": "sig.server-side-failure-records-present" },
         { "event": "ev04", "id": "sig.token-expiry-errors" },
         { "event": "ev05", "id": "sig.policy-events-outside-failure-window" },
-        { "event": "ev05", "id": "sig.ca-config-unchanged", "uncertainty": "low", "note": "no policy change since Friday" },
-        { "event": "ev06", "id": "sig.token-expiry-errors", "uncertainty": "low", "note": "sessions ended by the password change" }
+        {
+          "event": "ev05",
+          "id": "sig.ca-config-unchanged",
+          "uncertainty": "low",
+          "note": "no policy change since Friday"
+        },
+        {
+          "event": "ev06",
+          "id": "sig.token-expiry-errors",
+          "uncertainty": "low",
+          "note": "sessions ended by the password change"
+        }
       ],
       "actions": [
         { "event": "ev02", "id": "act.request-minimal-scoping" },
@@ -29,13 +44,23 @@
         { "event": "ev10", "id": "act.validate-fix" }
       ],
       "absent": [
-        { "event": "ev01", "id": "sig.recent-network-change-reported", "reason": "negated", "note": "because we did not" }
+        {
+          "event": "ev01",
+          "id": "sig.recent-network-change-reported",
+          "reason": "negated",
+          "note": "because we did not"
+        }
       ],
       "forks": [],
       "earliestMissed": null,
       "counterfactualDirection": "none",
       "conflicts": [
-        { "class": "corrected_information", "events": ["ev01", "ev07"], "subject": "whether anything changed on the customer side", "note": "we did not change anything, then a forced password change for 400 users" }
+        {
+          "class": "corrected_information",
+          "events": ["ev01", "ev07"],
+          "subject": "whether anything changed on the customer side",
+          "note": "we did not change anything, then a forced password change for 400 users"
+        }
       ],
       "qualityBand": "strong",
       "causes": ["hyp.token-session"],

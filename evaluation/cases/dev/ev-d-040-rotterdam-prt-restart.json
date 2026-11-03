@@ -81,7 +81,7 @@
       "type": "engineer_email",
       "channel": "email",
       "title": "Re: Credentials prompt in Teams, Rotterdam",
-      "text": "Understood. As a quick test, please clear the Teams cache on k.dekker's laptop and open Teams again."
+      "text": "Understood. As a quick test, please empty the Teams cache folder of k.dekker's laptop and open Teams again."
     },
     {
       "key": "ev09",
@@ -90,7 +90,7 @@
       "type": "customer_email",
       "channel": "email",
       "title": "Re: Credentials prompt in Teams, Rotterdam",
-      "text": "I cleared the Teams cache on k.dekker's laptop and the credentials prompt is still there, exactly as before."
+      "text": "I emptied the Teams cache folder of k.dekker's laptop and the credentials prompt is still there, exactly as before."
     },
     {
       "key": "ev10",

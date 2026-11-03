@@ -13,8 +13,18 @@
         { "event": "ev01", "id": "sig.multiple-users-affected" },
         { "event": "ev04", "id": "sig.no-server-side-failure-records" },
         { "event": "ev06", "id": "sig.cache-clear-resolved" },
-        { "event": "ev09", "id": "sig.cache-clear-resolved", "uncertainty": "low", "note": "restated in the closing note" },
-        { "event": "ev09", "id": "sig.no-server-side-failure-records", "uncertainty": "low", "note": "restated in the closing note" }
+        {
+          "event": "ev09",
+          "id": "sig.cache-clear-resolved",
+          "uncertainty": "low",
+          "note": "restated in the closing note"
+        },
+        {
+          "event": "ev09",
+          "id": "sig.no-server-side-failure-records",
+          "uncertainty": "low",
+          "note": "restated in the closing note"
+        }
       ],
       "actions": [
         { "event": "ev02", "id": "act.request-minimal-scoping" },
@@ -22,8 +32,18 @@
         { "event": "ev05", "id": "act.clear-teams-cache" }
       ],
       "absent": [
-        { "event": "ev01", "id": "sig.web-client-also-fails", "reason": "negated", "note": "the browser works inside the same desktop" },
-        { "event": "ev03", "id": "sig.site-correlated", "reason": "negated", "note": "different offices, so not a place" },
+        {
+          "event": "ev01",
+          "id": "sig.web-client-also-fails",
+          "reason": "negated",
+          "note": "the browser works inside the same desktop"
+        },
+        {
+          "event": "ev03",
+          "id": "sig.site-correlated",
+          "reason": "negated",
+          "note": "different offices, so not a place"
+        },
         { "event": "ev09", "id": "sig.web-client-also-fails", "reason": "negated" }
       ],
       "forks": [],

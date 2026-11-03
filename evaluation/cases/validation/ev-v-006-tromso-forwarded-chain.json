@@ -18,7 +18,7 @@
       "type": "customer_email",
       "channel": "email",
       "title": "FW: FW: Teams logging us out again and again",
-      "text": "Hi support team,\n\nsee below, our manager keeps asking. Can you please look at this today?\n\nThanks,\nSigrid\nSent from my mobile\n\n-----Original Message-----\nFrom: Anders Moe <anders.moe@example.com>\nSent: Wednesday, 19 August 2026 08:41\nTo: IT Service Desk <servicedesk@example.com>\nSubject: FW: Teams logging us out\n\n[cid:image001.png]\n\nHello IT,\nwe get logged out of Teams roughly every 3 hours since the end of last week and have to type our password and approve on the phone again. It is annoying during meetings. About 45 of us in the Tromso office. I asked the Narvik office and they have no such issue.&nbsp;<br>\nAnders\n\nThis e-mail and any attachment may contain information that is privileged. If you are not the addressee, please notify the sender and delete the message."
+      "text": "Hi support team,\n\nsee below, our manager keeps asking. Can you please look at this today?\n\nThanks,\nSigrid\nSent from my mobile\n\n-----Original Message-----\nFrom: Anders Moe <anders.moe@example.com>\nSent: Wednesday, 19 August 2026 08:41\nTo: IT Service Desk <servicedesk@example.com>\nSubject: FW: Teams logging us out\n\n[cid:image001.png]\n\nHello IT,\nwe get logged out of Teams roughly every 3 hours since the end of last week and have to type our password and approve on the phone again. It is annoying during meetings. About 45 of us in the Tromso office. I asked the Narvik office and they have no such issue.&nbsp;<br>\nAnders\n\nPrivileged and confidential. If this message reached you by mistake, tell the sender and remove it from your system."
     },
     {
       "key": "ev02",
@@ -27,7 +27,7 @@
       "type": "customer_email",
       "channel": "email",
       "title": "Automatic reply: FW: FW: Teams logging us out again and again",
-      "text": "Automatic reply: I am away from my desk until 24 August 2026 and will respond after my return. For urgent matters please contact the service desk."
+      "text": "Automatic reply: I am away from my desk until 24 August 2026 and will respond after my return. In urgent cases write to the service desk instead."
     },
     {
       "key": "ev03",

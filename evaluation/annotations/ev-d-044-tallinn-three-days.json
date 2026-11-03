@@ -20,15 +20,29 @@
         { "event": "ev05", "id": "sig.service-health-clear" },
         { "event": "ev07", "id": "sig.ca-exclusion-no-effect" },
         { "event": "ev07", "id": "sig.error-timeout" },
-        { "event": "ev08", "id": "sig.multiple-users-affected", "uncertainty": "low", "note": "restated in a phone note" },
+        {
+          "event": "ev08",
+          "id": "sig.multiple-users-affected",
+          "uncertainty": "low",
+          "note": "restated in a phone note"
+        },
         { "event": "ev10", "id": "sig.cache-clear-no-effect" },
         { "event": "ev10", "id": "sig.error-timeout" },
         { "event": "ev12", "id": "sig.resolvers-consistent" },
         { "event": "ev14", "id": "sig.proxy-node-inconsistent" },
-        { "event": "ev15", "id": "sig.recent-network-change-reported", "note": "a renewed inspection certificate on one node" },
+        {
+          "event": "ev15",
+          "id": "sig.recent-network-change-reported",
+          "note": "a renewed inspection certificate on one node"
+        },
         { "event": "ev19", "id": "sig.proxy-fix-resolved" },
         { "event": "ev24", "id": "sig.proxy-fix-resolved" },
-        { "event": "ev25", "id": "sig.proxy-fix-resolved", "uncertainty": "low", "note": "before and after counts" }
+        {
+          "event": "ev25",
+          "id": "sig.proxy-fix-resolved",
+          "uncertainty": "low",
+          "note": "before and after counts"
+        }
       ],
       "actions": [
         { "event": "ev02", "id": "act.request-minimal-scoping" },
@@ -47,11 +61,24 @@
         { "event": "ev27", "id": "act.communicate-status" }
       ],
       "absent": [
-        { "event": "ev03", "id": "sig.recent-network-change-reported", "reason": "speculative", "note": "someone touched the proxy at some point, the writer does not know when or what" }
+        {
+          "event": "ev03",
+          "id": "sig.recent-network-change-reported",
+          "reason": "speculative",
+          "note": "someone touched the proxy at some point, the writer does not know when or what"
+        }
       ],
       "forks": [
-        { "event": "ev06", "category": "low_value_action", "note": "a policy exclusion test although no server-side failure record exists" },
-        { "event": "ev09", "category": "low_value_action", "note": "a cache clear when the failures never reach the identity service" }
+        {
+          "event": "ev06",
+          "category": "low_value_action",
+          "note": "a policy exclusion test although no server-side failure record exists"
+        },
+        {
+          "event": "ev09",
+          "category": "low_value_action",
+          "note": "a cache clear when the failures never reach the identity service"
+        }
       ],
       "earliestMissed": "ev06",
       "counterfactualDirection": "better",

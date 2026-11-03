@@ -20,7 +20,12 @@
         { "event": "ev09", "id": "sig.cache-clear-no-effect" },
         { "event": "ev11", "id": "sig.cache-clear-no-effect" },
         { "event": "ev14", "id": "sig.prt-healthy" },
-        { "event": "ev15", "id": "sig.prt-healthy", "uncertainty": "low", "note": "restates the pasted output" }
+        {
+          "event": "ev15",
+          "id": "sig.prt-healthy",
+          "uncertainty": "low",
+          "note": "restates the pasted output"
+        }
       ],
       "actions": [
         { "event": "ev02", "id": "act.device-registration-check" },
@@ -34,17 +39,41 @@
         { "event": "ev15", "id": "act.validate-fix" }
       ],
       "absent": [
-        { "event": "ev01", "id": "sig.web-client-also-fails", "reason": "negated", "note": "Teams in the browser works" }
+        {
+          "event": "ev01",
+          "id": "sig.web-client-also-fails",
+          "reason": "negated",
+          "note": "Teams in the browser works"
+        }
       ],
       "forks": [
-        { "event": "ev10", "category": "low_value_action", "note": "a reinstall after a cache clear failed and the token was already missing on two devices" }
+        {
+          "event": "ev10",
+          "category": "low_value_action",
+          "note": "a reinstall after a cache clear failed and the token was already missing on two devices"
+        }
       ],
       "earliestMissed": "ev10",
       "counterfactualDirection": "better",
       "conflicts": [
-        { "class": "corrected_information", "events": ["ev01", "ev05"], "subject": "number of affected laptops", "note": "three laptops, corrected to eleven" },
-        { "class": "temporal_update", "events": ["ev03", "ev07"], "subject": "sig.prt-healthy", "note": "the token was there in the morning and gone after a restart" },
-        { "class": "temporal_update", "events": ["ev07", "ev14"], "subject": "sig.prt-missing", "note": "gone after the restart, back after the synchronisation was resumed" }
+        {
+          "class": "corrected_information",
+          "events": ["ev01", "ev05"],
+          "subject": "number of affected laptops",
+          "note": "three laptops, corrected to eleven"
+        },
+        {
+          "class": "temporal_update",
+          "events": ["ev03", "ev07"],
+          "subject": "sig.prt-healthy",
+          "note": "the token was there in the morning and gone after a restart"
+        },
+        {
+          "class": "temporal_update",
+          "events": ["ev07", "ev14"],
+          "subject": "sig.prt-missing",
+          "note": "gone after the restart, back after the synchronisation was resumed"
+        }
       ],
       "qualityBand": "adequate",
       "causes": ["hyp.device-state"],

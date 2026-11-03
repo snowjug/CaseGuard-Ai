@@ -10,15 +10,30 @@
       "excluded": false,
       "exclusionReason": null,
       "signals": [
-        { "event": "ev01", "id": "sig.multiple-users-affected", "uncertainty": "low", "note": "six users" },
+        {
+          "event": "ev01",
+          "id": "sig.multiple-users-affected",
+          "uncertainty": "low",
+          "note": "six users"
+        },
         { "event": "ev03", "id": "sig.prt-missing" },
         { "event": "ev03", "id": "sig.prt-healthy" },
         { "event": "ev05", "id": "sig.no-server-side-failure-records" },
         { "event": "ev06", "id": "sig.prt-missing" },
         { "event": "ev06", "id": "sig.prt-healthy" },
         { "event": "ev08", "id": "sig.prt-healthy" },
-        { "event": "ev09", "id": "sig.prt-healthy", "uncertainty": "low", "note": "a fresh primary refresh token" },
-        { "event": "ev10", "id": "sig.prt-missing", "uncertainty": "low", "note": "restated in the closing note" }
+        {
+          "event": "ev09",
+          "id": "sig.prt-healthy",
+          "uncertainty": "low",
+          "note": "a fresh primary refresh token"
+        },
+        {
+          "event": "ev10",
+          "id": "sig.prt-missing",
+          "uncertainty": "low",
+          "note": "restated in the closing note"
+        }
       ],
       "actions": [
         { "event": "ev02", "id": "act.device-registration-check" },
@@ -27,7 +42,12 @@
         { "event": "ev09", "id": "act.validate-fix" }
       ],
       "absent": [
-        { "event": "ev01", "id": "sig.web-client-also-fails", "reason": "other", "note": "the web application that works is Outlook, not Teams" }
+        {
+          "event": "ev01",
+          "id": "sig.web-client-also-fails",
+          "reason": "other",
+          "note": "the web application that works is Outlook, not Teams"
+        }
       ],
       "forks": [],
       "earliestMissed": null,

@@ -18,7 +18,7 @@
       "type": "customer_email",
       "channel": "email",
       "title": "Teams fails in Oslo",
-      "text": "Hello. Several colleagues in the Oslo office cannot sign in to Teams since 8:00 local time (06:00 UTC). The app says it could not resolve a name. I have not tried anything yet, I did not want to make it worse. Henrik"
+      "text": "Hello. Several colleagues in the Oslo office are locked out of Teams since 8:00 local time (06:00 UTC). The app says it could not resolve a name. I have not tried anything yet, I did not want to make it worse. Henrik"
     },
     {
       "key": "ev02",

@@ -12,24 +12,54 @@
       "signals": [
         { "event": "ev01", "id": "sig.multiple-users-affected" },
         { "event": "ev01", "id": "sig.site-correlated" },
-        { "event": "ev04", "id": "sig.recent-ca-change-reported", "uncertainty": "low", "note": "relayed from the customer's own security group" },
+        {
+          "event": "ev04",
+          "id": "sig.recent-ca-change-reported",
+          "uncertainty": "low",
+          "note": "relayed from the customer's own security group"
+        },
         { "event": "ev05", "id": "sig.server-side-failure-records-present" },
         { "event": "ev05", "id": "sig.token-expiry-errors" },
-        { "event": "ev06", "id": "sig.recent-ca-change-reported", "uncertainty": "low", "note": "from the audit log" },
-        { "event": "ev11", "id": "sig.recent-ca-change-reported", "uncertainty": "low", "note": "restated in the closing summary" }
+        {
+          "event": "ev06",
+          "id": "sig.recent-ca-change-reported",
+          "uncertainty": "low",
+          "note": "from the audit log"
+        },
+        {
+          "event": "ev11",
+          "id": "sig.recent-ca-change-reported",
+          "uncertainty": "low",
+          "note": "restated in the closing summary"
+        }
       ],
       "actions": [
         { "event": "ev03", "id": "act.request-minimal-scoping" },
         { "event": "ev03", "id": "act.request-recent-changes" },
         { "event": "ev05", "id": "act.signin-log-correlation" },
         { "event": "ev06", "id": "act.review-ca-policy-config" },
-        { "event": "ev07", "id": "act.communicate-status", "uncertainty": "medium", "note": "tells what was found and what to do next" },
+        {
+          "event": "ev07",
+          "id": "act.communicate-status",
+          "uncertainty": "medium",
+          "note": "tells what was found and what to do next"
+        },
         { "event": "ev10", "id": "act.validate-fix" },
         { "event": "ev11", "id": "act.communicate-status" }
       ],
       "absent": [
-        { "event": "ev08", "id": "sig.recent-ca-change-reported", "reason": "future_intent", "note": "the security group will change the frequency back tomorrow" },
-        { "event": "ev10", "id": "sig.token-expiry-errors", "reason": "negated", "note": "no AADSTS700082 rows after the change" }
+        {
+          "event": "ev08",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "future_intent",
+          "note": "the security group will change the frequency back tomorrow"
+        },
+        {
+          "event": "ev10",
+          "id": "sig.token-expiry-errors",
+          "reason": "negated",
+          "note": "no AADSTS700082 rows after the change"
+        }
       ],
       "forks": [],
       "earliestMissed": null,

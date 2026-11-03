@@ -12,16 +12,36 @@
       "signals": [
         { "event": "ev01", "id": "sig.multiple-users-affected" },
         { "event": "ev01", "id": "sig.intermittent-failures" },
-        { "event": "ev01", "id": "sig.token-expiry-errors", "uncertainty": "low", "note": "the client says the session expired; the log code comes in ev05" },
+        {
+          "event": "ev01",
+          "id": "sig.token-expiry-errors",
+          "uncertainty": "low",
+          "note": "the client says the session expired; the log code comes in ev05"
+        },
         { "event": "ev03", "id": "sig.ca-config-unchanged" },
         { "event": "ev04", "id": "sig.policy-events-outside-failure-window" },
-        { "event": "ev04", "id": "sig.ca-config-unchanged", "uncertainty": "low", "note": "an audit query that shows no recent policy change" },
+        {
+          "event": "ev04",
+          "id": "sig.ca-config-unchanged",
+          "uncertainty": "low",
+          "note": "an audit query that shows no recent policy change"
+        },
         { "event": "ev05", "id": "sig.server-side-failure-records-present" },
         { "event": "ev05", "id": "sig.token-expiry-errors" },
         { "event": "ev07", "id": "sig.revoke-sessions-no-effect" },
         { "event": "ev07", "id": "sig.intermittent-failures" },
-        { "event": "ev07", "id": "sig.token-expiry-errors", "uncertainty": "low", "note": "the tablets still say session expired" },
-        { "event": "ev08", "id": "sig.revoke-sessions-no-effect", "uncertainty": "low", "note": "the revoke did not matter" }
+        {
+          "event": "ev07",
+          "id": "sig.token-expiry-errors",
+          "uncertainty": "low",
+          "note": "the tablets still say session expired"
+        },
+        {
+          "event": "ev08",
+          "id": "sig.revoke-sessions-no-effect",
+          "uncertainty": "low",
+          "note": "the revoke did not matter"
+        }
       ],
       "actions": [
         { "event": "ev02", "id": "act.request-recent-changes" },
@@ -33,7 +53,12 @@
         { "event": "ev10", "id": "act.validate-fix" }
       ],
       "absent": [
-        { "event": "ev08", "id": "act.validate-fix", "reason": "future_intent", "note": "I will check the logs again at 11:30 UTC" }
+        {
+          "event": "ev08",
+          "id": "act.validate-fix",
+          "reason": "future_intent",
+          "note": "I will check the logs again at 11:30 UTC"
+        }
       ],
       "forks": [{ "event": "ev06", "category": "low_value_action" }],
       "earliestMissed": "ev06",

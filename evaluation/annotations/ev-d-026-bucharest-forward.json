@@ -10,8 +10,16 @@
       "excluded": false,
       "exclusionReason": null,
       "signals": [
-        { "event": "ev01", "id": "sig.multiple-users-affected", "note": "from the forwarded helpdesk message" },
-        { "event": "ev01", "id": "sig.web-client-also-fails", "note": "the web version does the same, in the forwarded message" },
+        {
+          "event": "ev01",
+          "id": "sig.multiple-users-affected",
+          "note": "from the forwarded helpdesk message"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.web-client-also-fails",
+          "note": "the web version does the same, in the forwarded message"
+        },
         { "event": "ev03", "id": "sig.error-name-not-resolved" },
         { "event": "ev05", "id": "sig.no-server-side-failure-records" },
         { "event": "ev06", "id": "sig.resolver-inconsistent" },
@@ -19,19 +27,39 @@
         { "event": "ev09", "id": "sig.recent-network-change-reported" },
         { "event": "ev10", "id": "sig.dns-fix-resolved" },
         { "event": "ev11", "id": "sig.dns-fix-resolved" },
-        { "event": "ev12", "id": "sig.recent-network-change-reported", "uncertainty": "low", "note": "restated in the closing note" }
+        {
+          "event": "ev12",
+          "id": "sig.recent-network-change-reported",
+          "uncertainty": "low",
+          "note": "restated in the closing note"
+        }
       ],
       "actions": [
         { "event": "ev02", "id": "act.request-minimal-scoping" },
         { "event": "ev05", "id": "act.signin-log-correlation" },
         { "event": "ev06", "id": "act.dns-resolver-comparison" },
-        { "event": "ev07", "id": "act.remove-resolver-from-service", "uncertainty": "low", "note": "points clients at the healthy resolver instead of the filtered ones" },
+        {
+          "event": "ev07",
+          "id": "act.remove-resolver-from-service",
+          "uncertainty": "low",
+          "note": "points clients at the healthy resolver instead of the filtered ones"
+        },
         { "event": "ev07", "id": "act.restore-dns-policy" },
         { "event": "ev11", "id": "act.validate-fix" }
       ],
       "absent": [
-        { "event": "ev01", "id": "sig.resolver-inconsistent", "reason": "speculative", "note": "we think maybe it is DNS" },
-        { "event": "ev08", "id": "act.remove-resolver-from-service", "reason": "attributed", "note": "a quote of the engineer's own step" }
+        {
+          "event": "ev01",
+          "id": "sig.resolver-inconsistent",
+          "reason": "speculative",
+          "note": "we think maybe it is DNS"
+        },
+        {
+          "event": "ev08",
+          "id": "act.remove-resolver-from-service",
+          "reason": "attributed",
+          "note": "a quote of the engineer's own step"
+        }
       ],
       "forks": [],
       "earliestMissed": null,

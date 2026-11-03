@@ -12,12 +12,22 @@
       "signals": [
         { "event": "ev01", "id": "sig.multiple-users-affected" },
         { "event": "ev01", "id": "sig.error-name-not-resolved" },
-        { "event": "ev01", "id": "sig.site-correlated", "uncertainty": "medium", "note": "one department, not the whole company" },
+        {
+          "event": "ev01",
+          "id": "sig.site-correlated",
+          "uncertainty": "medium",
+          "note": "one department, not the whole company"
+        },
         { "event": "ev04", "id": "sig.no-server-side-failure-records" },
         { "event": "ev05", "id": "sig.service-health-clear" },
         { "event": "ev07", "id": "sig.proxy-node-inconsistent" },
         { "event": "ev10", "id": "sig.proxy-fix-resolved" },
-        { "event": "ev11", "id": "sig.proxy-fix-resolved", "uncertainty": "low", "note": "before and after counts" }
+        {
+          "event": "ev11",
+          "id": "sig.proxy-fix-resolved",
+          "uncertainty": "low",
+          "note": "before and after counts"
+        }
       ],
       "actions": [
         { "event": "ev02", "id": "act.request-minimal-scoping" },
@@ -29,15 +39,60 @@
         { "event": "ev11", "id": "act.validate-fix" }
       ],
       "absent": [
-        { "event": "ev01", "id": "sig.error-timeout", "reason": "negated", "note": "it is not a time-out, nothing says timed out" },
-        { "event": "ev01", "id": "sig.cache-clear-no-effect", "reason": "negated", "note": "no cache was cleared yet" },
-        { "event": "ev01", "id": "sig.cache-clear-resolved", "reason": "negated", "note": "no cache was cleared yet" },
-        { "event": "ev03", "id": "sig.resolvers-consistent", "reason": "attributed", "note": "the network admin says the resolvers are fine, he looked yesterday" },
-        { "event": "ev03", "id": "sig.ca-config-unchanged", "reason": "speculative", "note": "I do not think anything changed, but I cannot confirm" },
-        { "event": "ev03", "id": "sig.recent-network-change-reported", "reason": "speculative", "note": "the parent company's network team may have touched something, I do not know" },
-        { "event": "ev08", "id": "sig.recent-network-change-reported", "reason": "speculative", "note": "I do not know whether anybody changed anything on node 3" },
-        { "event": "ev09", "id": "act.clear-teams-cache", "reason": "negated", "note": "no cache clearing is needed" },
-        { "event": "ev09", "id": "act.reinstall-teams", "reason": "negated", "note": "no reinstall is needed" }
+        {
+          "event": "ev01",
+          "id": "sig.error-timeout",
+          "reason": "negated",
+          "note": "it is not a time-out, nothing says timed out"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.cache-clear-no-effect",
+          "reason": "negated",
+          "note": "no cache was cleared yet"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.cache-clear-resolved",
+          "reason": "negated",
+          "note": "no cache was cleared yet"
+        },
+        {
+          "event": "ev03",
+          "id": "sig.resolvers-consistent",
+          "reason": "attributed",
+          "note": "the network admin says the resolvers are fine, he looked yesterday"
+        },
+        {
+          "event": "ev03",
+          "id": "sig.ca-config-unchanged",
+          "reason": "speculative",
+          "note": "I do not think anything changed, but I cannot confirm"
+        },
+        {
+          "event": "ev03",
+          "id": "sig.recent-network-change-reported",
+          "reason": "speculative",
+          "note": "the parent company's network team may have touched something, I do not know"
+        },
+        {
+          "event": "ev08",
+          "id": "sig.recent-network-change-reported",
+          "reason": "speculative",
+          "note": "I do not know whether anybody changed anything on node 3"
+        },
+        {
+          "event": "ev09",
+          "id": "act.clear-teams-cache",
+          "reason": "negated",
+          "note": "no cache clearing is needed"
+        },
+        {
+          "event": "ev09",
+          "id": "act.reinstall-teams",
+          "reason": "negated",
+          "note": "no reinstall is needed"
+        }
       ],
       "forks": [],
       "earliestMissed": null,

@@ -11,13 +11,23 @@
       "exclusionReason": null,
       "signals": [
         { "event": "ev01", "id": "sig.error-timeout" },
-        { "event": "ev01", "id": "sig.multiple-users-affected", "uncertainty": "low", "note": "at least four colleagues" },
+        {
+          "event": "ev01",
+          "id": "sig.multiple-users-affected",
+          "uncertainty": "low",
+          "note": "at least four colleagues"
+        },
         { "event": "ev03", "id": "sig.site-correlated" },
         { "event": "ev04", "id": "sig.no-server-side-failure-records" },
         { "event": "ev05", "id": "sig.service-health-clear" },
         { "event": "ev08", "id": "sig.proxy-node-inconsistent" },
         { "event": "ev09", "id": "sig.proxy-node-inconsistent" },
-        { "event": "ev10", "id": "sig.proxy-fix-resolved", "uncertainty": "medium", "note": "four colleagues can sign in, said with a hedge" },
+        {
+          "event": "ev10",
+          "id": "sig.proxy-fix-resolved",
+          "uncertainty": "medium",
+          "note": "four colleagues can sign in, said with a hedge"
+        },
         { "event": "ev11", "id": "sig.proxy-fix-resolved" },
         { "event": "ev12", "id": "sig.proxy-fix-resolved" }
       ],
@@ -31,22 +41,77 @@
         { "event": "ev12", "id": "act.validate-fix" }
       ],
       "absent": [
-        { "event": "ev01", "id": "sig.intermittent-failures", "reason": "negated", "note": "I would not call it intermittent" },
-        { "event": "ev01", "id": "sig.site-correlated", "reason": "speculative", "note": "I do not know yet whether other offices are affected" },
-        { "event": "ev01", "id": "sig.single-user-scope", "reason": "negated", "note": "it is not one person" },
-        { "event": "ev02", "id": "sig.site-correlated", "reason": "requested", "note": "asks whether others see it" },
-        { "event": "ev03", "id": "sig.service-health-incident", "reason": "negated", "note": "I do not think this is a Microsoft problem" },
-        { "event": "ev04", "id": "sig.mfa-ca-events-in-logs", "reason": "negated", "note": "no Conditional Access or MFA results" },
-        { "event": "ev06", "id": "sig.token-expiry-errors", "reason": "negated", "note": "I do not think this is an expired token" },
-        { "event": "ev07", "id": "sig.recent-network-change-reported", "reason": "negated", "note": "nothing has changed in the last month" },
-        { "event": "ev07", "id": "sig.proxy-nodes-consistent", "reason": "attributed", "note": "fairly sure both are healthy, the monitoring page is green" },
-        { "event": "ev09", "id": "sig.proxy-fix-resolved", "reason": "conditional", "note": "if that fixes it" }
+        {
+          "event": "ev01",
+          "id": "sig.intermittent-failures",
+          "reason": "negated",
+          "note": "I would not call it intermittent"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.site-correlated",
+          "reason": "speculative",
+          "note": "I do not know yet whether other offices are affected"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.single-user-scope",
+          "reason": "negated",
+          "note": "it is not one person"
+        },
+        {
+          "event": "ev02",
+          "id": "sig.site-correlated",
+          "reason": "requested",
+          "note": "asks whether others see it"
+        },
+        {
+          "event": "ev03",
+          "id": "sig.service-health-incident",
+          "reason": "negated",
+          "note": "I do not think this is a Microsoft problem"
+        },
+        {
+          "event": "ev04",
+          "id": "sig.mfa-ca-events-in-logs",
+          "reason": "negated",
+          "note": "no Conditional Access or MFA results"
+        },
+        {
+          "event": "ev06",
+          "id": "sig.token-expiry-errors",
+          "reason": "negated",
+          "note": "I do not think this is an expired token"
+        },
+        {
+          "event": "ev07",
+          "id": "sig.recent-network-change-reported",
+          "reason": "negated",
+          "note": "nothing has changed in the last month"
+        },
+        {
+          "event": "ev07",
+          "id": "sig.proxy-nodes-consistent",
+          "reason": "attributed",
+          "note": "fairly sure both are healthy, the monitoring page is green"
+        },
+        {
+          "event": "ev09",
+          "id": "sig.proxy-fix-resolved",
+          "reason": "conditional",
+          "note": "if that fixes it"
+        }
       ],
       "forks": [],
       "earliestMissed": null,
       "counterfactualDirection": "none",
       "conflicts": [
-        { "class": "source_disagreement", "events": ["ev07", "ev08"], "subject": "sig.proxy-nodes-consistent", "note": "the monitoring page is green for both proxies, the per-proxy test shows one timing out" }
+        {
+          "class": "source_disagreement",
+          "events": ["ev07", "ev08"],
+          "subject": "sig.proxy-nodes-consistent",
+          "note": "the monitoring page is green for both proxies, the per-proxy test shows one timing out"
+        }
       ],
       "qualityBand": "strong",
       "causes": ["hyp.proxy-egress"],

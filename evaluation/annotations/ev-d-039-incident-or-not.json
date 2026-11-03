@@ -28,15 +28,35 @@
         { "event": "ev12", "id": "act.validate-fix", "uncertainty": "low" }
       ],
       "absent": [
-        { "event": "ev07", "id": "sig.service-health-incident", "reason": "attributed", "note": "the office manager says the status page showed a red banner; no screenshot" }
+        {
+          "event": "ev07",
+          "id": "sig.service-health-incident",
+          "reason": "attributed",
+          "note": "the office manager says the status page showed a red banner; no screenshot"
+        }
       ],
       "forks": [],
       "earliestMissed": null,
       "counterfactualDirection": "none",
       "conflicts": [
-        { "class": "source_disagreement", "events": ["ev06", "ev07"], "subject": "sig.service-health-incident", "note": "the engineer's check shows no incident, the office manager says a banner was shown" },
-        { "class": "temporal_update", "events": ["ev06", "ev09"], "subject": "sig.service-health-incident", "note": "clear at 12:10, an incident posted by 13:30 with a start time of 10:25" },
-        { "class": "ambiguous_wording", "events": ["ev08", "ev10"], "subject": "whether sign-in works", "note": "it works now: for whom and how completely? A Leeds user says it still fails" }
+        {
+          "class": "source_disagreement",
+          "events": ["ev06", "ev07"],
+          "subject": "sig.service-health-incident",
+          "note": "the engineer's check shows no incident, the office manager says a banner was shown"
+        },
+        {
+          "class": "temporal_update",
+          "events": ["ev06", "ev09"],
+          "subject": "sig.service-health-incident",
+          "note": "clear at 12:10, an incident posted by 13:30 with a start time of 10:25"
+        },
+        {
+          "class": "ambiguous_wording",
+          "events": ["ev08", "ev10"],
+          "subject": "whether sign-in works",
+          "note": "it works now: for whom and how completely? A Leeds user says it still fails"
+        }
       ],
       "qualityBand": "strong",
       "causes": ["hyp.service-incident"],

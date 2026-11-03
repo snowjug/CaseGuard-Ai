@@ -4,7 +4,7 @@
   "split": "dev",
   "family": "fam-039",
   "title": "Teams does not let one person sign in",
-  "scenario": "One person on one laptop cannot sign in to Teams while the browser works and colleagues are fine; the device token is healthy, no failure record reaches the identity service, and a cache clear fixes it.",
+  "scenario": "One person is shut out of Teams on a single laptop while the browser works and colleagues are fine; the device token is healthy, no failure record reaches the identity service, and a cache clear fixes it.",
   "categories": ["paraphrase"],
   "workload": "teams-authentication",
   "openedAt": "2026-07-22T07:20:00Z",

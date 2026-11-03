@@ -27,7 +27,7 @@
       "type": "engineer_email",
       "channel": "email",
       "title": "Re: Teams time-outs in the Linz warehouse",
-      "text": "Hello, thanks for writing. To check the logs I need three affected people and, for each of them, the time of a failure in UTC. Please also tell me which locations work normally, and whether the network, proxy or identity team changed anything in the last 48 hours."
+      "text": "Hello, thanks for writing. For the log check please name three people who are affected and give the failure time in UTC of each. Please also tell me which locations work normally, and whether the network, proxy or identity team changed anything in the last 48 hours."
     },
     {
       "key": "ev03",

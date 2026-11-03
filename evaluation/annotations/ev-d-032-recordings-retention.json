@@ -12,9 +12,24 @@
       "signals": [],
       "actions": [],
       "absent": [
-        { "event": "ev01", "id": "sig.recent-ca-change-reported", "reason": "other", "note": "a retention policy was changed, not an access policy" },
-        { "event": "ev02", "id": "sig.recent-ca-change-reported", "reason": "other", "note": "the retention policy again" },
-        { "event": "ev06", "id": "sig.recent-ca-change-reported", "reason": "other", "note": "the retention policy again" }
+        {
+          "event": "ev01",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "other",
+          "note": "a retention policy was changed, not an access policy"
+        },
+        {
+          "event": "ev02",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "other",
+          "note": "the retention policy again"
+        },
+        {
+          "event": "ev06",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "other",
+          "note": "the retention policy again"
+        }
       ],
       "forks": [],
       "earliestMissed": null,

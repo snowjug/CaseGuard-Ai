@@ -18,7 +18,7 @@
       "type": "customer_email",
       "channel": "email",
       "title": "New colleague cannot sign in to Teams",
-      "text": "Hello, our new colleague Rita Alves cannot sign in to Teams on her laptop, which was handed to her on Monday. The browser version of Teams fails for her as well, it just returns to the sign-in page. She is the only one: two other new colleagues with the same laptop model are fine."
+      "text": "Hello, our new colleague Rita Alves cannot sign in to Teams on her laptop, which was handed to her on Monday. Teams in the browser fails for her as well, it just returns to the sign-in page. She is the only one: two other new colleagues with the same laptop model are fine."
     },
     {
       "key": "ev02",
@@ -54,7 +54,7 @@
       "type": "engineer_email",
       "channel": "email",
       "title": "Re: New colleague cannot sign in to Teams",
-      "text": "Thanks. Next, empty the Teams cache folder on the laptop, sign out of the browser as well, and try once more."
+      "text": "Thanks. Next, wipe the cached Teams data on the laptop, sign out of the browser as well, and try once more."
     },
     {
       "key": "ev06",

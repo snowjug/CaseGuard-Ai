@@ -14,13 +14,33 @@
         { "event": "ev03", "id": "sig.multiple-users-affected" },
         { "event": "ev06", "id": "sig.federation-node-error" },
         { "event": "ev07", "id": "sig.server-side-failure-records-present" },
-        { "event": "ev07", "id": "sig.federation-node-error", "uncertainty": "low", "note": "the federated token or certificate rejected as not valid" },
-        { "event": "ev08", "id": "sig.federation-node-error", "uncertainty": "low", "note": "the engineer restates the cause" },
-        { "event": "ev12", "id": "sig.federation-node-error", "uncertainty": "low", "note": "restated in the closing note" }
+        {
+          "event": "ev07",
+          "id": "sig.federation-node-error",
+          "uncertainty": "low",
+          "note": "the federated token or certificate rejected as not valid"
+        },
+        {
+          "event": "ev08",
+          "id": "sig.federation-node-error",
+          "uncertainty": "low",
+          "note": "the engineer restates the cause"
+        },
+        {
+          "event": "ev12",
+          "id": "sig.federation-node-error",
+          "uncertainty": "low",
+          "note": "restated in the closing note"
+        }
       ],
       "actions": [
         { "event": "ev03", "id": "act.escalate-to-identity-team" },
-        { "event": "ev04", "id": "act.check-federation-health", "uncertainty": "low", "note": "advice to ask for the certificate check" },
+        {
+          "event": "ev04",
+          "id": "act.check-federation-health",
+          "uncertainty": "low",
+          "note": "advice to ask for the certificate check"
+        },
         { "event": "ev04", "id": "act.request-minimal-scoping", "uncertainty": "low" },
         { "event": "ev05", "id": "act.request-minimal-scoping" },
         { "event": "ev05", "id": "act.check-federation-health" },
@@ -28,8 +48,18 @@
         { "event": "ev11", "id": "act.validate-fix" }
       ],
       "absent": [
-        { "event": "ev02", "id": "act.escalate-to-identity-team", "reason": "future_intent", "note": "I am escalating right away; the escalation itself is ev03" },
-        { "event": "ev01", "id": "sig.federation-node-error", "reason": "other", "note": "the quoted monitoring alert says there are warnings, without saying what" }
+        {
+          "event": "ev02",
+          "id": "act.escalate-to-identity-team",
+          "reason": "future_intent",
+          "note": "I am escalating right away; the escalation itself is ev03"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.federation-node-error",
+          "reason": "other",
+          "note": "the quoted monitoring alert says there are warnings, without saying what"
+        }
       ],
       "forks": [{ "event": "ev03", "category": "premature_escalation" }],
       "earliestMissed": "ev03",

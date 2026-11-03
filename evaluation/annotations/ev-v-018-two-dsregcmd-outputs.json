@@ -21,21 +21,45 @@
       "actions": [
         { "event": "ev02", "id": "act.device-registration-check" },
         { "event": "ev04", "id": "act.signin-log-correlation" },
-        { "event": "ev07", "id": "act.device-registration-check", "note": "asks to run it again in a normal prompt" },
+        {
+          "event": "ev07",
+          "id": "act.device-registration-check",
+          "note": "asks to run it again in a normal prompt"
+        },
         { "event": "ev09", "id": "act.clear-teams-cache" },
         { "event": "ev12", "id": "act.clear-teams-cache" },
         { "event": "ev14", "id": "act.validate-fix" }
       ],
       "absent": [
-        { "event": "ev01", "id": "sig.web-client-also-fails", "reason": "negated", "note": "Teams in the browser works fine" },
-        { "event": "ev06", "id": "sig.prt-missing", "reason": "corrected", "note": "the NO values came from an elevated admin session, not from the users' sessions" }
+        {
+          "event": "ev01",
+          "id": "sig.web-client-also-fails",
+          "reason": "negated",
+          "note": "Teams in the browser works fine"
+        },
+        {
+          "event": "ev06",
+          "id": "sig.prt-missing",
+          "reason": "corrected",
+          "note": "the NO values came from an elevated admin session, not from the users' sessions"
+        }
       ],
       "forks": [],
       "earliestMissed": null,
       "counterfactualDirection": "none",
       "conflicts": [
-        { "class": "direct_contradiction", "events": ["ev01", "ev03"], "subject": "AzureAdPrt state of k.horvat's laptop", "note": "YES in one output, NO in another" },
-        { "class": "corrected_information", "events": ["ev03", "ev06"], "subject": "AzureAdPrt state of k.horvat's laptop", "note": "the NO values were from an elevated admin session and are withdrawn" }
+        {
+          "class": "direct_contradiction",
+          "events": ["ev01", "ev03"],
+          "subject": "AzureAdPrt state of k.horvat's laptop",
+          "note": "YES in one output, NO in another"
+        },
+        {
+          "class": "corrected_information",
+          "events": ["ev03", "ev06"],
+          "subject": "AzureAdPrt state of k.horvat's laptop",
+          "note": "the NO values were from an elevated admin session and are withdrawn"
+        }
       ],
       "qualityBand": "strong",
       "causes": ["hyp.client-cache"],

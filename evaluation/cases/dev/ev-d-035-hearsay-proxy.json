@@ -81,7 +81,7 @@
       "type": "engineer_email",
       "channel": "email",
       "title": "What I found",
-      "text": "I tested the points. DNS is fine, as the network team said, and service health is clear. The proxy dashboard is wrong, though: mad-prx3 times out for the Microsoft sign-in host while the other three nodes are fine. Please ask the network team what changed on the proxy cluster, because the statement that nothing changed may not hold."
+      "text": "I tested the points. DNS is fine, as the network team said, and service health is clear. The proxy dashboard is wrong, though: mad-prx3 times out on the Microsoft sign-in address, and the other three nodes answer normally. Please ask the network team what changed on the proxy cluster, because the statement that nothing changed may not hold."
     },
     {
       "key": "ev09",

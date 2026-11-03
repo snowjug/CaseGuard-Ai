@@ -13,13 +13,33 @@
         { "event": "ev01", "id": "sig.multiple-users-affected" },
         { "event": "ev05", "id": "sig.server-side-failure-records-present" },
         { "event": "ev05", "id": "sig.mfa-ca-events-in-logs" },
-        { "event": "ev06", "id": "sig.mfa-ca-events-in-logs", "uncertainty": "low", "note": "the engineer restates what the rows show" },
-        { "event": "ev07", "id": "sig.recent-network-change-reported", "uncertainty": "low", "note": "a new VPN provider with a new egress range" },
+        {
+          "event": "ev06",
+          "id": "sig.mfa-ca-events-in-logs",
+          "uncertainty": "low",
+          "note": "the engineer restates what the rows show"
+        },
+        {
+          "event": "ev07",
+          "id": "sig.recent-network-change-reported",
+          "uncertainty": "low",
+          "note": "a new VPN provider with a new egress range"
+        },
         { "event": "ev08", "id": "sig.resolvers-consistent" },
         { "event": "ev08", "id": "sig.proxy-nodes-consistent" },
         { "event": "ev10", "id": "sig.ca-exclusion-no-effect" },
-        { "event": "ev11", "id": "sig.mfa-ca-events-in-logs", "uncertainty": "low", "note": "new rows still show the policy applied" },
-        { "event": "ev11", "id": "sig.ca-exclusion-no-effect", "uncertainty": "low", "note": "explains why the exclusion changed nothing" }
+        {
+          "event": "ev11",
+          "id": "sig.mfa-ca-events-in-logs",
+          "uncertainty": "low",
+          "note": "new rows still show the policy applied"
+        },
+        {
+          "event": "ev11",
+          "id": "sig.ca-exclusion-no-effect",
+          "uncertainty": "low",
+          "note": "explains why the exclusion changed nothing"
+        }
       ],
       "actions": [
         { "event": "ev02", "id": "act.request-minimal-scoping" },
@@ -31,7 +51,12 @@
         { "event": "ev14", "id": "act.validate-fix" }
       ],
       "absent": [
-        { "event": "ev04", "id": "act.signin-log-correlation", "reason": "future_intent", "note": "looking at the logs now, back in 10" }
+        {
+          "event": "ev04",
+          "id": "act.signin-log-correlation",
+          "reason": "future_intent",
+          "note": "looking at the logs now, back in 10"
+        }
       ],
       "forks": [],
       "earliestMissed": null,

@@ -12,11 +12,36 @@
       "signals": [],
       "actions": [],
       "absent": [
-        { "event": "ev04", "id": "act.request-minimal-scoping", "reason": "conditional", "note": "taught as what to do if a user complains, not asked of this customer" },
-        { "event": "ev04", "id": "act.signin-log-correlation", "reason": "conditional", "note": "taught as a step for a future complaint" },
-        { "event": "ev04", "id": "act.review-ca-policy-config", "reason": "conditional", "note": "taught as a step for a future complaint" },
-        { "event": "ev04", "id": "act.revoke-user-sessions", "reason": "conditional", "note": "taught as the last step for a future complaint" },
-        { "event": "ev04", "id": "act.exclude-users-from-mfa-ca", "reason": "conditional", "note": "taught as the last step for a future complaint" }
+        {
+          "event": "ev04",
+          "id": "act.request-minimal-scoping",
+          "reason": "conditional",
+          "note": "taught as what to do if a user complains, not asked of this customer"
+        },
+        {
+          "event": "ev04",
+          "id": "act.signin-log-correlation",
+          "reason": "conditional",
+          "note": "taught as a step for a future complaint"
+        },
+        {
+          "event": "ev04",
+          "id": "act.review-ca-policy-config",
+          "reason": "conditional",
+          "note": "taught as a step for a future complaint"
+        },
+        {
+          "event": "ev04",
+          "id": "act.revoke-user-sessions",
+          "reason": "conditional",
+          "note": "taught as the last step for a future complaint"
+        },
+        {
+          "event": "ev04",
+          "id": "act.exclude-users-from-mfa-ca",
+          "reason": "conditional",
+          "note": "taught as the last step for a future complaint"
+        }
       ],
       "forks": [],
       "earliestMissed": null,

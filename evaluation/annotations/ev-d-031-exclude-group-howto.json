@@ -12,9 +12,24 @@
       "signals": [],
       "actions": [],
       "absent": [
-        { "event": "ev01", "id": "sig.recent-ca-change-reported", "reason": "future_intent", "note": "an MFA roll-out planned for next month, not done" },
-        { "event": "ev02", "id": "act.exclude-users-from-mfa-ca", "reason": "other", "note": "a how-to explanation, nothing is excluded or asked for" },
-        { "event": "ev04", "id": "act.exclude-users-from-mfa-ca", "reason": "future_intent", "note": "advice to try a test account before the real roll-out" }
+        {
+          "event": "ev01",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "future_intent",
+          "note": "an MFA roll-out planned for next month, not done"
+        },
+        {
+          "event": "ev02",
+          "id": "act.exclude-users-from-mfa-ca",
+          "reason": "other",
+          "note": "a how-to explanation, nothing is excluded or asked for"
+        },
+        {
+          "event": "ev04",
+          "id": "act.exclude-users-from-mfa-ca",
+          "reason": "future_intent",
+          "note": "advice to try a test account before the real roll-out"
+        }
       ],
       "forks": [],
       "earliestMissed": null,

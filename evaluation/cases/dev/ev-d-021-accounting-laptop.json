@@ -3,7 +3,7 @@
   "id": "ev-d-021-accounting-laptop",
   "split": "dev",
   "family": "fam-015",
-  "title": "One laptop cannot sign in to the Teams app",
+  "title": "The Teams app stays on the sign-in screen on one laptop",
   "scenario": "A single accounting laptop has lost its primary refresh token after a stale device registration; the browser works, a cache clear does not help, and re-registering the device fixes it.",
   "categories": ["paraphrase"],
   "workload": "teams-authentication",
