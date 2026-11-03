@@ -79,9 +79,9 @@ resolution }`. It throws `BundleValidationError` (schema-style `{ path, message 
 references** (a reply that points forward, a `repeatOf` that points forward) and canonicalises timestamps (whole seconds
 stay `...Z`, finer precision becomes `....mmmZ`). `CaseBundleSchema` rejects the same references.
 
-**Knowledge pack.** The only authored pack is `kp.teams-authentication` v1.0.0 (`TEAMS_AUTH_PACK`): 9 hypotheses with
-priors, 30 signals with per-hypothesis likelihoods, 21 diagnostic actions (cost, risk, reliability, outcomes, prerequisites,
-produced requirements), 13 requirements and one inference. `getCompiledPack` precompiles keyword regular expressions and
+**Knowledge pack.** The only authored pack is `kp.teams-authentication` v1.1.0 (`TEAMS_AUTH_PACK`): 9 hypotheses with
+priors, 30 signals with per-hypothesis likelihoods (and 8 declared signal pairs), 21 diagnostic actions (cost, risk,
+reliability, outcomes, prerequisites, produced requirements), 13 requirements and one inference. `getCompiledPack` precompiles keyword regular expressions and
 lexicon alternations once (patterns with `g` or `y` flags are rejected). Every pattern scans up to 20,000 characters of an
 event on the API's event loop, so **repetition in a pattern must be bounded** (`[\w-]{0,40}`, not `[\w-]*` after a literal):
 `packages/domain/test/robustness.test.ts` fails a pattern that needs 100 ms of CPU on inputs derived from the pattern itself, and
@@ -177,7 +177,11 @@ Confidence is **always a model estimate** driven by authored likelihoods; it is 
 - **Observations** come from the pack's compiled signal detectors (`engine/signals.ts`): `regex` detectors over the event
   title and body (first 20,000 characters, optionally filtered by event type and participant role) and `structured` /
   `structured_all` detectors over the event's `structured` fields (`exists`, `eq`, `neq`, `includes`, `gt`, `gte`, `lt`,
-  `lte`). A signal yields at most one observation per event; `repeatIndex` counts how many earlier events showed it. Each
+  `lte`). A signal yields at most one observation per event; `repeatIndex` counts how many earlier events showed it. A
+  match counts only when the sentence **states** the fact: a denial, a guess, a plan, a condition or a request that merely
+  mentions the signal's words is set aside, and the analysis lists what was set aside and why (`suppressed`). The
+  analysis also carries `conflicts` (two statements that cannot both stand) and `sequenceFindings` (findings that need
+  more than one event); all of it is described in [DETECTION.md](DETECTION.md). Each
   observation becomes an `Evidence` item with a category (`confirmed_fact`, `customer_reported`, `engineer_assumption`,
   `diagnostic_evidence`, `ai_inference`, `conflicting_evidence`, `missing_evidence`, `simulated_outcome`), a strength and
   an excerpt, and a source reference that says where in the stored record it was found (section 5.1).
@@ -570,7 +574,7 @@ separate, governed `skillMatches.apply`.
   alone. `packages/domain/test/determinism-across-ids.test.ts` runs both samples under four sets of generated ids and
   compares every figure after replacing ids by what they stand for (so a different order of the same things fails too);
   `apps/api/test/determinism-across-ids.int.test.ts` does the same through two fresh databases.
-- **Engine version.** `ENGINE_VERSION` (`apps/api/src/services/analysis/inputs.ts`, currently `2026.3.1`) is part of the
+- **Engine version.** `ENGINE_VERSION` (`apps/api/src/services/analysis/inputs.ts`, currently `2026.4.0`) is part of the
   analysis input hash, so a change of meaning re-analyses stored cases instead of reusing them. `2026.2.0`: a view's belief is
   one number (the last step of its own timeline), scenario summaries are written from the decision instant and the simulated
   path alone, and the "Retrospectively produced little information" note needs a complete case with a recorded resolution
@@ -580,9 +584,14 @@ separate, governed `skillMatches.apply`.
   token figures derived from it, confidence bands, skill baselines) moved once, and the order of claims, improvements and
   skill matches that were tied by a generated id changed. `2026.3.1`: source offsets name the text they count into
   (section 5.1) and the quality sub-checks, and so the coaching items built from them, cite more of their basis; **no
-  detection, id, score, band, fork or simulated figure changed** (`packages/domain/test/engine-golden.ts` and
-  `fixtures/engine-golden.json` pin the digests of both samples as `2026.3.0` produced them, with only the source
-  linkage and the citation lists left out of the comparison). Stored artefacts are replaced at the next analysis; until
+  detection, id, score, band, fork or simulated figure changed**. `2026.4.0`: detection reads whether a sentence states a
+  fact, reads chat shorthand and typos from a fixed list, ignores what an e-mail only quotes and knows more of the ways the
+  same fact is worded ([DETECTION.md](DETECTION.md)); the analysis carries what was set aside, the conflicts and the
+  sequence findings. On the two samples Case One reads the same 26 signals (one excerpt a few words longer) and Case Two
+  reads two more; the score, band, forks and leading hypothesis (and its final posterior) of both are unchanged, and some
+  intermediate confidence bounds and per-action values of Case Two moved by at most 0.04 with the two extra observations (`packages/domain/test/engine-golden.ts` and `fixtures/engine-golden.json`
+  pin the digests of both samples, with only the source linkage and the citation lists left out of the comparison, and
+  were regenerated once for this version). Stored artefacts are replaced at the next analysis; until
   then a stored citation has no field and is `not_checkable`. After a version
   change a reviewer's decision on a counterfactual scenario survives only if the regenerated simulation is identical;
   otherwise it is reset and the reset is audited. Because the seed no longer covers the engine version, the skill library or
