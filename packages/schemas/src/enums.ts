@@ -342,6 +342,8 @@ export const AGENT_NAMES = [
   'communication_coach',
   'token_governor',
   'safety_policy_validator',
+  'case_reasoner',
+  'case_critic',
 ] as const;
 export const AgentNameSchema = z.enum(AGENT_NAMES);
 export type AgentName = z.infer<typeof AgentNameSchema>;
@@ -356,9 +358,15 @@ export const AGENT_LABELS: Record<AgentName, string> = {
   communication_coach: 'Communication Coach',
   token_governor: 'Token Governor',
   safety_policy_validator: 'Safety and Policy Validator',
+  case_reasoner: 'Case Reasoner',
+  case_critic: 'Case Critic',
 };
 
-export const ProviderKindSchema = z.enum(['deterministic', 'azure-openai']);
+/**
+ * `scripted` is the test-only provider that replays a stated script (packages/ai, providers/scripted). The
+ * configuration loader refuses it unless the runtime is local or test, so it can never serve a deployed environment.
+ */
+export const ProviderKindSchema = z.enum(['deterministic', 'azure-openai', 'scripted']);
 export type ProviderKind = z.infer<typeof ProviderKindSchema>;
 
 export const JOB_STATUSES = ['queued', 'running', 'succeeded', 'failed', 'cancelled'] as const;

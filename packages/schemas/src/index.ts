@@ -12,6 +12,7 @@ export * from './skill-quality';
 export * from './skill-overlay';
 export * from './provenance';
 export * from './conflicts';
+export * from './ai-findings';
 export * from './ai';
 export * from './governance';
 export * from './views';
