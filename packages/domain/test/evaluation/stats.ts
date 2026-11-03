@@ -26,7 +26,11 @@ export function wilson(successes: number, n: number): { low: number; high: numbe
   const denominator = 1 + z2 / n;
   const centre = (p + z2 / (2 * n)) / denominator;
   const margin = (Z95 * Math.sqrt((p * (1 - p)) / n + z2 / (4 * n * n))) / denominator;
-  return { low: Math.max(0, centre - margin), high: Math.min(1, centre + margin) };
+  // At the ends the bound is exact (floating point would leave it a hair off 0 or 1).
+  return {
+    low: successes === 0 ? 0 : Math.max(0, centre - margin),
+    high: successes === n ? 1 : Math.min(1, centre + margin),
+  };
 }
 
 export function proportion(successes: number, n: number): Proportion {
