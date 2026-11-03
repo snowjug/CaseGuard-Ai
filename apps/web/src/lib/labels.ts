@@ -56,6 +56,7 @@ export const HEALTH_BADGES: Record<HealthStatus, StatusLabel> = {
 export const PROVIDER_LABELS: Record<ProviderKind, string> = {
   deterministic: 'Deterministic provider',
   'azure-openai': 'Azure OpenAI',
+  scripted: 'Scripted test provider',
 };
 
 export const CRITICALITY_LABELS = {
