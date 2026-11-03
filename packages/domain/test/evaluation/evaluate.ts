@@ -1,274 +1,273 @@
-import type { CaseBundle } from '@caseguard/schemas';
-import type { CompiledPack } from '../../src';
-import { prepareBundle } from '../helpers';
-import { NEGATIVE_CASES, NOISY_CASES, REORDERED_CASES } from './corpus-other';
-import { PARAPHRASE_CASES } from './corpus-paraphrase';
-import { toBundle, type EvalCase, type EvalGroup, type SignalId } from './types';
-
-export const EVAL_CASES: readonly EvalCase[] = [
-  ...PARAPHRASE_CASES,
-  ...NOISY_CASES,
-  ...NEGATIVE_CASES,
-  ...REORDERED_CASES,
-];
-
-export type ForkAgreement = 'exact' | 'near' | 'different' | 'missed' | 'spurious' | 'agree-none';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { acceptedFor } from './labels';
+import {
+  EVALUATION_ROOT,
+  caseSetHash,
+  canonicalJson,
+  loadDataset,
+  readLockedRuns,
+  sha256,
+  testSetHash,
+  writeJson,
+  type Dataset,
+} from './dataset';
+import { enginePackIdentity, runEngine } from './engine';
+import { gitHead, uncommittedUnder } from './git';
+import { appendRun, lockProblems } from './locked';
+import {
+  caseDetail,
+  caseInputOf,
+  computeMetrics,
+  invariance,
+  type CaseDetail,
+  type CaseInput,
+  type InvarianceResult,
+  type MetricsResult,
+} from './metrics';
+import { renderMarkdown } from './report';
+import { runDataset } from './runner';
+import {
+  EVAL_LOCKED_RUNS_SCHEMA,
+  type LockedRunRecord,
+  type LockedRuns,
+  type Split,
+} from './schema';
+import {
+  buildArtifact,
+  engineVersion,
+  withoutPerId,
+  type RunArtifact,
+  type RunResults,
+} from './artifact';
 
 /**
- * Whether the hypothesis the engine ranks first is one the story's cause allows. `right` means the evidence moved it
- * above its prior; `right-by-prior` that it leads only because it is the favourite before any evidence (so no
- * evidence-driven agreement); `other` that the catch-all leads; `wrong` that another named cause leads.
+ * The functions behind every command line of the evaluation (`eval:dev`, `eval:validation`, `eval:locked`): what they
+ * print and write is what these return, so a test or another script can call them and read the same structured results.
+ *
+ *  - `evaluateCase(caseId, split)`: one case, with its accepted labels, what the engine said and how the two compare;
+ *  - `evaluateSplit(split)`: every measure over a split, the per-case lines, the artifact and the Markdown report;
+ *  - `evaluateLocked()`: the locked test split. It is the only way to run the engine on it: it checks the lock and the
+ *    log, records the run in the append-only log of locked runs and returns aggregates only unless asked for detail.
+ *
+ * The first two refuse the test split on purpose.
  */
-export type LeaderAgreement = 'right' | 'right-by-prior' | 'other' | 'wrong' | 'n/a';
 
-/** A confidence this close to the prior (as a probability) counts as not moved by evidence. */
-const PRIOR_TOLERANCE = 0.02;
-
-/**
- * Why an expected signal was not reported, decided from the detector definitions alone (never from the wording):
- *  - `structured-only`: every detector of the signal reads structured event data, so free text cannot show it;
- *  - `type-or-role-gate`: the signal has text detectors, but none accepts this event's type or author role;
- *  - `wording`: a text detector accepts the event and its pattern did not match what was written.
- */
-export type MissCause = 'structured-only' | 'type-or-role-gate' | 'wording';
-
-export interface CaseResult {
-  readonly id: string;
-  readonly group: EvalGroup;
-  readonly bundle: CaseBundle;
-  /** `eventKey|signalId` pairs the engine reported and the labels expect. */
-  readonly truePositives: readonly string[];
-  /** Reported, but not on the event's list. */
-  readonly falsePositives: readonly string[];
-  /** On the event's list, but not reported. */
-  readonly misses: readonly string[];
-  readonly missCauses: Readonly<Record<string, MissCause>>;
-  readonly forkCount: number;
-  readonly earliestFork: string | null;
-  readonly expectedFork: string | null;
-  readonly forkAgreement: ForkAgreement;
-  readonly leader: string;
-  readonly leaderConfidence: number;
-  readonly leaderAgreement: LeaderAgreement;
-  /** Rank (1 = first) and confidence of the best-placed hypothesis the story's cause allows; null with no cause. */
-  readonly causeRank: number | null;
-  readonly causeConfidence: number | null;
-  readonly causePrior: number | null;
-  /** Everything an order of events must not change, as one string. */
-  readonly fingerprint: string;
+export interface EvaluationOptions {
+  /** Only the cases whose accepted labels come from this annotator. */
+  readonly annotator?: string | undefined;
+  /** Quality improvements, warnings and coaching suggestions, for the evidence-link measure. Default: on. */
+  readonly recommendations?: boolean;
+  /** Simulated better paths at the earliest decision point. Slow. Default: off. */
+  readonly counterfactual?: boolean;
+  /** Per-case lines in the artifact and the report. Default: on for dev, off for the others. */
+  readonly detail?: boolean;
+  /** A dataset that is already loaded (tests). Otherwise only the files of the split are read. */
+  readonly dataset?: Dataset;
 }
 
-const pair = (eventKey: string, signal: string): string => `${eventKey}|${signal}`;
+export interface CaseEvaluation {
+  readonly caseId: string;
+  readonly split: Split;
+  /** The accepted labels (a reordered copy repeats its source's) and the engine's output for the case. */
+  readonly input: CaseInput;
+  readonly detail: CaseDetail;
+  /** The measures over this one case. */
+  readonly metrics: MetricsResult;
+  /** For a reordered copy only: whether it gives exactly the analysis of its source. */
+  readonly invariance: InvarianceResult | null;
+}
 
-function causeOf(
-  pack: CompiledPack,
-  signalId: string,
-  event: { type: string; participantRole: string },
-): MissCause {
-  const detectors = pack.pack.signals.find((signal) => signal.id === signalId)?.detectors ?? [];
-  const text = detectors.filter((detector) => detector.kind === 'regex');
-  if (text.length === 0) return 'structured-only';
-  const accepted = text.some(
-    (detector) =>
-      (!detector.eventTypes || detector.eventTypes.some((type) => type === event.type)) &&
-      (!detector.roles || detector.roles.some((role) => role === event.participantRole)),
+export interface SplitEvaluation {
+  readonly split: Split;
+  readonly inputs: readonly CaseInput[];
+  readonly metrics: MetricsResult;
+  readonly invariance: readonly InvarianceResult[];
+  readonly details: readonly CaseDetail[];
+  /** The JSON the command line writes to `evaluation/runs/<split>-latest.json`. */
+  readonly artifact: RunArtifact;
+  /** The Markdown the command line prints. */
+  readonly markdown: string;
+}
+
+const LOCKED_MESSAGE =
+  'The locked test split is evaluated only by evaluateLocked() (`eval:locked`): it checks the lock, records the run in the log of locked runs and shows aggregates only.';
+
+const engineOptions = (options: EvaluationOptions) => ({
+  recommendations: options.recommendations ?? true,
+  counterfactual: options.counterfactual ?? false,
+});
+
+function datasetFor(split: Split, options: EvaluationOptions): Dataset {
+  const dataset = options.dataset ?? loadDataset({ splits: [split] });
+  if (dataset.problems.length > 0) throw new Error(dataset.problems.join('\n'));
+  return dataset;
+}
+
+const safeHead = (): string | null => {
+  try {
+    return gitHead();
+  } catch {
+    return null;
+  }
+};
+const now = (): string => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+export function evaluateCase(
+  caseId: string,
+  split: Split,
+  options: EvaluationOptions = {},
+): CaseEvaluation {
+  if (split === 'test') throw new Error(LOCKED_MESSAGE);
+  const dataset = datasetFor(split, options);
+  const loaded = dataset.cases.find((entry) => entry.case.id === caseId && entry.case.split === split);
+  if (!loaded) throw new Error(`There is no case ${caseId} in the ${split} split.`);
+  const accepted = acceptedFor(dataset, loaded);
+  const labelled = accepted?.labels?.signals.map((label) => `${label.event}|${label.id}`) ?? [];
+  const output = runEngine(loaded.case, { ...engineOptions(options), explainMisses: labelled });
+  const input = caseInputOf(loaded.case, accepted, output);
+  let check: InvarianceResult | null = null;
+  if (loaded.case.derivedFrom !== null) {
+    const source = dataset.cases.find((entry) => entry.case.id === loaded.case.derivedFrom);
+    if (source) check = invariance(runEngine(source.case, { recommendations: false }), output);
+  }
+  return {
+    caseId,
+    split,
+    input,
+    detail: caseDetail(input),
+    metrics: computeMetrics([input]),
+    invariance: check,
+  };
+}
+
+function assemble(
+  split: Split,
+  dataset: Dataset,
+  options: EvaluationOptions,
+  detail: boolean,
+  transform: (metrics: MetricsResult) => MetricsResult,
+  title: string,
+  perId: boolean,
+): SplitEvaluation {
+  const outcome = runDataset(dataset, {
+    selection: { splits: [split], annotator: options.annotator },
+    engine: engineOptions(options),
+  });
+  const metrics = transform(outcome.metrics);
+  const results: RunResults = {
+    metrics,
+    invariance: outcome.invariance,
+    details: detail ? outcome.details : null,
+  };
+  const artifact = buildArtifact({
+    split,
+    generatedAt: now(),
+    gitCommit: safeHead(),
+    dataset,
+    selected: outcome.selected,
+    selection: { splits: [split], annotator: options.annotator ?? null },
+    options: { ...engineOptions(options), detail },
+    results,
+  });
+  const markdown = renderMarkdown(
+    metrics,
+    outcome.invariance,
+    {
+      title,
+      annotators: artifact.meta.annotators,
+      lines: [
+        `engine ${artifact.meta.engine.version} (${artifact.meta.engine.package}), pack ${artifact.meta.pack.id}@${artifact.meta.pack.version} (sha256 ${artifact.meta.pack.sha256.slice(0, 12)})`,
+        `case set sha256 ${artifact.meta.dataset.caseSetSha256.slice(0, 12)}, results sha256 ${artifact.resultsSha256.slice(0, 12)}`,
+        artifact.meta.gitCommit ? `git commit ${artifact.meta.gitCommit.slice(0, 10)}` : 'no git commit available',
+      ],
+    },
+    { perId, details: detail ? outcome.details : null },
   );
-  return accepted ? 'wording' : 'type-or-role-gate';
-}
-
-/** The case the way the engine sees it: events by time, hypotheses, evidence and forks. */
-export function evaluateCase(source: EvalCase): CaseResult {
-  const bundle = toBundle(source);
-  const prepared = prepareBundle(bundle, `case_${source.id.replace(/[^a-z0-9]/g, '_')}`);
-  const { normalized, analysis, pack } = prepared;
-
-  const keyOf = new Map<string, string>();
-  const position = new Map<string, number>();
-  const eventOf = new Map<string, (typeof normalized.events)[number]>();
-  normalized.events.forEach((event, index) => {
-    const key = source.events.find((candidate) => event.id.endsWith(candidate.key))?.key;
-    if (!key) throw new Error(`${source.id}: no authored event for ${event.id}`);
-    keyOf.set(event.id, key);
-    position.set(key, index);
-    eventOf.set(key, event);
-  });
-
-  const reported = new Set<string>();
-  for (const item of analysis.evidence) {
-    const key = keyOf.get(item.eventId);
-    if (key) reported.add(pair(key, item.signalId));
-  }
-  const expected = new Set<string>();
-  for (const event of source.events)
-    for (const id of event.signals ?? []) expected.add(pair(event.key, id));
-
-  const truePositives = [...reported].filter((item) => expected.has(item)).sort();
-  const falsePositives = [...reported].filter((item) => !expected.has(item)).sort();
-  const misses = [...expected].filter((item) => !reported.has(item)).sort();
-  const missCauses: Record<string, MissCause> = {};
-  for (const item of misses) {
-    const [key = '', signalId = ''] = item.split('|');
-    const event = eventOf.get(key);
-    if (event) missCauses[item] = causeOf(pack, signalId, event);
-  }
-
-  const earliest = analysis.forks.find((fork) => fork.isEarliestMeaningful);
-  const earliestFork = earliest ? (keyOf.get(earliest.eventId) ?? null) : null;
-  const expectedFork = source.earliestMissed;
-  let forkAgreement: ForkAgreement;
-  if (expectedFork === null) forkAgreement = earliestFork === null ? 'agree-none' : 'spurious';
-  else if (earliestFork === null) forkAgreement = 'missed';
-  else if (earliestFork === expectedFork) forkAgreement = 'exact';
-  else
-    forkAgreement =
-      Math.abs((position.get(earliestFork) ?? 99) - (position.get(expectedFork) ?? -99)) <= 1
-        ? 'near'
-        : 'different';
-
-  const ranked = [...analysis.hypotheses].sort((a, b) => b.currentConfidence - a.currentConfidence);
-  const top = ranked[0];
-  const leader = top?.key ?? 'none';
-  let leaderAgreement: LeaderAgreement = 'n/a';
-  if (source.causes) {
-    if (source.causes.some((cause) => cause === leader))
-      leaderAgreement =
-        top && top.currentConfidence - top.prior > PRIOR_TOLERANCE ? 'right' : 'right-by-prior';
-    else leaderAgreement = leader === 'hyp.other' ? 'other' : 'wrong';
-  }
-  const causeIndex = source.causes
-    ? ranked.findIndex((hypothesis) => source.causes?.some((cause) => cause === hypothesis.key))
-    : -1;
-  const cause = causeIndex >= 0 ? ranked[causeIndex] : undefined;
-
-  const fingerprint = JSON.stringify({
-    evidence: [...reported].sort(),
-    forks: analysis.forks.map((fork) => [keyOf.get(fork.eventId), fork.category, fork.severity]),
-    hypotheses: analysis.hypotheses.map((hypothesis) => [
-      hypothesis.key,
-      Math.round(hypothesis.currentConfidence * 1e6),
-    ]),
-  });
-
   return {
-    id: source.id,
-    group: source.group,
-    bundle,
-    truePositives,
-    falsePositives,
-    misses,
-    missCauses,
-    forkCount: analysis.forks.length,
-    earliestFork,
-    expectedFork,
-    forkAgreement,
-    leader,
-    leaderConfidence: top?.currentConfidence ?? 0,
-    leaderAgreement,
-    causeRank: cause ? causeIndex + 1 : null,
-    causeConfidence: cause?.currentConfidence ?? null,
-    causePrior: cause?.prior ?? null,
-    fingerprint,
+    split,
+    inputs: outcome.inputs,
+    metrics,
+    invariance: outcome.invariance,
+    details: outcome.details,
+    artifact,
+    markdown,
   };
 }
 
-export interface Rate {
-  readonly tp: number;
-  readonly fp: number;
-  readonly fn: number;
-  /** Null when nothing was reported (no precision) or nothing was expected (no recall). */
-  readonly precision: number | null;
-  readonly recall: number | null;
+export function evaluateSplit(split: Split, options: EvaluationOptions = {}): SplitEvaluation {
+  if (split === 'test') throw new Error(LOCKED_MESSAGE);
+  return assemble(
+    split,
+    datasetFor(split, options),
+    options,
+    options.detail ?? split === 'dev',
+    (metrics) => metrics,
+    `Evaluation run: ${split} split`,
+    true,
+  );
 }
 
-export function rate(results: readonly CaseResult[]): Rate {
-  const tp = results.reduce((sum, result) => sum + result.truePositives.length, 0);
-  const fp = results.reduce((sum, result) => sum + result.falsePositives.length, 0);
-  const fn = results.reduce((sum, result) => sum + result.misses.length, 0);
-  return {
-    tp,
-    fp,
-    fn,
-    precision: tp + fp === 0 ? null : tp / (tp + fp),
-    recall: tp + fn === 0 ? null : tp / (tp + fn),
+// ---------------------------------------------------------------- the locked split
+
+
+
+export interface LockedOptions {
+  /** Per-case lines. They are recorded in the log as given, and must never be used to change a detector. */
+  readonly detail?: boolean;
+  readonly recommendations?: boolean;
+  readonly counterfactual?: boolean;
+}
+
+export interface LockedEvaluation extends SplitEvaluation {
+  /** The record that was appended to `evaluation/runs/locked-runs.json`. */
+  readonly record: LockedRunRecord;
+}
+
+export async function evaluateLocked(options: LockedOptions = {}): Promise<LockedEvaluation> {
+  const dataset = loadDataset({ splits: ['test'] });
+  if (dataset.problems.length > 0) throw new Error(dataset.problems.join('\n'));
+  const logPath = join(EVALUATION_ROOT, 'runs', 'locked-runs.json');
+  const log: LockedRuns = (existsSync(logPath) ? readLockedRuns() : null) ?? {
+    schema: EVAL_LOCKED_RUNS_SCHEMA,
+    runs: [],
   };
-}
+  const testHash = testSetHash(dataset.cases);
+  const problems = lockProblems({
+    manifest: dataset.manifest,
+    uncommitted: uncommittedUnder(['evaluation/cases/test', 'evaluation/annotations/ev-t-*.json']),
+    testHash,
+    log,
+  });
+  if (problems.length > 0) throw new Error(`Refusing to run the locked split.\n${problems.join('\n')}`);
 
-/** Expected signals that were not reported, counted by why (see `MissCause`). */
-export function missSummary(results: readonly CaseResult[]): Record<MissCause, number> {
-  const counts: Record<MissCause, number> = {
-    'structured-only': 0,
-    'type-or-role-gate': 0,
-    wording: 0,
-  };
-  for (const result of results)
-    for (const cause of Object.values(result.missCauses)) counts[cause] += 1;
-  return counts;
-}
-
-/** Recall over the expected signals that a text detector could report for the event as it is typed and authored. */
-export function reachableRecall(results: readonly CaseResult[]): number | null {
-  const tp = results.reduce((sum, result) => sum + result.truePositives.length, 0);
-  const wording = missSummary(results).wording;
-  return tp + wording === 0 ? null : tp / (tp + wording);
-}
-
-export function rateBySignal(results: readonly CaseResult[]): Map<SignalId, Rate> {
-  const ids = new Set<string>();
-  for (const result of results)
-    for (const item of [...result.truePositives, ...result.falsePositives, ...result.misses])
-      ids.add(item.split('|')[1] ?? '');
-  const out = new Map<SignalId, Rate>();
-  for (const id of [...ids].sort()) {
-    const tp = results.reduce(
-      (sum, r) => sum + r.truePositives.filter((i) => i.endsWith(`|${id}`)).length,
-      0,
-    );
-    const fp = results.reduce(
-      (sum, r) => sum + r.falsePositives.filter((i) => i.endsWith(`|${id}`)).length,
-      0,
-    );
-    const fn = results.reduce(
-      (sum, r) => sum + r.misses.filter((i) => i.endsWith(`|${id}`)).length,
-      0,
-    );
-    out.set(id as SignalId, {
-      tp,
-      fp,
-      fn,
-      precision: tp + fp === 0 ? null : tp / (tp + fp),
-      recall: tp + fn === 0 ? null : tp / (tp + fn),
-    });
-  }
-  return out;
-}
-
-export function leaderSummary(results: readonly CaseResult[]): Record<LeaderAgreement, number> {
-  const counts: Record<LeaderAgreement, number> = {
-    right: 0,
-    'right-by-prior': 0,
-    other: 0,
-    wrong: 0,
-    'n/a': 0,
-  };
-  for (const result of results) counts[result.leaderAgreement] += 1;
-  return counts;
-}
-
-export function forkSummary(results: readonly CaseResult[]): Record<ForkAgreement, number> {
-  const counts: Record<ForkAgreement, number> = {
-    exact: 0,
-    near: 0,
-    different: 0,
-    missed: 0,
-    spurious: 0,
-    'agree-none': 0,
-  };
-  for (const result of results) counts[result.forkAgreement] += 1;
-  return counts;
-}
-
-/** Everything the measures are computed from. Reordered cases repeat other cases and are only checked for invariance. */
-export function evaluateAll(): { results: CaseResult[]; scored: CaseResult[] } {
-  const results = EVAL_CASES.map(evaluateCase);
-  return { results, scored: results.filter((result) => result.group !== 'reordered') };
+  const detail = options.detail === true;
+  const evaluation = assemble(
+    'test',
+    dataset,
+    { recommendations: options.recommendations, counterfactual: options.counterfactual },
+    detail,
+    withoutPerId,
+    'Locked test split (aggregates only)',
+    false,
+  );
+  const pack = enginePackIdentity();
+  const version = engineVersion();
+  const next = appendRun(log, {
+    ranAt: now(),
+    gitCommit: safeHead() ?? '0'.repeat(40),
+    engineVersion: `${version.version} (${version.package})`,
+    packId: pack.id,
+    packVersion: pack.version,
+    packSha256: pack.sha256,
+    caseSetSha256: caseSetHash(dataset.cases),
+    testSetSha256: testHash,
+    resultsSha256: sha256(canonicalJson(evaluation.artifact.results)),
+    detail,
+  });
+  await writeJson(logPath, next);
+  await writeJson(join(EVALUATION_ROOT, 'runs', 'test-latest.json'), evaluation.artifact);
+  const record = next.runs[next.runs.length - 1];
+  if (!record) throw new Error('the record of the run was not appended');
+  return { ...evaluation, record };
 }

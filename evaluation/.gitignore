@@ -1,0 +1,4 @@
+# Local only: progress notes, drafts waiting to be merged, and the latest run of each split.
+PROGRESS.md
+pending/
+runs/*-latest.json

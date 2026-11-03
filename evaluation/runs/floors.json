@@ -1,0 +1,8 @@
+{
+  "note": "Floors for the dev split, edited by hand at each milestone: raise them when the engine improves, never lower one to hide a regression. Only dev has floors; no test reads the validation or the locked split. Measures are fractions between 0 and 1; the names are the keys of FLOOR_METRICS in packages/domain/test/evaluation/floors.ts.",
+  "dev": {
+    "recall": 0.15,
+    "precision": 0.5,
+    "negationAccuracy": 0.5
+  }
+}

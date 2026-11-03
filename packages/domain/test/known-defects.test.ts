@@ -1,0 +1,51 @@
+import { describe, expect, it } from 'vitest';
+import { parsePastedTranscript } from '../src/ingest/parsers';
+import { evaluateCase } from './evaluation/evaluate';
+import { wave1Id } from './evaluation/wave1-plan';
+import { prepareBundle } from './helpers';
+
+/**
+ * Defects the first independent evaluation found. Each test states what should be true, as an ordinary test would, and is
+ * marked as known to fail (`it.fails`) while the defect is open: the suite stays green, and goes red the day the defect is
+ * fixed, which is the cue to turn the test into a normal one (drop `.fails`) and to update docs/EVALUATION.md and
+ * docs/KNOWN_LIMITATIONS.md. The cases are the migrated Wave 1 cases of `evaluation/cases/dev`.
+ */
+const p4 = evaluateCase(wave1Id('p4-hourly-signout'), 'dev', { recommendations: false });
+const z4 = evaluateCase(wave1Id('z4-negations'), 'dev', { recommendations: false });
+
+describe('[eval] known defects: a statement that denies a signal must not report it', () => {
+  it.fails('"nothing active in service health" is not read as an incident (p4)', () => {
+    expect(p4.detail.signals?.fp).toEqual([]);
+  });
+
+  it.fails('and so does not make an incident the leading cause of an unrelated story (p4)', () => {
+    expect(p4.detail.leader?.agreement).not.toBe('wrong');
+  });
+
+  it.fails('"this is not intermittent" is not read as intermittent failures (z4)', () => {
+    expect(z4.detail.signals?.fp).toEqual([]);
+  });
+
+  it.fails('the same log finding is read whichever word opens a pasted message', () => {
+    const parsed = parsePastedTranscript(
+      [
+        '[2026-06-02 08:00 UTC] Customer: About 45 people in our Warsaw office get thrown out of Teams.',
+        '[2026-06-02 08:40 UTC] Support Engineer: Checked the logs. No matching sign-in records for the failing attempts.',
+        '[2026-06-02 09:10 UTC] Support Engineer: Result of the log lookup. No matching sign-in records for the failing attempts.',
+      ].join('\n'),
+      { synthetic: true, now: '2026-10-29T00:00:00Z' },
+    );
+    if (!parsed.ok) throw new Error('the transcript did not parse');
+    const bundle = structuredClone(parsed.bundle);
+    bundle.case.workload = 'teams-authentication';
+    const { analysis, normalized } = prepareBundle(bundle, 'case_same_finding');
+    // The parser types the first engineer message (it opens with the verb "Checked") as an engineer action, which the
+    // signal's text detector does not accept; the second becomes a case note, which it does.
+    const position = new Map(normalized.events.map((event, index) => [event.id, index + 1]));
+    expect(
+      analysis.evidence
+        .filter((item) => item.signalId === 'sig.no-server-side-failure-records')
+        .map((item) => position.get(item.eventId)),
+    ).toEqual([2, 3]);
+  });
+});
