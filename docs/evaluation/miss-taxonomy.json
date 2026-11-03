@@ -1,0 +1,1937 @@
+{
+  "schema": "caseguard.miss-taxonomy/1",
+  "baseline": "Wave 1 evaluation: 16 synthetic cases (13 independent), one AI-drafted annotator, engine 2026.3.1, knowledge pack 1.0.0",
+  "note": "Written before any detector was changed. Categories are the primary reason the engine did not report a labelled signal; alsoNeeds lists other things the same event needs. The labels were drafted by an AI assistant: a miss can also be a labelling issue.",
+  "summary": {
+    "totals": {
+      "truePositives": 13,
+      "falsePositives": 4,
+      "falseNegatives": 53
+    },
+    "byGroup": {
+      "paraphrase": {
+        "tp": 9,
+        "fp": 2,
+        "fn": 30
+      },
+      "noisy": {
+        "tp": 4,
+        "fp": 1,
+        "fn": 21
+      },
+      "negative": {
+        "tp": 0,
+        "fp": 1,
+        "fn": 2
+      }
+    },
+    "byMeasuredCause": {
+      "wording": 46,
+      "structured-only": 4,
+      "type-or-role-gate": 3
+    },
+    "byCategory": {
+      "paraphrase": 18,
+      "negation": 6,
+      "synonym": 5,
+      "cross_event_dependency": 5,
+      "detector_scope": 4,
+      "entity_resolution": 4,
+      "event_type_gate": 3,
+      "noise_typo": 3,
+      "cross_sentence": 1,
+      "passive_voice": 1,
+      "temporal_phrasing": 1,
+      "abbreviation": 1,
+      "unsupported_language": 1
+    },
+    "byFamily": {
+      "F13": 6,
+      "F01": 5,
+      "F04": 4,
+      "F06": 4,
+      "F07": 4,
+      "F05": 3,
+      "F08": 3,
+      "F09": 3,
+      "F11": 3,
+      "F02": 2,
+      "F03": 2,
+      "F10": 2,
+      "F12": 2,
+      "F14": 2,
+      "F16": 2,
+      "F18": 2,
+      "F15": 1,
+      "F17": 1,
+      "F20": 1,
+      "F19": 1
+    },
+    "bySignal": {
+      "sig.intermittent-failures": 5,
+      "sig.no-server-side-failure-records": 4,
+      "sig.recent-network-change-reported": 4,
+      "sig.resolver-inconsistent": 3,
+      "sig.error-timeout": 3,
+      "sig.cache-clear-no-effect": 3,
+      "sig.proxy-node-inconsistent": 3,
+      "sig.recent-ca-change-reported": 3,
+      "sig.server-side-failure-records-present": 3,
+      "sig.site-correlated": 2,
+      "sig.error-name-not-resolved": 2,
+      "sig.dns-fix-resolved": 2,
+      "sig.revoke-sessions-no-effect": 2,
+      "sig.proxy-fix-resolved": 2,
+      "sig.mfa-ca-events-in-logs": 2,
+      "sig.ca-exclusion-no-effect": 2,
+      "sig.single-user-scope": 2,
+      "sig.multiple-users-affected": 2,
+      "sig.token-expiry-errors": 1,
+      "sig.service-health-clear": 1,
+      "sig.prt-missing": 1,
+      "sig.ca-config-unchanged": 1
+    }
+  },
+  "families": {
+    "F01": {
+      "name": "Intermittency phrases",
+      "fix": "A typed phrase family for \"sometimes works, sometimes not\" (sometimes/now and then/occasionally/off and on + works/fails/goes through/signs in), \"comes and goes\", and \"not constant/consistent/every time\", read only in a clause that also speaks of failing or signing in.",
+      "risk": "medium: \"sometimes\" is common outside failures; the clause must carry a failure or sign-in word.",
+      "test": "Positive: six wordings per alternative. Negative: \"sometimes I forget my password\", \"not constant bandwidth\"; negation: \"this is not intermittent\".",
+      "priority": 1,
+      "valueTo": "issue isolation (scope)",
+      "status": "planned"
+    },
+    "F02": {
+      "name": "Other sites are fine",
+      "fix": "A family for \"colleagues/users/staff at <other> office/site have no trouble / are fine / unaffected\" that does not need the literal words \"other sites\".",
+      "risk": "medium: any unaffected group is read as a site pattern; require a place word and a contrast with the affected group.",
+      "test": "Positive: four wordings. Negative: \"everyone at our office is affected\", \"the other team is on holiday\".",
+      "priority": 1,
+      "valueTo": "issue isolation (scope)",
+      "status": "planned"
+    },
+    "F03": {
+      "name": "Name-resolution error in words",
+      "fix": "Allow words between \"name\" and \"could not be resolved\" (\"the name of the server could not be resolved\"), \"could not resolve the host\", \"DNS lookup failed\", in a sentence about the client or sign-in.",
+      "risk": "medium: printers and other products report the same words; require the sign-in or Teams context in the same sentence.",
+      "test": "Positive: five wordings. Negative: the printer look-alike case (z3) must still report nothing.",
+      "priority": 1,
+      "valueTo": "authentication flow (client error)",
+      "status": "planned"
+    },
+    "F04": {
+      "name": "No records in the sign-in logs, in words",
+      "fix": "A family for \"nothing/no failures/no rows/no entries/not a single record ... for those attempts/users\", with the log check named in the same event (title included), including the passive \"no failures are recorded\".",
+      "risk": "medium: a request \"please check whether there are no records\" must not fire (modality handles requests).",
+      "test": "Positive: six wordings. Negative: \"we expected no records\", \"if there are no records, escalate\"; conflict with the present-side signal when both are stated.",
+      "priority": 1,
+      "valueTo": "evidence collection (server-side correlation)",
+      "status": "planned"
+    },
+    "F05": {
+      "name": "A name server does not answer",
+      "fix": "A family for one of several name servers or resolvers that does not answer, times out or stays silent while the others answer, with a count (\"four of the five tries\") or a contrast (\"while the other one is fine\").",
+      "risk": "medium: \"does not answer\" about a person; require resolver, name server or DNS words or an address pair.",
+      "test": "Positive: five wordings. Negative: \"the customer did not answer my email\", \"both name servers answered\".",
+      "priority": 1,
+      "valueTo": "diagnostic sequence (network checks)",
+      "status": "planned"
+    },
+    "F06": {
+      "name": "A network change is reported",
+      "fix": "Broaden the verb family (switched on, rolled out, put in place, introduced) and the object family (filtering policy, inspection profile, web filter), accept the network admin role as the context, and let the object be \"that server\" or \"the cluster\" when the event answers a question about changes.",
+      "risk": "high: \"change\" statements are common; keep the role gate and a policy/filter/profile noun.",
+      "test": "Positive: six wordings by a network admin. Negative: a change to a printer, a change that is planned (\"we will switch on\"), a denied change.",
+      "priority": 2,
+      "valueTo": "diagnostic sequence (change history)",
+      "status": "planned"
+    },
+    "F07": {
+      "name": "A fix worked (reported in prose)",
+      "fix": "These two signals can only be read from structured data today. A text reading needs three things: recognising the customer-side remediation (\"I removed it from the DHCP scope\", \"took proxy-04 out of the load balancer\"), a generic success statement (\"since the change every sign-in worked\"), and linking them across events. Not attempted before the dev set can measure it.",
+      "risk": "high: a success statement without the link says nothing about which cause was right.",
+      "test": "Cross-event cases in the corpus; property test that the signal needs both the remediation and the success statement.",
+      "priority": 3,
+      "valueTo": "resolution validation",
+      "status": "deferred"
+    },
+    "F08": {
+      "name": "Timeout reported in words",
+      "fix": "Read \"the connection timed out\", \"timed out at login\", \"times out when they open Teams\" as the client timeout when the sentence is about the client, users or sign-in.",
+      "risk": "medium: the printer look-alike also \"timed out\"; require the sign-in, Teams, users or client context in the same sentence.",
+      "test": "Positive: five wordings. Negative: printer and print-server look-alikes, \"the report timed out\".",
+      "priority": 1,
+      "valueTo": "authentication flow (client error)",
+      "status": "planned"
+    },
+    "F09": {
+      "name": "Clearing the cache or reinstalling did nothing",
+      "fix": "Let the outcome follow the action across a sentence boundary within the same event (\"did a full reinstall. No difference, ...\", \"nothing changed\"), and read \"did both/it\" as the step the engineer asked for in the event it answers.",
+      "risk": "medium: an outcome phrase without an action in the reply must resolve through the request it answers.",
+      "test": "Positive: reply after a request, with and without the action named. Negative: an outcome phrase answering a different request.",
+      "priority": 2,
+      "valueTo": "diagnostic sequence (remediation outcome)",
+      "status": "planned"
+    },
+    "F10": {
+      "name": "Revoking sessions: request and outcome",
+      "fix": "Recognise the engineer asking for \"sign out everywhere\", \"drop old sessions\" as the revoke step, and read \"same failures as before\" in the reply as its outcome.",
+      "risk": "medium: sign-out requests are also routine hygiene; require the session wording.",
+      "test": "Positive: request and reply pairs. Negative: sign-out for another purpose.",
+      "priority": 2,
+      "valueTo": "diagnostic sequence (remediation outcome)",
+      "status": "planned"
+    },
+    "F11": {
+      "name": "Proxy comparison reported by the engineer",
+      "fix": "The signal is read only from customer-side events; the engineer ran this test, so accept the engineer roles and the engineer e-mail and diagnostic types.",
+      "risk": "low: the same statement by the engineer is evidence of the same kind; gated by the proxy wording.",
+      "test": "Positive: engineer diagnostic result and engineer e-mail. Negative: an engineer request to test the proxies (modality).",
+      "priority": 1,
+      "valueTo": "diagnostic sequence (network checks)",
+      "status": "planned"
+    },
+    "F12": {
+      "name": "An access policy was changed",
+      "fix": "Broaden the subject (access rule or policy, security policy, compliance rule, session policy, sign-in frequency) and the recency (day names, \"two weeks ago\", \"last week\", \"on Friday\") beyond the literal \"Conditional Access policy ... yesterday\".",
+      "risk": "medium: \"policy\" is generic; keep the access/security/session noun and a change verb.",
+      "test": "Positive: six wordings. Negative: \"we will change the policy\", \"no change was made\", a password policy.",
+      "priority": 1,
+      "valueTo": "diagnostic sequence (change history)",
+      "status": "planned"
+    },
+    "F13": {
+      "name": "Log findings described in prose",
+      "fix": "Read \"failed attempts are in the sign-in logs\", \"stopped by Conditional Access\", \"interrupted multi-factor step\", and \"errors 70043 and 700082 ... token has expired\" as the log findings, with or without the AADSTS prefix.",
+      "risk": "medium: a request to look for them must not fire (modality); code numbers need the log context.",
+      "test": "Positive: eight wordings. Negative: \"check whether the logs show CA failures\", an unrelated five-digit number.",
+      "priority": 1,
+      "valueTo": "evidence collection (server-side evidence)",
+      "status": "planned"
+    },
+    "F14": {
+      "name": "Excluding a user did nothing",
+      "fix": "Recognise the engineer asking to exclude or leave a user out of \"that rule\" and read \"still blocked, same message\" in the reply as the outcome.",
+      "risk": "medium: exclusion is a security-weakening step; the outcome must be tied to the request.",
+      "test": "Positive: request and reply pairs. Negative: an exclusion that worked.",
+      "priority": 2,
+      "valueTo": "diagnostic sequence (remediation outcome)",
+      "status": "planned"
+    },
+    "F15": {
+      "name": "A denial reported as the fact",
+      "fix": "A modality layer: a denied, guessed, planned or conditional statement is not read as the fact, and a denial of one side of a declared signal pair is read as the other side (\"nothing active\" is \"no active incident\").",
+      "risk": "low to medium: cue reach is bounded and every cue has fires and look-alike examples; see docs/EVALUATION.md.",
+      "test": "The four known-defect tests become passing tests; adversarial negation tests for every cue.",
+      "priority": 1,
+      "valueTo": "precision (negation)",
+      "status": "planned"
+    },
+    "F16": {
+      "name": "Only one user or device is affected",
+      "fix": "A family for \"only me\", \"just my laptop/this device\", and \"my colleagues/teammates ... are fine\", read together with a failure in the same message.",
+      "risk": "medium: \"only me\" without a failure is not a scope statement; require a failure or sign-in word in the event.",
+      "test": "Positive: five wordings. Negative: \"only me in the meeting\", \"not just one user\" (negated).",
+      "priority": 1,
+      "valueTo": "issue isolation (scope)",
+      "status": "planned"
+    },
+    "F17": {
+      "name": "The device has no primary refresh token",
+      "fix": "A family for \"no primary refresh token\", \"PRT is missing\", \"does not have a PRT\", read as a statement about the device.",
+      "risk": "low: specific vocabulary; the negation is the content.",
+      "test": "Positive: four wordings. Negative: \"there is a primary refresh token\".",
+      "priority": 2,
+      "valueTo": "diagnostic sequence (device state)",
+      "status": "planned"
+    },
+    "F18": {
+      "name": "Chat style: typos and abbreviations",
+      "fix": "A bounded normalisation of the scanned text with a fixed list of common abbreviations and typos (ppl, pls, u, r, thru, somtimes, peple, agian, ...), with an offset map so every match and excerpt still points into the stored text. No fuzzy matching.",
+      "risk": "low: a fixed, reviewed list; each entry is whole-word and has a test.",
+      "test": "Offsets and excerpts verify against the stored text; every entry has a positive and a look-alike; property test: normalisation never moves a match outside the original text.",
+      "priority": 2,
+      "valueTo": "robustness (noisy input)",
+      "status": "planned"
+    },
+    "F19": {
+      "name": "Access policy unchanged, said with a negative quantifier",
+      "fix": "A family for \"nothing was changed in our access policies\", \"no changes to the conditional access\", \"we have not touched the policy\", with the broadened subject of F12.",
+      "risk": "low to medium: the negation is the content; the subject must be an access or security policy.",
+      "test": "Positive: five wordings. Negative: \"something was changed\", \"the printer policy is unchanged\".",
+      "priority": 2,
+      "valueTo": "diagnostic sequence (change history)",
+      "status": "planned"
+    },
+    "F20": {
+      "name": "A message written in another language",
+      "fix": "Not fixed. The engine reads English only. The case is kept in the set as a known limit; a language-specific pack would be a separate piece of work.",
+      "risk": "n/a",
+      "test": "The case stays labelled; the metrics report it as out of scope.",
+      "priority": 3,
+      "valueTo": "robustness (language)",
+      "status": "not fixable in scope"
+    }
+  },
+  "misses": [
+    {
+      "id": "miss-01",
+      "caseId": "p1-warsaw-resolver",
+      "group": "paraphrase",
+      "eventId": "ev01",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.intermittent-failures",
+      "expectedHypotheses": ["hyp.dns-resolution"],
+      "expectedAction": null,
+      "text": "[Teams logins failing in Warsaw] Hi, since about nine this morning our Warsaw office, roughly 45 people, keeps getting thrown out of Teams when they sign in. If you wait a minute and try once more it sometimes goes through, sometimes it does not. Colleagues at our Gdansk office have no trouble at all.",
+      "measuredCause": "wording",
+      "category": "synonym",
+      "alsoNeeds": ["paraphrase"],
+      "family": "F01",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(intermittent(ly)?|sometimes (works|fails|succeeds)|on and off|randomly|retry (usually |sometimes )?(works|succeeds)|retr(y|ies)[^.\\n]{0,30}sometimes)\\b",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A typed phrase family for \"sometimes works, sometimes not\" (sometimes/now and then/occasionally/off and on + works/fails/goes through/signs in), \"comes and goes\", and \"not constant/consistent/every time\", read only in a clause that also speaks of failing or signing in.",
+      "falsePositiveRisk": "medium: \"sometimes\" is common outside failures; the clause must carry a failure or sign-in word.",
+      "testRequirement": "Positive: six wordings per alternative. Negative: \"sometimes I forget my password\", \"not constant bandwidth\"; negation: \"this is not intermittent\".",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-02",
+      "caseId": "p1-warsaw-resolver",
+      "group": "paraphrase",
+      "eventId": "ev01",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.site-correlated",
+      "expectedHypotheses": ["hyp.dns-resolution"],
+      "expectedAction": null,
+      "text": "[Teams logins failing in Warsaw] Hi, since about nine this morning our Warsaw office, roughly 45 people, keeps getting thrown out of Teams when they sign in. If you wait a minute and try once more it sometimes goes through, sometimes it does not. Colleagues at our Gdansk office have no trouble at all.",
+      "measuredCause": "wording",
+      "category": "paraphrase",
+      "alsoNeeds": ["negation", "entity_resolution"],
+      "family": "F02",
+      "currentDetectorBehaviour": "2 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(only|mostly|mainly|primarily|much worse|worse|more (often|frequent(ly)?))\\b[^.\\n]{0,70}\\b(office|site|branch|network|subnet|vlan|location)\\b",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        },
+        {
+          "pattern": "\\bother (sites|offices|locations|branches|networks)\\b[^.\\n]{0,50}\\b(are|is)?\\s*(fine|working|unaffected|not (affected|impacted)|ok)\\b",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A family for \"colleagues/users/staff at <other> office/site have no trouble / are fine / unaffected\" that does not need the literal words \"other sites\".",
+      "falsePositiveRisk": "medium: any unaffected group is read as a site pattern; require a place word and a contrast with the affected group.",
+      "testRequirement": "Positive: four wordings. Negative: \"everyone at our office is affected\", \"the other team is on holiday\".",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-03",
+      "caseId": "p1-warsaw-resolver",
+      "group": "paraphrase",
+      "eventId": "ev03",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.error-name-not-resolved",
+      "expectedHypotheses": ["hyp.dns-resolution"],
+      "expectedAction": null,
+      "text": "[Re: Teams logins failing in Warsaw] Users: a.kowal 08:14:10 UTC, m.nowak 08:16:55 UTC, t.wisniewski 08:20:31 UTC. Warsaw computers get 10.20.1.10 and 10.20.1.11 as DNS servers and go out directly, there is no proxy. The message in the Teams window says the name of the server could not be resolved.",
+      "measuredCause": "wording",
+      "category": "paraphrase",
+      "alsoNeeds": ["passive_voice"],
+      "family": "F03",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(caa82ee7|0x80072ee7|ERR_NAME_NOT_RESOLVED|DNS_PROBE_FINISHED_NXDOMAIN|name (could not be|not) resolved|can'?t resolve host)\\b",
+          "roles": null,
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Allow words between \"name\" and \"could not be resolved\" (\"the name of the server could not be resolved\"), \"could not resolve the host\", \"DNS lookup failed\", in a sentence about the client or sign-in.",
+      "falsePositiveRisk": "medium: printers and other products report the same words; require the sign-in or Teams context in the same sentence.",
+      "testRequirement": "Positive: five wordings. Negative: the printer look-alike case (z3) must still report nothing.",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-04",
+      "caseId": "p1-warsaw-resolver",
+      "group": "paraphrase",
+      "eventId": "ev04",
+      "author": "engineer",
+      "eventType": "diagnostic_result",
+      "expectedSignal": "sig.no-server-side-failure-records",
+      "expectedHypotheses": ["hyp.dns-resolution"],
+      "expectedAction": null,
+      "text": "[Sign-in log check] Looked up the three users in the Entra sign-in logs, around the minutes of their failed attempts. There is nothing at all for those attempts, which means the requests never got as far as Entra.",
+      "measuredCause": "wording",
+      "category": "negation",
+      "alsoNeeds": ["paraphrase"],
+      "family": "F04",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(0|zero|no)\\s+(of\\s+\\d+\\s+)?(failing attempts\\s+)?(have\\s+)?(a\\s+)?(matching\\s+)?(failed\\s+)?(sign-?in\\s+)?(records?|entries|rows|events)\\b[^.\\n]{0,60}\\b(failing|failure|failed|attempts?)\\b",
+          "roles": null,
+          "eventTypes": ["query_output", "diagnostic_result", "escalation_response", "case_note"],
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A family for \"nothing/no failures/no rows/no entries/not a single record ... for those attempts/users\", with the log check named in the same event (title included), including the passive \"no failures are recorded\".",
+      "falsePositiveRisk": "medium: a request \"please check whether there are no records\" must not fire (modality handles requests).",
+      "testRequirement": "Positive: six wordings. Negative: \"we expected no records\", \"if there are no records, escalate\"; conflict with the present-side signal when both are stated.",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-05",
+      "caseId": "p1-warsaw-resolver",
+      "group": "paraphrase",
+      "eventId": "ev05",
+      "author": "engineer",
+      "eventType": "diagnostic_result",
+      "expectedSignal": "sig.resolver-inconsistent",
+      "expectedHypotheses": ["hyp.dns-resolution"],
+      "expectedAction": null,
+      "text": "[Name server test] Asked each of the two Warsaw name servers for login.microsoftonline.com five times. 10.20.1.10 answered every time within milliseconds. 10.20.1.11 did not answer on four of the five tries.",
+      "measuredCause": "wording",
+      "category": "paraphrase",
+      "alsoNeeds": ["implied_action"],
+      "family": "F05",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(one of|1 of)\\s+(the\\s+)?(\\d+|two|three)\\s+(dns\\s+)?(resolvers|servers)\\b[^.\\n]{0,80}(fail|refus|block|servfail|nxdomain)",
+          "roles": null,
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A family for one of several name servers or resolvers that does not answer, times out or stays silent while the others answer, with a count (\"four of the five tries\") or a contrast (\"while the other one is fine\").",
+      "falsePositiveRisk": "medium: \"does not answer\" about a person; require resolver, name server or DNS words or an address pair.",
+      "testRequirement": "Positive: five wordings. Negative: \"the customer did not answer my email\", \"both name servers answered\".",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-06",
+      "caseId": "p1-warsaw-resolver",
+      "group": "paraphrase",
+      "eventId": "ev06",
+      "author": "engineer",
+      "eventType": "engineer_email",
+      "expectedSignal": "sig.resolver-inconsistent",
+      "expectedHypotheses": ["hyp.dns-resolution"],
+      "expectedAction": null,
+      "text": "[Name server 10.20.1.11] One of your two name servers, 10.20.1.11, is not answering for the Microsoft sign-in host names, while the other one is fine. Did anyone change anything on it lately? For now, please take it out of the addresses that Warsaw clients receive.",
+      "measuredCause": "wording",
+      "category": "paraphrase",
+      "alsoNeeds": ["negation"],
+      "family": "F05",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(one of|1 of)\\s+(the\\s+)?(\\d+|two|three)\\s+(dns\\s+)?(resolvers|servers)\\b[^.\\n]{0,80}(fail|refus|block|servfail|nxdomain)",
+          "roles": null,
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A family for one of several name servers or resolvers that does not answer, times out or stays silent while the others answer, with a count (\"four of the five tries\") or a contrast (\"while the other one is fine\").",
+      "falsePositiveRisk": "medium: \"does not answer\" about a person; require resolver, name server or DNS words or an address pair.",
+      "testRequirement": "Positive: five wordings. Negative: \"the customer did not answer my email\", \"both name servers answered\".",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-07",
+      "caseId": "p1-warsaw-resolver",
+      "group": "paraphrase",
+      "eventId": "ev07",
+      "author": "network",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.recent-network-change-reported",
+      "expectedHypotheses": ["hyp.dns-resolution"],
+      "expectedAction": null,
+      "text": "[Re: Name server 10.20.1.11] Yes, last Thursday we switched on a new web filtering policy on that server. I have removed it from the DHCP scope, the clients are renewing their leases now.",
+      "measuredCause": "wording",
+      "category": "synonym",
+      "alsoNeeds": ["temporal_phrasing", "entity_resolution"],
+      "family": "F06",
+      "currentDetectorBehaviour": "2 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "(dns|resolver|proxy|proxies|firewall|web filter|secure web gateway|network)[^.\\n]{0,80}(policy|rule|filter|blocklist|category|inspection)[^.\\n]{0,80}(updated|changed|deployed|rolled out|pushed|enabled|set to)",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        },
+        {
+          "pattern": "(deployed|rolled out|pushed|enabled|changed|updated)[^.\\n]{0,60}(inspection|filter|filtering|blocklist|policy)[^.\\n]{0,80}(proxy|proxies|dns|resolver|firewall|gateway)",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Broaden the verb family (switched on, rolled out, put in place, introduced) and the object family (filtering policy, inspection profile, web filter), accept the network admin role as the context, and let the object be \"that server\" or \"the cluster\" when the event answers a question about changes.",
+      "falsePositiveRisk": "high: \"change\" statements are common; keep the role gate and a policy/filter/profile noun.",
+      "testRequirement": "Positive: six wordings by a network admin. Negative: a change to a printer, a change that is planned (\"we will switch on\"), a denied change.",
+      "priority": 2,
+      "status": "planned"
+    },
+    {
+      "id": "miss-08",
+      "caseId": "p1-warsaw-resolver",
+      "group": "paraphrase",
+      "eventId": "ev08",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.dns-fix-resolved",
+      "expectedHypotheses": ["hyp.dns-resolution"],
+      "expectedAction": null,
+      "text": "[Re: Name server 10.20.1.11] Fifteen sign-ins in Warsaw since the change, every one of them worked. Nobody has complained again.",
+      "measuredCause": "structured-only",
+      "category": "detector_scope",
+      "alsoNeeds": ["cross_event_dependency", "temporal_phrasing"],
+      "family": "F07",
+      "currentDetectorBehaviour": "Every detector of this signal reads structured event data; free text cannot show it.",
+      "currentPatterns": [],
+      "proposedFix": "These two signals can only be read from structured data today. A text reading needs three things: recognising the customer-side remediation (\"I removed it from the DHCP scope\", \"took proxy-04 out of the load balancer\"), a generic success statement (\"since the change every sign-in worked\"), and linking them across events. Not attempted before the dev set can measure it.",
+      "falsePositiveRisk": "high: a success statement without the link says nothing about which cause was right.",
+      "testRequirement": "Cross-event cases in the corpus; property test that the signal needs both the remediation and the success statement.",
+      "priority": 3,
+      "status": "deferred"
+    },
+    {
+      "id": "miss-09",
+      "caseId": "p2-utrecht-proxy",
+      "group": "paraphrase",
+      "eventId": "ev01",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.error-timeout",
+      "expectedHypotheses": ["hyp.proxy-egress"],
+      "expectedAction": null,
+      "text": "[Teams times out in Utrecht] Good morning. Around 70 colleagues at the Utrecht site get a message that the connection timed out when they open Teams and sign in. It is not constant; restarting the app fixes it for some people for a while. The other sites are not affected as far as we know.",
+      "measuredCause": "wording",
+      "category": "paraphrase",
+      "alsoNeeds": ["detector_scope"],
+      "family": "F08",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(caa82ee2|0x80072ee2|ERR_(CONNECTION_)?TIMED_OUT|ETIMEDOUT|request timed out)\\b",
+          "roles": null,
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Read \"the connection timed out\", \"timed out at login\", \"times out when they open Teams\" as the client timeout when the sentence is about the client, users or sign-in.",
+      "falsePositiveRisk": "medium: the printer look-alike also \"timed out\"; require the sign-in, Teams, users or client context in the same sentence.",
+      "testRequirement": "Positive: five wordings. Negative: printer and print-server look-alikes, \"the report timed out\".",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-10",
+      "caseId": "p2-utrecht-proxy",
+      "group": "paraphrase",
+      "eventId": "ev01",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.intermittent-failures",
+      "expectedHypotheses": ["hyp.proxy-egress"],
+      "expectedAction": null,
+      "text": "[Teams times out in Utrecht] Good morning. Around 70 colleagues at the Utrecht site get a message that the connection timed out when they open Teams and sign in. It is not constant; restarting the app fixes it for some people for a while. The other sites are not affected as far as we know.",
+      "measuredCause": "wording",
+      "category": "paraphrase",
+      "alsoNeeds": ["negation"],
+      "family": "F01",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(intermittent(ly)?|sometimes (works|fails|succeeds)|on and off|randomly|retry (usually |sometimes )?(works|succeeds)|retr(y|ies)[^.\\n]{0,30}sometimes)\\b",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A typed phrase family for \"sometimes works, sometimes not\" (sometimes/now and then/occasionally/off and on + works/fails/goes through/signs in), \"comes and goes\", and \"not constant/consistent/every time\", read only in a clause that also speaks of failing or signing in.",
+      "falsePositiveRisk": "medium: \"sometimes\" is common outside failures; the clause must carry a failure or sign-in word.",
+      "testRequirement": "Positive: six wordings per alternative. Negative: \"sometimes I forget my password\", \"not constant bandwidth\"; negation: \"this is not intermittent\".",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-11",
+      "caseId": "p2-utrecht-proxy",
+      "group": "paraphrase",
+      "eventId": "ev03",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.cache-clear-no-effect",
+      "expectedHypotheses": ["hyp.proxy-egress"],
+      "expectedAction": null,
+      "text": "[Re: Teams times out in Utrecht] We deleted the cache and did a full reinstall on five computers. No difference, the timeout message still comes up. The browser version of Teams fails in exactly the same way.",
+      "measuredCause": "wording",
+      "category": "cross_sentence",
+      "alsoNeeds": ["negation", "paraphrase"],
+      "family": "F09",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "(clean|new|fresh) (teams )?profile[^.\\n]{0,60}(still|also) fail|(cleared|deleted|reset)[^.\\n]{0,40}cache[^.\\n]{0,100}(still|continues?|persists?|didn'?t help|no change)|reinstall(ed)?[^.\\n]{0,60}(still|same)",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Let the outcome follow the action across a sentence boundary within the same event (\"did a full reinstall. No difference, ...\", \"nothing changed\"), and read \"did both/it\" as the step the engineer asked for in the event it answers.",
+      "falsePositiveRisk": "medium: an outcome phrase without an action in the reply must resolve through the request it answers.",
+      "testRequirement": "Positive: reply after a request, with and without the action named. Negative: an outcome phrase answering a different request.",
+      "priority": 2,
+      "status": "planned"
+    },
+    {
+      "id": "miss-12",
+      "caseId": "p2-utrecht-proxy",
+      "group": "paraphrase",
+      "eventId": "ev05",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.revoke-sessions-no-effect",
+      "expectedHypotheses": ["hyp.proxy-egress"],
+      "expectedAction": null,
+      "text": "[Re: Teams times out in Utrecht] We signed everyone in the pilot group out of all sessions yesterday evening and they signed in again this morning. Exactly the same failures as before.",
+      "measuredCause": "wording",
+      "category": "cross_event_dependency",
+      "alsoNeeds": ["paraphrase", "temporal_phrasing"],
+      "family": "F10",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "(revok(e|ed|ing)[^.\\n]{0,60}(session|token)s?[^.\\n]{0,100}(failures? continue|still fail|no change|same)|sessions? (were|was) revoked[^.\\n]{0,100}(failures? continue|still fail|no change|same))",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Recognise the engineer asking for \"sign out everywhere\", \"drop old sessions\" as the revoke step, and read \"same failures as before\" in the reply as its outcome.",
+      "falsePositiveRisk": "medium: sign-out requests are also routine hygiene; require the session wording.",
+      "testRequirement": "Positive: request and reply pairs. Negative: sign-out for another purpose.",
+      "priority": 2,
+      "status": "planned"
+    },
+    {
+      "id": "miss-13",
+      "caseId": "p2-utrecht-proxy",
+      "group": "paraphrase",
+      "eventId": "ev06",
+      "author": "engineer",
+      "eventType": "diagnostic_result",
+      "expectedSignal": "sig.no-server-side-failure-records",
+      "expectedHypotheses": ["hyp.proxy-egress"],
+      "expectedAction": null,
+      "text": "[Sign-in log check] Pulled the Entra sign-in logs and looked at the users and times you named. No failures are recorded for any of them; whatever is going wrong stops before it reaches Entra.",
+      "measuredCause": "wording",
+      "category": "passive_voice",
+      "alsoNeeds": ["negation"],
+      "family": "F04",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(0|zero|no)\\s+(of\\s+\\d+\\s+)?(failing attempts\\s+)?(have\\s+)?(a\\s+)?(matching\\s+)?(failed\\s+)?(sign-?in\\s+)?(records?|entries|rows|events)\\b[^.\\n]{0,60}\\b(failing|failure|failed|attempts?)\\b",
+          "roles": null,
+          "eventTypes": ["query_output", "diagnostic_result", "escalation_response", "case_note"],
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A family for \"nothing/no failures/no rows/no entries/not a single record ... for those attempts/users\", with the log check named in the same event (title included), including the passive \"no failures are recorded\".",
+      "falsePositiveRisk": "medium: a request \"please check whether there are no records\" must not fire (modality handles requests).",
+      "testRequirement": "Positive: six wordings. Negative: \"we expected no records\", \"if there are no records, escalate\"; conflict with the present-side signal when both are stated.",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-14",
+      "caseId": "p2-utrecht-proxy",
+      "group": "paraphrase",
+      "eventId": "ev07",
+      "author": "engineer",
+      "eventType": "diagnostic_result",
+      "expectedSignal": "sig.proxy-node-inconsistent",
+      "expectedHypotheses": ["hyp.proxy-egress"],
+      "expectedAction": null,
+      "text": "[Proxy test] Requested login.microsoftonline.com through each of the four proxy servers of the Utrecht cluster. Three returned the page in under a second. proxy-04 timed out every single time.",
+      "measuredCause": "type-or-role-gate",
+      "category": "event_type_gate",
+      "alsoNeeds": [],
+      "family": "F11",
+      "currentDetectorBehaviour": "No text detector accepts this event's author role or type (engineer, diagnostic_result); the patterns are limited to customer_network_admin.",
+      "currentPatterns": [
+        {
+          "pattern": "\\bproxy[- ]?[\\w-]{0,40}\\d?\\b[^.\\n]{0,60}\\b(times? out|timeouts?|fails?|dropped)\\b[^.\\n]{0,60}\\b(one in \\w+|roughly|about|some|intermittent)",
+          "roles": ["customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": false
+        }
+      ],
+      "proposedFix": "The signal is read only from customer-side events; the engineer ran this test, so accept the engineer roles and the engineer e-mail and diagnostic types.",
+      "falsePositiveRisk": "low: the same statement by the engineer is evidence of the same kind; gated by the proxy wording.",
+      "testRequirement": "Positive: engineer diagnostic result and engineer e-mail. Negative: an engineer request to test the proxies (modality).",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-15",
+      "caseId": "p2-utrecht-proxy",
+      "group": "paraphrase",
+      "eventId": "ev08",
+      "author": "engineer",
+      "eventType": "engineer_email",
+      "expectedSignal": "sig.proxy-node-inconsistent",
+      "expectedHypotheses": ["hyp.proxy-egress"],
+      "expectedAction": null,
+      "text": "[Proxy server proxy-04] One of the four proxy servers, proxy-04, times out for the Microsoft sign-in addresses; the other three are fine. Was anything done on that cluster recently?",
+      "measuredCause": "type-or-role-gate",
+      "category": "event_type_gate",
+      "alsoNeeds": [],
+      "family": "F11",
+      "currentDetectorBehaviour": "No text detector accepts this event's author role or type (engineer, engineer_email); the patterns are limited to customer_network_admin.",
+      "currentPatterns": [
+        {
+          "pattern": "\\bproxy[- ]?[\\w-]{0,40}\\d?\\b[^.\\n]{0,60}\\b(times? out|timeouts?|fails?|dropped)\\b[^.\\n]{0,60}\\b(one in \\w+|roughly|about|some|intermittent)",
+          "roles": ["customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": false
+        }
+      ],
+      "proposedFix": "The signal is read only from customer-side events; the engineer ran this test, so accept the engineer roles and the engineer e-mail and diagnostic types.",
+      "falsePositiveRisk": "low: the same statement by the engineer is evidence of the same kind; gated by the proxy wording.",
+      "testRequirement": "Positive: engineer diagnostic result and engineer e-mail. Negative: an engineer request to test the proxies (modality).",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-16",
+      "caseId": "p2-utrecht-proxy",
+      "group": "paraphrase",
+      "eventId": "ev09",
+      "author": "network",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.recent-network-change-reported",
+      "expectedHypotheses": ["hyp.proxy-egress"],
+      "expectedAction": null,
+      "text": "[Re: Proxy server proxy-04] We rolled out a new certificate inspection profile on the cluster last Tuesday. I have taken proxy-04 out of the load balancer for now.",
+      "measuredCause": "wording",
+      "category": "entity_resolution",
+      "alsoNeeds": ["synonym", "temporal_phrasing"],
+      "family": "F06",
+      "currentDetectorBehaviour": "2 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "(dns|resolver|proxy|proxies|firewall|web filter|secure web gateway|network)[^.\\n]{0,80}(policy|rule|filter|blocklist|category|inspection)[^.\\n]{0,80}(updated|changed|deployed|rolled out|pushed|enabled|set to)",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        },
+        {
+          "pattern": "(deployed|rolled out|pushed|enabled|changed|updated)[^.\\n]{0,60}(inspection|filter|filtering|blocklist|policy)[^.\\n]{0,80}(proxy|proxies|dns|resolver|firewall|gateway)",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Broaden the verb family (switched on, rolled out, put in place, introduced) and the object family (filtering policy, inspection profile, web filter), accept the network admin role as the context, and let the object be \"that server\" or \"the cluster\" when the event answers a question about changes.",
+      "falsePositiveRisk": "high: \"change\" statements are common; keep the role gate and a policy/filter/profile noun.",
+      "testRequirement": "Positive: six wordings by a network admin. Negative: a change to a printer, a change that is planned (\"we will switch on\"), a denied change.",
+      "priority": 2,
+      "status": "planned"
+    },
+    {
+      "id": "miss-17",
+      "caseId": "p2-utrecht-proxy",
+      "group": "paraphrase",
+      "eventId": "ev10",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.proxy-fix-resolved",
+      "expectedHypotheses": ["hyp.proxy-egress"],
+      "expectedAction": null,
+      "text": "[Re: Proxy server proxy-04] No timeouts reported since proxy-04 was taken out. I watched twenty sign-ins and all of them were fine.",
+      "measuredCause": "structured-only",
+      "category": "detector_scope",
+      "alsoNeeds": ["cross_event_dependency"],
+      "family": "F07",
+      "currentDetectorBehaviour": "Every detector of this signal reads structured event data; free text cannot show it.",
+      "currentPatterns": [],
+      "proposedFix": "These two signals can only be read from structured data today. A text reading needs three things: recognising the customer-side remediation (\"I removed it from the DHCP scope\", \"took proxy-04 out of the load balancer\"), a generic success statement (\"since the change every sign-in worked\"), and linking them across events. Not attempted before the dev set can measure it.",
+      "falsePositiveRisk": "high: a success statement without the link says nothing about which cause was right.",
+      "testRequirement": "Cross-event cases in the corpus; property test that the signal needs both the remediation and the success statement.",
+      "priority": 3,
+      "status": "deferred"
+    },
+    {
+      "id": "miss-18",
+      "caseId": "p3-lisbon-access-rule",
+      "group": "paraphrase",
+      "eventId": "ev03",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.recent-ca-change-reported",
+      "expectedHypotheses": ["hyp.conditional-access"],
+      "expectedAction": null,
+      "text": "[Re: Staff blocked from Teams] Yes. On Friday afternoon our security team switched on a new access rule that requires a managed, compliant device for Teams. The three users are r.silva 08:02 UTC, c.santos 08:07 UTC and p.costa 08:11 UTC.",
+      "measuredCause": "wording",
+      "category": "synonym",
+      "alsoNeeds": ["temporal_phrasing"],
+      "family": "F12",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "(conditional access|ca policy|mfa policy)[^.\\n]{0,80}(was |were |has been |have been )?(changed|updated|modified|enabled|deployed)[^.\\n]{0,60}(yesterday|today|this (morning|week)|last night|hours? ago)",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Broaden the subject (access rule or policy, security policy, compliance rule, session policy, sign-in frequency) and the recency (day names, \"two weeks ago\", \"last week\", \"on Friday\") beyond the literal \"Conditional Access policy ... yesterday\".",
+      "falsePositiveRisk": "medium: \"policy\" is generic; keep the access/security/session noun and a change verb.",
+      "testRequirement": "Positive: six wordings. Negative: \"we will change the policy\", \"no change was made\", a password policy.",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-19",
+      "caseId": "p3-lisbon-access-rule",
+      "group": "paraphrase",
+      "eventId": "ev04",
+      "author": "engineer",
+      "eventType": "diagnostic_result",
+      "expectedSignal": "sig.server-side-failure-records-present",
+      "expectedHypotheses": ["hyp.conditional-access"],
+      "expectedAction": null,
+      "text": "[Sign-in log check] All three failed attempts are in the Entra sign-in logs. Each one is marked as stopped by Conditional Access, by the new device-compliance rule, and one of them also shows an interrupted multi-factor step.",
+      "measuredCause": "wording",
+      "category": "paraphrase",
+      "alsoNeeds": ["passive_voice"],
+      "family": "F13",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b\\d+ of \\d+ failing attempts (have|had) (a )?matching (failed )?sign-?in",
+          "roles": null,
+          "eventTypes": ["query_output", "diagnostic_result", "escalation_response", "case_note"],
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Read \"failed attempts are in the sign-in logs\", \"stopped by Conditional Access\", \"interrupted multi-factor step\", and \"errors 70043 and 700082 ... token has expired\" as the log findings, with or without the AADSTS prefix.",
+      "falsePositiveRisk": "medium: a request to look for them must not fire (modality); code numbers need the log context.",
+      "testRequirement": "Positive: eight wordings. Negative: \"check whether the logs show CA failures\", an unrelated five-digit number.",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-20",
+      "caseId": "p3-lisbon-access-rule",
+      "group": "paraphrase",
+      "eventId": "ev04",
+      "author": "engineer",
+      "eventType": "diagnostic_result",
+      "expectedSignal": "sig.mfa-ca-events-in-logs",
+      "expectedHypotheses": ["hyp.conditional-access"],
+      "expectedAction": null,
+      "text": "[Sign-in log check] All three failed attempts are in the Entra sign-in logs. Each one is marked as stopped by Conditional Access, by the new device-compliance rule, and one of them also shows an interrupted multi-factor step.",
+      "measuredCause": "wording",
+      "category": "paraphrase",
+      "alsoNeeds": ["detector_scope", "passive_voice"],
+      "family": "F13",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\bAADSTS(50076|50074|53003|53000|530003)\\b|ConditionalAccessStatus\\W+failure",
+          "roles": null,
+          "eventTypes": ["query_output", "log_sample", "diagnostic_result"],
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Read \"failed attempts are in the sign-in logs\", \"stopped by Conditional Access\", \"interrupted multi-factor step\", and \"errors 70043 and 700082 ... token has expired\" as the log findings, with or without the AADSTS prefix.",
+      "falsePositiveRisk": "medium: a request to look for them must not fire (modality); code numbers need the log context.",
+      "testRequirement": "Positive: eight wordings. Negative: \"check whether the logs show CA failures\", an unrelated five-digit number.",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-21",
+      "caseId": "p3-lisbon-access-rule",
+      "group": "paraphrase",
+      "eventId": "ev07",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.ca-exclusion-no-effect",
+      "expectedHypotheses": ["hyp.conditional-access"],
+      "expectedAction": null,
+      "text": "[Re: Next step] We excluded the test user and waited twenty minutes. They are still blocked with the same message.",
+      "measuredCause": "wording",
+      "category": "cross_event_dependency",
+      "alsoNeeds": ["cross_sentence", "missing_object"],
+      "family": "F14",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "(exclud(e|ed|ing)|bypass(ed)?)[^.\\n]{0,70}(from|for)[^.\\n]{0,70}(mfa|ca |conditional access|polic)[^.\\n]{0,120}(failures? continue|still fail|no change|same|continues?)",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Recognise the engineer asking to exclude or leave a user out of \"that rule\" and read \"still blocked, same message\" in the reply as the outcome.",
+      "falsePositiveRisk": "medium: exclusion is a security-weakening step; the outcome must be tied to the request.",
+      "testRequirement": "Positive: request and reply pairs. Negative: an exclusion that worked.",
+      "priority": 2,
+      "status": "planned"
+    },
+    {
+      "id": "miss-22",
+      "caseId": "p4-hourly-signout",
+      "group": "paraphrase",
+      "eventId": "ev01",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.recent-ca-change-reported",
+      "expectedHypotheses": ["hyp.token-session", "hyp.conditional-access"],
+      "expectedAction": null,
+      "text": "[Signed out of Teams every hour] Users are signed out of Teams about once an hour and have to log in again. About 30 people have reported it, from several locations. Our security admin did shorten the session time in an access policy two weeks ago, but we assumed that would be one day, not one hour.",
+      "measuredCause": "wording",
+      "category": "synonym",
+      "alsoNeeds": ["temporal_phrasing"],
+      "family": "F12",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "(conditional access|ca policy|mfa policy)[^.\\n]{0,80}(was |were |has been |have been )?(changed|updated|modified|enabled|deployed)[^.\\n]{0,60}(yesterday|today|this (morning|week)|last night|hours? ago)",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Broaden the subject (access rule or policy, security policy, compliance rule, session policy, sign-in frequency) and the recency (day names, \"two weeks ago\", \"last week\", \"on Friday\") beyond the literal \"Conditional Access policy ... yesterday\".",
+      "falsePositiveRisk": "medium: \"policy\" is generic; keep the access/security/session noun and a change verb.",
+      "testRequirement": "Positive: six wordings. Negative: \"we will change the policy\", \"no change was made\", a password policy.",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-23",
+      "caseId": "p4-hourly-signout",
+      "group": "paraphrase",
+      "eventId": "ev04",
+      "author": "engineer",
+      "eventType": "diagnostic_result",
+      "expectedSignal": "sig.token-expiry-errors",
+      "expectedHypotheses": ["hyp.token-session", "hyp.conditional-access"],
+      "expectedAction": null,
+      "text": "[Sign-in log check] For these users the logs show errors 70043 and 700082 at exactly the times they were signed out, both saying that the token has expired because of the session lifetime.",
+      "measuredCause": "wording",
+      "category": "paraphrase",
+      "alsoNeeds": ["abbreviation"],
+      "family": "F13",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\bAADSTS(70043|700082|50173|50132|50133)\\b",
+          "roles": null,
+          "eventTypes": ["query_output", "log_sample", "diagnostic_result"],
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Read \"failed attempts are in the sign-in logs\", \"stopped by Conditional Access\", \"interrupted multi-factor step\", and \"errors 70043 and 700082 ... token has expired\" as the log findings, with or without the AADSTS prefix.",
+      "falsePositiveRisk": "medium: a request to look for them must not fire (modality); code numbers need the log context.",
+      "testRequirement": "Positive: eight wordings. Negative: \"check whether the logs show CA failures\", an unrelated five-digit number.",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-24",
+      "caseId": "p4-hourly-signout",
+      "group": "paraphrase",
+      "eventId": "ev04",
+      "author": "engineer",
+      "eventType": "diagnostic_result",
+      "expectedSignal": "sig.server-side-failure-records-present",
+      "expectedHypotheses": ["hyp.token-session", "hyp.conditional-access"],
+      "expectedAction": null,
+      "text": "[Sign-in log check] For these users the logs show errors 70043 and 700082 at exactly the times they were signed out, both saying that the token has expired because of the session lifetime.",
+      "measuredCause": "wording",
+      "category": "paraphrase",
+      "alsoNeeds": ["abbreviation"],
+      "family": "F13",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b\\d+ of \\d+ failing attempts (have|had) (a )?matching (failed )?sign-?in",
+          "roles": null,
+          "eventTypes": ["query_output", "diagnostic_result", "escalation_response", "case_note"],
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Read \"failed attempts are in the sign-in logs\", \"stopped by Conditional Access\", \"interrupted multi-factor step\", and \"errors 70043 and 700082 ... token has expired\" as the log findings, with or without the AADSTS prefix.",
+      "falsePositiveRisk": "medium: a request to look for them must not fire (modality); code numbers need the log context.",
+      "testRequirement": "Positive: eight wordings. Negative: \"check whether the logs show CA failures\", an unrelated five-digit number.",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-25",
+      "caseId": "p4-hourly-signout",
+      "group": "paraphrase",
+      "eventId": "ev05",
+      "author": "engineer",
+      "eventType": "diagnostic_result",
+      "expectedSignal": "sig.service-health-clear",
+      "expectedHypotheses": ["hyp.token-session", "hyp.conditional-access"],
+      "expectedAction": null,
+      "text": "[Service health check] Service health lists nothing active for sign-in or Teams.",
+      "measuredCause": "wording",
+      "category": "negation",
+      "alsoNeeds": [],
+      "family": "F15",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "(service health|message center)[^.\\n]{0,80}(no|not)[^.\\n]{0,40}(incident|advisory|issue)|no (active )?(incidents|advisories) (reported|posted|found)",
+          "roles": null,
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Done by the modality layer: a denied statement is not read as the fact, and a denial of one side of a declared signal pair is read as the other side (\"nothing active\" is \"no active incident\").",
+      "falsePositiveRisk": "low to medium: cue reach is bounded and every cue has fires and look-alike examples; see docs/EVALUATION.md.",
+      "testRequirement": "The four known-defect tests become passing tests; adversarial negation tests for every cue.",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-26",
+      "caseId": "p5-single-laptop",
+      "group": "paraphrase",
+      "eventId": "ev01",
+      "author": "enduser",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.single-user-scope",
+      "expectedHypotheses": ["hyp.device-state"],
+      "expectedAction": null,
+      "text": "[Cannot sign in on my laptop] My laptop will not sign in to Teams since yesterday. My teammates sitting next to me are fine on their own machines.",
+      "measuredCause": "wording",
+      "category": "paraphrase",
+      "alsoNeeds": ["implied_action"],
+      "family": "F16",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(only|just) (one|1|a single) (user|person|device|pc|laptop)\\b",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A family for \"only me\", \"just my laptop/this device\", and \"my colleagues/teammates ... are fine\", read together with a failure in the same message.",
+      "falsePositiveRisk": "medium: \"only me\" without a failure is not a scope statement; require a failure or sign-in word in the event.",
+      "testRequirement": "Positive: five wordings. Negative: \"only me in the meeting\", \"not just one user\" (negated).",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-27",
+      "caseId": "p5-single-laptop",
+      "group": "paraphrase",
+      "eventId": "ev03",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.cache-clear-no-effect",
+      "expectedHypotheses": ["hyp.device-state"],
+      "expectedAction": null,
+      "text": "[Re: Cannot sign in on my laptop] Confirmed, it is only this one device. We removed the cache folder and reinstalled Teams and nothing changed. Teams in the browser on the same laptop signs in without any problem.",
+      "measuredCause": "wording",
+      "category": "negation",
+      "alsoNeeds": ["synonym"],
+      "family": "F09",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "(clean|new|fresh) (teams )?profile[^.\\n]{0,60}(still|also) fail|(cleared|deleted|reset)[^.\\n]{0,40}cache[^.\\n]{0,100}(still|continues?|persists?|didn'?t help|no change)|reinstall(ed)?[^.\\n]{0,60}(still|same)",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Let the outcome follow the action across a sentence boundary within the same event (\"did a full reinstall. No difference, ...\", \"nothing changed\"), and read \"did both/it\" as the step the engineer asked for in the event it answers.",
+      "falsePositiveRisk": "medium: an outcome phrase without an action in the reply must resolve through the request it answers.",
+      "testRequirement": "Positive: reply after a request, with and without the action named. Negative: an outcome phrase answering a different request.",
+      "priority": 2,
+      "status": "planned"
+    },
+    {
+      "id": "miss-28",
+      "caseId": "p5-single-laptop",
+      "group": "paraphrase",
+      "eventId": "ev04",
+      "author": "engineer",
+      "eventType": "diagnostic_result",
+      "expectedSignal": "sig.prt-missing",
+      "expectedHypotheses": ["hyp.device-state"],
+      "expectedAction": null,
+      "text": "[Device registration check] The device registration status from the laptop says it is joined to the tenant, but there is no primary refresh token on it.",
+      "measuredCause": "wording",
+      "category": "negation",
+      "alsoNeeds": ["paraphrase"],
+      "family": "F17",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "AzureAdPrt\\s*:\\s*NO",
+          "roles": null,
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A family for \"no primary refresh token\", \"PRT is missing\", \"does not have a PRT\", read as a statement about the device.",
+      "falsePositiveRisk": "low: specific vocabulary; the negation is the content.",
+      "testRequirement": "Positive: four wordings. Negative: \"there is a primary refresh token\".",
+      "priority": 2,
+      "status": "planned"
+    },
+    {
+      "id": "miss-29",
+      "caseId": "p6-vendor-incident",
+      "group": "paraphrase",
+      "eventId": "ev01",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.intermittent-failures",
+      "expectedHypotheses": ["hyp.service-incident"],
+      "expectedAction": null,
+      "text": "[Nobody can sign in to Teams] Since 14:05 UTC people at all our sites cannot sign in to Teams, about 300 users so far. Now and then a second attempt works. Before writing I checked our own network and nothing there has changed.",
+      "measuredCause": "wording",
+      "category": "temporal_phrasing",
+      "alsoNeeds": [],
+      "family": "F01",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(intermittent(ly)?|sometimes (works|fails|succeeds)|on and off|randomly|retry (usually |sometimes )?(works|succeeds)|retr(y|ies)[^.\\n]{0,30}sometimes)\\b",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A typed phrase family for \"sometimes works, sometimes not\" (sometimes/now and then/occasionally/off and on + works/fails/goes through/signs in), \"comes and goes\", and \"not constant/consistent/every time\", read only in a clause that also speaks of failing or signing in.",
+      "falsePositiveRisk": "medium: \"sometimes\" is common outside failures; the clause must carry a failure or sign-in word.",
+      "testRequirement": "Positive: six wordings per alternative. Negative: \"sometimes I forget my password\", \"not constant bandwidth\"; negation: \"this is not intermittent\".",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-30",
+      "caseId": "p6-vendor-incident",
+      "group": "paraphrase",
+      "eventId": "ev04",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.error-timeout",
+      "expectedHypotheses": ["hyp.service-incident"],
+      "expectedAction": null,
+      "text": "[Re: Nobody can sign in to Teams] Thank you. Our users now see an error saying that the connection timed out.",
+      "measuredCause": "wording",
+      "category": "paraphrase",
+      "alsoNeeds": ["detector_scope", "missing_subject"],
+      "family": "F08",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(caa82ee2|0x80072ee2|ERR_(CONNECTION_)?TIMED_OUT|ETIMEDOUT|request timed out)\\b",
+          "roles": null,
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Read \"the connection timed out\", \"timed out at login\", \"times out when they open Teams\" as the client timeout when the sentence is about the client, users or sign-in.",
+      "falsePositiveRisk": "medium: the printer look-alike also \"timed out\"; require the sign-in, Teams, users or client context in the same sentence.",
+      "testRequirement": "Positive: five wordings. Negative: printer and print-server look-alikes, \"the report timed out\".",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-31",
+      "caseId": "n1-warsaw-noisy",
+      "group": "noisy",
+      "eventId": "ev01",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.multiple-users-affected",
+      "expectedHypotheses": ["hyp.dns-resolution"],
+      "expectedAction": null,
+      "text": "[teams login problm warsaw] Hi, sice about nine this mornig our Warsaw ofice, roughly 45 peple, keeps geting thrown out of Teams when they sign in. If u wait a minute and try agian it somtimes goes thru, sometimes not. Gdansk colegues r fine.\n\n--\nJan K.\nIT Operations | Example Corp\nThis e-mail and any attachments are confidential and intended solely for the addressee. If you have received it in error, please notify the sender and delete it.",
+      "measuredCause": "wording",
+      "category": "noise_typo",
+      "alsoNeeds": [],
+      "family": "F18",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(\\d{2,4}|dozens of|many|multiple|several|all)\\s+(of our\\s+)?(users|people|agents|employees|staff|colleagues|supervisors)\\b",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A bounded normalisation of the scanned text with a fixed list of common abbreviations and typos (ppl, pls, u, r, thru, somtimes, peple, agian, ...), with an offset map so every match and excerpt still points into the stored text. No fuzzy matching.",
+      "falsePositiveRisk": "low: a fixed, reviewed list; each entry is whole-word and has a test.",
+      "testRequirement": "Offsets and excerpts verify against the stored text; every entry has a positive and a look-alike; property test: normalisation never moves a match outside the original text.",
+      "priority": 2,
+      "status": "planned"
+    },
+    {
+      "id": "miss-32",
+      "caseId": "n1-warsaw-noisy",
+      "group": "noisy",
+      "eventId": "ev01",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.intermittent-failures",
+      "expectedHypotheses": ["hyp.dns-resolution"],
+      "expectedAction": null,
+      "text": "[teams login problm warsaw] Hi, sice about nine this mornig our Warsaw ofice, roughly 45 peple, keeps geting thrown out of Teams when they sign in. If u wait a minute and try agian it somtimes goes thru, sometimes not. Gdansk colegues r fine.\n\n--\nJan K.\nIT Operations | Example Corp\nThis e-mail and any attachments are confidential and intended solely for the addressee. If you have received it in error, please notify the sender and delete it.",
+      "measuredCause": "wording",
+      "category": "noise_typo",
+      "alsoNeeds": ["synonym"],
+      "family": "F01",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(intermittent(ly)?|sometimes (works|fails|succeeds)|on and off|randomly|retry (usually |sometimes )?(works|succeeds)|retr(y|ies)[^.\\n]{0,30}sometimes)\\b",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A typed phrase family for \"sometimes works, sometimes not\" (sometimes/now and then/occasionally/off and on + works/fails/goes through/signs in), \"comes and goes\", and \"not constant/consistent/every time\", read only in a clause that also speaks of failing or signing in.",
+      "falsePositiveRisk": "medium: \"sometimes\" is common outside failures; the clause must carry a failure or sign-in word.",
+      "testRequirement": "Positive: six wordings per alternative. Negative: \"sometimes I forget my password\", \"not constant bandwidth\"; negation: \"this is not intermittent\".",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-33",
+      "caseId": "n1-warsaw-noisy",
+      "group": "noisy",
+      "eventId": "ev01",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.site-correlated",
+      "expectedHypotheses": ["hyp.dns-resolution"],
+      "expectedAction": null,
+      "text": "[teams login problm warsaw] Hi, sice about nine this mornig our Warsaw ofice, roughly 45 peple, keeps geting thrown out of Teams when they sign in. If u wait a minute and try agian it somtimes goes thru, sometimes not. Gdansk colegues r fine.\n\n--\nJan K.\nIT Operations | Example Corp\nThis e-mail and any attachments are confidential and intended solely for the addressee. If you have received it in error, please notify the sender and delete it.",
+      "measuredCause": "wording",
+      "category": "noise_typo",
+      "alsoNeeds": ["abbreviation"],
+      "family": "F02",
+      "currentDetectorBehaviour": "2 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(only|mostly|mainly|primarily|much worse|worse|more (often|frequent(ly)?))\\b[^.\\n]{0,70}\\b(office|site|branch|network|subnet|vlan|location)\\b",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        },
+        {
+          "pattern": "\\bother (sites|offices|locations|branches|networks)\\b[^.\\n]{0,50}\\b(are|is)?\\s*(fine|working|unaffected|not (affected|impacted)|ok)\\b",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A family for \"colleagues/users/staff at <other> office/site have no trouble / are fine / unaffected\" that does not need the literal words \"other sites\".",
+      "falsePositiveRisk": "medium: any unaffected group is read as a site pattern; require a place word and a contrast with the affected group.",
+      "testRequirement": "Positive: four wordings. Negative: \"everyone at our office is affected\", \"the other team is on holiday\".",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-34",
+      "caseId": "n1-warsaw-noisy",
+      "group": "noisy",
+      "eventId": "ev04",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.error-name-not-resolved",
+      "expectedHypotheses": ["hyp.dns-resolution"],
+      "expectedAction": null,
+      "text": "[Re: teams login problm warsaw] Users: a.kowal 08:14:10 UTC, m.nowak 08:16:55 UTC, t.wisniewski 08:20:31 UTC. DNS servers in Warsaw are 10.20.1.10 and 10.20.1.11, no proxy. Teams says the name of the server could not be resolved.\n\n> I need three example users and the UTC time of a failed sign-in for each\n\nJan K.\nThis e-mail and any attachments are confidential and intended solely for the addressee. If you have received it in error, please notify the sender and delete it.",
+      "measuredCause": "wording",
+      "category": "paraphrase",
+      "alsoNeeds": ["passive_voice", "quoted"],
+      "family": "F03",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(caa82ee7|0x80072ee7|ERR_NAME_NOT_RESOLVED|DNS_PROBE_FINISHED_NXDOMAIN|name (could not be|not) resolved|can'?t resolve host)\\b",
+          "roles": null,
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Allow words between \"name\" and \"could not be resolved\" (\"the name of the server could not be resolved\"), \"could not resolve the host\", \"DNS lookup failed\", in a sentence about the client or sign-in.",
+      "falsePositiveRisk": "medium: printers and other products report the same words; require the sign-in or Teams context in the same sentence.",
+      "testRequirement": "Positive: five wordings. Negative: the printer look-alike case (z3) must still report nothing.",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-35",
+      "caseId": "n1-warsaw-noisy",
+      "group": "noisy",
+      "eventId": "ev05",
+      "author": "engineer",
+      "eventType": "diagnostic_result",
+      "expectedSignal": "sig.no-server-side-failure-records",
+      "expectedHypotheses": ["hyp.dns-resolution"],
+      "expectedAction": null,
+      "text": "[sign-in logs] ok so i looked at the entra sign-in logs, those 3 users, around those times. nothing there at all. the requests never made it to entra.",
+      "measuredCause": "wording",
+      "category": "negation",
+      "alsoNeeds": ["noise_typo"],
+      "family": "F04",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(0|zero|no)\\s+(of\\s+\\d+\\s+)?(failing attempts\\s+)?(have\\s+)?(a\\s+)?(matching\\s+)?(failed\\s+)?(sign-?in\\s+)?(records?|entries|rows|events)\\b[^.\\n]{0,60}\\b(failing|failure|failed|attempts?)\\b",
+          "roles": null,
+          "eventTypes": ["query_output", "diagnostic_result", "escalation_response", "case_note"],
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A family for \"nothing/no failures/no rows/no entries/not a single record ... for those attempts/users\", with the log check named in the same event (title included), including the passive \"no failures are recorded\".",
+      "falsePositiveRisk": "medium: a request \"please check whether there are no records\" must not fire (modality handles requests).",
+      "testRequirement": "Positive: six wordings. Negative: \"we expected no records\", \"if there are no records, escalate\"; conflict with the present-side signal when both are stated.",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-36",
+      "caseId": "n1-warsaw-noisy",
+      "group": "noisy",
+      "eventId": "ev06",
+      "author": "engineer",
+      "eventType": "diagnostic_result",
+      "expectedSignal": "sig.resolver-inconsistent",
+      "expectedHypotheses": ["hyp.dns-resolution"],
+      "expectedAction": null,
+      "text": "[name servers] asked both name servers for login.microsoftonline.com 5 times each. .10 answers every time, instantly. .11 stays silent 4 out of 5.",
+      "measuredCause": "wording",
+      "category": "entity_resolution",
+      "alsoNeeds": ["noise_typo", "abbreviation"],
+      "family": "F05",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(one of|1 of)\\s+(the\\s+)?(\\d+|two|three)\\s+(dns\\s+)?(resolvers|servers)\\b[^.\\n]{0,80}(fail|refus|block|servfail|nxdomain)",
+          "roles": null,
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A family for one of several name servers or resolvers that does not answer, times out or stays silent while the others answer, with a count (\"four of the five tries\") or a contrast (\"while the other one is fine\").",
+      "falsePositiveRisk": "medium: \"does not answer\" about a person; require resolver, name server or DNS words or an address pair.",
+      "testRequirement": "Positive: five wordings. Negative: \"the customer did not answer my email\", \"both name servers answered\".",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-37",
+      "caseId": "n1-warsaw-noisy",
+      "group": "noisy",
+      "eventId": "ev08",
+      "author": "network",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.recent-network-change-reported",
+      "expectedHypotheses": ["hyp.dns-resolution"],
+      "expectedAction": null,
+      "text": "[Re: teams login problm warsaw] yes - thursday we enabled a new webfilter policy on .11. already took it out of the dhcp scope.",
+      "measuredCause": "wording",
+      "category": "entity_resolution",
+      "alsoNeeds": ["noise_typo"],
+      "family": "F06",
+      "currentDetectorBehaviour": "2 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "(dns|resolver|proxy|proxies|firewall|web filter|secure web gateway|network)[^.\\n]{0,80}(policy|rule|filter|blocklist|category|inspection)[^.\\n]{0,80}(updated|changed|deployed|rolled out|pushed|enabled|set to)",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        },
+        {
+          "pattern": "(deployed|rolled out|pushed|enabled|changed|updated)[^.\\n]{0,60}(inspection|filter|filtering|blocklist|policy)[^.\\n]{0,80}(proxy|proxies|dns|resolver|firewall|gateway)",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Broaden the verb family (switched on, rolled out, put in place, introduced) and the object family (filtering policy, inspection profile, web filter), accept the network admin role as the context, and let the object be \"that server\" or \"the cluster\" when the event answers a question about changes.",
+      "falsePositiveRisk": "high: \"change\" statements are common; keep the role gate and a policy/filter/profile noun.",
+      "testRequirement": "Positive: six wordings by a network admin. Negative: a change to a printer, a change that is planned (\"we will switch on\"), a denied change.",
+      "priority": 2,
+      "status": "planned"
+    },
+    {
+      "id": "miss-38",
+      "caseId": "n1-warsaw-noisy",
+      "group": "noisy",
+      "eventId": "ev09",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.dns-fix-resolved",
+      "expectedHypotheses": ["hyp.dns-resolution"],
+      "expectedAction": null,
+      "text": "[Re: teams login problm warsaw] 15 logins since then, all ok.\n\nJan K.\nIT Operations | Example Corp",
+      "measuredCause": "structured-only",
+      "category": "detector_scope",
+      "alsoNeeds": ["cross_event_dependency", "noise_typo"],
+      "family": "F07",
+      "currentDetectorBehaviour": "Every detector of this signal reads structured event data; free text cannot show it.",
+      "currentPatterns": [],
+      "proposedFix": "These two signals can only be read from structured data today. A text reading needs three things: recognising the customer-side remediation (\"I removed it from the DHCP scope\", \"took proxy-04 out of the load balancer\"), a generic success statement (\"since the change every sign-in worked\"), and linking them across events. Not attempted before the dev set can measure it.",
+      "falsePositiveRisk": "high: a success statement without the link says nothing about which cause was right.",
+      "testRequirement": "Cross-event cases in the corpus; property test that the signal needs both the remediation and the success statement.",
+      "priority": 3,
+      "status": "deferred"
+    },
+    {
+      "id": "miss-39",
+      "caseId": "n2-utrecht-chat",
+      "group": "noisy",
+      "eventId": "ev01",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.multiple-users-affected",
+      "expectedHypotheses": ["hyp.proxy-egress"],
+      "expectedAction": null,
+      "text": "[utrecht teams] utrecht. about 70 ppl. teams says connection timed out at login. comes and goes. other sites ok as far as i know",
+      "measuredCause": "wording",
+      "category": "abbreviation",
+      "alsoNeeds": [],
+      "family": "F18",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(\\d{2,4}|dozens of|many|multiple|several|all)\\s+(of our\\s+)?(users|people|agents|employees|staff|colleagues|supervisors)\\b",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A bounded normalisation of the scanned text with a fixed list of common abbreviations and typos (ppl, pls, u, r, thru, somtimes, peple, agian, ...), with an offset map so every match and excerpt still points into the stored text. No fuzzy matching.",
+      "falsePositiveRisk": "low: a fixed, reviewed list; each entry is whole-word and has a test.",
+      "testRequirement": "Offsets and excerpts verify against the stored text; every entry has a positive and a look-alike; property test: normalisation never moves a match outside the original text.",
+      "priority": 2,
+      "status": "planned"
+    },
+    {
+      "id": "miss-40",
+      "caseId": "n2-utrecht-chat",
+      "group": "noisy",
+      "eventId": "ev01",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.error-timeout",
+      "expectedHypotheses": ["hyp.proxy-egress"],
+      "expectedAction": null,
+      "text": "[utrecht teams] utrecht. about 70 ppl. teams says connection timed out at login. comes and goes. other sites ok as far as i know",
+      "measuredCause": "wording",
+      "category": "paraphrase",
+      "alsoNeeds": ["noise_typo"],
+      "family": "F08",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(caa82ee2|0x80072ee2|ERR_(CONNECTION_)?TIMED_OUT|ETIMEDOUT|request timed out)\\b",
+          "roles": null,
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Read \"the connection timed out\", \"timed out at login\", \"times out when they open Teams\" as the client timeout when the sentence is about the client, users or sign-in.",
+      "falsePositiveRisk": "medium: the printer look-alike also \"timed out\"; require the sign-in, Teams, users or client context in the same sentence.",
+      "testRequirement": "Positive: five wordings. Negative: printer and print-server look-alikes, \"the report timed out\".",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-41",
+      "caseId": "n2-utrecht-chat",
+      "group": "noisy",
+      "eventId": "ev01",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.intermittent-failures",
+      "expectedHypotheses": ["hyp.proxy-egress"],
+      "expectedAction": null,
+      "text": "[utrecht teams] utrecht. about 70 ppl. teams says connection timed out at login. comes and goes. other sites ok as far as i know",
+      "measuredCause": "wording",
+      "category": "paraphrase",
+      "alsoNeeds": ["noise_typo"],
+      "family": "F01",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(intermittent(ly)?|sometimes (works|fails|succeeds)|on and off|randomly|retry (usually |sometimes )?(works|succeeds)|retr(y|ies)[^.\\n]{0,30}sometimes)\\b",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A typed phrase family for \"sometimes works, sometimes not\" (sometimes/now and then/occasionally/off and on + works/fails/goes through/signs in), \"comes and goes\", and \"not constant/consistent/every time\", read only in a clause that also speaks of failing or signing in.",
+      "falsePositiveRisk": "medium: \"sometimes\" is common outside failures; the clause must carry a failure or sign-in word.",
+      "testRequirement": "Positive: six wordings per alternative. Negative: \"sometimes I forget my password\", \"not constant bandwidth\"; negation: \"this is not intermittent\".",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-42",
+      "caseId": "n2-utrecht-chat",
+      "group": "noisy",
+      "eventId": "ev03",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.cache-clear-no-effect",
+      "expectedHypotheses": ["hyp.proxy-egress"],
+      "expectedAction": null,
+      "text": "[Re: utrecht teams] did both on 5 pcs. nothing changed. teams in the browser fails the same way.\n\nunrelated, our print server logged this today:\nspooler: job 1432 timed out waiting for device HP-2F-03\nspooler: name HP-2F-03.corp could not be resolved\nspooler: job 1432 cancelled",
+      "measuredCause": "wording",
+      "category": "cross_event_dependency",
+      "alsoNeeds": ["implied_action"],
+      "family": "F09",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "(clean|new|fresh) (teams )?profile[^.\\n]{0,60}(still|also) fail|(cleared|deleted|reset)[^.\\n]{0,40}cache[^.\\n]{0,100}(still|continues?|persists?|didn'?t help|no change)|reinstall(ed)?[^.\\n]{0,60}(still|same)",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Let the outcome follow the action across a sentence boundary within the same event (\"did a full reinstall. No difference, ...\", \"nothing changed\"), and read \"did both/it\" as the step the engineer asked for in the event it answers.",
+      "falsePositiveRisk": "medium: an outcome phrase without an action in the reply must resolve through the request it answers.",
+      "testRequirement": "Positive: reply after a request, with and without the action named. Negative: an outcome phrase answering a different request.",
+      "priority": 2,
+      "status": "planned"
+    },
+    {
+      "id": "miss-43",
+      "caseId": "n2-utrecht-chat",
+      "group": "noisy",
+      "eventId": "ev05",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.revoke-sessions-no-effect",
+      "expectedHypotheses": ["hyp.proxy-egress"],
+      "expectedAction": null,
+      "text": "[Re: utrecht teams] did it. same failures.",
+      "measuredCause": "wording",
+      "category": "cross_event_dependency",
+      "alsoNeeds": ["noise_typo"],
+      "family": "F10",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "(revok(e|ed|ing)[^.\\n]{0,60}(session|token)s?[^.\\n]{0,100}(failures? continue|still fail|no change|same)|sessions? (were|was) revoked[^.\\n]{0,100}(failures? continue|still fail|no change|same))",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Recognise the engineer asking for \"sign out everywhere\", \"drop old sessions\" as the revoke step, and read \"same failures as before\" in the reply as its outcome.",
+      "falsePositiveRisk": "medium: sign-out requests are also routine hygiene; require the session wording.",
+      "testRequirement": "Positive: request and reply pairs. Negative: sign-out for another purpose.",
+      "priority": 2,
+      "status": "planned"
+    },
+    {
+      "id": "miss-44",
+      "caseId": "n2-utrecht-chat",
+      "group": "noisy",
+      "eventId": "ev06",
+      "author": "engineer",
+      "eventType": "diagnostic_result",
+      "expectedSignal": "sig.no-server-side-failure-records",
+      "expectedHypotheses": ["hyp.proxy-egress"],
+      "expectedAction": null,
+      "text": "[sign-in logs] checked the entra sign-in logs of the pilot users. no failure rows for the times they failed",
+      "measuredCause": "wording",
+      "category": "synonym",
+      "alsoNeeds": [],
+      "family": "F04",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(0|zero|no)\\s+(of\\s+\\d+\\s+)?(failing attempts\\s+)?(have\\s+)?(a\\s+)?(matching\\s+)?(failed\\s+)?(sign-?in\\s+)?(records?|entries|rows|events)\\b[^.\\n]{0,60}\\b(failing|failure|failed|attempts?)\\b",
+          "roles": null,
+          "eventTypes": ["query_output", "diagnostic_result", "escalation_response", "case_note"],
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A family for \"nothing/no failures/no rows/no entries/not a single record ... for those attempts/users\", with the log check named in the same event (title included), including the passive \"no failures are recorded\".",
+      "falsePositiveRisk": "medium: a request \"please check whether there are no records\" must not fire (modality handles requests).",
+      "testRequirement": "Positive: six wordings. Negative: \"we expected no records\", \"if there are no records, escalate\"; conflict with the present-side signal when both are stated.",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-45",
+      "caseId": "n2-utrecht-chat",
+      "group": "noisy",
+      "eventId": "ev07",
+      "author": "engineer",
+      "eventType": "diagnostic_result",
+      "expectedSignal": "sig.proxy-node-inconsistent",
+      "expectedHypotheses": ["hyp.proxy-egress"],
+      "expectedAction": null,
+      "text": "[proxies] tried login.microsoftonline.com through all 4 proxies. 3 are fine. proxy-04 times out every time",
+      "measuredCause": "type-or-role-gate",
+      "category": "event_type_gate",
+      "alsoNeeds": ["noise_typo"],
+      "family": "F11",
+      "currentDetectorBehaviour": "No text detector accepts this event's author role or type (engineer, diagnostic_result); the patterns are limited to customer_network_admin.",
+      "currentPatterns": [
+        {
+          "pattern": "\\bproxy[- ]?[\\w-]{0,40}\\d?\\b[^.\\n]{0,60}\\b(times? out|timeouts?|fails?|dropped)\\b[^.\\n]{0,60}\\b(one in \\w+|roughly|about|some|intermittent)",
+          "roles": ["customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": false
+        }
+      ],
+      "proposedFix": "The signal is read only from customer-side events; the engineer ran this test, so accept the engineer roles and the engineer e-mail and diagnostic types.",
+      "falsePositiveRisk": "low: the same statement by the engineer is evidence of the same kind; gated by the proxy wording.",
+      "testRequirement": "Positive: engineer diagnostic result and engineer e-mail. Negative: an engineer request to test the proxies (modality).",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-46",
+      "caseId": "n2-utrecht-chat",
+      "group": "noisy",
+      "eventId": "ev08",
+      "author": "network",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.recent-network-change-reported",
+      "expectedHypotheses": ["hyp.proxy-egress"],
+      "expectedAction": null,
+      "text": "[Re: proxies] new cert inspection profile went on that cluster last tue. proxy-04 is out of the lb now",
+      "measuredCause": "wording",
+      "category": "entity_resolution",
+      "alsoNeeds": ["noise_typo", "abbreviation"],
+      "family": "F06",
+      "currentDetectorBehaviour": "2 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "(dns|resolver|proxy|proxies|firewall|web filter|secure web gateway|network)[^.\\n]{0,80}(policy|rule|filter|blocklist|category|inspection)[^.\\n]{0,80}(updated|changed|deployed|rolled out|pushed|enabled|set to)",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        },
+        {
+          "pattern": "(deployed|rolled out|pushed|enabled|changed|updated)[^.\\n]{0,60}(inspection|filter|filtering|blocklist|policy)[^.\\n]{0,80}(proxy|proxies|dns|resolver|firewall|gateway)",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Broaden the verb family (switched on, rolled out, put in place, introduced) and the object family (filtering policy, inspection profile, web filter), accept the network admin role as the context, and let the object be \"that server\" or \"the cluster\" when the event answers a question about changes.",
+      "falsePositiveRisk": "high: \"change\" statements are common; keep the role gate and a policy/filter/profile noun.",
+      "testRequirement": "Positive: six wordings by a network admin. Negative: a change to a printer, a change that is planned (\"we will switch on\"), a denied change.",
+      "priority": 2,
+      "status": "planned"
+    },
+    {
+      "id": "miss-47",
+      "caseId": "n2-utrecht-chat",
+      "group": "noisy",
+      "eventId": "ev09",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.proxy-fix-resolved",
+      "expectedHypotheses": ["hyp.proxy-egress"],
+      "expectedAction": null,
+      "text": "[Re: proxies] no more timeouts. 20 logins ok",
+      "measuredCause": "structured-only",
+      "category": "detector_scope",
+      "alsoNeeds": ["cross_event_dependency"],
+      "family": "F07",
+      "currentDetectorBehaviour": "Every detector of this signal reads structured event data; free text cannot show it.",
+      "currentPatterns": [],
+      "proposedFix": "These two signals can only be read from structured data today. A text reading needs three things: recognising the customer-side remediation (\"I removed it from the DHCP scope\", \"took proxy-04 out of the load balancer\"), a generic success statement (\"since the change every sign-in worked\"), and linking them across events. Not attempted before the dev set can measure it.",
+      "falsePositiveRisk": "high: a success statement without the link says nothing about which cause was right.",
+      "testRequirement": "Cross-event cases in the corpus; property test that the signal needs both the remediation and the success statement.",
+      "priority": 3,
+      "status": "deferred"
+    },
+    {
+      "id": "miss-48",
+      "caseId": "n3-lisbon-mixed-language",
+      "group": "noisy",
+      "eventId": "ev03",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.recent-ca-change-reported",
+      "expectedHypotheses": ["hyp.conditional-access"],
+      "expectedAction": null,
+      "text": "[Re: Teams bloqueado] Sim, na sexta-feira a equipa de segurança ativou uma nova regra de acesso que só permite dispositivos geridos e conformes. Utilizadores: r.silva 08:02 UTC, c.santos 08:07 UTC, p.costa 08:11 UTC.",
+      "measuredCause": "wording",
+      "category": "unsupported_language",
+      "alsoNeeds": [],
+      "family": "F20",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "(conditional access|ca policy|mfa policy)[^.\\n]{0,80}(was |were |has been |have been )?(changed|updated|modified|enabled|deployed)[^.\\n]{0,60}(yesterday|today|this (morning|week)|last night|hours? ago)",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Not fixed. The engine reads English only. The case is kept in the set as a known limit; a language-specific pack would be a separate piece of work.",
+      "falsePositiveRisk": "n/a",
+      "testRequirement": "The case stays labelled; the metrics report it as out of scope.",
+      "priority": 3,
+      "status": "not fixable in scope"
+    },
+    {
+      "id": "miss-49",
+      "caseId": "n3-lisbon-mixed-language",
+      "group": "noisy",
+      "eventId": "ev04",
+      "author": "engineer",
+      "eventType": "diagnostic_result",
+      "expectedSignal": "sig.server-side-failure-records-present",
+      "expectedHypotheses": ["hyp.conditional-access"],
+      "expectedAction": null,
+      "text": "[Sign-in log check] The failed attempts of all three users are in the Entra sign-in logs, each one stopped by Conditional Access because of the device-compliance rule.",
+      "measuredCause": "wording",
+      "category": "paraphrase",
+      "alsoNeeds": ["passive_voice"],
+      "family": "F13",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b\\d+ of \\d+ failing attempts (have|had) (a )?matching (failed )?sign-?in",
+          "roles": null,
+          "eventTypes": ["query_output", "diagnostic_result", "escalation_response", "case_note"],
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Read \"failed attempts are in the sign-in logs\", \"stopped by Conditional Access\", \"interrupted multi-factor step\", and \"errors 70043 and 700082 ... token has expired\" as the log findings, with or without the AADSTS prefix.",
+      "falsePositiveRisk": "medium: a request to look for them must not fire (modality); code numbers need the log context.",
+      "testRequirement": "Positive: eight wordings. Negative: \"check whether the logs show CA failures\", an unrelated five-digit number.",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-50",
+      "caseId": "n3-lisbon-mixed-language",
+      "group": "noisy",
+      "eventId": "ev04",
+      "author": "engineer",
+      "eventType": "diagnostic_result",
+      "expectedSignal": "sig.mfa-ca-events-in-logs",
+      "expectedHypotheses": ["hyp.conditional-access"],
+      "expectedAction": null,
+      "text": "[Sign-in log check] The failed attempts of all three users are in the Entra sign-in logs, each one stopped by Conditional Access because of the device-compliance rule.",
+      "measuredCause": "wording",
+      "category": "paraphrase",
+      "alsoNeeds": ["detector_scope"],
+      "family": "F13",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\bAADSTS(50076|50074|53003|53000|530003)\\b|ConditionalAccessStatus\\W+failure",
+          "roles": null,
+          "eventTypes": ["query_output", "log_sample", "diagnostic_result"],
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Read \"failed attempts are in the sign-in logs\", \"stopped by Conditional Access\", \"interrupted multi-factor step\", and \"errors 70043 and 700082 ... token has expired\" as the log findings, with or without the AADSTS prefix.",
+      "falsePositiveRisk": "medium: a request to look for them must not fire (modality); code numbers need the log context.",
+      "testRequirement": "Positive: eight wordings. Negative: \"check whether the logs show CA failures\", an unrelated five-digit number.",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-51",
+      "caseId": "n3-lisbon-mixed-language",
+      "group": "noisy",
+      "eventId": "ev06",
+      "author": "customer",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.ca-exclusion-no-effect",
+      "expectedHypotheses": ["hyp.conditional-access"],
+      "expectedAction": null,
+      "text": "[Re: Teams bloqueado] We left the test user out of that rule and waited, still blocked, same message.",
+      "measuredCause": "wording",
+      "category": "cross_event_dependency",
+      "alsoNeeds": ["paraphrase"],
+      "family": "F14",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "(exclud(e|ed|ing)|bypass(ed)?)[^.\\n]{0,70}(from|for)[^.\\n]{0,70}(mfa|ca |conditional access|polic)[^.\\n]{0,120}(failures? continue|still fail|no change|same|continues?)",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "Recognise the engineer asking to exclude or leave a user out of \"that rule\" and read \"still blocked, same message\" in the reply as the outcome.",
+      "falsePositiveRisk": "medium: exclusion is a security-weakening step; the outcome must be tied to the request.",
+      "testRequirement": "Positive: request and reply pairs. Negative: an exclusion that worked.",
+      "priority": 2,
+      "status": "planned"
+    },
+    {
+      "id": "miss-52",
+      "caseId": "z4-negations",
+      "group": "negative",
+      "eventId": "ev01",
+      "author": "enduser",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.single-user-scope",
+      "expectedHypotheses": [],
+      "expectedAction": null,
+      "text": "[Teams will not let me in] To be clear, this is not intermittent: it fails every single time I try. It is only me, not a whole team, and nothing was changed in our access policies.",
+      "measuredCause": "wording",
+      "category": "paraphrase",
+      "alsoNeeds": ["implied_action"],
+      "family": "F16",
+      "currentDetectorBehaviour": "1 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "\\b(only|just) (one|1|a single) (user|person|device|pc|laptop)\\b",
+          "roles": ["customer_admin", "customer_end_user", "customer_network_admin"],
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A family for \"only me\", \"just my laptop/this device\", and \"my colleagues/teammates ... are fine\", read together with a failure in the same message.",
+      "falsePositiveRisk": "medium: \"only me\" without a failure is not a scope statement; require a failure or sign-in word in the event.",
+      "testRequirement": "Positive: five wordings. Negative: \"only me in the meeting\", \"not just one user\" (negated).",
+      "priority": 1,
+      "status": "planned"
+    },
+    {
+      "id": "miss-53",
+      "caseId": "z4-negations",
+      "group": "negative",
+      "eventId": "ev01",
+      "author": "enduser",
+      "eventType": "customer_email",
+      "expectedSignal": "sig.ca-config-unchanged",
+      "expectedHypotheses": [],
+      "expectedAction": null,
+      "text": "[Teams will not let me in] To be clear, this is not intermittent: it fails every single time I try. It is only me, not a whole team, and nothing was changed in our access policies.",
+      "measuredCause": "wording",
+      "category": "negation",
+      "alsoNeeds": ["synonym"],
+      "family": "F19",
+      "currentDetectorBehaviour": "2 text detector(s) accept the event and none of their patterns matches the wording.",
+      "currentPatterns": [
+        {
+          "pattern": "(conditional access|ca policy|sign-in frequency)[^.\\n]{0,80}(unchanged|no changes?|not changed|last (edit(ed)?|modified|changed))",
+          "roles": null,
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        },
+        {
+          "pattern": "last (conditional access )?polic(y|ies) (edit|change|modification)[^.\\n]{0,40}(weeks?|months?) ago",
+          "roles": null,
+          "eventTypes": null,
+          "acceptsThisEvent": true
+        }
+      ],
+      "proposedFix": "A family for \"nothing was changed in our access policies\", \"no changes to the conditional access\", \"we have not touched the policy\", with the broadened subject of F12.",
+      "falsePositiveRisk": "low to medium: the negation is the content; the subject must be an access or security policy.",
+      "testRequirement": "Positive: five wordings. Negative: \"something was changed\", \"the printer policy is unchanged\".",
+      "priority": 2,
+      "status": "planned"
+    }
+  ],
+  "falsePositives": [
+    {
+      "id": "fp-1",
+      "caseId": "p4-hourly-signout",
+      "eventId": "ev05",
+      "reportedSignal": "sig.service-health-incident",
+      "matchedWords": "Service health lists nothing active",
+      "text": "Service health lists nothing active for sign-in or Teams.",
+      "category": "negation",
+      "family": "F15",
+      "explanation": "The words of the signal are present in a sentence that denies them.",
+      "proposedFix": "Done by the modality layer: a denied statement is not read as the fact, and a denial of one side of a declared signal pair is read as the other side (\"nothing active\" is \"no active incident\").",
+      "status": "planned"
+    },
+    {
+      "id": "fp-2",
+      "caseId": "p5-single-laptop",
+      "eventId": "ev03",
+      "reportedSignal": "sig.web-client-also-fails",
+      "matchedWords": "browser on the same",
+      "text": "Confirmed, it is only this one device. We removed the cache folder and reinstalled Teams and nothing changed. Teams in the browser on the same laptop signs in without any problem.",
+      "category": "lexical_artifact",
+      "family": "F21",
+      "explanation": "The pattern asks for the browser and then any of \"also/same/too\" within 80 characters, with no failure word; \"the same laptop\" satisfies it although the sentence says the browser works.",
+      "proposedFix": "Require a failure word with the browser (also fails, same error, fails too) and let a denial of the failure suppress it.",
+      "status": "planned"
+    },
+    {
+      "id": "fp-3",
+      "caseId": "n3-lisbon-mixed-language",
+      "eventId": "ev05",
+      "reportedSignal": "sig.service-health-incident",
+      "matchedWords": "Service health has no active",
+      "text": "Service health has no active incident for sign-in or Teams.",
+      "category": "negation",
+      "family": "F15",
+      "explanation": "The words of the signal are present in a sentence that denies them.",
+      "proposedFix": "Done by the modality layer: a denied statement is not read as the fact, and a denial of one side of a declared signal pair is read as the other side (\"nothing active\" is \"no active incident\").",
+      "status": "planned"
+    },
+    {
+      "id": "fp-4",
+      "caseId": "z4-negations",
+      "eventId": "ev01",
+      "reportedSignal": "sig.intermittent-failures",
+      "matchedWords": "intermittent",
+      "text": "To be clear, this is not intermittent: it fails every single time I try. It is only me, not a whole team, and nothing was changed in our access policies.",
+      "category": "negation",
+      "family": "F15",
+      "explanation": "The words of the signal are present in a sentence that denies them.",
+      "proposedFix": "Done by the modality layer: a denied statement is not read as the fact, and a denial of one side of a declared signal pair is read as the other side (\"nothing active\" is \"no active incident\").",
+      "status": "planned"
+    }
+  ]
+}
