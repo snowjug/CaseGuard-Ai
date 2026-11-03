@@ -409,7 +409,8 @@ weights re-normalised over the assessable dimensions (equal weights if every con
   actions or forks.
 
 A score is **a rule-based estimate about the written record, not a rating of a person**; see
-[RESPONSIBLE_AI.md](RESPONSIBLE_AI.md).
+[RESPONSIBLE_AI.md](RESPONSIBLE_AI.md). An audit of the weights, thresholds, missing-data behaviour, stability and
+sensitivity, with its findings and what it could not check, is in [SCORE_AUDIT.md](SCORE_AUDIT.md).
 
 ## 10. Avoidable Support Effort (ASE)
 
