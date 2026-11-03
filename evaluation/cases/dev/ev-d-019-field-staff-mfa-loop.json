@@ -1,0 +1,105 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-019-field-staff-mfa-loop",
+  "split": "dev",
+  "family": "fam-013",
+  "title": "Field staff blocked after repeated MFA prompts",
+  "scenario": "A new location-based access policy meant for admins is assigned to the whole field group, so staff abroad get endless MFA prompts and then a block; narrowing the assignment fixes it.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-11T06:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Mobile workers cannot get into Teams",
+      "text": "Dear support team, I am the security operations lead at a regional distribution company. Since yesterday evening our field staff who sign in from outside the country are asked to approve a multi-factor prompt again and again, and after the fifth prompt Teams gives up with an access blocked message. This affects roughly 40 mobile workers so far; the office staff are fine. We have changed nothing in Teams itself. I would like to understand quickly whether this is on your side."
+    },
+    {
+      "key": "ev02",
+      "at": 20,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Mobile workers cannot get into Teams",
+      "text": "Hello, thank you for the detail. It sounds like a policy decision in your tenant rather than a fault on our side, but I will check service health first so that we can rule that out, and then I need to look at the sign-in logs. Please send me the names of three affected users plus the UTC moment of one blocked attempt for each, and tell me whether a Conditional Access or MFA rule was created or edited in the last week."
+    },
+    {
+      "key": "ev03",
+      "at": 32,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Service health",
+      "text": "Service health and the message centre: no incident for sign-in, Teams or MFA at the moment, and nothing in the last 24 hours either."
+    },
+    {
+      "key": "ev04",
+      "at": 75,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Mobile workers cannot get into Teams",
+      "text": "Users: p.vermeulen 21:14 UTC (Lisbon hotel), l.dubois 21:31 UTC (Barcelona), t.novak 22:02 UTC (airport). And yes: yesterday afternoon our identity team rolled out a policy that requires MFA for any sign-in from outside the three countries where we operate and blocks it after repeated failures. It was meant for admin accounts only, but the assignment was set to the whole field group."
+    },
+    {
+      "key": "ev05",
+      "at": 95,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log lookup",
+      "text": "Sign-in logs for the three users: every blocked attempt is there at the times you gave, with the result interrupted because multi-factor is required, followed by blocked by Conditional Access. The policy named in each row is MFA outside operating countries."
+    },
+    {
+      "key": "ev06",
+      "at": 110,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Mobile workers cannot get into Teams",
+      "text": "That explains it: the policy is stopping these sign-ins, not Teams. Could your identity team (a) change the assignment from the whole field group to the admin accounts it was meant for, and (b) as a quick test first, exclude one of the three users, for example p.vermeulen, from the policy and ask him to sign in again? Tell me what happens."
+    },
+    {
+      "key": "ev07",
+      "at": 170,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Mobile workers cannot get into Teams",
+      "text": "p.vermeulen was excluded at 08:40 UTC and signed in from the hotel Wi-Fi at the first attempt, no prompt at all. We are changing the assignment for everybody to admin accounts only and will be done by 09:30 UTC."
+    },
+    {
+      "key": "ev08",
+      "at": 255,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Mobile workers cannot get into Teams",
+      "text": "10:15 UTC: the field staff say sign-in works normally again and the repeated prompts are gone. The policy now applies to the 12 admin accounts only."
+    },
+    {
+      "key": "ev09",
+      "at": 265,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Sign-ins after the change",
+      "text": "Checked the sign-in logs from 09:30 to 10:15 UTC for the field group: 212 sign-ins from outside the country and none blocked by Conditional Access. The policy now shows up only against admin accounts."
+    },
+    {
+      "key": "ev10",
+      "at": 280,
+      "who": "engineer",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Closing note",
+      "text": "A new Conditional Access policy was assigned to the whole field group instead of to admins only, so every sign-in from abroad was interrupted for MFA and then blocked. Workaround: exclusion of one user as a test. Fix: assignment corrected by the customer's identity team. Nothing was wrong in the service."
+    }
+  ]
+}

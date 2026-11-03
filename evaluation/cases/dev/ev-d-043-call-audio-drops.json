@@ -1,0 +1,78 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-043-call-audio-drops",
+  "split": "dev",
+  "family": "fam-038",
+  "title": "Audio breaks up in Teams calls from the head office",
+  "scenario": "Call quality in meetings: a support case that mentions sign-in, time-outs and the proxy in passing, in a workload that has no knowledge pack, so the engine has to refuse it.",
+  "categories": ["unsupported"],
+  "workload": "teams-call-quality",
+  "openedAt": "2026-07-16T09:40:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Audio breaks up in Teams calls",
+      "text": "Since Monday the audio in Teams calls and meetings breaks up for people at the head office. Voices are robotic for a few seconds, then it clears. Signing in is fine and chat is fine. About 25 people, always in the afternoon. The branch offices have no problem."
+    },
+    {
+      "key": "ev02",
+      "at": 20,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Audio breaks up in Teams calls",
+      "text": "Hello, thank you. Please send me the call IDs of two bad calls from the Call Quality Dashboard, and tell me whether the people use wired or wireless networks and a headset or the laptop speakers."
+    },
+    {
+      "key": "ev03",
+      "at": 95,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Audio breaks up in Teams calls",
+      "text": "Two call IDs are attached. Most people are on the wireless network with a headset. The wired desks have the problem less often."
+    },
+    {
+      "key": "ev04",
+      "at": 130,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Call quality records",
+      "text": "Both calls show packet loss between 6 and 11 percent on the wireless access point AP-HQ-3 and jitter above 60 ms, in the 14:00 to 16:00 UTC window. The same users on a wired desk show 0 percent packet loss."
+    },
+    {
+      "key": "ev05",
+      "at": 140,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Wireless congestion",
+      "text": "The loss is on the wireless segment of access point AP-HQ-3 in the afternoon. Please ask your network admin to check the load and the channel settings of that access point and tell me whether the number of devices on it grew recently."
+    },
+    {
+      "key": "ev06",
+      "at": 300,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Wireless congestion",
+      "text": "The access point carries 70 devices at 15:00 UTC, twice as many as in spring, because of the new tablets. We moved 30 of them to another access point today at 14:50 UTC."
+    },
+    {
+      "key": "ev07",
+      "at": 1900,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Check after the change",
+      "text": "Call quality records of 15:00 to 17:00 UTC the following day show packet loss below 1 percent on AP-HQ-3 for all calls. The case can be closed."
+    }
+  ]
+}

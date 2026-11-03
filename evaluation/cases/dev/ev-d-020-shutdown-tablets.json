@@ -1,0 +1,114 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-020-shutdown-tablets",
+  "split": "dev",
+  "family": "fam-014",
+  "title": "Shop-floor tablets ask to sign in again after the shutdown",
+  "scenario": "Shared tablets come back from a three-week shutdown with expired sessions because a tenant token lifetime allows only 14 days of inactivity; revoking sessions changes nothing and an interactive sign-in fixes it.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-15T07:15:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams tablets production",
+      "text": "Hello. After the shutdown of 3 weeks, about 80 people in production cannot start Teams on the shared tablets. It says session expired and to sign in again. Then sometimes the login finishes, sometimes it gives an error. Office people with laptops are OK. Please advise. Pavel"
+    },
+    {
+      "key": "ev02",
+      "at": 8,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams tablets production",
+      "text": "Hello Pavel, thank you. First question: did anyone change an access or sign-in policy (Conditional Access, MFA, session settings) before the shutdown or since? And please send the names of three affected users and the UTC moment of a failed sign-in for each."
+    },
+    {
+      "key": "ev03",
+      "at": 30,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams tablets production",
+      "text": "No changes. I checked our audit log yesterday and there is nothing for the access policies since March. Users: z.kaminski 06:52 UTC, r.dabrowski 07:03 UTC, e.malek 07:10 UTC."
+    },
+    {
+      "key": "ev04",
+      "at": 40,
+      "who": "engineer",
+      "type": "query_output",
+      "channel": "tool",
+      "title": "Audit query, policy events, last 30 days",
+      "text": "Audit query for policy-related events in the last 30 days, run now: zero rows inside the failure window (from 06:30 UTC today). The only two policy events it returns are dated in March, so they are background and have nothing to do with this morning's failures."
+    },
+    {
+      "key": "ev05",
+      "at": 52,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log lookup",
+      "text": "Sign-in logs for the three users: each has a failed attempt at the time given. The error is AADSTS700082, the refresh token has expired due to inactivity. The last successful sign-in on these tablets was on 12 July, before the shutdown."
+    },
+    {
+      "key": "ev06",
+      "at": 58,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Token lifetime",
+      "text": "This is a token lifetime matter. Please have an admin revoke the sessions of the 80 affected users and ask them to sign in again so that fresh tokens are issued."
+    },
+    {
+      "key": "ev07",
+      "at": 120,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Token lifetime",
+      "text": "Revoked the sessions of the 80 users at 08:35 UTC and asked them to sign in. Same thing: the tablets still say session expired, and some people need two or three attempts."
+    },
+    {
+      "key": "ev08",
+      "at": 135,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "What is going on",
+      "text": "Thank you, understood. The two policy events from March are a token lifetime policy: refresh tokens expire after 14 days of inactivity, and the shutdown lasted 21 days, so every tablet's token had expired. That is how the policy works, not a fault. The revoke did not matter, because nothing was left to revoke. Each user just needs one normal sign-in with password and MFA on the tablet. I will check the logs again at 11:30 UTC and write to you."
+    },
+    {
+      "key": "ev09",
+      "at": 215,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: What is going on",
+      "text": "OK, we asked people to sign in with the full password and MFA on each tablet. Sixty are done since 09:45 and they stay signed in. Twenty more tablets are in a locker, we will do those at lunch."
+    },
+    {
+      "key": "ev10",
+      "at": 255,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Check at 11:30 UTC",
+      "text": "61 tablets show a successful interactive sign-in since 09:45 and none of them has failed again. The remaining failures come only from the 19 tablets that have not been signed in yet."
+    },
+    {
+      "key": "ev11",
+      "at": 270,
+      "who": "engineer",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Closing note",
+      "text": "Cause: the 14-day inactivity limit of the tenant token lifetime policy (set in March), exceeded by the three-week shutdown. Not a service fault and not a recent policy change. The customer is signing the tablets in one by one and was advised to consider a longer limit for shop-floor devices through their own change process."
+    }
+  ]
+}

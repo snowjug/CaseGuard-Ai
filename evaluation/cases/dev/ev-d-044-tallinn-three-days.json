@@ -1,0 +1,258 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-044-tallinn-three-days",
+  "split": "dev",
+  "family": "fam-037",
+  "title": "Teams sign-in problem at the Tallinn site",
+  "scenario": "A three-day case in which the engineer first tries two policy and client detours, then finds one inspection node that times out, works around it and has the permanent fix applied; the e-mails carry footers, a phone note, quoted text and pasted command lines.",
+  "categories": ["noisy"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-07-21T10:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams sign-in problem Tallinn",
+      "text": "Hi support, since Tuesday morning the staff at our Tallinn site have trouble signing in to Teams. The client says 'We couldn't connect' and the tag shown is caa82ee2. About 70 people so far. Riga and Vilnius are fine. Often a second try works.\n\nRegards,\nMarta Kask | IT coordinator | Baltic Freight Example\nThe contents of this e-mail are confidential and meant for the addressee only."
+    },
+    {
+      "key": "ev02",
+      "at": 15,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "Hello Marta, thank you. To narrow this down please send me the names of three affected users and the UTC moment of one failure each, the sites that work and the sites that do not, and any change to identity, network or proxy settings in the 48 hours before Tuesday."
+    },
+    {
+      "key": "ev03",
+      "at": 75,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "Users: m.tamm Tue 07:41 UTC, k.saar Tue 08:02 UTC, o.rebane Tue 09:15 UTC. Only Tallinn is affected. Conditional Access has not been changed since March, I checked the audit log myself. I think someone in the network team touched the proxy at some point, but I do not know when or what.\n\nSent from my phone"
+    },
+    {
+      "key": "ev04",
+      "at": 95,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log lookup",
+      "text": "Sign-in logs, three attempts: no failed sign-in row exists for m.tamm at 07:41, k.saar at 08:02 or o.rebane at 09:15 UTC."
+    },
+    {
+      "key": "ev05",
+      "at": 100,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Service health",
+      "text": "Service health at 11:40 UTC: no active incident that concerns Teams or Microsoft Entra ID, and the Message center has nothing relevant."
+    },
+    {
+      "key": "ev06",
+      "at": 115,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "Thank you Marta. As a first test, please ask your security team to exclude m.tamm, k.saar and o.rebane from the Conditional Access policy for MFA for today, to sign in again, and to tell me the time they did it."
+    },
+    {
+      "key": "ev07",
+      "at": 240,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "The security team excluded the three users at 12:30 UTC. All three signed in again and got the same error, caa82ee2. No change at all."
+    },
+    {
+      "key": "ev08",
+      "at": 262,
+      "who": "customer",
+      "type": "customer_call",
+      "channel": "phone",
+      "title": "Call from Marta Kask",
+      "text": "Call note, 14:22 UTC: Marta phoned. The afternoon shift has started and about 30 more people at Tallinn cannot sign in. She asked for news and said her managers are asking."
+    },
+    {
+      "key": "ev09",
+      "at": 275,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "Hello Marta, thank you for calling. The security team can put the three users back into the policy. Next, on one affected laptop please clear the Teams cache and sign in again, and tell me what happens."
+    },
+    {
+      "key": "ev10",
+      "at": 330,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "I cleared the Teams cache on k.saar's laptop at 15:10 UTC and she signed in again. The same error caa82ee2 appeared."
+    },
+    {
+      "key": "ev11",
+      "at": 345,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "Understood. Please ask your network admin to run Resolve-DnsName for login.microsoftonline.com and for the Microsoft CDN names against each DNS resolver that the Tallinn site uses, from a Tallinn machine, and send me the output."
+    },
+    {
+      "key": "ev12",
+      "at": 450,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "From a Tallinn laptop at 17:20 UTC:\n\nResolve-DnsName login.microsoftonline.com -Server 10.20.0.2 : answered in 31 ms\nResolve-DnsName login.microsoftonline.com -Server 10.20.0.3 : answered in 29 ms\nResolve-DnsName login.microsoftonline.com -Server 10.20.0.4 : answered in 35 ms\n\nThe CDN names behave the same. Every resolver answers and the answers are identical on each."
+    },
+    {
+      "key": "ev13",
+      "at": 465,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "Thank you. Next, please run a sign-in test through every proxy node, from a Tallinn machine, and send me the timings of every node."
+    },
+    {
+      "key": "ev14",
+      "at": 1400,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "Sorry for the delay, I was out yesterday. Today at 09:05 UTC, from a Tallinn laptop, login.microsoftonline.com through the four proxy nodes: node 1 0.4 s, node 2 0.5 s, node 3 timed out after 20 s on three of three tries, node 4 0.4 s."
+    },
+    {
+      "key": "ev15",
+      "at": 1412,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "Our network admin also says that node 3 got a renewed inspection certificate last Thursday. That is before Tuesday, so it could fit.\n\n> Hi support, since Tuesday morning the staff at our Tallinn site have trouble signing in to Teams.\n> Often a second try works."
+    },
+    {
+      "key": "ev16",
+      "at": 1425,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "Thank you. Please take proxy node 3 out of rotation for now, in the PAC file or on the load balancer, and tell me the time."
+    },
+    {
+      "key": "ev17",
+      "at": 1500,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "Node 3 was removed from the load balancer at 10:55 UTC."
+    },
+    {
+      "key": "ev18",
+      "at": 1530,
+      "who": "engineer",
+      "type": "case_note",
+      "channel": "internal",
+      "title": "Internal note",
+      "text": "Internal note: the customer's helpdesk numbers are due this afternoon. No escalation for now, the evidence points to the customer's own proxy."
+    },
+    {
+      "key": "ev19",
+      "at": 1740,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "Update from Tallinn, Wednesday 15:00 UTC: since node 3 was removed, Teams works for everybody we have asked and the helpdesk has had no new calls since 12:00."
+    },
+    {
+      "key": "ev20",
+      "at": 1755,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "That is good news. Removing the node is a workaround. As the permanent fix, please bypass TLS inspection for the published Microsoft 365 endpoints on all nodes, under your change control, and then node 3 can go back into rotation. Please tell me the change window."
+    },
+    {
+      "key": "ev21",
+      "at": 1850,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "Change window approved: Thursday 06:00 to 07:00 UTC."
+    },
+    {
+      "key": "ev22",
+      "at": 1860,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "Thank you. I will keep the case open, check the failure counts after the change and write to you on Thursday."
+    },
+    {
+      "key": "ev23",
+      "at": 2775,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "The change is done. TLS inspection has been bypassed for the Microsoft 365 endpoints on all four nodes since 06:40 UTC, and node 3 is back in rotation."
+    },
+    {
+      "key": "ev24",
+      "at": 2790,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams sign-in problem Tallinn",
+      "text": "Tallinn staff started at 07:30 UTC and nobody has reported a sign-in problem since the change.\n\nMarta Kask | IT coordinator | Baltic Freight Example\nThe contents of this e-mail are confidential and meant for the addressee only."
+    },
+    {
+      "key": "ev25",
+      "at": 2890,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Before and after comparison",
+      "text": "Helpdesk counts of Teams sign-in tickets from Tallinn: Tuesday 61, Wednesday 24 until node 3 was removed at 10:55 UTC and 2 afterwards, Thursday up to 11:00 UTC 0. Three users sampled at 11:00 UTC signed in without an error."
+    },
+    {
+      "key": "ev26",
+      "at": 2900,
+      "who": "engineer",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Resolution note",
+      "text": "Resolution: workaround on Wednesday at 10:55 UTC, permanent fix on Thursday at 06:40 UTC, documented separately for the customer. Closing."
+    },
+    {
+      "key": "ev27",
+      "at": 2910,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Closing summary",
+      "text": "Hello Marta, closing summary: the cause was on your side of the network. Wednesday 10:55 UTC: node 3 out of rotation as the workaround. Thursday 06:40 UTC: TLS inspection bypassed for the Microsoft 365 endpoints as the permanent fix. The helpdesk numbers confirm the effect. If anything comes back, reply to this case."
+    }
+  ]
+}

@@ -1,0 +1,123 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-033-hedging-admin",
+  "split": "dev",
+  "family": "fam-027",
+  "title": "Connection timed out in Teams for part of the Cork office",
+  "scenario": "A careful admin hedges and denies as much as she states while one of two Cork proxies times out; the monitoring page that is said to be green is wrong, and taking the node out fixes it.",
+  "categories": ["negation"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-07-02T08:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams timing out in Cork",
+      "text": "Hi team. Some users in our Cork office get a connection timed out message when they open Teams. I cannot say it is intermittent: for the ones I tested it fails every single time, so I would not call it intermittent. I do not know yet whether other offices are affected, I only heard from Cork so far. It is not one person, at least four colleagues told me. Maya"
+    },
+    {
+      "key": "ev02",
+      "at": 15,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams timing out in Cork",
+      "text": "Hello Maya, thanks for being careful. Please ask someone in two other offices whether they see the same message, and send me the names of three failing users from Cork and the UTC moment of one failure for each."
+    },
+    {
+      "key": "ev03",
+      "at": 50,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams timing out in Cork",
+      "text": "Dublin and Galway have no problem at all, I asked both service desks. So it is Cork only. Users: o.byrne 09:02 UTC, s.walsh 09:11 UTC, t.ryan 09:25 UTC. I still do not think this is a Microsoft problem."
+    },
+    {
+      "key": "ev04",
+      "at": 70,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in logs",
+      "text": "Sign-in logs for the three users around those times: no failure rows at all, and no Conditional Access or MFA results either for these attempts."
+    },
+    {
+      "key": "ev05",
+      "at": 82,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Service health",
+      "text": "Service health: nothing active for Teams or Entra ID."
+    },
+    {
+      "key": "ev06",
+      "at": 90,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams timing out in Cork",
+      "text": "Thanks. I do not think this is an expired token, because the failure is the same every time and the logs hold nothing. More likely something on the path between Cork and Microsoft. Does the Cork office use a proxy, and was anything changed there lately?"
+    },
+    {
+      "key": "ev07",
+      "at": 130,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams timing out in Cork",
+      "text": "We have two proxy servers in Cork, cork-prx1 and cork-prx2. Nothing has changed there in the last month, I checked the change log. I am fairly sure both are healthy, the monitoring page is green for both."
+    },
+    {
+      "key": "ev08",
+      "at": 150,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Per-proxy test",
+      "text": "Requested login.microsoftonline.com through each of the two proxies from a Cork PC. cork-prx1 returned the page in 0.5 s, five times out of five. cork-prx2 timed out after 30 s, five times out of five."
+    },
+    {
+      "key": "ev09",
+      "at": 160,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "The monitoring page is wrong",
+      "text": "So the monitoring page was wrong: cork-prx2 times out for the Microsoft sign-in addresses while cork-prx1 is fine. Please take cork-prx2 out of rotation for now. If that fixes it, we can look at why it stopped answering."
+    },
+    {
+      "key": "ev10",
+      "at": 200,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: The monitoring page is wrong",
+      "text": "cork-prx2 has been out since 11:10 UTC. I will not say it is fixed before the afternoon, but the first four colleagues I asked can sign in."
+    },
+    {
+      "key": "ev11",
+      "at": 440,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: The monitoring page is wrong",
+      "text": "15:20 UTC. Nobody in Cork has reported a timeout since 11:10, 22 people have confirmed."
+    },
+    {
+      "key": "ev12",
+      "at": 455,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Check of the helpdesk count",
+      "text": "Cork helpdesk: 17 timeout tickets before 11:10 UTC and none since. Closing with the customer's agreement; the reason cork-prx2 stopped answering stays with their network team."
+    }
+  ]
+}

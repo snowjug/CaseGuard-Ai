@@ -1,0 +1,56 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-034-plan-heavy-dns",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T17:00:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected", "uncertainty": "low", "note": "several colleagues" },
+        { "event": "ev01", "id": "sig.error-name-not-resolved", "uncertainty": "low", "note": "the app could not resolve a name" },
+        { "event": "ev05", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev06", "id": "sig.resolver-inconsistent" },
+        { "event": "ev07", "id": "sig.resolver-inconsistent" },
+        { "event": "ev09", "id": "sig.dns-fix-resolved" },
+        { "event": "ev10", "id": "sig.dns-fix-resolved" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev05", "id": "act.signin-log-correlation" },
+        { "event": "ev06", "id": "act.dns-resolver-comparison" },
+        { "event": "ev07", "id": "act.remove-resolver-from-service" },
+        { "event": "ev10", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        { "event": "ev02", "id": "sig.no-server-side-failure-records", "reason": "future_intent", "note": "First I will look for matching sign-in records" },
+        { "event": "ev02", "id": "sig.server-side-failure-records-present", "reason": "conditional", "note": "If the records are there" },
+        { "event": "ev02", "id": "sig.mfa-ca-events-in-logs", "reason": "conditional", "note": "I will check whether Conditional Access or MFA events explain them" },
+        { "event": "ev02", "id": "sig.policy-events-outside-failure-window", "reason": "future_intent", "note": "I would like to look at the audit log" },
+        { "event": "ev02", "id": "sig.cache-clear-no-effect", "reason": "conditional", "note": "If none of that explains it, we can try clearing the cache" },
+        { "event": "ev02", "id": "sig.revoke-sessions-no-effect", "reason": "conditional", "note": "we could revoke the sessions" },
+        { "event": "ev02", "id": "sig.ca-exclusion-no-effect", "reason": "future_intent", "note": "as a last test, exclude one user from the MFA policy" },
+        { "event": "ev02", "id": "act.signin-log-correlation", "reason": "future_intent" },
+        { "event": "ev02", "id": "act.review-ca-policy-config", "reason": "future_intent", "note": "the audit log for policy changes" },
+        { "event": "ev02", "id": "act.clear-teams-cache", "reason": "conditional" },
+        { "event": "ev02", "id": "act.revoke-user-sessions", "reason": "conditional" },
+        { "event": "ev02", "id": "act.exclude-users-from-mfa-ca", "reason": "future_intent" },
+        { "event": "ev03", "id": "sig.cache-clear-no-effect", "reason": "conditional", "note": "if that does not work" },
+        { "event": "ev04", "id": "act.signin-log-correlation", "reason": "future_intent", "note": "I will look up your three users after this message" },
+        { "event": "ev07", "id": "sig.dns-fix-resolved", "reason": "speculative", "note": "I hope that will stop the failures" }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.dns-resolution"],
+      "rationale": "The second message is a plan, not a finding: in the future and under conditions the engineer names the log lookup, the log rows, Conditional Access and MFA events, the audit log, the cache clear, the session revoke and the exclusion test, and none of it has happened. A reader who sees the words and not the modality finds eight signals and five actions that are not there. The true story is short: a name could not be resolved, the logs hold nothing for the attempts, one of the two DNS servers fails when tested, it is taken out of the scope and the failures stop. The engineer's I hope in ev07 is a guess about the fix, not a result.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

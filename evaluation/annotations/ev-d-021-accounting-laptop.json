@@ -1,0 +1,47 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-021-accounting-laptop",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T14:50:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.single-user-scope" },
+        { "event": "ev03", "id": "sig.cache-clear-no-effect" },
+        { "event": "ev05", "id": "sig.prt-missing" },
+        { "event": "ev05", "id": "sig.prt-healthy" },
+        { "event": "ev06", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev07", "id": "sig.prt-missing" },
+        { "event": "ev07", "id": "sig.prt-healthy" },
+        { "event": "ev07", "id": "sig.no-server-side-failure-records", "uncertainty": "low", "note": "the logs are clean" },
+        { "event": "ev08", "id": "sig.prt-missing" },
+        { "event": "ev09", "id": "sig.prt-healthy" },
+        { "event": "ev10", "id": "sig.prt-healthy", "uncertainty": "low" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.clear-teams-cache" },
+        { "event": "ev04", "id": "act.device-registration-check" },
+        { "event": "ev06", "id": "act.signin-log-correlation" },
+        { "event": "ev07", "id": "act.device-registration-check" },
+        { "event": "ev10", "id": "act.validate-fix", "uncertainty": "low" }
+      ],
+      "absent": [
+        { "event": "ev02", "id": "sig.web-client-also-fails", "reason": "requested", "note": "asked whether the browser lets her in" },
+        { "event": "ev03", "id": "sig.web-client-also-fails", "reason": "negated", "note": "the browser works" }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.device-state"],
+      "rationale": "One user, one laptop, and the browser works. The engineer starts with the cheap and normal step of a cache clear and a browser check, then looks at the device when only the desktop app fails: a dsregcmd comparison with a colleague's laptop shows no primary refresh token on one and a healthy one on the other, and the logs hold no failure for the attempts. Re-registration fixes it. The early cache clear is a reasonable first step for a single-user report, so no fork is labelled. The browser question is asked in ev02 and answered in ev03, which denies that the web client fails.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

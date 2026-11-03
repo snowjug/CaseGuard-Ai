@@ -1,0 +1,18 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-041-second-floor-print-queue",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T18:20:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [],
+      "rationale": "A print queue that is blocked by a corrupt job. The workload has no knowledge pack, so nothing in it is a signal of the vocabulary and the engine has to refuse the case instead of reading it.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

@@ -1,0 +1,70 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-046-kaunas-filtering-rule",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T19:40:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.error-name-not-resolved" },
+        { "event": "ev01", "id": "sig.site-correlated" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev03", "id": "sig.recent-network-change-reported" },
+        { "event": "ev03", "id": "sig.ca-config-unchanged" },
+        { "event": "ev03", "id": "sig.site-correlated", "uncertainty": "low", "note": "restated: two other sites work" },
+        { "event": "ev04", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev05", "id": "sig.service-health-clear" },
+        { "event": "ev07", "id": "sig.revoke-sessions-no-effect" },
+        { "event": "ev07", "id": "sig.error-name-not-resolved" },
+        { "event": "ev07", "id": "sig.intermittent-failures" },
+        { "event": "ev08", "id": "sig.policy-events-outside-failure-window" },
+        { "event": "ev09", "id": "sig.multiple-users-affected", "uncertainty": "low", "note": "restated with a corrected count" },
+        { "event": "ev11", "id": "sig.resolver-inconsistent" },
+        { "event": "ev11", "id": "sig.error-name-not-resolved", "note": "NXDOMAIN for the CDN names" },
+        { "event": "ev13", "id": "sig.proxy-nodes-consistent" },
+        { "event": "ev14", "id": "sig.dns-fix-resolved" },
+        { "event": "ev19", "id": "sig.error-name-not-resolved" },
+        { "event": "ev20", "id": "sig.recent-network-change-reported", "uncertainty": "low", "note": "a nightly template job put the resolver back" },
+        { "event": "ev22", "id": "sig.resolvers-consistent" },
+        { "event": "ev23", "id": "sig.dns-fix-resolved", "uncertainty": "low", "note": "before and after counts" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.check-service-health" },
+        { "event": "ev06", "id": "act.revoke-user-sessions" },
+        { "event": "ev08", "id": "act.review-ca-policy-config", "uncertainty": "low", "note": "an audit log query for policy changes" },
+        { "event": "ev10", "id": "act.dns-resolver-comparison" },
+        { "event": "ev12", "id": "act.remove-resolver-from-service" },
+        { "event": "ev12", "id": "act.proxy-node-comparison" },
+        { "event": "ev15", "id": "act.restore-dns-policy" },
+        { "event": "ev15", "id": "act.communicate-status" },
+        { "event": "ev21", "id": "act.communicate-status" },
+        { "event": "ev21", "id": "act.dns-resolver-comparison" },
+        { "event": "ev23", "id": "act.validate-fix" },
+        { "event": "ev25", "id": "act.communicate-status" }
+      ],
+      "absent": [],
+      "forks": [
+        { "event": "ev06", "category": "low_value_action", "note": "revoking sessions when no failure record reaches the identity service" }
+      ],
+      "earliestMissed": "ev06",
+      "counterfactualDirection": "better",
+      "conflicts": [
+        { "class": "corrected_information", "events": ["ev01", "ev09"], "subject": "number of affected people", "note": "about 90, corrected to about 120" },
+        { "class": "temporal_update", "events": ["ev14", "ev19"], "subject": "sig.dns-fix-resolved", "note": "it works since the resolver was removed, then it is back on Tuesday" }
+      ],
+      "qualityBand": "adequate",
+      "causes": ["hyp.dns-resolution"],
+      "rationale": "A name-resolution story told in new words: the client tag is a name-resolution one, the filtering resolver returns NXDOMAIN for the CDN names, and the removal of that resolver fixes it. The engineer scopes, correlates and checks service health at once. Revoking sessions with no failure record in the sign-in logs is a low-value step, and the audit log shows no policy event inside the failure window. The per-resolver comparison finds the resolver, the proxy nodes are consistent, the workaround and the permanent fix are separated, and the problem that returns on Tuesday comes from a template job that put the resolver back. The customer corrects the count of people from 90 to 120 in a phone call.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

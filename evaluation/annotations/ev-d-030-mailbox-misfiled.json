@@ -1,0 +1,32 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-030-mailbox-misfiled",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T16:20:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [],
+      "actions": [],
+      "absent": [
+        { "event": "ev01", "id": "sig.error-timeout", "reason": "other", "note": "a mail bounce, not a Teams client message" },
+        { "event": "ev01", "id": "sig.error-name-not-resolved", "reason": "other", "note": "a mail bounce, not a Teams client message" },
+        { "event": "ev03", "id": "sig.error-timeout", "reason": "other", "note": "the bounce text" },
+        { "event": "ev05", "id": "sig.error-timeout", "reason": "other", "note": "the handover note quotes the bounce" },
+        { "event": "ev05", "id": "sig.error-name-not-resolved", "reason": "other", "note": "the handover note quotes the bounce" }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": null,
+      "causes": [],
+      "rationale": "A negative control: the case was filed under Teams by mistake and is about mail delivery. The words connection timed out and host name could not be resolved appear in the supplier's bounce, which is not a client message of Teams, so no signal is stated and the engine should report nothing. The engineer routes the case to the mail flow team and asks only for the full bounce message, which is not one of the diagnostic actions. No decision point is expected.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

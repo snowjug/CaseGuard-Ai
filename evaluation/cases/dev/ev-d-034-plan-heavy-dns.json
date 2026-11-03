@@ -1,0 +1,105 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-034-plan-heavy-dns",
+  "split": "dev",
+  "family": "fam-028",
+  "title": "Teams cannot resolve a name for several people in Oslo",
+  "scenario": "An engineer announces a long plan of checks and fixes in one message, conditionally and in the future, before doing any of them; the real cause is one of two DNS servers failing, and the plan words must not be read as findings.",
+  "categories": ["negation"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-07-03T06:30:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams fails in Oslo",
+      "text": "Hello. Several colleagues in the Oslo office cannot sign in to Teams since 8:00 local time (06:00 UTC). The app says it could not resolve a name. I have not tried anything yet, I did not want to make it worse. Henrik"
+    },
+    {
+      "key": "ev02",
+      "at": 12,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams fails in Oslo",
+      "text": "Hello Henrik, thank you. Here is what I plan, in this order. First I will look for matching sign-in records for your failing users; if there are none, the problem is before Microsoft. If the records are there, I will check whether Conditional Access or MFA events explain them. I would also like to look at the audit log for policy changes in the failure window. If none of that explains it, we can try clearing the Teams cache on one PC, and after that we could revoke the sessions of the affected users and, as a last test, exclude one user from the MFA policy. Please do not do any of it yet. First I need three users with UTC times, and the list of DNS servers used in Oslo."
+    },
+    {
+      "key": "ev03",
+      "at": 40,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams fails in Oslo",
+      "text": "Users: e.hansen 06:05 UTC, m.larsen 06:12 UTC, i.berg 06:30 UTC. DNS servers in Oslo: 10.90.1.10 and 10.90.1.11. If you want, I can clear the cache on my own PC right now, just tell me. And should I reinstall Teams if that does not work?"
+    },
+    {
+      "key": "ev04",
+      "at": 48,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams fails in Oslo",
+      "text": "No need yet, thanks. I will look up your three users after this message and write again."
+    },
+    {
+      "key": "ev05",
+      "at": 62,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log lookup",
+      "text": "Sign-in logs for e.hansen, m.larsen and i.berg at the times given: no matching failure rows. Their attempts never reached Microsoft."
+    },
+    {
+      "key": "ev06",
+      "at": 75,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Name resolution by server",
+      "text": "Resolved login.microsoftonline.com from an Oslo PC against 10.90.1.10: a correct answer every time. Against 10.90.1.11: SERVFAIL on four of five tries."
+    },
+    {
+      "key": "ev07",
+      "at": 82,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "One of the two DNS servers",
+      "text": "So one of the two Oslo DNS servers, 10.90.1.11, is failing and the other is fine. Please take 10.90.1.11 out of the DHCP scope. I hope that will stop the failures; we will know within the hour."
+    },
+    {
+      "key": "ev08",
+      "at": 125,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: One of the two DNS servers",
+      "text": "Done at 07:45 UTC. 10.90.1.11 is out of the Oslo scope and the leases are renewing."
+    },
+    {
+      "key": "ev09",
+      "at": 130,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: One of the two DNS servers",
+      "text": "08:40 UTC. Nobody has complained since 07:45 and I tried five PCs, all fine."
+    },
+    {
+      "key": "ev10",
+      "at": 140,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Test sign-ins",
+      "text": "From 07:50 UTC 25 of 25 test sign-ins succeed. Before the change six in ten had failed. Closing the case with your agreement; the repair of 10.90.1.11 stays with your network team."
+    }
+  ]
+}

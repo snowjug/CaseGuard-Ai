@@ -1,0 +1,96 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-024-restored-profiles",
+  "split": "dev",
+  "family": "fam-018",
+  "title": "Teams stuck on signing in for nine virtual desktop users",
+  "scenario": "Nine users whose profile disks were restored from backup have stale Teams data and a stale account broker state, so the desktop app hangs while the browser works; resetting both fixes all nine.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-19T08:10:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams hangs on signing in, virtual desktops",
+      "text": "Hello, about nine users on our virtual desktops have had Teams stuck on the signing you in screen since Tuesday. Their colleagues on the same desktop pool are fine. These nine all had their profile disks restored from backup last Monday after the storage problem. Teams in the browser inside the same desktop works for them."
+    },
+    {
+      "key": "ev02",
+      "at": 18,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams hangs on signing in, virtual desktops",
+      "text": "Hello, thanks. If the browser works and only these profiles fail, I suspect the Teams data inside the restored profiles. First I need to rule out the obvious: do the nine share anything else, like a site or a network? And please send the time of one failed sign-in for three of them."
+    },
+    {
+      "key": "ev03",
+      "at": 52,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams hangs on signing in, virtual desktops",
+      "text": "No, they sit in three different offices and two of them work from home over the VPN, so it is not a place. Times: h.vos 09:02 UTC, d.peeters 09:15 UTC, m.jacobs 09:21 UTC."
+    },
+    {
+      "key": "ev04",
+      "at": 66,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log lookup",
+      "text": "No failed rows for the three users at those times in the sign-in logs. The app is stuck before it asks for a token."
+    },
+    {
+      "key": "ev05",
+      "at": 75,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "A reset to try",
+      "text": "Since the service side is clean and the browser works, let us reset the Teams data in one restored profile: sign out, close Teams, delete the contents of the Teams cache folder and the Teams entry in the Web Account Manager data of that profile, then start Teams again. Please try it with one of the nine and tell me what happens."
+    },
+    {
+      "key": "ev06",
+      "at": 130,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: A reset to try",
+      "text": "Did it for h.vos: Teams started and signed in at the first try. We then ran the same steps with a script for the other eight and they all work now."
+    },
+    {
+      "key": "ev07",
+      "at": 142,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: A reset to try",
+      "text": "Great. To avoid a repeat: when profile disks are restored from backup, the Teams cache folders should be excluded or cleared as part of the restore. I will note that in the case."
+    },
+    {
+      "key": "ev08",
+      "at": 160,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: A reset to try",
+      "text": "We will add that to the restore procedure. You can close the case, thank you."
+    },
+    {
+      "key": "ev09",
+      "at": 170,
+      "who": "engineer",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Closing note",
+      "text": "Cause: stale Teams cache and account broker state in nine profile disks restored from backup. Resetting both fixed all nine users. The browser version worked throughout, and the sign-in logs held nothing for the failing attempts."
+    }
+  ]
+}

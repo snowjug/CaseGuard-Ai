@@ -1,0 +1,123 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-028-expired-signing-cert",
+  "split": "dev",
+  "family": "fam-022",
+  "title": "Nobody from our domain can log in to Teams or Outlook",
+  "scenario": "The token-signing certificate of a customer's federation farm expired at midnight; the engineer escalates at once without evidence, the escalation team points back at the federation trust, and the customer finds the certificate; thread with inline quoting and a monitoring alert.",
+  "categories": ["noisy"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-25T05:30:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams login not working for all (since 00:00)",
+      "text": "Good morning,\nnobody from our domain can log in to Teams or Outlook this morning. Everyone gets wrong username or password, also the ones who just changed their password yesterday!! About 1200 users, all sites. In the browser the message is a bit different: We can't verify your identity. Our own IT portal is also affected.\nBR, Gábor\n\n> From: Monitoring <alerts@corp.example>\n> Subject: ADFS service warnings\n> The ADFS service on ADFSPROD01 reported 3 warnings. Full text is in the attachment."
+    },
+    {
+      "key": "ev02",
+      "at": 9,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams login not working for all (since 00:00)",
+      "text": "Hello Gábor, thank you for the report. This is a big impact, so I am escalating to the identity team right away with what you wrote. I will come back when they answer."
+    },
+    {
+      "key": "ev03",
+      "at": 12,
+      "who": "engineer",
+      "type": "escalation",
+      "channel": "internal",
+      "title": "Escalation to the identity backend team",
+      "text": "Customer reports about 1200 users at all sites unable to sign in since 00:00 UTC, message We can't verify your identity. No logs checked yet and no sample users yet. Please take it and advise, traces if you need them."
+    },
+    {
+      "key": "ev04",
+      "at": 38,
+      "who": "engineer",
+      "type": "escalation_response",
+      "channel": "internal",
+      "title": "Re: Escalation to the identity backend team",
+      "text": "Not yet a backend case. All users and all sites failing from exactly midnight sounds like the federation trust. Please get three users with UTC times and ask the customer to check the validity of the federation token-signing certificate."
+    },
+    {
+      "key": "ev05",
+      "at": 45,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams login not working for all (since 00:00)",
+      "text": "Gábor, I need two things: (1) three failing users and the UTC moment of one failure for each, and (2) a check of the AD FS token-signing certificate: its validity dates, and whether the farm shows certificate errors in its event log."
+    },
+    {
+      "key": "ev06",
+      "at": 80,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "RE: Teams login not working for all (since 00:00)",
+      "text": "> (1) three failing users and the UTC moment of one failure for each\nk.szabo 00:12 UTC, p.toth 00:40 UTC, e.nagy 04:55 UTC\n> (2) the validity dates of the token-signing certificate\nI CHECKED: the token-signing certificate on ADFSPROD01 expired yesterday at 23:59 UTC!! It was set to renew by itself but the auto renewal was switched off in March when we did the migration. We have a new certificate ready.\n> certificate errors in the event log?\nYes, the event says the token-signing certificate has expired, repeated since 00:00 UTC."
+    },
+    {
+      "key": "ev07",
+      "at": 92,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log lookup",
+      "text": "Entra sign-in logs for k.szabo, p.toth and e.nagy: a failed row at each time given, all on the federated path, with the token signature or certificate rejected as not valid."
+    },
+    {
+      "key": "ev08",
+      "at": 100,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "That is the cause",
+      "text": "That is the cause: the expired signing certificate breaks the trust for every federated user. Please make the new certificate the primary one on the farm and then update the federation settings of your domain so that Microsoft learns the new signing key. I am available all morning if you want to check a step with me."
+    },
+    {
+      "key": "ev09",
+      "at": 195,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "RE: That is the cause",
+      "text": "New certificate is primary since 06:20 UTC and the domain is updated. At 06:35 I tested with 5 users and they all signed in."
+    },
+    {
+      "key": "ev10",
+      "at": 220,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "RE: That is the cause",
+      "text": "09:10 UTC. Everything fine, thank you. Sorry for the capital letters this morning."
+    },
+    {
+      "key": "ev11",
+      "at": 235,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Federated sign-ins after the change",
+      "text": "Federated sign-ins since 06:40 UTC are at normal volume with no certificate errors. Closing with the customer's agreement."
+    },
+    {
+      "key": "ev12",
+      "at": 245,
+      "who": "engineer",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Closing note",
+      "text": "Expired token-signing certificate on the customer's federation farm; auto-renewal had been off since March. New certificate installed and the domain federation settings updated by the customer. The escalation was made before any evidence was collected and was not needed."
+    }
+  ]
+}

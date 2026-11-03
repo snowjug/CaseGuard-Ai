@@ -1,0 +1,105 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-017-lyon-forwarder",
+  "split": "dev",
+  "family": "fam-011",
+  "title": "Teams sign-in fails for part of the Lyon site",
+  "scenario": "Half of one site is unable to open Teams because one of its two DHCP-issued DNS servers answers almost nothing after a rack move; taking it out of the scope fixes it.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-09T07:30:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams will not open for half of Lyon",
+      "text": "Bonjour, I am writing for the whole IT desk. Since this morning around 8:30 local time (06:30 UTC I believe) a lot of colleagues at our Lyon site cannot get into Teams: the window opens, spins, then says it could not find the server and offers a Retry button. Retry works for some of them after two or three attempts. We are about 60 people on this floor. The Paris office is perfectly fine, I asked their service desk. I am worried because we have a client workshop at 14:00 and everybody needs Teams for it."
+    },
+    {
+      "key": "ev02",
+      "at": 12,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams will not open for half of Lyon",
+      "text": "Hello, thanks for the clear description, and understood about the 14:00 workshop. To get moving I need three things: (1) the exact text of the message on screen, ideally a screenshot of one; (2) the names of three affected users and the UTC moment at which each of them failed; (3) which DNS servers and which proxy the Lyon clients use. If you can also tell me whether anything in the network was touched this week, that would help a lot."
+    },
+    {
+      "key": "ev03",
+      "at": 41,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams will not open for half of Lyon",
+      "text": "Screenshot attached (I cannot paste it here). The message says: We couldn't connect, the server name could not be resolved. Error code: caa82ee7. Users: m.leclerc 06:41 UTC, s.bonnet 06:47 UTC, j.garnier 06:52 UTC. Lyon clients get 10.30.4.5 and 10.30.4.6 from DHCP and go out directly, there is no proxy at this site. As for changes: the infrastructure team moved the Lyon DNS service to a new rack on Monday night, but they said it was transparent."
+    },
+    {
+      "key": "ev04",
+      "at": 58,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log lookup",
+      "text": "Looked up m.leclerc, s.bonnet and j.garnier in the Entra sign-in logs between 06:30 and 07:00 UTC, interactive and non-interactive. No failed sign-in rows for any of them in that window. The attempts are failing before they get as far as the service."
+    },
+    {
+      "key": "ev05",
+      "at": 75,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Name resolution test from a Lyon PC",
+      "text": "Remote session on a Lyon laptop. Resolved login.microsoftonline.com against 10.30.4.5 and against 10.30.4.6, ten times each. 10.30.4.5: ten answers, all under 20 ms. 10.30.4.6: three answers out of ten, the rest came back SERVFAIL. Same pattern for the CDN host names."
+    },
+    {
+      "key": "ev06",
+      "at": 80,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Findings and a quick fix",
+      "text": "Good news, I think we have it. One of your two Lyon DNS servers, 10.30.4.6, fails to resolve the Microsoft sign-in names most of the time, while 10.30.4.5 is healthy. That fits a new rack. Please ask the infrastructure team to take .6 out of the Lyon DHCP scope right now so that clients only receive .5; leases renew within the hour and restarting Teams will speed it up for people. I will check back at 10:30 UTC with some test sign-ins to confirm."
+    },
+    {
+      "key": "ev07",
+      "at": 118,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Findings and a quick fix",
+      "text": "Done. My colleague removed 10.30.4.6 from the Lyon scope at 08:20 UTC and forced a lease refresh. He found that the forwarder on the new rack still points at the old datacentre resolver, which has been switched off. He will repoint it this afternoon."
+    },
+    {
+      "key": "ev08",
+      "at": 190,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Findings and a quick fix",
+      "text": "It is 10:15 UTC and nobody in Lyon has complained since the scope change. I watched the helpdesk queue and also tried Teams on six different machines myself, all of them signed in at the first attempt."
+    },
+    {
+      "key": "ev09",
+      "at": 205,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Before and after",
+      "text": "Ran 20 sign-ins from three Lyon machines between 10:20 and 10:35 UTC: 20 of 20 succeeded, none slow. Failure notices at the helpdesk since 08:20 UTC: zero. Between 06:30 and 08:20 UTC about a third of attempts had failed."
+    },
+    {
+      "key": "ev10",
+      "at": 240,
+      "who": "engineer",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Closing note",
+      "text": "Root cause: the forwarder on the new Lyon rack pointed at a decommissioned resolver, so one of the two DNS servers handed out by DHCP could not resolve Microsoft names. Workaround: 10.30.4.6 removed from the scope. Permanent fix is with the infrastructure team, who will repoint the forwarder and confirm that every sign-in host resolves before the server goes back into the scope."
+    }
+  ]
+}

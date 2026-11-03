@@ -1,0 +1,141 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-022-freight-all-sites",
+  "split": "dev",
+  "family": "fam-016",
+  "title": "Nobody at any site can sign in to Teams",
+  "scenario": "A sudden sign-in failure at every site of a freight company is a vendor-side incident that Microsoft posts hours later; the engineer first sends the customer to clear caches and capture traces and calls it no outage.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-17T09:20:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "URGENT Teams login down all sites",
+      "text": "Nobody at any of our 11 sites can log in to Teams since about 09:00 UTC. People who were already in are still fine. About 250 users have hit it so far. The error is a connection timed out message. Sometimes the second try works after a minute. We changed nothing this week, I checked with the network guys."
+    },
+    {
+      "key": "ev02",
+      "at": 22,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: URGENT Teams login down all sites",
+      "text": "Hello, sorry to hear this. For timeouts the first step is to make sure the client is not damaged, so please have a few users clear the Teams cache and sign in again. Please also collect a HAR capture from two affected users while the timeout is showing."
+    },
+    {
+      "key": "ev03",
+      "at": 80,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: URGENT Teams login down all sites",
+      "text": "Cache cleared on 5 PCs, same result. The HAR will take long because most users are working from home today. Can you tell me what is going on? It is 10:40 UTC and my director is asking every ten minutes."
+    },
+    {
+      "key": "ev04",
+      "at": 85,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: URGENT Teams login down all sites",
+      "text": "Thanks. While you collect the traces I will look at the sign-in logs for your users."
+    },
+    {
+      "key": "ev05",
+      "at": 100,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log lookup",
+      "text": "Looked up four users who failed between 09:05 and 10:30 UTC. There is no failure row for any of their attempts in the Entra sign-in logs."
+    },
+    {
+      "key": "ev06",
+      "at": 112,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Service health",
+      "text": "Service health at 11:12 UTC: no active incident listed for Teams or Entra ID, and nothing in the message centre."
+    },
+    {
+      "key": "ev07",
+      "at": 115,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: URGENT Teams login down all sites",
+      "text": "Service health shows nothing, so I would say this is not an outage and the cause is on your side of the connection. Please send the HAR traces as soon as you can."
+    },
+    {
+      "key": "ev08",
+      "at": 155,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: URGENT Teams login down all sites",
+      "text": "Maybe it is a Microsoft outage after all? A contact at another firm says their Teams has the same timeouts right now. We still have no traces, people cannot even find the button for it."
+    },
+    {
+      "key": "ev09",
+      "at": 165,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Service health, second look",
+      "text": "Service health at 12:05 UTC: Microsoft has just posted an incident for sign-in and Teams connectivity in Western Europe, start time 09:00 UTC, status investigating. It matches the symptoms of this case."
+    },
+    {
+      "key": "ev10",
+      "at": 170,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "It is an incident",
+      "text": "I am sorry for the detour with caches and traces, please stop both. The incident explains what you describe and there is nothing for you to change. I will send you the next update as soon as Microsoft posts one, and at the latest at 14:00 UTC."
+    },
+    {
+      "key": "ev11",
+      "at": 180,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: It is an incident",
+      "text": "Thanks, I told everyone to stop and wait. I will forward your note to my director."
+    },
+    {
+      "key": "ev12",
+      "at": 240,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Incident update 13:20 UTC",
+      "text": "Update: Microsoft says a faulty change in a regional authentication front end was rolled back at 13:05 UTC and recovery is in progress. The incident stays open. Next update from me by 14:00 UTC."
+    },
+    {
+      "key": "ev13",
+      "at": 290,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Incident update 13:20 UTC",
+      "text": "14:10 UTC: all sites can log in again. About five users needed a second try."
+    },
+    {
+      "key": "ev14",
+      "at": 310,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Confirmation",
+      "text": "Checked two users and the sign-in logs at 14:30 UTC: successful sign-ins at normal volume. Microsoft marked the incident resolved at 14:15 UTC. Closing the case."
+    }
+  ]
+}

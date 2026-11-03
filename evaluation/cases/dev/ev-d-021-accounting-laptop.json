@@ -1,0 +1,105 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-021-accounting-laptop",
+  "split": "dev",
+  "family": "fam-015",
+  "title": "One laptop cannot sign in to the Teams app",
+  "scenario": "A single accounting laptop has lost its primary refresh token after a stale device registration; the browser works, a cache clear does not help, and re-registering the device fixes it.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-16T12:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Cannot use Teams app on my laptop",
+      "text": "Hi, I'm Ines from accounting. Since Monday my laptop will not let me into the Teams app. It keeps asking for my password and then says something went wrong. A colleague two desks away has no problem at all. Nobody told me about any change."
+    },
+    {
+      "key": "ev02",
+      "at": 14,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Cannot use Teams app on my laptop",
+      "text": "Hello Ines, sorry about that. Can you check whether Teams in a web browser lets you in with the same account? And please clear the Teams cache: close Teams, delete the Teams folder under your AppData, and start it again."
+    },
+    {
+      "key": "ev03",
+      "at": 55,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Cannot use Teams app on my laptop",
+      "text": "The browser works, I am in with the same account. I cleared the cache like you said and it still fails the same way in the app."
+    },
+    {
+      "key": "ev04",
+      "at": 68,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Cannot use Teams app on my laptop",
+      "text": "Thanks. Since only the desktop app on your laptop fails, I would like to look at the device itself. Please open a command prompt, run dsregcmd /status and paste the part called SSO State (it shows a line AzureAdPrt). If your colleague whose Teams works can run it too, we can compare the two."
+    },
+    {
+      "key": "ev05",
+      "at": 110,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Cannot use Teams app on my laptop",
+      "text": "Here it is. Mine: AzureAdPrt: NO, AzureAdPrtUpdateTime 2026-06-12 07:44:10 UTC. Marta's laptop two desks away: AzureAdPrt: YES, updated this morning."
+    },
+    {
+      "key": "ev06",
+      "at": 125,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in logs for ines.f",
+      "text": "No failed sign-in rows at all for ines.f in today's logs, although she has tried many times. The failures happen on the laptop before anything is sent to the service."
+    },
+    {
+      "key": "ev07",
+      "at": 140,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "What I think it is",
+      "text": "This fits a laptop that has lost its primary refresh token: AzureAdPrt is NO on yours and YES on your colleague's, and the logs are clean. It often follows a stale device registration. Please sign out of Windows, restart, sign in on the office network and run dsregcmd /status once more. If it still says NO, your IT admin should run dsregcmd /leave from an admin prompt, restart, and let the laptop register again with your work account."
+    },
+    {
+      "key": "ev08",
+      "at": 185,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: What I think it is",
+      "text": "I did the first part and it still says NO. Our IT admin is doing the leave and register now, he is connected to my laptop."
+    },
+    {
+      "key": "ev09",
+      "at": 250,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: What I think it is",
+      "text": "It worked! After the new registration it shows AzureAdPrt: YES and Teams opened at once. Thank you!"
+    },
+    {
+      "key": "ev10",
+      "at": 262,
+      "who": "engineer",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Closing note",
+      "text": "Re-registered laptop shows AzureAdPrt YES, the Teams desktop app signs in, the user confirmed. Cause: a stale device registration on this laptop. Their IT admin will check the other laptops from the same batch."
+    }
+  ]
+}

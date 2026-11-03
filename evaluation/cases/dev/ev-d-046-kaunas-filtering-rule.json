@@ -1,0 +1,240 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-046-kaunas-filtering-rule",
+  "split": "dev",
+  "family": "fam-040",
+  "title": "Teams cannot connect at the Kaunas site",
+  "scenario": "A long case about a filtering resolver that answers the Microsoft CDN names with errors: the engineer first revokes sessions and reads the audit log, finds the resolver and the proxy nodes by comparison, works around it, sees the problem return through a template job and has the filtering rule corrected.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-07-27T09:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams cannot connect, Kaunas",
+      "text": "Hello, since this morning Teams cannot connect for the staff at the Kaunas site, about 90 people. The tag in the client is caa82ee7. Other sites are fine. It comes and goes: some people get in after two or three tries.\n\nJonas Vaitkus\nIT, Nemunas Logistics Example"
+    },
+    {
+      "key": "ev02",
+      "at": 10,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Kaunas",
+      "text": "Hello Jonas, thank you. Please send me three affected users with one UTC failure time each, the sites that are fine, and every change made to DNS, proxy, firewall or identity settings in the last 48 hours."
+    },
+    {
+      "key": "ev03",
+      "at": 60,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Kaunas",
+      "text": "Users: a.petrauskas 07:12 UTC, i.kazlauskas 07:40 UTC, v.jonaitis 08:05 UTC. Panevezys and Siauliai work. On Friday evening our security team enabled a new category rule on the DNS filtering resolver for the Kaunas scopes. Conditional Access has not been touched."
+    },
+    {
+      "key": "ev04",
+      "at": 80,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log lookup",
+      "text": "Sign-in logs for the three attempts: no failed sign-in row exists for a.petrauskas at 07:12, i.kazlauskas at 07:40 or v.jonaitis at 08:05 UTC."
+    },
+    {
+      "key": "ev05",
+      "at": 84,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Service health",
+      "text": "Service health at 10:25 UTC: no active incident for Teams or sign-in, nothing relevant in the Message center."
+    },
+    {
+      "key": "ev06",
+      "at": 95,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Kaunas",
+      "text": "Thank you Jonas. As a quick test, please revoke the sessions of the three users and have them sign in again, so that we know it is not an old token, and tell me the time you did it."
+    },
+    {
+      "key": "ev07",
+      "at": 190,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Kaunas",
+      "text": "Sessions revoked at 11:50 UTC. The three users signed in again: two got caa82ee7 again, the third got in on the third try."
+    },
+    {
+      "key": "ev08",
+      "at": 200,
+      "who": "engineer",
+      "type": "query_output",
+      "channel": "tool",
+      "title": "Audit log query",
+      "text": "Audit log query for policy changes from 2026-07-20 to 2026-07-27: 14 rows, none inside the failure window of Monday 06:30 to 08:30 UTC. The closest rows are two group membership updates on Sunday at 21:10 UTC."
+    },
+    {
+      "key": "ev09",
+      "at": 215,
+      "who": "customer",
+      "type": "customer_call",
+      "channel": "phone",
+      "title": "Call from Jonas Vaitkus",
+      "text": "Call note, 12:35 UTC: Jonas phoned and asked for news. He corrected the number of people: it is about 120, not 90, because the second shift has started. He said the site manager is asking for a time."
+    },
+    {
+      "key": "ev10",
+      "at": 225,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Kaunas",
+      "text": "Hello Jonas, thank you for calling. As the new filtering rule came in on Friday, please have your network admin run Resolve-DnsName for login.microsoftonline.com and the Microsoft CDN names against every DNS resolver that the Kaunas scopes hand out, from a Kaunas laptop, and send me the results."
+    },
+    {
+      "key": "ev11",
+      "at": 320,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Kaunas",
+      "text": "At 14:05 UTC from a Kaunas laptop: resolvers 10.30.0.2 and 10.30.0.3 answer all hosts every time. Resolver 10.30.0.4, the filtering resolver, answers login.microsoftonline.com but returns NXDOMAIN for the Microsoft CDN names in about half of the queries."
+    },
+    {
+      "key": "ev12",
+      "at": 335,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Kaunas",
+      "text": "Thank you. As a workaround, please remove resolver 10.30.0.4 from the DHCP scopes of Kaunas so that clients use the two other resolvers, and tell me the time. Please also run a sign-in test through every proxy node from a Kaunas laptop and send me the timings of each node, so that we can rule the proxy in or out."
+    },
+    {
+      "key": "ev13",
+      "at": 440,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Kaunas",
+      "text": "Resolver 10.30.0.4 was removed from the DHCP scopes at 15:40 UTC. The proxy test from a Kaunas laptop at 15:55 UTC: all three nodes answered within 0.6 s on five of five tries."
+    },
+    {
+      "key": "ev14",
+      "at": 500,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Kaunas",
+      "text": "Update 17:20 UTC: Teams works for the people we have asked at Kaunas since about 15:45 UTC. Two people had to restart Teams once."
+    },
+    {
+      "key": "ev15",
+      "at": 515,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Kaunas",
+      "text": "That is good news. Removing the resolver is a workaround. The permanent fix is to correct the filtering rule, with an exception for the published Microsoft 365 endpoints, under your change control. Please ask the security team for that change and tell me when it will be done."
+    },
+    {
+      "key": "ev16",
+      "at": 560,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Kaunas",
+      "text": "The security team needs approval from their manager, which comes on Wednesday."
+    },
+    {
+      "key": "ev17",
+      "at": 570,
+      "who": "engineer",
+      "type": "case_note",
+      "channel": "internal",
+      "title": "Internal note",
+      "text": "Internal note: the workaround is in place, the permanent change is planned for Wednesday. Next contact when the customer has the approval."
+    },
+    {
+      "key": "ev18",
+      "at": 1375,
+      "who": "system",
+      "type": "system_event",
+      "channel": "tool",
+      "title": "Helpdesk alert",
+      "text": "ALERT (helpdesk tool): the ticket volume for the title 'Teams sign-in' is above the daily threshold."
+    },
+    {
+      "key": "ev19",
+      "at": 1400,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Kaunas",
+      "text": "Tuesday morning: it is back for some people. Two users got caa82ee7 again at 07:50 UTC. As far as I know nobody changed the DHCP scopes."
+    },
+    {
+      "key": "ev20",
+      "at": 1450,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Kaunas",
+      "text": "Found it: the nightly job that applies our DHCP scope template ran at 05:00 UTC and put resolver 10.30.0.4 back into the Kaunas scopes. I removed it again at 09:00 UTC and switched the template job off for Kaunas."
+    },
+    {
+      "key": "ev21",
+      "at": 1465,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Kaunas",
+      "text": "Thank you. I will keep the case open until the filtering rule is corrected. After the correction, please run the per-resolver comparison again and send me the output."
+    },
+    {
+      "key": "ev22",
+      "at": 2960,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams cannot connect, Kaunas",
+      "text": "The filtering rule was corrected on Wednesday at 09:10 UTC, with an exception for the published Microsoft 365 endpoints. Comparison from a Kaunas laptop at 10:10 UTC: all three resolvers answer all sign-in and CDN hosts, ten of ten queries each."
+    },
+    {
+      "key": "ev23",
+      "at": 2990,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Before and after comparison",
+      "text": "Helpdesk counts of Teams sign-in tickets from Kaunas: Monday 74, Tuesday after the resolver was removed again 3, Wednesday up to 10:45 UTC 0. Three users sampled at 10:45 UTC signed in without an error."
+    },
+    {
+      "key": "ev24",
+      "at": 3000,
+      "who": "engineer",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Resolution note",
+      "text": "Resolution: workaround on Monday at 15:40 UTC, permanent fix on Wednesday at 09:10 UTC, documented separately for the customer. The return on Tuesday came from the template job. Closing."
+    },
+    {
+      "key": "ev25",
+      "at": 3010,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Closing summary",
+      "text": "Hello Jonas, closing summary: Monday 15:40 UTC resolver 10.30.0.4 out of the scopes as the workaround, Tuesday it came back through the template job, Wednesday 09:10 UTC the filtering rule corrected as the permanent fix. The helpdesk numbers confirm the effect. If anything comes back, reply to this case."
+    }
+  ]
+}

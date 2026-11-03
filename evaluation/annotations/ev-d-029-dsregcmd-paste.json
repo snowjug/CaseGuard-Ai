@@ -1,0 +1,43 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-029-dsregcmd-paste",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T16:10:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected", "uncertainty": "low", "note": "six users" },
+        { "event": "ev03", "id": "sig.prt-missing" },
+        { "event": "ev03", "id": "sig.prt-healthy" },
+        { "event": "ev05", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev06", "id": "sig.prt-missing" },
+        { "event": "ev06", "id": "sig.prt-healthy" },
+        { "event": "ev08", "id": "sig.prt-healthy" },
+        { "event": "ev09", "id": "sig.prt-healthy", "uncertainty": "low", "note": "a fresh primary refresh token" },
+        { "event": "ev10", "id": "sig.prt-missing", "uncertainty": "low", "note": "restated in the closing note" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.device-registration-check" },
+        { "event": "ev05", "id": "act.signin-log-correlation" },
+        { "event": "ev06", "id": "act.device-registration-check" },
+        { "event": "ev09", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        { "event": "ev01", "id": "sig.web-client-also-fails", "reason": "other", "note": "the web application that works is Outlook, not Teams" }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.device-state"],
+      "rationale": "A mixed English and Spanish portal thread with a pasted dsregcmd output and an automatic status message. Six new laptops fail, an older laptop works, and the paste shows no primary refresh token on one and a healthy one on the other. The logs hold nothing for the attempts. The engineer asks for the device state in the first reply and then points at the duplicate registration that a fresh image often leaves; the customer confirms it and the token returns after rejoining. The web client that works is Outlook, so the Teams web signal is labelled neither present nor negated. The system event carries no label.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

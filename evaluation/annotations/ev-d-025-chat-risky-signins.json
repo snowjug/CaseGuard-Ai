@@ -1,0 +1,47 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-025-chat-risky-signins",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T15:30:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev05", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev05", "id": "sig.mfa-ca-events-in-logs" },
+        { "event": "ev06", "id": "sig.mfa-ca-events-in-logs", "uncertainty": "low", "note": "the engineer restates what the rows show" },
+        { "event": "ev07", "id": "sig.recent-network-change-reported", "uncertainty": "low", "note": "a new VPN provider with a new egress range" },
+        { "event": "ev08", "id": "sig.resolvers-consistent" },
+        { "event": "ev08", "id": "sig.proxy-nodes-consistent" },
+        { "event": "ev10", "id": "sig.ca-exclusion-no-effect" },
+        { "event": "ev11", "id": "sig.mfa-ca-events-in-logs", "uncertainty": "low", "note": "new rows still show the policy applied" },
+        { "event": "ev11", "id": "sig.ca-exclusion-no-effect", "uncertainty": "low", "note": "explains why the exclusion changed nothing" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev05", "id": "act.signin-log-correlation" },
+        { "event": "ev06", "id": "act.request-recent-changes" },
+        { "event": "ev08", "id": "act.dns-resolver-comparison" },
+        { "event": "ev08", "id": "act.proxy-node-comparison" },
+        { "event": "ev09", "id": "act.exclude-users-from-mfa-ca" },
+        { "event": "ev14", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        { "event": "ev04", "id": "act.signin-log-correlation", "reason": "future_intent", "note": "looking at the logs now, back in 10" }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.conditional-access"],
+      "rationale": "A chat-style thread with typos, abbreviations, a local time against UTC, an unrelated firmware question and pasted log lines. The cause is a sign-in risk policy reacting to a new VPN egress range; the engineer finds the blocked rows, asks about recent changes, and rules out DNS and the proxies with per-resolver and per-node tests before blaming the policy. The first exclusion targets the wrong group, so it changes nothing, and the engineer sees why in the logs; adding the contractors group fixes it. The engineer is efficient, so there are no forks. The words of the log lookup appear in ev04 as an intention only.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

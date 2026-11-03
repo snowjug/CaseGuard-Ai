@@ -1,0 +1,59 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-036-fix-came-back",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T17:20:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.error-name-not-resolved" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev01", "id": "sig.site-correlated" },
+        { "event": "ev04", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev05", "id": "sig.resolver-inconsistent" },
+        { "event": "ev06", "id": "sig.resolver-inconsistent" },
+        { "event": "ev07", "id": "sig.dns-fix-resolved", "uncertainty": "low", "note": "stated, and corrected the next day" },
+        { "event": "ev09", "id": "sig.multiple-users-affected" },
+        { "event": "ev09", "id": "sig.error-name-not-resolved", "uncertainty": "low", "note": "the same message" },
+        { "event": "ev09", "id": "sig.site-correlated", "uncertainty": "low", "note": "Poznań is still fine" },
+        { "event": "ev10", "id": "sig.resolver-inconsistent", "uncertainty": "low", "note": "both servers fail, one worse than before" },
+        { "event": "ev11", "id": "sig.resolver-inconsistent", "uncertainty": "low" },
+        { "event": "ev13", "id": "sig.dns-fix-resolved" },
+        { "event": "ev14", "id": "sig.dns-fix-resolved" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.dns-resolver-comparison" },
+        { "event": "ev06", "id": "act.remove-resolver-from-service" },
+        { "event": "ev08", "id": "act.communicate-status", "uncertainty": "low", "note": "will close tomorrow unless you write" },
+        { "event": "ev10", "id": "act.dns-resolver-comparison" },
+        { "event": "ev11", "id": "act.remove-resolver-from-service", "uncertainty": "low", "note": "stop using the failing upstream resolver" },
+        { "event": "ev14", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        { "event": "ev06", "id": "sig.dns-fix-resolved", "reason": "conditional", "note": "If .11 was the only bad one, this should be fixed within the hour" },
+        { "event": "ev09", "id": "sig.dns-fix-resolved", "reason": "corrected", "note": "Yesterday I wrote that all was fixed, but I had only tested on floor 1" },
+        { "event": "ev09", "id": "sig.proxy-node-inconsistent", "reason": "negated", "note": "it is not the proxy, we do not have one here" },
+        { "event": "ev11", "id": "act.validate-fix", "reason": "future_intent", "note": "I will run my 40 test sign-ins again after the change" }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [
+        { "class": "corrected_information", "events": ["ev07", "ev09"], "subject": "sig.dns-fix-resolved", "note": "all fixed, corrected the next day" },
+        { "class": "temporal_update", "events": ["ev05", "ev10"], "subject": "sig.resolver-inconsistent", "note": "10.60.3.10 answered ten of ten, and fails three of ten the next day" }
+      ],
+      "qualityBand": "adequate",
+      "causes": ["hyp.dns-resolution"],
+      "rationale": "A DNS case in two days. On the first day one of two DNS servers fails and is taken out, and the customer says everything is fixed after testing on one floor. The next day the customer corrects that, so the first fix claim is retracted, and the engineer finds that the server which answered ten of ten the day before now fails too and that both servers forward to a failing datacentre resolver, which changes the finding over time. The engineer's first plan assumed that one bad server explained it, and with a fix tested on one floor only the case went on for a day; hence adequate and not strong, but no fork: the evidence available on the first day did show one failing server. The test sign-ins in ev11 are announced and done in ev14.",
+      "uncertainty": "medium"
+    }
+  ],
+  "adjudication": null
+}

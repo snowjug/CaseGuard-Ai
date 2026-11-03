@@ -1,0 +1,60 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-031-exclude-group-howto",
+  "split": "dev",
+  "family": "fam-025",
+  "title": "How do we exempt emergency accounts from the MFA policy",
+  "scenario": "A how-to question ahead of a planned MFA roll-out: nothing is broken and nothing is changed yet, and the engineer explains how exclusions work in general.",
+  "categories": ["negative-control"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-30T09:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Question about exempting emergency accounts",
+      "text": "Hi, we are going to roll out MFA to everyone next month. Nothing is broken, I only have a question. Our emergency accounts must stay exempt from the MFA policy. How do I exclude a group from a Conditional Access policy, and is it safe to leave the break-glass accounts out?"
+    },
+    {
+      "key": "ev02",
+      "at": 25,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Question about exempting emergency accounts",
+      "text": "Hello, happy to explain. In the admin center you open the policy, go to the assignments, then users, and under exclude you pick the group. It is good practice to keep at least two emergency accounts in an excluded group and to alert on every sign-in they make. I can also send you the documentation page if you like."
+    },
+    {
+      "key": "ev03",
+      "at": 70,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Question about exempting emergency accounts",
+      "text": "Thanks. Does the exclusion apply immediately, and do we have to tell Microsoft about the break-glass accounts?"
+    },
+    {
+      "key": "ev04",
+      "at": 95,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Question about exempting emergency accounts",
+      "text": "It takes effect within a few minutes of saving, and you do not need to tell Microsoft. Before the real roll-out, try the policy on one non-critical test account first. I will leave this open until Friday in case you have more questions."
+    },
+    {
+      "key": "ev05",
+      "at": 130,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Question about exempting emergency accounts",
+      "text": "That is all I needed, thank you."
+    }
+  ]
+}

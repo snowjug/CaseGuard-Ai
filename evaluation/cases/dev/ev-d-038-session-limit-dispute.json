@@ -1,0 +1,114 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-038-session-limit-dispute",
+  "split": "dev",
+  "family": "fam-032",
+  "title": "Users asked to sign in again and again in Teams",
+  "scenario": "The customer's admin says nothing was changed and floor 2 is unaffected, while a colleague admits setting a four-hour session limit and a floor 2 user says they are affected too; who is in the policy group is never settled.",
+  "categories": ["contradiction"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-07-09T08:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams asks to sign in again and again",
+      "text": "Hello. About 90 users are asked to sign in again and again in Teams since Monday. We did not touch Conditional Access or any session setting, I am sure of that. Floor 2 is not affected, only floors 3 and 4. Marek"
+    },
+    {
+      "key": "ev02",
+      "at": 12,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams asks to sign in again and again",
+      "text": "Hello Marek, thank you. Please send me three affected users with UTC times, an export of your Conditional Access policies and the audit log of the last 14 days, so that I can look at the sign-in frequency settings."
+    },
+    {
+      "key": "ev03",
+      "at": 55,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams asks to sign in again and again",
+      "text": "Users: n.wisniewski 08:20 UTC, p.lewandowski 10:05 UTC, a.kaczmarek 12:31 UTC. The export and the audit log are attached."
+    },
+    {
+      "key": "ev04",
+      "at": 80,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in logs and the export",
+      "text": "Sign-in logs for the three users: each has failed attempts at those times with AADSTS700082, the refresh token expired because the sign-in frequency was reached. The audit log in your export shows the policy Teams session limit updated on Monday at 07:12 UTC: sign-in frequency set to 4 hours."
+    },
+    {
+      "key": "ev05",
+      "at": 100,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams asks to sign in again and again",
+      "text": "That was me. On Monday morning I set the sign-in frequency of Teams session limit to 4 hours, as our security review recommended. Nobody asked me, and I did not tell Marek."
+    },
+    {
+      "key": "ev06",
+      "at": 110,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "That explains it",
+      "text": "That explains it: a four-hour limit ends every session after four hours, so people are asked to sign in again and again. The users on floors 3 and 4 are assigned to that policy; floor 2 is not, which is why floor 2 is fine."
+    },
+    {
+      "key": "ev07",
+      "at": 150,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: That explains it",
+      "text": "That cannot be right about floor 2. I looked at the group list for that policy and 14 people from floor 2 are in it. And they do not have the problem."
+    },
+    {
+      "key": "ev08",
+      "at": 160,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: That explains it",
+      "text": "I cannot see the membership from here, and I cannot explain why those 14 would be unaffected. Please send me the member list of the group assigned to the policy. For now, please change the limit to 24 hours for everybody."
+    },
+    {
+      "key": "ev09",
+      "at": 200,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams asks to sign in again and again",
+      "text": "Hi, I work on floor 2 and I am also signed out of Teams every few hours since Monday. Marek says we are not affected, but we are."
+    },
+    {
+      "key": "ev10",
+      "at": 260,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: That explains it",
+      "text": "We changed the limit to 24 hours for everybody at 14:05 UTC. It works now."
+    },
+    {
+      "key": "ev11",
+      "at": 300,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Check after the change",
+      "text": "From 14:10 UTC there is no new AADSTS700082 for floors 3 and 4. For floor 2 one user had a failed row before 14:05 and none after. I still cannot tell why the other floor 2 members were not affected, because the member list has not arrived."
+    }
+  ]
+}

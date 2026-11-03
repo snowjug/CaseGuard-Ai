@@ -1,0 +1,41 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-023-adfs-clock",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T15:10:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev03", "id": "sig.federation-node-error" },
+        { "event": "ev04", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev04", "id": "sig.intermittent-failures", "uncertainty": "low", "note": "successes minutes before or after the failures" },
+        { "event": "ev04", "id": "sig.federation-node-error", "uncertainty": "low", "note": "tokens rejected as not yet valid in the Entra logs" },
+        { "event": "ev05", "id": "sig.federation-node-error" },
+        { "event": "ev05", "id": "sig.intermittent-failures", "uncertainty": "low", "note": "why a second try often works" },
+        { "event": "ev09", "id": "sig.federation-node-error", "uncertainty": "low", "note": "restated in the closing note" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.check-federation-health" },
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev08", "id": "act.validate-fix" }
+      ],
+      "absent": [],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.federation"],
+      "rationale": "A formal customer with their own federation farm reports intermittent failures for thousands of users. The engineer goes straight to the federation side, asking for certificate, clock and event log checks from each server, and the customer finds one server whose clock is six minutes fast. The sign-in logs confirm tokens rejected as not yet valid, which explains why a second try often works. The engineer asks for the node to be taken out, the fix is measured before and after, and the case waits for the customer's own re-add check. There is no wasted step.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

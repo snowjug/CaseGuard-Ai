@@ -1,0 +1,60 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-022-freight-all-sites",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T15:00:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.error-timeout" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev03", "id": "sig.cache-clear-no-effect" },
+        { "event": "ev05", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev06", "id": "sig.service-health-clear" },
+        { "event": "ev07", "id": "sig.service-health-clear" },
+        { "event": "ev09", "id": "sig.service-health-incident" },
+        { "event": "ev10", "id": "sig.service-health-incident" },
+        { "event": "ev12", "id": "sig.service-health-incident" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.clear-teams-cache" },
+        { "event": "ev02", "id": "act.request-har-capture" },
+        { "event": "ev05", "id": "act.signin-log-correlation" },
+        { "event": "ev06", "id": "act.check-service-health" },
+        { "event": "ev07", "id": "act.request-har-capture" },
+        { "event": "ev09", "id": "act.check-service-health" },
+        { "event": "ev10", "id": "act.communicate-status" },
+        { "event": "ev12", "id": "act.communicate-status" },
+        { "event": "ev14", "id": "act.validate-fix", "uncertainty": "low" }
+      ],
+      "absent": [
+        { "event": "ev01", "id": "sig.recent-network-change-reported", "reason": "negated", "note": "we changed nothing this week" },
+        { "event": "ev04", "id": "act.signin-log-correlation", "reason": "future_intent", "note": "I will look at the sign-in logs" },
+        { "event": "ev08", "id": "sig.service-health-incident", "reason": "speculative", "note": "maybe it is a Microsoft outage" },
+        { "event": "ev10", "id": "act.clear-teams-cache", "reason": "corrected", "note": "please stop both" },
+        { "event": "ev10", "id": "act.request-har-capture", "reason": "corrected", "note": "please stop both" }
+      ],
+      "forks": [
+        { "event": "ev02", "category": "low_value_action" },
+        { "event": "ev02", "category": "disproportionate_customer_effort" },
+        { "event": "ev07", "category": "assumption_as_fact" }
+      ],
+      "earliestMissed": "ev02",
+      "counterfactualDirection": "better",
+      "conflicts": [
+        { "class": "temporal_update", "events": ["ev06", "ev09"], "subject": "sig.service-health-incident", "note": "no incident at 11:12, an incident at 12:05" },
+        { "class": "corrected_information", "events": ["ev07", "ev10"], "subject": "sig.service-health-incident", "note": "the engineer withdraws the not-an-outage view" }
+      ],
+      "qualityBand": "needs_attention",
+      "causes": ["hyp.service-incident"],
+      "rationale": "A vendor incident that Microsoft posts three hours after it began. The first engineer reply sends the customer to clear caches and capture HAR traces for a problem that hit 250 users at every site at once, which is low value and a heavy ask of people working from home. The health page is clean at 11:12, which is true then, but the engineer turns it into a conclusion that it is not an outage and repeats the trace request. The incident appears at 12:05, so the health state changes between two checks (a temporal update) and the engineer withdraws the earlier view in ev10 (a correction). A health check could not have found the incident before it was posted, so the better path is about customer effort and a cautious message, not about time to the cause.",
+      "uncertainty": "medium"
+    }
+  ],
+  "adjudication": null
+}

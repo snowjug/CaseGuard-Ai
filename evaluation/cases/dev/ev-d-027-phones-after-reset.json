@@ -1,0 +1,105 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-027-phones-after-reset",
+  "split": "dev",
+  "family": "fam-021",
+  "title": "Phones and tablets keep logging out of Teams",
+  "scenario": "A bad phone line, a non-native caller and local times: 400 users had their passwords reset on Friday, which ended their sessions, and the caller first says nothing changed; one fresh sign-in per device fixes it.",
+  "categories": ["noisy"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-24T10:10:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_call",
+      "channel": "phone",
+      "title": "Phone call from the factory group IT",
+      "text": "Yes hello? Hello, is this the support? Ok. My name is Hoang, I am from IT in the factory group. Since Saturday many people, maybe 300, on phones and tablets are logged out from Teams, and then it ask for the password again and sometimes it work and sometimes not. On the PC it is mostly ok. Also the coffee machine portal is not working, but that is other thing, ignore it. I want to know if Microsoft changed something, because we did not."
+    },
+    {
+      "key": "ev02",
+      "at": 12,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: phone call, Teams logging out",
+      "text": "Hello Hoang, thank you for calling. To continue I need: the exact message a phone shows, three affected users with the time of one failure each (UTC please), and whether you or anybody else changed a sign-in or Conditional Access policy recently."
+    },
+    {
+      "key": "ev03",
+      "at": 60,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "RE: phone call, Teams logging out",
+      "text": "Hallo. Message on the phone is: Your session has expired. Please sign in again. Users: t.nguyen, l.pham, q.tran. Times here are UTC+7 so 15:55, 16:10, 16:30. No changes in Conditional Access, I looked in the portal, the last change is in April. Sorry my English."
+    },
+    {
+      "key": "ev04",
+      "at": 85,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log lookup",
+      "text": "Converted to 08:55, 09:10 and 09:30 UTC. Each of the three has a failed row at that time in the Entra sign-in logs with AADSTS50173: the provided grant has expired because the user changed their password. The audit log shows a password change for all three on Friday evening."
+    },
+    {
+      "key": "ev05",
+      "at": 95,
+      "who": "engineer",
+      "type": "query_output",
+      "channel": "tool",
+      "title": "Audit query, Conditional Access policy changes",
+      "text": "Audit query, Conditional Access policy changes since Friday 18:00 UTC: 0 rows in the failure window. The only policy events the query returns are from April, so they are unrelated background."
+    },
+    {
+      "key": "ev06",
+      "at": 110,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "What the logs say",
+      "text": "The logs show a password change on Friday evening for the users I checked. A password change ends the existing sessions of a user, so every app has to sign in again, and that is the message your users see. Did something happen on Friday, such as a forced password change?"
+    },
+    {
+      "key": "ev07",
+      "at": 150,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "RE: What the logs say",
+      "text": "Ahh yes. The security team forced a password change for 400 users on Friday evening because of the incident last week, I forgot to say, sorry. So the logout is because of this?"
+    },
+    {
+      "key": "ev08",
+      "at": 160,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: What the logs say",
+      "text": "Yes. After one new sign-in with the new password and MFA on each phone the token is fresh and it stays. There is nothing to fix on the Microsoft side. If a phone still fails after a fresh sign-in, tell me the user and the time."
+    },
+    {
+      "key": "ev09",
+      "at": 225,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "RE: What the logs say",
+      "text": "OK we send a message to everybody. The phones that signed in again are ok. Three phones are not ok, I look tomorrow."
+    },
+    {
+      "key": "ev10",
+      "at": 1215,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Check next morning",
+      "text": "06:25 UTC: no AADSTS50173 rows since yesterday evening apart from the three phones that have not signed in again. Closing the case, reopen if those three still fail after a fresh sign-in."
+    }
+  ]
+}
