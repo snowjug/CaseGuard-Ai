@@ -46,7 +46,7 @@ export const RawEnvSchema = z.object({
   AZURE_SEARCH_INDEX: envString(128),
   CACHE_PROVIDER: envEnum(['memory'] as const),
 
-  AI_PROVIDER: envEnum(['deterministic', 'azure-openai'] as const),
+  AI_PROVIDER: envEnum(['deterministic', 'azure-openai', 'scripted'] as const),
   AZURE_OPENAI_ENDPOINT: envString(500),
   AZURE_OPENAI_DEPLOYMENT: envString(128),
   AZURE_OPENAI_API_VERSION: envString(40),
