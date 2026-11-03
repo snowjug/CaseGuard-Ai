@@ -253,33 +253,44 @@ describe('Avoidable Support Effort properties (FR-ASE-01)', () => {
     counterfactual: metricsArb,
   });
 
+  type Variant = typeof variantArb extends fc.Arbitrary<infer T> ? T : never;
+
+  /** Case One's scenario of its earliest fork, once per variant, with the variant's status and numbers. */
+  const listOf = (variants: readonly Variant[]): CounterfactualScenario[] => {
+    const base = scenariosFor(one).find((s) => s.forkId === one.analysis.earliestMeaningfulForkId);
+    if (!base) throw new Error('Case One has no scenario for its earliest fork');
+    return variants.map((v, i) => ({
+      ...base,
+      id: `scn_prop_${i}`,
+      status: v.status,
+      reviewState: v.review,
+      validity: { ...base.validity, valid: v.valid },
+      boundary: {
+        ...base.boundary,
+        leakCheck: { ...base.boundary.leakCheck, passed: v.leakFree },
+      },
+      actualMetrics: v.actual,
+      counterfactualMetrics: v.counterfactual,
+    }));
+  };
+
+  /** The weights are reported to four decimals, each off by at most 5e-5, so their sum is 1 within that rounding. */
+  const expectWeightsSumToOne = (weights: readonly number[]) => {
+    const sum = weights.reduce((s, w) => s + w, 0);
+    expect(Math.abs(sum - 1)).toBeLessThanOrEqual(weights.length * 5e-5 + 1e-9);
+  };
+
   it('[FR-ASE-01] never exceeds 100%, never negative, whatever the simulated numbers are', () => {
     fc.assert(
       fc.property(fc.array(variantArb, { maxLength: 4 }), (variants) => {
-        const base = scenariosFor(one).find(
-          (s) => s.forkId === one.analysis.earliestMeaningfulForkId,
-        );
-        if (!base) throw new Error('Case One has no scenario for its earliest fork');
-        const list: CounterfactualScenario[] = variants.map((v, i) => ({
-          ...base,
-          id: `scn_prop_${i}`,
-          status: v.status,
-          reviewState: v.review,
-          validity: { ...base.validity, valid: v.valid },
-          boundary: {
-            ...base.boundary,
-            leakCheck: { ...base.boundary.leakCheck, passed: v.leakFree },
-          },
-          actualMetrics: v.actual,
-          counterfactualMetrics: v.counterfactual,
-        }));
+        const list = listOf(variants);
         const result = ase(list);
         expect(result.estimated).toBe(true);
         if (list.some(isUsableScenario)) {
           expect(result.state).toBe('estimated');
           inBounds(result.percent as Range);
           const included = result.components.filter((c) => c.included);
-          expect(included.reduce((s, c) => s + c.weight, 0)).toBeCloseTo(1, 6);
+          expectWeightsSumToOne(included.map((c) => c.weight));
           for (const c of result.components) {
             inBounds(c.pct);
             expect(c.avoidable.low).toBeGreaterThanOrEqual(0);
@@ -295,6 +306,42 @@ describe('Avoidable Support Effort properties (FR-ASE-01)', () => {
       }),
       { numRuns: 120 },
     );
+  });
+
+  it('[FR-ASE-01] reports weights to four decimals, so two renormalised weights can sum to 1.0001', () => {
+    // Found by a random run on CI (fast-check seed 105150624, on a documents-only commit): a real path with a vanishing
+    // amount of two efforts and a counterfactual with none. Only two components have data, their weights are
+    // renormalised and each is reported to four decimals; the estimate itself uses the unrounded weights.
+    const tiny = { low: 0, mid: Number.MIN_VALUE, high: Number.MIN_VALUE };
+    const zero = { low: 0, mid: 0, high: 0 };
+    const nothing: PathMetrics = {
+      actionCount: zero,
+      customerInteractions: zero,
+      timeToUsefulEvidenceMinutes: zero,
+      timeToDiagnosisMinutes: zero,
+      diagnosticVolume: zero,
+      tokenEstimate: zero,
+      customerEffortMinutes: zero,
+      operationalRisk: 0,
+      informationGainBits: zero,
+      unsupportedBranches: 0,
+    };
+    const result = ase(
+      listOf([
+        {
+          status: 'completed',
+          review: 'pending',
+          valid: true,
+          leakFree: true,
+          actual: { ...nothing, actionCount: tiny, tokenEstimate: tiny },
+          counterfactual: nothing,
+        },
+      ]),
+    );
+    expect(result.state).toBe('estimated');
+    const included = result.components.filter((c) => c.included);
+    expect(included.length).toBeGreaterThan(1);
+    expectWeightsSumToOne(included.map((c) => c.weight));
   });
 
   it('[FR-ASE-01] a cheaper counterfactual never lowers the estimate (monotonicity)', () => {
