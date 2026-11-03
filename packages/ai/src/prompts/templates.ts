@@ -166,12 +166,13 @@ export const PROMPT_TEMPLATES: readonly PromptTemplate[] = [
   },
   {
     agent: 'safety_policy_validator',
-    version: '1.0.0',
+    version: '1.1.0',
     system:
       'Deterministic component. This prompt is recorded for traceability and is never sent to a model.',
     task: 'Apply the safety, policy, temporal and prompt-injection rules to a candidate output and report the verdict.',
     outputSchemaId: OUTPUT_SCHEMA_IDS.safety_policy_validator,
-    changeNote: 'Initial version.',
+    changeNote:
+      'The checked agent may also be case_reasoner or case_critic (the agent list of the verdict grew by two); the rules are unchanged.',
     status: 'active',
   },
   {

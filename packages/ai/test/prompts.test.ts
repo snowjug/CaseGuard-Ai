@@ -41,7 +41,10 @@ const GOLDEN_TEMPLATE_HASHES: Record<AgentName, string> = {
   communication_coach: 'bd2a501fa8a01db763d2b927fbf997ca2f88c4876d5f7fe48f4b59fb57bf21b2',
   // secretscan:allow-next-line pinned SHA-256 of a prompt template, not a credential
   token_governor: 'b148d0104a53ef46b30c62c33979f01582af727bbd2e20b87913b44a44ca3300',
-  safety_policy_validator: '42ecef04ad3ba0e5b48eeb27dadcfab3483923eeac8d5c43f35c09dbfb44c4f1',
+  safety_policy_validator: '582f8cb4687fad4ac16f8a32dca23f129c70f360c2406ebc4afd5997a8fe2d51',
+  // New in wave 2 (optional model-assisted review): first published at 1.0.0.
+  case_reasoner: '5c528fa3d3bef11245074fb2f2bc65c386a880e7d7291d6c158c59412480fe27',
+  case_critic: 'b9c8f93eaf1e8a4378e5faa3d70afbe95d2d13d4d372f2f4e805dc8baa3e526c',
 };
 
 const one = prepareCase(CASE_ONE);
