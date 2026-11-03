@@ -237,7 +237,7 @@ export async function evaluateLocked(options: LockedOptions = {}): Promise<Locke
   const testHash = testSetHash(dataset.cases);
   const problems = lockProblems({
     manifest: dataset.manifest,
-    uncommitted: uncommittedUnder(['evaluation/cases/test', 'evaluation/annotations/ev-t-*.json']),
+    uncommitted: uncommittedUnder(['evaluation/cases/test', 'evaluation/annotations']),
     testHash,
     log,
   });

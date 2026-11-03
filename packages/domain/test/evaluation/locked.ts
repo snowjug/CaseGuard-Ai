@@ -40,7 +40,7 @@ export function verifyChain(log: LockedRuns, lockHash: string | null): string[] 
 /** What stands in the way of a locked run; empty when it may go ahead. */
 export function lockProblems(input: {
   readonly manifest: Manifest | null;
-  /** `git status` lines under the test cases and the annotations of the test cases. */
+  /** `git status` lines under the test cases and the annotations. */
   readonly uncommitted: readonly string[];
   readonly testHash: string;
   readonly log: LockedRuns;
@@ -54,7 +54,7 @@ export function lockProblems(input: {
   const problems: string[] = [];
   if (uncommitted.length > 0) {
     problems.push(
-      `Uncommitted changes under evaluation/cases/test or in the annotations of the test cases:\n${uncommitted.join('\n')}`,
+      `Uncommitted changes under evaluation/cases/test or evaluation/annotations:\n${uncommitted.join('\n')}`,
     );
   }
   if (testHash !== manifest.locked.testSetSha256) {

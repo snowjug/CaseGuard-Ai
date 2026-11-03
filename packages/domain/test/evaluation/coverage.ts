@@ -126,8 +126,16 @@ export function computeCoverage(dataset: Dataset, vocabulary: VocabularyData): C
     validation: emptySplit(),
     test: emptySplit(),
   };
+  const causeIds = [
+    ...new Set([
+      ...NAMED_CAUSES,
+      ...vocabulary.hypotheses
+        .map((hypothesis) => hypothesis.id)
+        .filter((id) => id !== 'hyp.other'),
+    ]),
+  ];
   const causes: Record<string, PerSplit> = Object.fromEntries(
-    NAMED_CAUSES.map((id) => [id, zeroSplits()]),
+    causeIds.map((id) => [id, zeroSplits()]),
   );
   const signals: Record<string, IdCoverage> = Object.fromEntries(
     vocabulary.signals.map((signal) => [
@@ -420,6 +428,33 @@ export function renderCoverage(
         ],
       ],
     ),
+    '',
+  );
+  const idRows = (entries: Record<string, IdCoverage>): string[][] =>
+    Object.entries(entries).map(([id, entry]) => [
+      id,
+      ...show.flatMap((split) => [String(entry.present[split]), String(entry.absent[split])]),
+    ]);
+  const idHeaders = (first: string): string[] => [
+    first,
+    ...show.flatMap((split) => [`${split} present`, `${split} absent`]),
+  ];
+  out.push(
+    '## Labels by id (independent cases that carry the label)',
+    '',
+    ...table(
+      ['hypothesis (a labelled cause)', ...show],
+      Object.entries(coverage.causes).map(([id, counts]) => [
+        id,
+        ...show.map((split) => String(counts[split])),
+      ]),
+    ),
+    '',
+    ...table(idHeaders('signal'), idRows(coverage.signals)),
+    '',
+    ...table(idHeaders('action'), idRows(coverage.actions)),
+    '',
+    '"absent" counts the cases that carry an absence with a reason (negated, speculative, future intent, conditional, attributed, corrected, requested) for the id.',
     '',
   );
   if (!options.testNeedsOnly) {

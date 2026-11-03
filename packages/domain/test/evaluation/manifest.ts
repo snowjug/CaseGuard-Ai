@@ -128,10 +128,7 @@ async function main(): Promise<void> {
   }
   try {
     if (lock) {
-      const dirty = uncommittedUnder([
-        'evaluation/cases/test',
-        'evaluation/annotations/ev-t-*.json',
-      ]);
+      const dirty = uncommittedUnder(['evaluation/cases/test', 'evaluation/annotations']);
       if (dirty.length > 0) {
         throw new Error(
           `Commit the test split and the annotations before locking it:\n${dirty.join('\n')}`,
