@@ -23,6 +23,8 @@ import {
   headlineImprovements,
   metricDeltas,
 } from './model';
+import { TrustPanel } from './TrustPanel';
+import { describeTrust } from './trust';
 
 const useStyles = makeStyles({
   stack: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
@@ -135,6 +137,7 @@ export function ComparisonPanel({ fork, scenario, actions }: ComparisonPanelProp
   const deltas = useMemo(() => metricDeltas(scenario), [scenario]);
   const headlines = headlineImprovements(scenario);
   const confidence = scenario.comparisonConfidence;
+  const trust = useMemo(() => describeTrust(scenario.quality), [scenario.quality]);
   const countMismatch = tracks.recordedActionCount !== scenario.actualMetrics.actionCount.mid;
 
   return (
@@ -173,6 +176,8 @@ export function ComparisonPanel({ fork, scenario, actions }: ComparisonPanelProp
       >
         {confidence.rationale}
       </Notice>
+
+      {trust ? <TrustPanel trust={trust} /> : null}
 
       <PathComparison
         actual={tracks.actual}

@@ -20,6 +20,7 @@ export * from './engine/conflicts';
 export * from './engine/sequence';
 export * from './engine/hypotheses';
 export * from './engine/counterfactual';
+export * from './engine/counterfactual-quality';
 export * from './engine/hindsight';
 export * from './engine/pipeline';
 export * from './engine/twin';

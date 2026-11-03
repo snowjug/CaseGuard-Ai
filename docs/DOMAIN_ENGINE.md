@@ -346,6 +346,33 @@ After generation, `HindsightCheck` re-simulates conditioned on the real resoluti
 rollouts) and compares with the unconditioned scenario. It is labelled with `HINDSIGHT_NOTICE`, requires the
 `quality:review` permission at the API, and **never feeds back into generation**.
 
+### How far to trust a path
+
+Every scenario carries a `quality` block (`engine/counterfactual-quality.ts`; scenarios stored before engine `2026.4.0` have
+none, and every reader treats it as optional). It adds **no figure**: the golden digest of the paths with the annotations left
+out is the one engine `2026.3.1` produced, and a separate digest pins the annotations.
+
+- **What each figure rests on.** `basis.scenario` is one of `measured`, `deterministic_estimate`, `model_estimate` and
+  `illustrative`. A counterfactual never happened, so no figure of it is measured; the recorded side (elapsed time, step and
+  exchange counts) is, and the block says so part by part. The engine writes `deterministic_estimate` when the path can
+  support a comparison and `illustrative` when it cannot: no supported step could be ranked, a validity check failed, or fewer
+  than half of the simulated runs reached a diagnosis. `model_estimate` is reserved for what a model proposes and is never
+  written here. The knowledge pack's probabilities and times are authored, not calibrated on real outcomes, and the block says
+  that too.
+- **Whether it could have been followed.** Each step has a `feasibility`: `feasible`, `feasible_with_conditions` or
+  `not_feasible`, with the conditions in words. A destructive step, one at the risk ceiling, or one whose prerequisite does
+  not exist is not feasible; a step the customer must do, that needs approval, is not read-only, often fails (below 70% usable
+  results) or needs the output of an earlier step is conditional. The path takes the worst of its steps.
+- **What limits it** (the strategy's exclusions, what was known, what the simulation cannot know, who must act) **and what a
+  reviewer must check before relying on it** (access, the customer's time, approvals, the outcomes, quoting ranges).
+- **Which skill would have helped.** `skillApplicability` reads the case's skill matches: a skill whose triggers all rested on
+  evidence recorded before the decision moment, and which recommends the path's first step, `applies`; one that resembled the
+  case but does not recommend that step, or only part of whose triggers held, `partially_applies`. A trigger with no evidence
+  behind it is not counted, so the answer errs toward "no". It is annotated after matching and is ignored when two simulations
+  are compared, so a change of the skill library never resets a reviewer's decision.
+- **What may be claimed.** `timeSavedClaim` is `estimated_range` (a range is shown, never a single saving) or `none` (an
+  illustration: no saving is claimed, and the first thing to check says so). A test scans every sentence for exactness words.
+
 ## 9. Case Quality Index (CQI)
 
 `computeQualityReview` assesses six dimensions from sub-checks, applies rule-based penalties and composes one score with

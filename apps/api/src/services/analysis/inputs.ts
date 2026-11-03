@@ -42,7 +42,9 @@ import type { RequestContext } from '../../http/request-context';
  * sequence findings, and the observations it dropped for not stating a fact. On the two shipped samples:
  * Case One reads the same signals (one excerpt is a few words longer); Case Two reads two more (the customer's
  * "we have not changed Conditional Access" and the engineer's note that one proxy node timed out), and its
- * headline figures, forks and band are unchanged. Stored runs are recomputed once.
+ * headline figures, forks and band are unchanged. Stored runs are recomputed once. Each counterfactual path also says how
+ * far to trust it (what its figures rest on, whether it could have been followed, what limits it, what to check, which
+ * skill would have applied); no figure of a path moved.
  */
 export const ENGINE_VERSION = '2026.4.0';
 

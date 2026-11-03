@@ -72,6 +72,11 @@ export {
   type SkillMatchSet,
 } from './matching';
 export { isSafeConditionPattern, type CaseInfo } from './evidence';
+export {
+  skillApplicabilityFor,
+  withSkillApplicability,
+  type PathForSkills,
+} from './scenario-applicability';
 export { asOfView, buildGuidedPlan, type AnalysisAsOf, type GuidedPlanInput } from './guidance';
 export {
   toMatchSteps,

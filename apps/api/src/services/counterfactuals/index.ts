@@ -1,3 +1,4 @@
+import { withSkillApplicability } from '@caseguard/domain';
 import {
   COUNTERFACTUAL_STRATEGIES,
   type CounterfactualScenario,
@@ -271,11 +272,14 @@ export class CounterfactualService implements CounterfactualPort {
       `Simulating ${strategies.length} strateg${strategies.length === 1 ? 'y' : 'ies'} from the decision moment`,
     );
     const generated = generateForFork(replay, fork, strategies);
+    // Whether a skill would have helped at this moment is read from the case's stored matches; it adds an annotation only.
+    const storedMatches = await ctx.repos.skills.listMatchesForCase(caseId);
 
     await report('validate', 'Validating each path with the counterfactual simulator task');
     const prepared: CounterfactualScenario[] = [];
     let tokens: ReadonlySet<string> | null = null;
-    for (const scenario of generated.scenarios) {
+    for (const simulated of generated.scenarios) {
+      const scenario = withSkillApplicability(simulated, storedMatches);
       const run = await runSimulatorTask(ctx, replay, fork, scenario.strategy);
       prepared.push(
         finalizeScenario({

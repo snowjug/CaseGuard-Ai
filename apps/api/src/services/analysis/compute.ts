@@ -10,6 +10,7 @@ import {
   matchSkills,
   replayWarnings,
   runDeterministicAnalysis,
+  withSkillApplicability,
   type AvoidableEffortEstimate,
   type CoachingSkill,
   type DeterministicAnalysis,
@@ -153,7 +154,8 @@ export async function computeAnalysis(
   return {
     analysis,
     twin,
-    scenarios,
+    // Whether a skill would have helped at each decision moment is read from the matches; it adds an annotation only.
+    scenarios: scenarios.map((scenario) => withSkillApplicability(scenario, skillMatches.matches)),
     review,
     avoidable,
     efficiency,

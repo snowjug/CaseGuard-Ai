@@ -13,6 +13,7 @@ import {
   type Level,
   type PathMetrics,
   type Range,
+  type StepFeasibility,
 } from '@caseguard/schemas';
 import type { CompiledPack } from '../knowledge/compile';
 import { hypothesisRecordId, stableId } from '../util/ids';
@@ -31,6 +32,7 @@ import {
 } from './action-value';
 import { type Belief, beliefToVector, informationGain, topHypotheses } from './belief';
 import { type EngineContext, metaOf } from './context';
+import { assessScenarioQuality, stepFeasibility } from './counterfactual-quality';
 import { scanForLeaks } from './leak-check';
 import { signalRequirementLinks } from './requirements';
 import { analyzeView } from './state';
@@ -584,7 +586,29 @@ export function assembleScenario(input: AssembleInput): CounterfactualScenario {
     return scored.slice(0, 3).map((x) => x.id);
   };
 
-  const steps: CounterfactualStep[] = sim.steps.map((s) => {
+  /** Whether each step could have been taken then: what held at the boundary and what an earlier step produces. */
+  const producedEarlier = new Map<string, string>();
+  const feasibility: StepFeasibility[] = sim.steps.map((s) => {
+    const result = stepFeasibility(s.action, {
+      riskCeiling: config.riskCeiling,
+      availableAtBoundary: initialSatisfied,
+      producedEarlier,
+      requirementLabel: (requirementId) =>
+        pack.requirements.get(requirementId)?.label ?? requirementId,
+    });
+    const produced = [
+      ...s.action.produces,
+      ...s.outcome.emitsSignals.flatMap((signal) => [...(links.get(signal) ?? [])]),
+    ];
+    for (const requirementId of produced) {
+      if (!initialSatisfied.has(requirementId) && !producedEarlier.has(requirementId)) {
+        producedEarlier.set(requirementId, s.action.label);
+      }
+    }
+    return result;
+  });
+
+  const steps: CounterfactualStep[] = sim.steps.map((s, position) => {
     const targets = s.action.targets;
     const id = stableId('cfs', scenarioId, s.index);
     const leaderBefore = topHypotheses(s.beliefBefore, 1)[0];
@@ -660,6 +684,7 @@ export function assembleScenario(input: AssembleInput): CounterfactualScenario {
       supported: true,
       unsupportedReasons: [],
       uncertainty: uncertaintyOf(s.outcome.probability),
+      feasibility: feasibility[position] ?? { level: 'feasible', conditions: [] },
       simulated: true,
     };
   });
@@ -783,6 +808,16 @@ export function assembleScenario(input: AssembleInput): CounterfactualScenario {
     rollouts: sim.rollouts,
   });
 
+  const quality = assessScenarioQuality({
+    strategy: sim.strategy,
+    steps,
+    actions: sim.steps.map((s) => s.action),
+    validity: { valid, checks },
+    comparison: { level: confidenceLevel, score: confidenceScore },
+    rollouts: sim.rollouts,
+    eventCount: preView.events.length,
+  });
+
   return {
     ...metaOf(ctx),
     id: scenarioId,
@@ -826,6 +861,7 @@ export function assembleScenario(input: AssembleInput): CounterfactualScenario {
     },
     validity: { valid, checks },
     labels: { simulated: true, estimated: true },
+    quality,
     reviewState: 'pending',
     reviewReason: null,
     reviewedBy: null,

@@ -132,6 +132,20 @@ export function withoutLinkage(value: unknown, links: boolean): unknown {
   return out;
 }
 
+/** What the scenario annotations are called: they describe a path and are never part of what it computes. */
+const SCENARIO_ANNOTATIONS: ReadonlySet<string> = new Set(['quality', 'feasibility']);
+
+const withoutAnnotations = (value: unknown): unknown =>
+  Array.isArray(value)
+    ? value.map(withoutAnnotations)
+    : value !== null && typeof value === 'object'
+      ? Object.fromEntries(
+          Object.entries(value)
+            .filter(([name]) => !SCENARIO_ANNOTATIONS.has(name))
+            .map(([name, inner]) => [name, withoutAnnotations(inner)]),
+        )
+      : value;
+
 /** One digest per part of a case, so a failure names the part that moved. */
 export function linkageFreeDigests(c: CaseComputation): Record<string, string> {
   const { analysis } = c;
@@ -146,7 +160,16 @@ export function linkageFreeDigests(c: CaseComputation): Record<string, string> {
     forks: part(analysis.forks, false),
     timeline: part(analysis.timeline, false),
     twin: part(c.twin, false),
-    scenarios: part(c.scenarios, false),
+    // The paths without the annotations that say how far to trust them: describing a path moves no figure of it.
+    scenarios: part(withoutAnnotations(c.scenarios), false),
+    scenarioQuality: part(
+      c.scenarios.map((s) => ({
+        id: s.id,
+        quality: s.quality,
+        feasibility: s.steps.map((step) => step.feasibility),
+      })),
+      false,
+    ),
     quality: part(c.review, true),
     metrics: part(c.metrics, true),
     warnings: part(c.warnings, true),

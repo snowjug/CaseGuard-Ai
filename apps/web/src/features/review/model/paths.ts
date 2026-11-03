@@ -8,6 +8,7 @@ import {
   type ReviewState,
 } from '@caseguard/schemas';
 import { formatDuration, formatNumber, formatProbability, type BadgeStatus } from '@caseguard/ui';
+import { describeTrust, type TrustView } from '../../counterfactual/trust';
 import {
   EFFORT_SHORT_LABELS,
   EXECUTOR_LABELS,
@@ -99,6 +100,8 @@ export interface PathModel {
   rows: PathRow[];
   headline: string;
   confidence: { level: Level; label: string; scoreText: string; rationale: string };
+  /** What the figures rest on and what to check; null for a scenario stored before the engine wrote it down. */
+  trust: TrustView | null;
   validity: {
     valid: boolean;
     passed: number;
@@ -214,6 +217,7 @@ export function describeScenario(
       scoreText: formatProbability(scenario.comparisonConfidence.score, 0),
       rationale: scenario.comparisonConfidence.rationale,
     },
+    trust: describeTrust(scenario.quality),
     validity: {
       valid: scenario.validity.valid,
       passed: scenario.validity.checks.length - failed.length,

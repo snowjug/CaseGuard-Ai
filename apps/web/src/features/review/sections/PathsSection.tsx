@@ -27,6 +27,7 @@ import { GatedAction, useSession } from '../../../lib/auth/session';
 import { caseHref } from '../../../lib/deep-links';
 import { useToast } from '../../../lib/toast';
 import { comparisonTracks, metricDeltas } from '../../counterfactual/model';
+import { TrustPanel } from '../../counterfactual/TrustPanel';
 import { explainJobStartFailure } from '../../reasoning/errors';
 import { useActorLabel, useInvalidate } from '../../reasoning/hooks';
 import {
@@ -237,6 +238,7 @@ function PathView({
           diagnosis was reached in {path.rollouts.diagnosisReachedText} of them.
         </p>
       </div>
+      {path.trust ? <TrustPanel trust={path.trust} /> : null}
       <div className={styles.panel}>
         <div className={styles.badges}>
           <StatusBadge status={path.review.badge} label={path.review.label} />

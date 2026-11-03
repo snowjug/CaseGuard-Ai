@@ -39,6 +39,115 @@ export type PathMetrics = z.infer<typeof PathMetricsSchema>;
 
 export const PREDICTED_OUTCOME_ALT_LIMIT = 4;
 
+// ---------------------------------------------------------------- how far to trust a counterfactual (wave 2)
+
+/**
+ * What a figure rests on. A counterfactual path never happened, so no figure of it is "measured": only the recorded side
+ * (elapsed time and counts read from the case's own timestamps and events) is. The others differ in who computed the
+ * figure and whether the path could support a comparison at all.
+ */
+export const COUNTERFACTUAL_BASES = [
+  'measured',
+  'deterministic_estimate',
+  'model_estimate',
+  'illustrative',
+] as const;
+export const CounterfactualBasisSchema = z.enum(COUNTERFACTUAL_BASES);
+export type CounterfactualBasis = z.infer<typeof CounterfactualBasisSchema>;
+export const COUNTERFACTUAL_BASIS_LABELS: Record<CounterfactualBasis, string> = {
+  measured: 'Measured from the record',
+  deterministic_estimate: 'Computed estimate',
+  model_estimate: 'Model estimate',
+  illustrative: 'Illustration only',
+};
+export const COUNTERFACTUAL_BASIS_DESCRIPTIONS: Record<CounterfactualBasis, string> = {
+  measured: 'Read from the case itself, for example the time between two recorded events.',
+  deterministic_estimate:
+    "Computed by the engine from the knowledge pack's authored probabilities and times, with a fixed random seed. The same case gives the same figure. It is a range, not a measurement.",
+  model_estimate:
+    'Proposed by a language model. It has not been computed or checked by the engine.',
+  illustrative:
+    'A worked example. The path could not support a comparison, so read it as an illustration and not as an estimate.',
+};
+
+export const FEASIBILITY_LEVELS = ['feasible', 'feasible_with_conditions', 'not_feasible'] as const;
+export const FeasibilityLevelSchema = z.enum(FEASIBILITY_LEVELS);
+export type FeasibilityLevel = z.infer<typeof FeasibilityLevelSchema>;
+export const FEASIBILITY_LABELS: Record<FeasibilityLevel, string> = {
+  feasible: 'Could have been done',
+  feasible_with_conditions: 'Could have been done if certain things held',
+  not_feasible: 'Could not have been done as described',
+};
+
+export const StepFeasibilitySchema = z.object({
+  level: FeasibilityLevelSchema,
+  /** What had to be true for the step to be possible, one short sentence each; empty when nothing special. */
+  conditions: z.array(z.string().max(300)).max(8),
+});
+export type StepFeasibility = z.infer<typeof StepFeasibilitySchema>;
+
+export const SKILL_APPLICABILITY_STATUSES = [
+  'not_assessed',
+  'no_matching_skill',
+  'applies',
+  'partially_applies',
+] as const;
+export const ScenarioSkillApplicabilitySchema = z.object({
+  /**
+   * `applies`: a governed skill's triggers held at the decision moment and it recommends the path's first step.
+   * `partially_applies`: a skill resembled the case at that moment but does not recommend that step, or only some of its
+   * triggers held. `no_matching_skill`: skills were checked and none resembled the case then. `not_assessed`: no skill
+   * information was available when the scenario was written.
+   */
+  status: z.enum(SKILL_APPLICABILITY_STATUSES),
+  skills: z
+    .array(
+      z.object({
+        skillId: IdSchema,
+        name: z.string().max(160),
+        /** Share of the skill's trigger weight that held with what was known at the decision moment. */
+        triggerCoverage: ProbabilitySchema,
+        /** The skill recommends the same first step as the path. */
+        recommendsFirstStep: z.boolean(),
+      }),
+    )
+    .max(5),
+  note: z.string().max(400),
+});
+export type ScenarioSkillApplicability = z.infer<typeof ScenarioSkillApplicabilitySchema>;
+
+export const CounterfactualQualitySchema = z.object({
+  basis: z.object({
+    /** What the figures of the alternative path rest on. */
+    scenario: CounterfactualBasisSchema,
+    summary: z.string().max(600),
+    /** Each part of the comparison and what it rests on (the recorded side is measured, the alternative is not). */
+    parts: z
+      .array(
+        z.object({
+          what: z.string().max(160),
+          basis: CounterfactualBasisSchema,
+          note: z.string().max(360),
+        }),
+      )
+      .min(2)
+      .max(6),
+  }),
+  /** The worst of the steps: whether the path could have been followed at the time. */
+  feasibility: z.object({
+    level: FeasibilityLevelSchema,
+    reasons: z.array(z.string().max(320)).max(12),
+  }),
+  /** What limits the alternative: who must act, what is not known, what the strategy excludes. */
+  constraints: z.array(z.string().max(320)).max(12),
+  skillApplicability: ScenarioSkillApplicabilitySchema,
+  /** What a reviewer has to confirm before relying on the path. */
+  validation: z.array(z.string().max(320)).min(1).max(12),
+  /** `estimated_range`: a range is shown and never a single saving. `none`: no saving is claimed at all. */
+  timeSavedClaim: z.enum(['estimated_range', 'none']),
+});
+export type CounterfactualQuality = z.infer<typeof CounterfactualQualitySchema>;
+
 export const CounterfactualStepSchema = z.object({
   id: IdSchema,
   scenarioId: IdSchema,
@@ -82,6 +191,8 @@ export const CounterfactualStepSchema = z.object({
   supported: z.boolean(),
   unsupportedReasons: z.array(z.string()),
   uncertainty: LevelSchema,
+  /** Whether the step could have been taken at the time. Absent on scenarios stored before engine 2026.4.0. */
+  feasibility: StepFeasibilitySchema.optional(),
   /** Every step is simulated, always. */
   simulated: z.literal(true),
 });
@@ -138,6 +249,8 @@ export const CounterfactualScenarioSchema = RecordMetaSchema.extend({
   /** Counterfactual validity rules (section 10 of the specification). */
   validity: z.object({ valid: z.boolean(), checks: z.array(EligibilityCheckSchema) }),
   labels: z.object({ simulated: z.literal(true), estimated: z.literal(true) }),
+  /** How far to trust the path. Absent on scenarios stored before engine 2026.4.0. */
+  quality: CounterfactualQualitySchema.optional(),
   reviewState: ReviewStateSchema,
   reviewReason: z.string().nullable(),
   reviewedBy: z.string().nullable(),

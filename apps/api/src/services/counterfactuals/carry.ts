@@ -14,6 +14,7 @@ import type { RequestContext } from '../../http/request-context';
  * and the checks, the steps (ids, actions, outcomes and numbers) and the comparison with the
  * recorded path. Left out: the run that produced it, the model execution that validated it, the
  * wording of the steps (a validated model proposal may reword a step but never change it), the
+ * annotations derived from it (whether each step was feasible, how far to trust the path), the
  * review decision and the record bookkeeping.
  */
 function simulationOf(scenario: CounterfactualScenario): string {
@@ -29,7 +30,14 @@ function simulationOf(scenario: CounterfactualScenario): string {
     createdAt: undefined,
     updatedAt: undefined,
     createdBy: undefined,
-    steps: scenario.steps.map((step) => ({ ...step, rationale: undefined })),
+    steps: scenario.steps.map((step) => ({
+      ...step,
+      rationale: undefined,
+      feasibility: undefined,
+    })),
+    // How far to trust the path is derived from the simulation and the pack, and its skill part from the skill library:
+    // neither is what a reviewer judged, so neither may reset a decision.
+    quality: undefined,
     boundary: {
       ...scenario.boundary,
       leakCheck: { ...scenario.boundary.leakCheck, checkedAt: undefined },

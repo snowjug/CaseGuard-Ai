@@ -206,6 +206,40 @@ describe('what counts as the same simulation', () => {
     expect(sameSimulation(balanced, reworded)).toBe(true);
   });
 
+  it('ignores how far to trust the path, so a reviewer’s decision survives the annotation being added or changed', () => {
+    const annotated: CounterfactualScenario = {
+      ...balanced,
+      steps: balanced.steps.map((step) => ({
+        ...step,
+        feasibility: { level: 'not_feasible', conditions: ['changed'] },
+      })),
+      ...(balanced.quality
+        ? {
+            quality: {
+              ...balanced.quality,
+              validation: ['Something else to check.'],
+              skillApplicability: { status: 'applies', skills: [], note: 'A skill now applies.' },
+            },
+          }
+        : {}),
+    };
+    expect(sameSimulation(balanced, annotated)).toBe(true);
+
+    // Stored before engine 2026.4.0, a scenario has neither annotation; the regenerated one carries the decision on.
+    const { quality: _quality, ...withoutQuality } = balanced;
+    const legacy: CounterfactualScenario = {
+      ...withoutQuality,
+      steps: balanced.steps.map(({ feasibility: _feasibility, ...step }) => step),
+      reviewState: 'confirmed',
+      reviewReason: 'Looked realistic.',
+      reviewedBy: 'user_riley_reviewer',
+      reviewedAt: '2026-01-15T10:00:00.000Z',
+    };
+    const carried = carryReview(legacy, balanced);
+    expect(carried.reviewState).toBe('confirmed');
+    expect(carried.quality).toEqual(balanced.quality);
+  });
+
   it('is a different simulation as soon as an action, a number, the seed or a check changes', () => {
     const variants: Record<string, CounterfactualScenario> = {
       action: { ...balanced, steps: [{ ...firstStep, actionKey: 'act.other' }, ...rest] },
