@@ -157,7 +157,10 @@ export function buildVocabulary(pack: KnowledgePack = TEAMS_AUTH_PACK): Vocabula
     packId: pack.id,
     packVersion: pack.version,
     dimensions: [
-      ...EVAL_DIMENSIONS.map((id) => ({ id: id as string, description: DIMENSION_DESCRIPTIONS[id] })),
+      ...EVAL_DIMENSIONS.map((id) => ({
+        id,
+        description: DIMENSION_DESCRIPTIONS[id],
+      })),
       { id: ACTION_DIMENSION, description: 'What an engineer did, asked for or arranged.' },
     ],
     signals: byId(
@@ -193,13 +196,16 @@ export function buildVocabulary(pack: KnowledgePack = TEAMS_AUTH_PACK): Vocabula
         category: hypothesis.category,
       })),
     ),
-    forkCategories: FORK_CATEGORIES.map((id) => ({ id: id as string, label: FORK_CATEGORY_LABELS[id] })),
+    forkCategories: FORK_CATEGORIES.map((id) => ({
+      id,
+      label: FORK_CATEGORY_LABELS[id],
+    })),
     conflictClasses: CONFLICT_CLASSES.map((id) => ({
-      id: id as string,
+      id,
       label: CONFLICT_CLASS_LABELS[id],
     })),
     modalities: STATEMENT_MODALITIES.map((id) => ({
-      id: id as string,
+      id,
       label: STATEMENT_MODALITY_LABELS[id],
     })),
     absentReasons: [...ABSENT_REASONS],
@@ -209,7 +215,10 @@ export function buildVocabulary(pack: KnowledgePack = TEAMS_AUTH_PACK): Vocabula
 export const serializeVocabulary = (vocabulary: Vocabulary): string =>
   `${JSON.stringify(vocabulary, null, 2)}\n`;
 
-export const VOCABULARY_PATH = resolve(import.meta.dirname, '../../../../evaluation/vocabulary.json');
+export const VOCABULARY_PATH = resolve(
+  import.meta.dirname,
+  '../../../../evaluation/vocabulary.json',
+);
 
 export function readCommittedVocabulary(): string {
   return readFileSync(VOCABULARY_PATH, 'utf8');
@@ -221,13 +230,15 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
   if (process.argv.includes('--check')) {
     const current = readCommittedVocabulary();
     if (current !== next) {
-      console.error('evaluation/vocabulary.json is out of date; run `pnpm --filter @caseguard/domain run eval:vocabulary`.');
+      console.error(
+        'evaluation/vocabulary.json is out of date; run `pnpm --filter @caseguard/domain run eval:vocabulary`.',
+      );
       process.exitCode = 1;
     } else {
-      console.log('evaluation/vocabulary.json is current.');
+      process.stdout.write('evaluation/vocabulary.json is current.\n');
     }
   } else {
     writeFileSync(VOCABULARY_PATH, next);
-    console.log(`wrote ${VOCABULARY_PATH}`);
+    process.stdout.write(`wrote ${VOCABULARY_PATH}\n`);
   }
 }

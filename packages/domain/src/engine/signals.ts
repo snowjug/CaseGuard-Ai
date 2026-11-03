@@ -1,6 +1,8 @@
-import type { CaseEvent, SignalDetector, SourceField } from '@caseguard/schemas';
+import type { CaseEvent, SignalDetector, SourceField, StatementModality } from '@caseguard/schemas';
 import type { CompiledDetector, CompiledPack } from '../knowledge/compile';
 import { stableId } from '../util/ids';
+import { assessModality, firesFor, maskQuotedHistory, type DetectionUse } from './modality';
+import { normaliseChatStyle, toOriginalSpan, type ScanMap } from './normalise-chat';
 import type { TemporalView } from './temporal';
 
 /** One occurrence of a knowledge-pack signal in one event. */
@@ -21,6 +23,15 @@ export interface Observation {
   field: SourceField | null;
   start: number | null;
   end: number | null;
+  /** How the sentence stands to the fact: asserted, or reported or corrected (the other modalities never become observations). */
+  modality: StatementModality;
+  /** The words that gave it a modality other than asserted. */
+  cue: string | null;
+  /**
+   * Set when the sentence denies another signal that the pack pairs with this one, so this observation reads the denial
+   * ("service health lists nothing active" is "no active incident"). The id of the signal that was denied.
+   */
+  negationOf: string | null;
 }
 
 const NON_BELIEF_EVENT_TYPES: ReadonlySet<string> = new Set([
@@ -110,6 +121,70 @@ export interface DetectorMatch {
   method: 'structured' | 'pattern';
   start: number | null;
   end: number | null;
+  /** How the sentence stands to the fact the detector found (see `assessModality`). */
+  modality: StatementModality;
+  /** The words that gave it a modality other than asserted. */
+  cue: string | null;
+}
+
+/** Words the detector found that were not counted, because the sentence does not state the fact. */
+export interface SuppressedMatch {
+  modality: StatementModality;
+  cueId: string | null;
+  cue: string | null;
+  excerpt: string;
+  start: number;
+  end: number;
+}
+
+export interface DetectorScan {
+  /** The first match that states the fact; null when there is none. */
+  match: DetectorMatch | null;
+  /** When there is no such match: the first one that was found and not counted, and why. */
+  suppressed: SuppressedMatch | null;
+}
+
+const NOT_FOUND: DetectorScan = { match: null, suppressed: null };
+
+/** Most matches of one detector in one event that are weighed; the cap bounds the cost of a hostile text. */
+export const MAX_MATCHES_PER_DETECTOR = 12;
+
+/**
+ * What the detectors read in one event: the stored text (excerpts and offsets are taken from it) and the text matching runs
+ * on, which is the same text with the earlier messages an e-mail quotes blanked out and the listed chat shorthand and typos
+ * replaced. `map` leads from a position in `scan` back to the word it came from in `text` (null when nothing was replaced).
+ */
+export interface EventTexts {
+  text: string;
+  scan: string;
+  map: ScanMap | null;
+}
+
+const scanTextOf = (text: string, type: string): { scan: string; map: ScanMap | null } => {
+  const normalised = normaliseChatStyle(maskQuotedHistory(text, type));
+  return { scan: normalised.text, map: normalised.map };
+};
+
+export function eventTexts(event: Pick<CaseEvent, 'title' | 'body' | 'type'>): EventTexts {
+  const text = eventText(event);
+  return { text, ...scanTextOf(text, event.type) };
+}
+
+const resolveTexts = (
+  event: Pick<CaseEvent, 'title' | 'body' | 'type'>,
+  texts: EventTexts | string | undefined,
+): EventTexts =>
+  texts === undefined
+    ? eventTexts(event)
+    : typeof texts === 'string'
+      ? { text: texts, ...scanTextOf(texts, event.type) }
+      : texts;
+
+function excerptAround(haystack: string, start: number, end: number): string {
+  const from = Math.max(0, start - EXCERPT_CHARS_BEFORE);
+  const to = Math.min(haystack.length, end + EXCERPT_CHARS_AFTER);
+  const excerpt = haystack.slice(from, to).replace(/\s+/g, ' ').trim();
+  return (from > 0 ? '…' : '') + excerpt + (to < haystack.length ? '…' : '');
 }
 
 type StructuredCondition = Extract<SignalDetector, { kind: 'structured' }>;
@@ -121,95 +196,216 @@ function conditionHolds(
   return compare(c.op, event.structured?.[c.key], c.value);
 }
 
-/** Runs one compiled detector against an event; returns the first match or null. */
+/**
+ * Runs one compiled detector against an event. A regex detector weighs every match (up to a cap), not only the first:
+ * the first that states the fact is returned, and when none does the first that was found is returned as suppressed,
+ * with the reason. `use` decides which modalities state the fact (a signal, an engineer's action, a request to the
+ * customer, a requirement).
+ */
+export function scanDetector(
+  compiled: CompiledDetector,
+  event: CaseEvent,
+  texts?: EventTexts | string,
+  use: DetectionUse = 'signal',
+): DetectorScan {
+  const { detector } = compiled;
+  if (!passesFilters(detector, event)) return NOT_FOUND;
+  if (detector.kind === 'structured') {
+    const actual = event.structured?.[detector.key];
+    return compare(detector.op, actual, detector.value)
+      ? {
+          match: {
+            excerpt: `${detector.key} = ${JSON.stringify(actual)}`,
+            method: 'structured',
+            start: null,
+            end: null,
+            modality: 'asserted',
+            cue: null,
+          },
+          suppressed: null,
+        }
+      : NOT_FOUND;
+  }
+  if (detector.kind === 'structured_all') {
+    if (!detector.conditions.every((c) => conditionHolds(event, c))) return NOT_FOUND;
+    const summary = detector.conditions
+      .map((c) => `${c.key} = ${JSON.stringify(event.structured?.[c.key])}`)
+      .join(', ');
+    return {
+      match: {
+        excerpt: summary,
+        method: 'structured',
+        start: null,
+        end: null,
+        modality: 'asserted',
+        cue: null,
+      },
+      suppressed: null,
+    };
+  }
+  if (!compiled.scan) return NOT_FOUND;
+  const { text, scan, map } = resolveTexts(event, texts);
+  let suppressed: SuppressedMatch | null = null;
+  let weighed = 0;
+  for (const found of scan.matchAll(compiled.scan)) {
+    const words = found[0] ?? '';
+    if (words === '') continue;
+    weighed += 1;
+    if (weighed > MAX_MATCHES_PER_DETECTOR) break;
+    const foundAt = found.index ?? 0;
+    const assessed = assessModality(scan, foundAt, foundAt + words.length, {
+      negativeContent: compiled.negativeContent,
+    });
+    // Everything reported points into the stored text, however the matched text was normalised.
+    const { start, end } = toOriginalSpan(map, foundAt, foundAt + words.length);
+    const excerpt = excerptAround(text, start, end);
+    if (firesFor(use, assessed.modality)) {
+      return {
+        match: {
+          excerpt,
+          method: 'pattern',
+          start,
+          end,
+          modality: assessed.modality,
+          cue: assessed.cue,
+        },
+        suppressed: null,
+      };
+    }
+    suppressed ??= {
+      modality: assessed.modality,
+      cueId: assessed.cueId,
+      cue: assessed.cue,
+      excerpt,
+      start,
+      end,
+    };
+  }
+  return suppressed === null ? NOT_FOUND : { match: null, suppressed };
+}
+
+/** Runs one compiled detector against an event as a signal detector; returns the first match that states the fact. */
 export function matchDetector(
   compiled: CompiledDetector,
   event: CaseEvent,
   text?: string,
 ): DetectorMatch | null {
-  const { detector, regex } = compiled;
-  if (!passesFilters(detector, event)) return null;
-  if (detector.kind === 'structured') {
-    const actual = event.structured?.[detector.key];
-    return compare(detector.op, actual, detector.value)
-      ? {
-          excerpt: `${detector.key} = ${JSON.stringify(actual)}`,
-          method: 'structured',
-          start: null,
-          end: null,
-        }
-      : null;
+  return scanDetector(compiled, event, text, 'signal').match;
+}
+
+/** The first detector of a list that finds a match stating the fact; when none does, the first match that was set aside. */
+export function scanDetectors(
+  detectors: readonly CompiledDetector[] | undefined,
+  event: CaseEvent,
+  texts?: EventTexts | string,
+  use: DetectionUse = 'signal',
+): DetectorScan {
+  if (!detectors || detectors.length === 0) return NOT_FOUND;
+  const resolved = resolveTexts(event, texts);
+  let suppressed: SuppressedMatch | null = null;
+  for (const detector of detectors) {
+    const result = scanDetector(detector, event, resolved, use);
+    if (result.match) return result;
+    suppressed ??= result.suppressed;
   }
-  if (detector.kind === 'structured_all') {
-    if (!detector.conditions.every((c) => conditionHolds(event, c))) return null;
-    const summary = detector.conditions
-      .map((c) => `${c.key} = ${JSON.stringify(event.structured?.[c.key])}`)
-      .join(', ');
-    return { excerpt: summary, method: 'structured', start: null, end: null };
-  }
-  if (!regex) return null;
-  const haystack = text ?? eventText(event);
-  const match = regex.exec(haystack);
-  if (!match) return null;
-  const start = match.index;
-  const end = start + match[0].length;
-  const from = Math.max(0, start - EXCERPT_CHARS_BEFORE);
-  const to = Math.min(haystack.length, end + EXCERPT_CHARS_AFTER);
-  const excerpt = haystack.slice(from, to).replace(/\s+/g, ' ').trim();
-  return {
-    excerpt: (from > 0 ? '…' : '') + excerpt + (to < haystack.length ? '…' : ''),
-    method: 'pattern',
-    start,
-    end,
-  };
+  return suppressed === null ? NOT_FOUND : { match: null, suppressed };
 }
 
 export function firstDetectorMatch(
   detectors: readonly CompiledDetector[] | undefined,
   event: CaseEvent,
-  text?: string,
+  texts?: EventTexts | string,
+  use: DetectionUse = 'signal',
 ): DetectorMatch | null {
-  if (!detectors) return null;
-  for (const d of detectors) {
-    const m = matchDetector(d, event, text);
-    if (m) return m;
-  }
-  return null;
+  return scanDetectors(detectors, event, texts, use).match;
 }
 
-/** Detects every knowledge-pack signal in every event of a temporal view. */
+/** A signal's words that were found in an event and not counted, with the reason. */
+export interface SuppressedObservation extends SuppressedMatch {
+  signalId: string;
+  eventId: string;
+  eventIndex: number;
+}
+
+/**
+ * Detects every knowledge-pack signal in every event of a temporal view. A sentence that mentions a signal's words
+ * without stating the fact (a denial, a guess, a plan, a condition) is not an observation; when `notes` is given the
+ * set-aside matches are collected in it. A denial of the positive side of a declared signal pair is an observation of
+ * the negative side ("service health lists nothing active" is "no active incident").
+ */
 export function detectObservations(
   view: TemporalView,
   pack: CompiledPack,
   caseId: string,
+  notes?: { suppressed: SuppressedObservation[] },
 ): Observation[] {
   const out: Observation[] = [];
   const seenCount = new Map<string, number>();
+  const push = (
+    signalId: string,
+    event: CaseEvent,
+    eventIndex: number,
+    match: DetectorMatch,
+    negationOf: string | null,
+  ): void => {
+    const where =
+      match.start !== null && match.end !== null
+        ? locateInEvent(event, match.start, match.end)
+        : null;
+    const repeatIndex = seenCount.get(signalId) ?? 0;
+    seenCount.set(signalId, repeatIndex + 1);
+    out.push({
+      id: stableId('evd', caseId, signalId, event.id),
+      signalId,
+      eventId: event.id,
+      eventIndex,
+      timestamp: event.timestamp,
+      excerpt: match.excerpt.slice(0, MAX_EXCERPT_CHARS),
+      method: match.method,
+      repeatIndex,
+      affectsBelief: !NON_BELIEF_EVENT_TYPES.has(event.type),
+      field: where?.field ?? null,
+      start: where?.start ?? null,
+      end: where?.end ?? null,
+      modality: match.modality,
+      cue: match.cue,
+      negationOf,
+    });
+  };
   view.events.forEach((event, eventIndex) => {
-    const text = eventText(event);
+    const texts = eventTexts(event);
+    const found = new Set<string>();
+    const setAside: SuppressedObservation[] = [];
     for (const signal of pack.pack.signals) {
-      const match = firstDetectorMatch(pack.signalDetectors.get(signal.id), event, text);
-      if (!match) continue;
-      const where =
-        match.start !== null && match.end !== null
-          ? locateInEvent(event, match.start, match.end)
-          : null;
-      const repeatIndex = seenCount.get(signal.id) ?? 0;
-      seenCount.set(signal.id, repeatIndex + 1);
-      out.push({
-        id: stableId('evd', caseId, signal.id, event.id),
-        signalId: signal.id,
-        eventId: event.id,
+      const result = scanDetectors(pack.signalDetectors.get(signal.id), event, texts, 'signal');
+      if (result.match) {
+        push(signal.id, event, eventIndex, result.match, null);
+        found.add(signal.id);
+      } else if (result.suppressed) {
+        setAside.push({ ...result.suppressed, signalId: signal.id, eventId: event.id, eventIndex });
+      }
+    }
+    for (const note of setAside) {
+      notes?.suppressed.push(note);
+      if (note.modality !== 'negated') continue;
+      const link = pack.signalPairs.get(note.signalId);
+      if (!link || link.side !== 'positive' || !link.pair.denialIsNegative) continue;
+      if (found.has(link.counterpart)) continue;
+      found.add(link.counterpart);
+      push(
+        link.counterpart,
+        event,
         eventIndex,
-        timestamp: event.timestamp,
-        excerpt: match.excerpt.slice(0, MAX_EXCERPT_CHARS),
-        method: match.method,
-        repeatIndex,
-        affectsBelief: !NON_BELIEF_EVENT_TYPES.has(event.type),
-        field: where?.field ?? null,
-        start: where?.start ?? null,
-        end: where?.end ?? null,
-      });
+        {
+          excerpt: note.excerpt,
+          method: 'pattern',
+          start: note.start,
+          end: note.end,
+          modality: 'asserted',
+          cue: note.cue,
+        },
+        note.signalId,
+      );
     }
   });
   return out;

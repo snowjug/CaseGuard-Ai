@@ -77,6 +77,33 @@ const stAll = (
   }[]
 ): SignalDetector => ({ kind: 'structured_all', conditions });
 
+/**
+ * Reusable pieces of the wording families below (wave 2). Each is a bounded fragment: every gap has an upper limit, nothing
+ * nests a repetition, and a fragment never matches across more than one sentence unless a pattern says so on purpose.
+ */
+/** A gap inside one sentence: no full stop, except one between two digits (an address such as 10.20.1.11). */
+const GAP = String.raw`(?:[^.\n]|(?<=\d)\.(?=\d))`;
+/** Something said about sign-in and the people who sign in: the context that makes an error message about Teams. */
+const SIGNIN_CONTEXT = String.raw`(?:teams|sign(?:ing|s)?[- ]?in|log(?:ging|s)?[- ]?in|logon|users?|people|staff|colleagues|employees)`;
+/** When something changed, as a customer says it: a time relative to now, or a named day. */
+const WHEN_RELATIVE = String.raw`(?:yesterday|today|tonight|this (?:morning|afternoon|week)|last (?:night|week)|(?:\d{1,2}|a|an|two|three|few|several) (?:hours?|days?|weeks?) ago|recently)`;
+const WHEN_WEEKDAY = String.raw`(?:(?:last|on) (?:mon|tues|wednes|thurs|fri|satur|sun)day(?: (?:morning|afternoon|evening))?)`;
+/** What was done to a policy or a setting. */
+const CHANGED = String.raw`(?:(?:chang|updat|modif|enabl|deploy|introduc|activat|appl|shorten|tighten)\w{0,5}|rolled out|(?:turn|switch)(?:ed)? on|went on|put in place)`;
+/** An access rule, in the words people use for it. */
+const ACCESS_RULE = String.raw`(?:conditional access|ca polic\w{0,6}|(?:access|security|compliance|mfa|session|device|sign-?in) (?:rule|polic\w{0,6}|setting|control)s?)`;
+/** The engineer's roles, for a signal an engineer's own test can show. */
+const ENG_ROLES = ['support_engineer', 'escalation_engineer'] as const;
+/** Events in which an engineer reports what a log or a query showed (a pasted message can open with any verb). */
+const LOG_RESULT_TYPES: NonNullable<Extract<SignalDetector, { kind: 'regex' }>['eventTypes']> = [
+  'query_output',
+  'diagnostic_result',
+  'escalation_response',
+  'case_note',
+  'engineer_action',
+  'engineer_email',
+];
+
 const hypotheses: KnowledgeHypothesis[] = [
   {
     id: H.dns,
@@ -218,9 +245,18 @@ const signals: KnowledgeSignal[] = [
     description: 'A retry sometimes succeeds; the failure is not deterministic.',
     detectors: [
       rx(
-        String.raw`\b(intermittent(ly)?|sometimes (works|fails|succeeds)|on and off|randomly|retry (usually |sometimes )?(works|succeeds)|retr(y|ies)[^.\n]{0,30}sometimes)\b`,
+        String.raw`\b(intermittent(ly)?|sometimes (works|fails|succeeds)|on and off|off and on|randomly|comes? and goes?|hit and miss|flaky|retry (usually |sometimes )?(works|succeeds)|retr(y|ies)[^.\n]{0,30}sometimes)\b`,
         { roles: [...CUSTOMER_ROLES] },
       ),
+      // "sometimes it goes through", "now and then a second attempt works": a frequency word and an outcome.
+      rx(
+        String.raw`\b(?:sometimes|occasionally|now and then|every now and then|from time to time|once in a while|at times|every so often)\b${GAP}{0,40}\b(?:works?|fails?|succeeds?|(?:goes?|gets?) through|connects?|sign(?:s|ed)? in|logs? in|(?:does ?n['’]?t|does not|do not|don['’]t) (?:work|go through|connect|help))\b`,
+        { roles: [...CUSTOMER_ROLES] },
+      ),
+      // "not constant", "not every time": the failure is there some of the time.
+      rx(String.raw`\bnot (?:constant|permanent|consistent|continuous|every time|always)\b`, {
+        roles: [...CUSTOMER_ROLES],
+      }),
     ],
     strength: 'moderate',
     evidenceKind: 'presence',
@@ -265,6 +301,15 @@ const signals: KnowledgeSignal[] = [
         String.raw`\bother (sites|offices|locations|branches|networks)\b[^.\n]{0,50}\b(are|is)?\s*(fine|working|unaffected|not (affected|impacted)|ok)\b`,
         { roles: [...CUSTOMER_ROLES] },
       ),
+      // "colleagues at our Gdansk office have no trouble", "the Gdansk team is fine": a named place that is not affected.
+      rx(
+        String.raw`\b(?:colleagues|users|people|staff|everyone|everybody|employees|team|office)\b${GAP}{0,30}\b(?:at|in|from)\b${GAP}{0,30}\b(?:office|site|branch|location|campus|building)\b${GAP}{0,40}\b(?:have|has) no (?:trouble|problems?|issues?)\b`,
+        { roles: [...CUSTOMER_ROLES] },
+      ),
+      rx(
+        String.raw`(?!(?:the|our|my|your|their|this|that|these|those|all|some|any|every|each|other|most|no)\b)\b[A-Za-z]{3,20} (?:colleagues|users|people|staff|team|office|site) (?:are|is) (?:fine|ok|okay|unaffected|working(?: fine| normally)?)\b`,
+        { roles: [...CUSTOMER_ROLES] },
+      ),
     ],
     strength: 'strong',
     evidenceKind: 'presence',
@@ -300,8 +345,18 @@ const signals: KnowledgeSignal[] = [
     description:
       'The Teams client error tag caa82ee7 (a WinINET "name not resolved" style code) or an ERR_NAME_NOT_RESOLVED / NXDOMAIN message appears.',
     detectors: [
+      // The codes and the browser's own message say it by themselves.
+      rx(String.raw`\b(caa82ee7|0x80072ee7|ERR_NAME_NOT_RESOLVED|DNS_PROBE_FINISHED_NXDOMAIN)\b`),
+      // The same thing in words ("the name of the server could not be resolved"), read only in a sentence about Teams or
+      // about signing in: a printer's or a print server's error does not count.
       rx(
-        String.raw`\b(caa82ee7|0x80072ee7|ERR_NAME_NOT_RESOLVED|DNS_PROBE_FINISHED_NXDOMAIN|name (could not be|not) resolved|can'?t resolve host)\b`,
+        String.raw`\b${SIGNIN_CONTEXT}\b${GAP}{0,80}\bname\b${GAP}{0,30}\b(?:could ?n['’]?t|could not|cannot|can['’]?t|was not|is not|not|unable to|failed to)\s+(?:be\s+)?resolved?\b`,
+      ),
+      rx(
+        String.raw`\bname\b${GAP}{0,30}\b(?:could ?n['’]?t|could not|cannot|can['’]?t|was not|is not|not|unable to|failed to)\s+(?:be\s+)?resolved?\b${GAP}{0,60}\b${SIGNIN_CONTEXT}\b`,
+      ),
+      rx(
+        String.raw`\b${SIGNIN_CONTEXT}\b${GAP}{0,80}\b(?:can['’]?t|cannot|could ?n['’]?t) resolve (?:the )?host`,
       ),
     ],
     strength: 'strong',
@@ -320,6 +375,13 @@ const signals: KnowledgeSignal[] = [
     detectors: [
       rx(
         String.raw`\b(caa82ee2|0x80072ee2|ERR_(CONNECTION_)?TIMED_OUT|ETIMEDOUT|request timed out)\b`,
+      ),
+      // "the connection timed out", said about Teams or about signing in (a printer's error does not count).
+      rx(
+        String.raw`\b${SIGNIN_CONTEXT}\b${GAP}{0,80}\b(?:connection|request|sign-?in|login|page|server)\b${GAP}{0,15}\btim(?:ed|es|e)? ?out\b`,
+      ),
+      rx(
+        String.raw`\b(?:connection|request|sign-?in|login|page|server)\b${GAP}{0,15}\btim(?:ed|es|e)? ?out\b${GAP}{0,60}\b${SIGNIN_CONTEXT}\b`,
       ),
     ],
     strength: 'strong',
@@ -340,6 +402,15 @@ const signals: KnowledgeSignal[] = [
       rx(String.raw`\bAADSTS(50076|50074|53003|53000|530003)\b|ConditionalAccessStatus\W+failure`, {
         eventTypes: ['query_output', 'log_sample', 'diagnostic_result'],
       }),
+      // "each one is marked as stopped by Conditional Access", "an interrupted multi-factor step".
+      rx(
+        String.raw`\b(?:stopped|blocked|failed|interrupted|denied|marked|rejected)\b${GAP}{0,40}\b(?:by|due to|because of)\b${GAP}{0,20}\bconditional access\b`,
+        { eventTypes: LOG_RESULT_TYPES },
+      ),
+      rx(
+        String.raw`\b(?:interrupted|failed|incomplete|abandoned)\b${GAP}{0,20}\b(?:mfa|multi-?factor)\b`,
+        { eventTypes: LOG_RESULT_TYPES },
+      ),
     ],
     strength: 'moderate',
     evidenceKind: 'presence',
@@ -357,6 +428,13 @@ const signals: KnowledgeSignal[] = [
     detectors: [
       rx(String.raw`\bAADSTS(70043|700082|50173|50132|50133)\b`, {
         eventTypes: ['query_output', 'log_sample', 'diagnostic_result'],
+      }),
+      // "errors 70043 and 700082", "the token has expired": the code without its prefix, or the meaning in words.
+      rx(String.raw`\b(?:errors?|codes?)\s+(?:70043|700082|50173|50132|50133)\b`, {
+        eventTypes: LOG_RESULT_TYPES,
+      }),
+      rx(String.raw`\btoken (?:has |had |is )?(?:expired|no longer valid)\b`, {
+        eventTypes: LOG_RESULT_TYPES,
       }),
     ],
     strength: 'moderate',
@@ -396,7 +474,27 @@ const signals: KnowledgeSignal[] = [
       st('correlationMatchedFailures', 'eq', 0),
       rx(
         String.raw`\b(0|zero|no)\s+(of\s+\d+\s+)?(failing attempts\s+)?(have\s+)?(a\s+)?(matching\s+)?(failed\s+)?(sign-?in\s+)?(records?|entries|rows|events)\b[^.\n]{0,60}\b(failing|failure|failed|attempts?)\b`,
-        { eventTypes: ['query_output', 'diagnostic_result', 'escalation_response', 'case_note'] },
+        { eventTypes: LOG_RESULT_TYPES },
+      ),
+      // "no failure rows for the times they failed". A bare "nothing" is read only when the log is named before it (below).
+      rx(
+        String.raw`\b(?:no [\w ]{0,25}\b(?:records?|entries|rows|events|traces?)|not a single (?:record|entry|row|event|failure))\b${GAP}{0,60}\b(?:for|of|from|in|at|matching|around|during)\b${GAP}{0,50}\b(?:attempts?|failures?|users?|times?|minutes?|sign-?ins?|logs?)\b`,
+        { eventTypes: LOG_RESULT_TYPES },
+      ),
+      // "no failures are recorded for any of them".
+      rx(
+        String.raw`\bno [\w ]{0,25}\bfailures?\b${GAP}{0,20}\b(?:recorded|logged|found|present|listed|shown|visible)\b`,
+        { eventTypes: LOG_RESULT_TYPES },
+      ),
+      // "looked at the sign-in logs ... nothing there at all": the log is named in the sentence before.
+      rx(
+        String.raw`\b(?:sign-?in logs?|audit logs?|entra|azure ad|the logs?)\b${GAP}{0,100}\.${GAP}{0,25}\b(?:nothing|no [\w ]{0,25}\b(?:records?|entries|rows|events|failures?))\b`,
+        { eventTypes: LOG_RESULT_TYPES },
+      ),
+      // "the requests never got as far as Entra".
+      rx(
+        String.raw`\bnever (?:got|made it|reached|arrived)\b${GAP}{0,30}\b(?:entra|azure ad|the identity (?:provider|service)|microsoft)\b`,
+        { eventTypes: LOG_RESULT_TYPES },
       ),
     ],
     strength: 'strong',
@@ -415,8 +513,18 @@ const signals: KnowledgeSignal[] = [
     detectors: [
       st('correlationMatchedFailures', 'gt', 0),
       rx(String.raw`\b\d+ of \d+ failing attempts (have|had) (a )?matching (failed )?sign-?in`, {
-        eventTypes: ['query_output', 'diagnostic_result', 'escalation_response', 'case_note'],
+        eventTypes: LOG_RESULT_TYPES,
       }),
+      // "all three failed attempts are in the Entra sign-in logs".
+      rx(
+        String.raw`\b(?:failed|failing|failures?|sign-?in failures?|attempts?)\b${GAP}{0,60}\b(?:are|were|appears?|shown?|recorded|logged|present|visible|found)\b${GAP}{0,40}\b(?:in|on)\b${GAP}{0,20}\b(?:sign-?in logs?|audit logs?|entra|azure ad|logs?)\b`,
+        { eventTypes: LOG_RESULT_TYPES },
+      ),
+      // "the logs show errors 70043 and 700082": a denial inside the sentence ("the logs do not show any failures") turns it round.
+      rx(
+        String.raw`\b(?:logs?|sign-?in logs?)\b${GAP}{0,20}\b(?:show(?:s|ed)?|list(?:s|ed)?|contain(?:s|ed)?)\b${GAP}{0,40}\b(?:errors?|failures?|failed)\b`,
+        { eventTypes: LOG_RESULT_TYPES },
+      ),
     ],
     strength: 'strong',
     evidenceKind: 'presence',
@@ -468,8 +576,9 @@ const signals: KnowledgeSignal[] = [
     label: 'The browser version of Teams also fails',
     description: 'Teams on the web fails too, so the desktop client is not the sole factor.',
     detectors: [
+      // The browser version fails the same way: a failure word is needed, "the same laptop" is not one.
       rx(
-        String.raw`(browser|web client|teams\.microsoft\.com|teams web|web teams)[^.\n]{0,80}(also|same|fails? too|same error|too)`,
+        String.raw`(browser|web client|teams\.microsoft\.com|teams web|web teams)[^.\n]{0,80}(also (?:fails?|failing|errors?|times? out|does ?n['’]?t work|does not work|breaks?)|same (?:error|failure|problem|issue|message|timeout)|fail(?:s|ed|ing)? (?:too|in exactly the same way|the same way)|(?:fails?|errors?) the same)`,
         { roles: [...CUSTOMER_ROLES] },
       ),
     ],
@@ -671,6 +780,15 @@ const signals: KnowledgeSignal[] = [
         String.raw`\bproxy[- ]?[\w-]{0,40}\d?\b[^.\n]{0,60}\b(times? out|timeouts?|fails?|dropped)\b[^.\n]{0,60}\b(one in \w+|roughly|about|some|intermittent)`,
         { roles: ['customer_network_admin'] },
       ),
+      // "proxy-04 timed out every single time", "one of the four proxy servers times out": a test result, by whoever ran it.
+      rx(
+        String.raw`\bproxy[- ]?[\w-]{0,20}\d\b${GAP}{0,40}\b(?:times? out|timed out|timeouts?|fails?|failed|dropped|not responding|unresponsive)\b`,
+        { roles: [...ENG_ROLES, 'customer_network_admin'] },
+      ),
+      rx(
+        String.raw`\b(?:one|1) of (?:the |our |your )?(?:two|three|four|five|\d{1,2}) proxy (?:servers|nodes)\b${GAP}{0,80}\b(?:times? out|timed out|fails?|failed|not responding|dropped)\b`,
+        { roles: [...ENG_ROLES, 'customer_network_admin'] },
+      ),
     ],
     strength: 'strong',
     evidenceKind: 'presence',
@@ -776,6 +894,102 @@ const signals: KnowledgeSignal[] = [
   },
 ];
 
+/**
+ * Wording families added in wave 2 (see docs/MISS_TAXONOMY.md). Each entry names the family it belongs to and is added to the
+ * signal's own detectors, so the original patterns stay as they were and what was added can be read in one place. A family is
+ * a way of saying a thing, not a list of the sentences that failed: each one has positive and look-alike examples in
+ * `test/detector-families.test.ts`.
+ */
+const WORDING_FAMILIES: Readonly<Record<string, readonly SignalDetector[]>> = {
+  // F05: one of several name servers does not answer, said in words.
+  'sig.resolver-inconsistent': [
+    rx(
+      String.raw`\b(?:one|1) of (?:your |the |our )?(?:two|three|four|\d{1,2})? ?(?:dns |name )?(?:servers|resolvers|name servers)\b${GAP}{0,80}\b(?:not answering|does ?n['’]?t answer|did not answer|stays? silent|silent|times? out|timed out|fail(?:s|ed|ing)?|unresponsive|not responding|refus(?:es|ed))`,
+    ),
+    rx(
+      String.raw`\b(?:name servers?|dns servers?|resolvers?)\b[^\n]{0,200}?\b(?:(?:did ?n['’]?t|did not|does not|doesn['’]t|never|fails? to)\s+(?:answer|respond|reply)|stays? silent|(?:is|was|stayed) silent|(?:is|was|are) not (?:answering|responding|replying))\b`,
+    ),
+  ],
+  // F06: a network change, said with the verbs and nouns people use (the network admin's own report).
+  'sig.recent-network-change-reported': [
+    rx(
+      String.raw`\b(?:switched on|turned on|rolled out|put in place|introduced|enabled|deployed|activated|applied|pushed|went on|set up)\b${GAP}{0,60}\b(?:web ?filter\w{0,10}|filtering|filter polic\w{0,6}|(?:cert(?:ificate)?|tls|ssl) inspection|inspection (?:profile|polic\w{0,6})|proxy polic\w{0,6}|dns polic\w{0,6}|blocklist|firewall rule)\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+    rx(
+      String.raw`\b(?:web ?filter\w{0,10}|filtering|(?:cert(?:ificate)?|tls|ssl) inspection|inspection (?:profile|polic\w{0,6})|proxy polic\w{0,6}|dns polic\w{0,6}|blocklist|firewall rule)\b${GAP}{0,30}\b(?:went on|was (?:switched|turned) on|was (?:rolled out|enabled|deployed|activated|applied|pushed|introduced)|got (?:rolled out|enabled|deployed|pushed))\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+  ],
+  // F12: an access policy was changed, with the time said in the many ways people say it (relative, or a named day).
+  'sig.recent-ca-change-reported': [WHEN_RELATIVE, WHEN_WEEKDAY].flatMap((when) =>
+    [
+      String.raw`\b${when}\b[^.\n]{0,80}\b${CHANGED}\b[^.\n]{0,60}\b${ACCESS_RULE}\b`,
+      String.raw`\b${CHANGED}\b[^.\n]{0,60}\b${ACCESS_RULE}\b[^.\n]{0,80}\b${when}\b`,
+      String.raw`\b${ACCESS_RULE}\b[^.\n]{0,80}\b${CHANGED}\b[^.\n]{0,60}\b${when}\b`,
+    ].map((pattern) => rx(pattern, { roles: [...CUSTOMER_ROLES] })),
+  ),
+  // F19: nothing was changed in the access policy, said with a negative quantifier.
+  'sig.ca-config-unchanged': [
+    rx(
+      String.raw`\b(?:nothing|no [\w ]{0,25}\bchanges?|not been (?:changed|modified|touched|updated)|(?:have|has|had) ?(?:not|n['’]?t) (?:changed|touched|modified|updated)|(?:did|do) ?(?:not|n['’]?t) (?:change|touch|modify|update))\b${GAP}{0,60}\b${ACCESS_RULE}\b`,
+    ),
+  ],
+  // F16: only one user or device is affected, said as "only me" or by the people next to the writer being fine.
+  'sig.single-user-scope': [
+    rx(
+      String.raw`\b(?:only|just)\s+(?:me|myself|my (?:laptop|pc|device|machine|computer|account)|this (?:one )?(?:device|laptop|pc|machine|computer|user|account))\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+    rx(
+      String.raw`\b(?:teammates|team ?mates|coworkers|co-workers|colleagues)\b${GAP}{0,30}\b(?:next to me|beside me|near me|around me|on my team|in my team)\b${GAP}{0,40}\b(?:are|is)\s+(?:fine|ok|okay|normal|unaffected|not affected)\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+  ],
+  // F17: the device has no primary refresh token, said in words and not as dsregcmd output.
+  'sig.prt-missing': [
+    rx(
+      String.raw`\b(?:no|missing|without|lacks?|lacking|does ?n['’]?t have|does not have|has no|not present)\b${GAP}{0,30}\b(?:primary refresh token|prt)\b`,
+    ),
+    rx(
+      String.raw`\b(?:primary refresh token|prt)\b${GAP}{0,30}\b(?:is |was )?(?:missing|absent|not (?:present|issued|found))\b`,
+    ),
+  ],
+  // F09: clearing the cache or reinstalling did nothing, the outcome in the sentence after the action.
+  'sig.cache-clear-no-effect': [
+    rx(
+      String.raw`\b(?:cleared|deleted|removed|reset|wiped)\b[^\n]{0,40}\bcache\b[^\n]{0,140}\b(?:still|continues?|persists?|didn['’]?t help|no (?:change|difference)|nothing changed|same (?:error|failure|problem|message))\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+    rx(
+      String.raw`\breinstall(?:ed)?\b[^\n]{0,100}\b(?:still|no (?:change|difference)|nothing changed|same|didn['’]?t help)\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+  ],
+  // F10: signing everyone out changed nothing, said without the word "revoke".
+  'sig.revoke-sessions-no-effect': [
+    rx(
+      String.raw`\b(?:signed|sign|logged|log)\s+(?:everyone|everybody|all users|all of them|the (?:pilot )?group|users?)\b[^\n]{0,60}\b(?:out|off)\b[^\n]{0,120}\b(?:same|still|no change|no difference|nothing changed)\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+  ],
+  // F14: leaving a user out of the rule changed nothing ("still blocked, same message").
+  'sig.ca-exclusion-no-effect': [
+    rx(
+      String.raw`\b(?:excluded|left out|exempted)\b[^\n]{0,60}\b(?:user|account|them)\b[^\n]{0,120}\b(?:still blocked|still fails?|still cannot|same (?:message|error|block))\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+    rx(
+      String.raw`\b(?:left|took|removed)\b[^\n]{0,40}\b(?:user|account)\b[^\n]{0,20}\bout of\b[^\n]{0,40}\b(?:rule|polic\w{0,6})\b[^\n]{0,80}\b(?:still blocked|still fails?|same (?:message|error))\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+  ],
+};
+for (const signal of signals) {
+  const extra = WORDING_FAMILIES[signal.id];
+  if (extra) signal.detectors.push(...extra);
+}
+
 const KQL_CORRELATE = [
   '// Correlate client-reported failing attempts with Microsoft Entra sign-in logs.',
   '// Replace the placeholders; never paste real user identifiers into shared notes.',
@@ -812,8 +1026,17 @@ const PS_PROXY = [
   '  Group-Object Proxy | ForEach-Object { "{0}: {1}/{2} succeeded" -f $_.Name, ($_.Group | ? Success).Count, $_.Count }',
 ].join('\n');
 
-function outcome(id: string, label: string, emitsSignals: string[], simulatedResult: string) {
-  return { id, label, emitsSignals, simulatedResult };
+function outcome(
+  id: string,
+  label: string,
+  emitsSignals: string[],
+  simulatedResult: string,
+  /** The step did not help: it is the outcome of a step that failed. */
+  ineffective = false,
+) {
+  return ineffective
+    ? { id, label, emitsSignals, simulatedResult, ineffective }
+    : { id, label, emitsSignals, simulatedResult };
 }
 
 const ENG = ['support_engineer', 'escalation_engineer'] as const;
@@ -1268,6 +1491,7 @@ const actions: KnowledgeAction[] = [
         'Still fails after clearing the cache',
         ['sig.cache-clear-no-effect'],
         'The device still fails after the cache was cleared.',
+        true,
       ),
       outcome(
         'fixed',
@@ -1305,6 +1529,7 @@ const actions: KnowledgeAction[] = [
         'Still fails after reinstall',
         ['sig.cache-clear-no-effect'],
         'The device still fails after reinstalling.',
+        true,
       ),
       outcome(
         'fixed',
@@ -1340,6 +1565,7 @@ const actions: KnowledgeAction[] = [
         'No change after revocation',
         ['sig.revoke-sessions-no-effect'],
         'Failures continue after sessions were revoked.',
+        true,
       ),
     ],
     detectors: [rx(String.raw`revok(e|ing)[^.\n]{0,40}(sessions?|tokens?)`, { roles: [...ENG] })],
@@ -1371,6 +1597,7 @@ const actions: KnowledgeAction[] = [
         'No change after exclusion',
         ['sig.ca-exclusion-no-effect'],
         'Failures continue after the exclusion.',
+        true,
       ),
     ],
     detectors: [
@@ -1796,7 +2023,7 @@ const requirements: KnowledgeRequirement[] = [
 
 export const TEAMS_AUTH_PACK: KnowledgePack = {
   id: 'kp.teams-authentication',
-  version: '1.0.0',
+  version: '1.1.0',
   workload: 'teams-authentication',
   title: 'Microsoft Teams authentication failures (illustrative knowledge pack)',
   description:
@@ -1807,6 +2034,72 @@ export const TEAMS_AUTH_PACK: KnowledgePack = {
   signals,
   actions,
   requirements,
+  signalPairs: [
+    {
+      id: 'pair.server-side-records',
+      label: 'Server-side records of the failing attempts',
+      positive: 'sig.server-side-failure-records-present',
+      negative: 'sig.no-server-side-failure-records',
+      timeVarying: false,
+      denialIsNegative: true,
+    },
+    {
+      id: 'pair.resolvers',
+      label: 'Consistency of the name servers',
+      positive: 'sig.resolver-inconsistent',
+      negative: 'sig.resolvers-consistent',
+      timeVarying: true,
+      denialIsNegative: true,
+    },
+    {
+      id: 'pair.proxy-nodes',
+      label: 'Consistency of the proxy servers',
+      positive: 'sig.proxy-node-inconsistent',
+      negative: 'sig.proxy-nodes-consistent',
+      timeVarying: true,
+      denialIsNegative: true,
+    },
+    {
+      id: 'pair.service-health',
+      label: 'A Microsoft service incident',
+      positive: 'sig.service-health-incident',
+      negative: 'sig.service-health-clear',
+      timeVarying: true,
+      denialIsNegative: true,
+    },
+    {
+      id: 'pair.access-policy-change',
+      label: 'A recent change to the access policy',
+      positive: 'sig.recent-ca-change-reported',
+      negative: 'sig.ca-config-unchanged',
+      timeVarying: false,
+      denialIsNegative: true,
+    },
+    {
+      id: 'pair.device-token',
+      label: 'The primary refresh token of the device',
+      positive: 'sig.prt-missing',
+      negative: 'sig.prt-healthy',
+      timeVarying: true,
+      denialIsNegative: true,
+    },
+    {
+      id: 'pair.cache-clear',
+      label: 'What clearing the Teams cache did',
+      positive: 'sig.cache-clear-no-effect',
+      negative: 'sig.cache-clear-resolved',
+      timeVarying: false,
+      denialIsNegative: false,
+    },
+    {
+      id: 'pair.scope',
+      label: 'How many users are affected',
+      positive: 'sig.single-user-scope',
+      negative: 'sig.multiple-users-affected',
+      timeVarying: true,
+      denialIsNegative: false,
+    },
+  ],
   claimPatterns: [
     {
       id: 'clm.affected-user-count',

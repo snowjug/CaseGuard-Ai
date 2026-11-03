@@ -3,6 +3,7 @@ import type {
   CaseEvent,
   CaseResolution,
   Claim,
+  Conflict,
   CounterfactualScenario,
   CounterfactualStrategy,
   DecisionFork,
@@ -12,11 +13,13 @@ import type {
   Hypothesis,
   HypothesisEvidenceLink,
   MissingEvidence,
+  TemporalFinding,
 } from '@caseguard/schemas';
 import type { CompiledPack } from '../knowledge/compile';
 import { type DecisionRanking, buildDiagnosticActions } from './actions';
 import { type BeliefTimeline, buildBeliefTimeline } from './belief';
 import { type AnchorInfo, buildClaims } from './claims';
+import { detectConflicts } from './conflicts';
 import { type EngineContext, buildEvidence } from './context';
 import { assembleScenario, simulateAlternativePath } from './counterfactual';
 import { detectForks } from './forks';
@@ -30,7 +33,8 @@ import {
 import { buildHypotheses } from './hypotheses';
 import { computeRequirementStates, type RequirementState } from './requirements';
 import { ResponderIndex } from './responders';
-import { detectObservations, type Observation } from './signals';
+import { detectSequenceFindings } from './sequence';
+import { detectObservations, type Observation, type SuppressedObservation } from './signals';
 import { PrefixAnalyzer } from './state';
 import {
   assertPreResolution,
@@ -63,6 +67,15 @@ export interface DeterministicAnalysis {
   forks: DecisionFork[];
   earliestMeaningfulForkId: string | null;
   /**
+   * Words that were found and not counted because the sentence does not state the fact (a denial, a guess, a plan, a
+   * condition). They are why an expected signal is missing, and the first thing to look at when one is.
+   */
+  suppressed: SuppressedObservation[];
+  /** Statements of the case that cannot both stand, with both sides and the kind of disagreement. */
+  conflicts: Conflict[];
+  /** Conclusions that need more than one event, each anchored at the event that makes it true. */
+  sequenceFindings: TemporalFinding[];
+  /**
    * Bounded notes about limits that shortened this analysis (for example the statement-claim cap).
    * Empty when nothing was truncated; surface them wherever the analysis is presented.
    */
@@ -72,7 +85,8 @@ export interface DeterministicAnalysis {
 /** Runs the full deterministic pipeline: signals -> beliefs -> claims -> actions -> forks. */
 export function runDeterministicAnalysis(input: AnalysisInput): DeterministicAnalysis {
   const { view, pack, config, ctx } = input;
-  const observations = detectObservations(view, pack, ctx.caseId);
+  const suppressedNotes: { suppressed: SuppressedObservation[] } = { suppressed: [] };
+  const observations = detectObservations(view, pack, ctx.caseId, suppressedNotes);
   const evidence = buildEvidence(view, pack, observations, ctx);
   const timeline = buildBeliefTimeline(view, pack, observations, { seed: ctx.seed });
   const requirementStates = computeRequirementStates(view, pack, observations);
@@ -123,6 +137,16 @@ export function runDeterministicAnalysis(input: AnalysisInput): DeterministicAna
     analyzer,
     responders,
   });
+  const conflicts = detectConflicts({ view, pack, caseId: ctx.caseId, observations });
+  const sequenceFindings = detectSequenceFindings({
+    view,
+    pack,
+    caseId: ctx.caseId,
+    observations,
+    timeline,
+    requirementStates,
+    forks,
+  });
   return {
     view,
     observations,
@@ -138,6 +162,9 @@ export function runDeterministicAnalysis(input: AnalysisInput): DeterministicAna
     decisions,
     forks,
     earliestMeaningfulForkId,
+    suppressed: suppressedNotes.suppressed,
+    conflicts,
+    sequenceFindings,
     notes,
   };
 }

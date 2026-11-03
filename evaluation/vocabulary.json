@@ -2,7 +2,7 @@
   "schema": "caseguard.eval-vocabulary/1",
   "workload": "teams-authentication",
   "packId": "kp.teams-authentication",
-  "packVersion": "1.0.0",
+  "packVersion": "1.1.0",
   "dimensions": [
     {
       "id": "scope",

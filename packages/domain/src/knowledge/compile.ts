@@ -7,11 +7,19 @@ import {
   type KnowledgeRequirement,
   type KnowledgeSignal,
   type SignalDetector,
+  type SignalPair,
 } from '@caseguard/schemas';
 
 export interface CompiledDetector {
   detector: SignalDetector;
   regex: RegExp | null;
+  /** The same expression with the `g` flag, for `matchAll` (which works on a copy, so nothing is shared). */
+  scan: RegExp | null;
+  /**
+   * The pattern spells out a denial itself ("no active incident", "did not help"), so a negation inside one of its
+   * matches is what it looks for and does not count against it.
+   */
+  negativeContent: boolean;
 }
 
 /**
@@ -28,6 +36,15 @@ export interface CompiledPack {
   signalDetectors: ReadonlyMap<string, readonly CompiledDetector[]>;
   actionDetectors: ReadonlyMap<string, readonly CompiledDetector[]>;
   requirementDetectors: ReadonlyMap<string, readonly CompiledDetector[]>;
+  /** For a signal that is one side of a declared pair: the pair, which side it is, and the signal on the other side. */
+  signalPairs: ReadonlyMap<
+    string,
+    {
+      readonly pair: SignalPair;
+      readonly side: 'positive' | 'negative';
+      readonly counterpart: string;
+    }
+  >;
   lexicon: {
     hedges: readonly RegExp[];
     definitive: readonly RegExp[];
@@ -105,12 +122,42 @@ function compileAuthored(kind: string, pattern: string, flags: string): RegExp {
   }
 }
 
+/**
+ * Words that make a pattern one that looks for a denial. Decided from the pattern's own text so that a new detector
+ * is handled without anyone having to remember a flag; `negativeContent` on the detector overrides it either way.
+ */
+const NEGATION_IN_PATTERN =
+  /(?:(?<![a-z])|(?<=\\b))(?:no|not|never|none|nothing|nobody|neither|nor|without|zero|unchanged|cannot)(?![a-z])|n\[['’]\]\??t|n['’]t/i;
+
 function compileDetectors(list: readonly SignalDetector[]): CompiledDetector[] {
-  return list.map((detector) =>
-    detector.kind === 'regex'
-      ? { detector, regex: compileAuthored('detector', detector.pattern, detector.flags) }
-      : { detector, regex: null },
-  );
+  return list.map((detector) => {
+    if (detector.kind !== 'regex') {
+      return { detector, regex: null, scan: null, negativeContent: false };
+    }
+    const regex = compileAuthored('detector', detector.pattern, detector.flags);
+    return {
+      detector,
+      regex,
+      scan: new RegExp(regex.source, `${regex.flags}g`),
+      negativeContent: detector.negativeContent ?? NEGATION_IN_PATTERN.test(detector.pattern),
+    };
+  });
+}
+
+function pairsBySignal(pairs: readonly SignalPair[]): CompiledPack['signalPairs'] {
+  const links = new Map<
+    string,
+    {
+      readonly pair: SignalPair;
+      readonly side: 'positive' | 'negative';
+      readonly counterpart: string;
+    }
+  >();
+  for (const pair of pairs) {
+    links.set(pair.positive, { pair, side: 'positive', counterpart: pair.negative });
+    links.set(pair.negative, { pair, side: 'negative', counterpart: pair.positive });
+  }
+  return links;
 }
 
 export function compileKnowledgePack(input: KnowledgePack): CompiledPack {
@@ -132,6 +179,7 @@ export function compileKnowledgePack(input: KnowledgePack): CompiledPack {
     requirementDetectors: new Map(
       pack.requirements.map((r) => [r.id, compileDetectors(r.satisfiedByDetectors)]),
     ),
+    signalPairs: pairsBySignal(pack.signalPairs),
     lexicon: {
       hedges: lexicon.hedges.map(phrase),
       definitive: lexicon.definitive.map(phrase),

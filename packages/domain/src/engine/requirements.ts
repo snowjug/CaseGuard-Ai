@@ -87,7 +87,7 @@ export function computeRequirementStates(
     if (detectors && detectors.length > 0) {
       view.events.forEach((event, index) => {
         if (best !== null && best.index <= index) return;
-        if (firstDetectorMatch(detectors, event)) best = { index, event };
+        if (firstDetectorMatch(detectors, event, undefined, 'requirement')) best = { index, event };
       });
     }
     const relevant = firstRelevantIndex(req.neededFrom, view, pack);

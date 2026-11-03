@@ -33,6 +33,9 @@ const observation = (signalId: string, index: number, repeatIndex = 0): Observat
   field: null,
   start: null,
   end: null,
+  modality: 'asserted',
+  cue: null,
+  negationOf: null,
 });
 
 const observationsArb = fc

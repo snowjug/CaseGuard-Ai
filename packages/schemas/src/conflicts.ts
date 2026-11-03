@@ -86,7 +86,7 @@ export const ConflictSideSchema = z.object({
   timestamp: IsoTimestampSchema,
   /** What this side states, in plain words (bounded; never more than the excerpt supports). */
   statement: z.string().min(1).max(300),
-  /** What both sides are about: a knowledge-pack signal id or a twin attribute key. */
+  /** What both sides are about, as a short name: the label of a signal pair, or of an attribute such as the number of users. */
   subject: z.string().min(1).max(120),
   /** Whether this side asserts the subject or denies it. */
   polarity: z.enum(['asserts', 'denies']),

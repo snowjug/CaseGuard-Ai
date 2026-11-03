@@ -6,6 +6,8 @@ import {
   type DiagnosticAction,
   type EffortLevel,
   type KnowledgeAction,
+  type SourceField,
+  type StatementModality,
 } from '@caseguard/schemas';
 import type { CompiledPack } from '../knowledge/compile';
 import { hypothesisRecordId, stableId } from '../util/ids';
@@ -16,7 +18,7 @@ import type { BeliefTimeline } from './belief';
 import { statedHypothesis } from './claims';
 import { type EngineContext, metaOf } from './context';
 import { ResponderIndex } from './responders';
-import { eventText, firstDetectorMatch } from './signals';
+import { eventText, eventTexts, firstDetectorMatch, locateInEvent } from './signals';
 import { analyzeView, PrefixAnalyzer, type ViewAnalysis } from './state';
 import { createTemporalViewBeforeEvent, isCompleteCase, type TemporalView } from './temporal';
 
@@ -93,16 +95,42 @@ export const actionCostOf = (
 ): number => (breakdown ? Math.max(0, breakdown.denominator - config.epsilon) : 0);
 
 /** Maps an event to a pack action key: explicit key first, then detectors on engineer-side text. */
-export function resolveActionKey(event: CaseEvent, pack: CompiledPack): string | null {
+export interface ResolvedAction {
+  /** The pack action key. */
+  key: string;
+  /** How the event stands to it: done, asked for, announced. An explicit action key is always done. */
+  modality: StatementModality;
+  /** The words that name it, and where they lie in the stored text; null for an explicit action key. */
+  excerpt: string | null;
+  span: { field: SourceField; start: number; end: number } | null;
+}
+
+/** Which pack action an event is, with the words that say so (`resolveActionKey` without the words). */
+export function resolveAction(event: CaseEvent, pack: CompiledPack): ResolvedAction | null {
   if (event.action?.actionKey && pack.actions.has(event.action.actionKey))
-    return event.action.actionKey;
+    return { key: event.action.actionKey, modality: 'asserted', excerpt: null, span: null };
   if (!ENGINEER_SIDE_ROLES.includes(event.participantRole)) return null;
   if (!ACTION_EVENT_TYPES.has(event.type)) return null;
-  const text = eventText(event);
+  const texts = eventTexts(event);
   for (const action of pack.pack.actions) {
-    if (firstDetectorMatch(pack.actionDetectors.get(action.id), event, text)) return action.id;
+    // An engineer's own step must be stated as done; a step the customer takes counts when the engineer asks for it.
+    const use =
+      action.executor === 'engineer' || action.executor === 'system'
+        ? 'action'
+        : 'delegated_action';
+    const match = firstDetectorMatch(pack.actionDetectors.get(action.id), event, texts, use);
+    if (!match) continue;
+    const span =
+      match.start !== null && match.end !== null
+        ? locateInEvent(event, match.start, match.end)
+        : null;
+    return { key: action.id, modality: match.modality, excerpt: match.excerpt, span };
   }
   return null;
+}
+
+export function resolveActionKey(event: CaseEvent, pack: CompiledPack): string | null {
+  return resolveAction(event, pack)?.key ?? null;
 }
 
 export function isActionEvent(event: CaseEvent, pack: CompiledPack): boolean {

@@ -303,6 +303,7 @@ describe('knowledge pack reference validation', () => {
     requirements: [],
     claimPatterns: [],
     inferences: [],
+    signalPairs: [],
     lexicon: {
       hedges: [],
       definitive: [],

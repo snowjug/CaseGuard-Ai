@@ -1,6 +1,6 @@
 {
-  "about": "What the two synthetic samples produced under ENGINE_VERSION 2026.3.0, before a source reference named the text its offsets count into. Each digest is the hash of one part of the analysis with source locations (pointer, field, start, end) and evidence links removed (see withoutLinkage in ../engine-golden.ts). A change that only adds source linkage leaves every digest as it is; a digest that moves means a score, id, ranking or text moved. Regenerate only for an intended change of the engine's output, and say so in the commit.",
-  "engineVersion": "2026.3.0",
+  "about": "What the two synthetic samples produce under ENGINE_VERSION 2026.4.0 (knowledge pack 1.1.0). Each digest is the hash of one part of the analysis with source locations (pointer, field, start, end) and evidence links removed (see withoutLinkage in ../engine-golden.ts). A change that only adds source linkage leaves every digest as it is; a digest that moves means a score, id, ranking or text moved. Regenerate only for an intended change of the engine's output, and say so in the commit. 2026.4.0 is such a change (detection reads whether a sentence states a fact, reads chat shorthand, and knows more wordings): Case One reads the same 26 signals with one excerpt a few words longer; Case Two reads two more (the customer's 'we have not changed Conditional Access' and the engineer's note that one proxy node timed out). Both keep their score, band, forks and leading hypothesis; the pack version in the method notes changed, and some intermediate confidence bounds and per-action values of Case Two moved by at most 0.04 with its two extra observations.",
+  "engineVersion": "2026.4.0",
   "cases": {
     "one": {
       "reference": "CG-SYN-1001",
@@ -22,20 +22,20 @@
         "earliest": "fork_85f167c1a22b7c2468301be4"
       },
       "digests": {
-        "evidence": "8cb3f6837ce49daa07ed04c38f3d25f08d2c54d3afa2a34a459442796501d2f7",
-        "claims": "a1b693dc153cd324f5092c93a44655ed2a229f6f04d8a3b04a389929d00bce45",
+        "evidence": "5b34fd54c730e54689892a2e48ad55776a8d28caa7840b9182cf5caeed6145ed",
+        "claims": "de5c5276b9fcc1827efe6366762545aca312df03646c101d1748c3452aaf6fe6",
         "hypotheses": "587af3a0570bd57a45dceb6752f29eba509cd56ab2b827bcc21d3fafa8d9c581",
         "hypothesisLinks": "343d65b5fc1779cf385940beafd7f03f1573f6ffcbe8757bd9594599bf984ebc",
         "missing": "9b37fcf7aaf61f51176e93d8075d78a346ff196a1c4fcbcd175336844fbcafee",
         "actions": "b980a9d7b67090482d4d288c2b1ac0a24b3d8c6fc227b88b22bf706a3110210f",
         "forks": "ea139bb3262abb80ae2fef49f8d57e4ef220419ac677e2efe6490d9f162c3bf1",
-        "timeline": "734393cfcd78a95ac32a839352678921ba0c04d3ee5752b33885ff2cd1eb4715",
-        "twin": "4c60a2b1afd732d71574c032d93644f3599c7fb0e05618ea2fd04d53818ccd29",
+        "timeline": "ac3a7c1a633d7ac21bbbd2968f9ff132941c2dc15e465a95684d5c173e11c86a",
+        "twin": "ef42edd77d511a8d852bd1c67ded42e55772719dee4be61f8db5929573fa444b",
         "scenarios": "f497eae0a1c0f593f704f29b1697b7749a427589e8e767c4946191c06f4201cc",
-        "quality": "b3ac9bba7e2b3372dbdf16e126a6f967b42e83509b2c34d14dc1ac1e2f9f817f",
-        "metrics": "72a4527842e11bbb605efd2b03a8422fff889317f0c77709235b2df7cd6f95bf",
+        "quality": "e9c260c2238175d97973b15cc118c3086515cbf40e26841ccbc0dcd6e4ea07c2",
+        "metrics": "b7f062654719d017a8cb08f6fd14807c2a5556dc4164a63bb1a3a92af21bb330",
         "warnings": "f2cb9af23b72e3f2aa103d233e0539e765bbe55c928582d5aa1b70de609fcea6",
-        "coaching": "9ec413f92bbcad0e9155f755d2b50a612133486f2a11cbccb23ca1b279215d48"
+        "coaching": "afa5a45ae467cd4dbf5c8fbd7614d074039e9bea0901ac6febba20195d41455e"
       }
     },
     "two": {
@@ -45,8 +45,8 @@
         "low": 95.1,
         "high": 99.7,
         "band": "strong",
-        "evidence": 12,
-        "claims": 31,
+        "evidence": 14,
+        "claims": 33,
         "forks": 0,
         "warnings": 0,
         "penalties": 0,
@@ -58,20 +58,20 @@
         "earliest": null
       },
       "digests": {
-        "evidence": "0e06694cae8b2604ddda995f2a6aebfb78ffa39ff64bc11ac4afbe619bbaaa5e",
-        "claims": "1500ca84f78eb50360faa1afa419b61acb21a724808febba3e6c3c69ff225e31",
-        "hypotheses": "e4e095216645bb1a78878359b9c8fe1ef9360fd40a90a001e9b65d87fc176630",
-        "hypothesisLinks": "bae2405aa1857042f8d4d23726a905b9173a8b7e7bcde73398e92f98c50970ff",
+        "evidence": "6499f4c2b661878ae1f3b872b6f9341f4c8cc41735b31371b7142860771b4570",
+        "claims": "30a0840a3474b123bb5eda757e3974f496b1277528f9814d4f8b53b3ee4928ee",
+        "hypotheses": "2bbd57dc30d5c8c53115842223a50a241a6b34e49dd47caa22db96981633f62f",
+        "hypothesisLinks": "7566cb32b533ffba5a6ef7b0533f36fe06ff6c44fff5e751017a01570ef859bb",
         "missing": "2ae073719632162d97ad99b879dba9d974b8798456ef7ee2507200b47bf805a4",
-        "actions": "85ceebaa1750bdfaaadba1e1ae81c718a7bdf3eaccd4d8b6b3dd3ee57ec7ba1f",
+        "actions": "53ec5406e8cb67552461673d12b8fb4550e61ba341d8dc14317e93207b53c518",
         "forks": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "timeline": "402c7a0b0e4289074d62c285b4e10f567f4921960c8235af2050d2558fe17ef1",
-        "twin": "dfd14fb546aa2928cd5a1baa9fd609774ed034c63fc462060d501e8e856760d0",
+        "timeline": "e66542404476198c2306a61650a2f226d42cb7e1b9c45be29c73bc6af7fbe710",
+        "twin": "c6d768cdfe6aa97b86f49e258738a4aea07d980ef18eecf450e741e7b8966525",
         "scenarios": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "quality": "9a79e078331777dfa3a0cf933a0da3b40017724dffcd37fa62a5e3d8a026da8b",
-        "metrics": "724d073eeb095e3af310db86a9398c8786dacffe4edad4e9e4e822deb46c121a",
+        "quality": "6d5d09fc465716f51a55640183a215bc06e9a3d50d15cc5d91cc7204a1245317",
+        "metrics": "6bcf71ee8072ee69daaeb81f23a83004f9f07c36d7dec8d51ce17fd201986de9",
         "warnings": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "coaching": "844a8fb72c6d4ad0d00394c56c33a500a552e7fcf20eeb8c556369f6ec76c4ee"
+        "coaching": "c0ae5c4ced5734253cd62d7289975e9872533cf3823e196c97bb88e850b9d529"
       }
     }
   }

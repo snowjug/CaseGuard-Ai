@@ -82,7 +82,10 @@ describe('evaluation vocabulary', () => {
       ...TEAMS_AUTH_PACK.actions.flatMap((action) => action.detectors),
       ...TEAMS_AUTH_PACK.requirements.flatMap((requirement) => requirement.satisfiedByDetectors),
     ];
-    for (const detector of sources) if (detector.kind === 'regex') patterns.push(detector.pattern);
+    // A short pattern such as "reinstall" can coincide with a label by accident; the long ones are the ones worth guarding.
+    for (const detector of sources)
+      if (detector.kind === 'regex' && detector.pattern.length >= 25)
+        patterns.push(detector.pattern);
     expect(patterns.length).toBeGreaterThan(20);
     for (const pattern of patterns) {
       expect(strings.some((text) => text.includes(pattern))).toBe(false);

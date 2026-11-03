@@ -4,6 +4,7 @@ export * from './util/rng';
 export * from './util/time';
 
 export * from './engine/temporal';
+export * from './engine/modality';
 export * from './engine/signals';
 export * from './engine/source-ref';
 export * from './engine/verify-excerpt';
@@ -15,6 +16,8 @@ export * from './engine/action-value';
 export * from './engine/state';
 export * from './engine/actions';
 export * from './engine/forks';
+export * from './engine/conflicts';
+export * from './engine/sequence';
 export * from './engine/hypotheses';
 export * from './engine/counterfactual';
 export * from './engine/hindsight';

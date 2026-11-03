@@ -35,8 +35,16 @@ import type { RequestContext } from '../../http/request-context';
  * body, or both). Offsets of a match in the body now count from the start of the body instead of from the
  * start of the title, and the pointer says which text that is. Every score, id, ranking and text is
  * unchanged, so no simulated figure is redrawn; stored runs are recomputed once to carry the field.
+ * 2026.4.0: detection reads whether a sentence states a fact (a denial, a guess, a plan, a condition or a
+ * report from someone else does not), reads chat shorthand and typos through a fixed list, ignores what an
+ * e-mail only quotes, and knows more of the ways the same fact is worded (docs/DETECTION.md). A denial of
+ * one side of a declared signal pair reads as the other side. The analysis also carries conflicts and
+ * sequence findings, and the observations it dropped for not stating a fact. On the two shipped samples:
+ * Case One reads the same signals (one excerpt is a few words longer); Case Two reads two more (the customer's
+ * "we have not changed Conditional Access" and the engineer's note that one proxy node timed out), and its
+ * headline figures, forks and band are unchanged. Stored runs are recomputed once.
  */
-export const ENGINE_VERSION = '2026.3.1';
+export const ENGINE_VERSION = '2026.4.0';
 
 /** Everything an analysis reads. Loaded once per run and never mutated. */
 export interface AnalysisInputs {

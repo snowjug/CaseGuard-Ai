@@ -29,6 +29,11 @@ export const SignalDetectorSchema = z.discriminatedUnion('kind', [
     flags: z.string().max(8).default('i'),
     eventTypes: z.array(EventTypeSchema).optional(),
     roles: z.array(ParticipantRoleSchema).optional(),
+    /**
+     * The pattern is built to match a denial ("no active incident"), so a negation inside its own match is part of
+     * what it looks for and must not count against it. When absent, the engine decides from the pattern's own words.
+     */
+    negativeContent: z.boolean().optional(),
   }),
   z.object({
     kind: z.literal('structured'),
@@ -99,6 +104,8 @@ export const ActionOutcomeSchema = z.object({
   emitsSignals: z.array(z.string()),
   /** Text rendered (and labelled simulated) when this outcome appears in a counterfactual path. */
   simulatedResult: z.string().max(500),
+  /** The step did not help (it is the outcome of a step that failed); asking for it again is a repeat of a failed step. */
+  ineffective: z.boolean().optional(),
 });
 export type ActionOutcome = z.infer<typeof ActionOutcomeSchema>;
 
@@ -247,6 +254,27 @@ export const KnowledgeInferenceSchema = z.object({
 });
 export type KnowledgeInference = z.infer<typeof KnowledgeInferenceSchema>;
 
+/**
+ * Two signals that state the same thing from opposite sides: "an incident is active" and "no incident is active".
+ * Declaring the pair lets the engine do two things it could not otherwise: read a denial of the positive side as a
+ * statement of the negative side ("service health lists nothing active" is "no active incident"), and notice when
+ * one case asserts both sides, which is a conflict to show, not a signal to count twice.
+ */
+export const SignalPairSchema = z.object({
+  id: z.string().regex(/^pair\.[a-z0-9-]+$/),
+  /** What the two signals are about, in a few words. */
+  label: z.string().min(3).max(120),
+  /** The signal that states the thing (a finding, a fault, a change). */
+  positive: z.string(),
+  /** The signal that states its absence or its opposite. */
+  negative: z.string(),
+  /** The state can change as work proceeds (a fault is fixed), so a later opposite statement is an update. */
+  timeVarying: z.boolean().default(false),
+  /** A direct denial of the positive signal counts as the negative signal. */
+  denialIsNegative: z.boolean().default(true),
+});
+export type SignalPair = z.infer<typeof SignalPairSchema>;
+
 export const KnowledgePackSchema = z.object({
   id: z.string().regex(/^kp\.[a-z0-9-]+$/),
   version: z.string().regex(/^\d+\.\d+\.\d+$/),
@@ -261,6 +289,7 @@ export const KnowledgePackSchema = z.object({
   requirements: z.array(KnowledgeRequirementSchema),
   claimPatterns: z.array(ClaimPatternSchema),
   inferences: z.array(KnowledgeInferenceSchema).default([]),
+  signalPairs: z.array(SignalPairSchema).default([]),
   lexicon: KnowledgeLexiconSchema,
   policies: KnowledgePoliciesSchema,
 });
@@ -356,6 +385,20 @@ export function validateKnowledgePackReferences(pack: KnowledgePack): string[] {
   for (const inf of pack.inferences) {
     if (!sigIds.has(inf.signalId))
       problems.push(`inference ${inf.id} references unknown signal ${inf.signalId}`);
+  }
+  dup(
+    pack.signalPairs.map((p) => p.id),
+    'signal pair',
+  );
+  const paired = new Set<string>();
+  for (const pair of pack.signalPairs) {
+    for (const s of [pair.positive, pair.negative]) {
+      if (!sigIds.has(s)) problems.push(`signal pair ${pair.id} references unknown signal ${s}`);
+      if (paired.has(s)) problems.push(`signal ${s} is in more than one signal pair`);
+      paired.add(s);
+    }
+    if (pair.positive === pair.negative)
+      problems.push(`signal pair ${pair.id} names one signal on both sides`);
   }
   return problems;
 }

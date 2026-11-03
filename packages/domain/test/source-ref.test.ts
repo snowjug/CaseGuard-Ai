@@ -53,9 +53,13 @@ const escapeRegex = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g
 
 /** What the engine itself records for the first occurrence of `needle` in an event. */
 function engineRef(event: CaseEvent, needle: string): SourceRef | null {
+  const regex = new RegExp(escapeRegex(needle));
   const compiled: CompiledDetector = {
     detector: { kind: 'regex', pattern: escapeRegex(needle), flags: '' },
-    regex: new RegExp(escapeRegex(needle)),
+    regex,
+    scan: new RegExp(regex.source, 'g'),
+    // The needle is whatever words the test quotes ("cannot sign in"); what is checked here is where they are, not what they mean.
+    negativeContent: true,
   };
   const match = matchDetector(compiled, event);
   if (match === null || match.start === null || match.end === null) return null;

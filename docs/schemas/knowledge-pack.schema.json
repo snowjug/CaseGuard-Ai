@@ -172,6 +172,9 @@
                           "system"
                         ]
                       }
+                    },
+                    "negativeContent": {
+                      "type": "boolean"
                     }
                   },
                   "required": ["kind", "pattern"]
@@ -501,6 +504,9 @@
                 "simulatedResult": {
                   "type": "string",
                   "maxLength": 500
+                },
+                "ineffective": {
+                  "type": "boolean"
                 }
               },
               "required": ["id", "label", "emitsSignals", "simulatedResult"]
@@ -564,6 +570,9 @@
                           "system"
                         ]
                       }
+                    },
+                    "negativeContent": {
+                      "type": "boolean"
                     }
                   },
                   "required": ["kind", "pattern"]
@@ -806,6 +815,9 @@
                           "system"
                         ]
                       }
+                    },
+                    "negativeContent": {
+                      "type": "boolean"
                     }
                   },
                   "required": ["kind", "pattern"]
@@ -1030,6 +1042,39 @@
           }
         },
         "required": ["id", "signalId", "text", "explanation", "hypothesisCategories"]
+      }
+    },
+    "signalPairs": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pair\\.[a-z0-9-]+$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "positive": {
+            "type": "string"
+          },
+          "negative": {
+            "type": "string"
+          },
+          "timeVarying": {
+            "default": false,
+            "type": "boolean"
+          },
+          "denialIsNegative": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": ["id", "label", "positive", "negative"]
       }
     },
     "lexicon": {
