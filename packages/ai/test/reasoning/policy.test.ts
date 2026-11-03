@@ -142,6 +142,20 @@ describe('hybrid policy: how a proposal stands next to the engine', () => {
         'corroborated',
       );
     });
+
+    it.each(['asserted', 'attributed', 'corrected'] as const)(
+      'is MODEL_CORROBORATED when the engine observed the signal as %s, the readings a signal fires on',
+      (modality) => {
+        const facts = plainFacts({
+          signals: [
+            { id: 'obs.1', signalId: 'sig.mfa-ca-events-in-logs', eventId: 'e3', modality },
+          ],
+        });
+        expect(only(decide([keptFixture('signal')], facts)).hybridStatus).toBe(
+          'MODEL_CORROBORATED',
+        );
+      },
+    );
   });
 
   describe('contradiction', () => {

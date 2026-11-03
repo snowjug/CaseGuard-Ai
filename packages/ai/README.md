@@ -150,11 +150,14 @@ this package accepts, approves or stores anything (a test scans the exports and 
 whole pipeline against a model that approves itself). The critic can only escalate: it never lowers a finding
 and never lifts a conflict. Order of inputs, repeated runs and the facts do not change the result (properties).
 
-The engine's side is a plain `DeterministicFacts` (`deterministicFactsOf(analysis, extras, { view })`): signals
-observed per event, actions recognised, forks, requirements unmet at each moment, ranked hypotheses,
-recommendations, and an optional `conflicts` list (the policy works without it). With a `view` the facts are
-those of the boundary: later events, and what only they show, are left out, so a critic never sees a hypothesis
-or fork the engine reached after the moment under review.
+The engine's side is a plain `DeterministicFacts` (`deterministicFactsOf(analysis, { pack }, { view })`): signals
+observed per event with the engine's reading of each (asserted, attributed or corrected), actions recognised,
+forks, requirements unmet at each moment, ranked hypotheses, recommendations, the conflicts the analysis found
+(`analysis.conflicts`; a facts object from a source without them says `null` and the policy works without them)
+and the signal pairs of the pack (a statement of one side at an event is a statement against the other side at
+that event). With a `view` the facts are those of the boundary: later events, and what only they show, are left
+out, so a critic never sees a hypothesis or fork the engine reached after the moment under review. A conflict
+that has a side after the boundary is dropped.
 
 ### The scripted test provider
 

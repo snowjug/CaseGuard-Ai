@@ -1,4 +1,9 @@
-import { compareIso, type DeterministicAnalysis, type TemporalView } from '@caseguard/domain';
+import {
+  compareIso,
+  type CompiledPack,
+  type DeterministicAnalysis,
+  type TemporalView,
+} from '@caseguard/domain';
 import type {
   Conflict,
   ForkCategory,
@@ -28,8 +33,9 @@ export interface SignalFact {
   signalId: string;
   eventId: string;
   /**
-   * What the engine says the statement is (asserted, negated, a guess...). Null when it makes no statement about it,
-   * which is how every observation reads until the modality detectors land: then the signal counts as observed.
+   * How the engine reads the statement: asserted, attributed (reported from someone else) or corrected, because the other
+   * modalities (a denial, a guess, a plan, a condition, a request) never become observations. Null when the facts come
+   * from a source that does not say.
    */
   modality: StatementModality | null;
 }
@@ -101,24 +107,22 @@ export interface DeterministicFacts {
   recommendations: RecommendationFact[];
   counterfactuals: CounterfactualFact[];
   /**
-   * The conflicts the engine found, or null when it does not look for them (the policy works without them). An empty
-   * list means it looked and found none.
+   * The conflicts the engine found, or null when the facts come from a source that does not carry them (the policy works
+   * without them). An empty list means it looked and found none.
    */
   conflicts: Conflict[] | null;
   /**
-   * Signals that cannot both hold, by signal id (symmetric: list both directions). Empty unless the caller knows of
-   * some: the knowledge pack does not state counterparts.
+   * Signals the pack pairs with their denial, by signal id (symmetric). A statement of one side at an event is a
+   * statement against the other side at that event.
    */
   signalCounterparts: Record<string, string[]>;
 }
 
-/** Facts the analysis does not carry: they come from detectors and engines that run next to it. */
+/** Facts the analysis does not carry. */
 export interface FactsExtras {
-  /** The modality of each observation, by observation id. */
-  modalities?: Readonly<Record<string, StatementModality>>;
-  conflicts?: readonly Conflict[];
+  /** The pack the analysis ran with: its signal pairs give the counterparts of a signal. */
+  pack?: Pick<CompiledPack, 'signalPairs'>;
   counterfactuals?: readonly CounterfactualFact[];
-  signalCounterparts?: Readonly<Record<string, readonly string[]>>;
 }
 
 const MAX_RECOMMENDING_HYPOTHESES = 3;
@@ -159,7 +163,7 @@ export function deterministicFactsOf(
       id: o.id,
       signalId: o.signalId,
       eventId: o.eventId,
-      modality: extras.modalities?.[o.id] ?? null,
+      modality: o.modality,
     }));
 
   const actions: ActionFact[] = analysis.actions
@@ -267,14 +271,16 @@ export function deterministicFactsOf(
     hypotheses,
     recommendations,
     counterfactuals: (extras.counterfactuals ?? []).filter((c) => known(c.forkEventId)),
-    conflicts:
-      extras.conflicts === undefined
-        ? null
-        : extras.conflicts.filter((c) => c.sides.every((side) => known(side.eventId))),
-    signalCounterparts: Object.fromEntries(
-      Object.entries(extras.signalCounterparts ?? {}).map(([k, v]) => [k, [...v]]),
-    ),
+    conflicts: analysis.conflicts.filter((c) => c.sides.every((side) => known(side.eventId))),
+    signalCounterparts: counterpartsOf(extras.pack),
   });
+}
+
+function counterpartsOf(pack: FactsExtras['pack']): Record<string, string[]> {
+  const counterparts: Record<string, string[]> = {};
+  for (const [signalId, link] of pack?.signalPairs ?? [])
+    counterparts[signalId] = [link.counterpart];
+  return counterparts;
 }
 
 // ---------------------------------------------------------------- reading the facts

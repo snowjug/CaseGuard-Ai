@@ -132,7 +132,7 @@ function signalStance(
   events: ReadonlySet<string>,
   facts: DeterministicFacts,
 ): Stance {
-  const holds = (m: StatementModality | null): boolean => m === null || m === 'asserted';
+  const holds = (m: StatementModality | null): boolean => m === null || !NOT_AS_FACT.has(m);
   const same = facts.signals.filter((s) => s.signalId === p.signalId && events.has(s.eventId));
   const counterparts = new Set(facts.signalCounterparts[p.signalId] ?? []);
   const against = [

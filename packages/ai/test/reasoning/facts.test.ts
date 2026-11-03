@@ -26,7 +26,7 @@ describe('facts of the engine analysis', () => {
     expect(facts.forks).toHaveLength(one.analysis.forks.length);
     expect(facts.requirements).toHaveLength(one.analysis.missing.length);
     expect(facts.hypotheses).toHaveLength(one.analysis.hypotheses.length);
-    expect(facts.conflicts).toBeNull();
+    expect(facts.conflicts).toHaveLength(one.analysis.conflicts.length);
     expect(facts.counterfactuals).toEqual([]);
   });
 
@@ -46,18 +46,22 @@ describe('facts of the engine analysis', () => {
     );
   });
 
-  it('carry the modalities, conflicts and counterparts the caller supplies, and only those', () => {
-    const observation = one.analysis.observations[0];
-    if (!observation) throw new Error('fixture');
-    const withExtras = deterministicFactsOf(one.analysis, {
-      modalities: { [observation.id]: 'negated' },
-      signalCounterparts: { 'sig.a': ['sig.b'], 'sig.b': ['sig.a'] },
-      conflicts: [],
-    });
-    expect(withExtras.signals.find((s) => s.id === observation.id)?.modality).toBe('negated');
-    expect(withExtras.signals.filter((s) => s.modality !== null)).toHaveLength(1);
-    expect(withExtras.signalCounterparts['sig.a']).toEqual(['sig.b']);
-    expect(withExtras.conflicts).toEqual([]);
+  it('read the modality of each observation and the conflicts from the analysis', () => {
+    expect(facts.signals.map((s) => s.modality)).toEqual(
+      one.analysis.observations.map((o) => o.modality),
+    );
+    expect(facts.conflicts).toEqual(one.analysis.conflicts);
+  });
+
+  it('take the counterparts of a signal from the signal pairs of the pack, in both directions, and from nowhere else', () => {
+    expect(facts.signalCounterparts).toEqual({});
+    const paired = deterministicFactsOf(one.analysis, { pack: one.pack });
+    const pairs = one.pack.pack.signalPairs;
+    expect(pairs.length).toBeGreaterThan(0);
+    for (const pair of pairs) {
+      expect(paired.signalCounterparts[pair.positive]).toEqual([pair.negative]);
+      expect(paired.signalCounterparts[pair.negative]).toEqual([pair.positive]);
+    }
   });
 
   it('can be made for the second case too', () => {
@@ -142,7 +146,7 @@ describe('facts of the engine analysis', () => {
       );
     });
 
-    it('drops a conflict, counterfactual or outcome the caller supplies about a later event', () => {
+    it('drops a conflict or counterfactual about a later event', () => {
       const later = afterBoundary[0];
       const inside = boundary.events[0];
       if (!later || !inside) throw new Error('fixture');
@@ -166,13 +170,14 @@ describe('facts of the engine analysis', () => {
         uncertainty: { level: 'low' as const, note: 'Nothing settles it.' },
         ruleId: 'test',
       });
+      const analysis = structuredClone(one.analysis);
+      analysis.conflicts = [
+        conflict('c.in', inside.id, inside.id),
+        conflict('c.out', inside.id, later.id),
+      ];
       const early = deterministicFactsOf(
-        one.analysis,
+        analysis,
         {
-          conflicts: [
-            conflict('c.in', inside.id, inside.id),
-            conflict('c.out', inside.id, later.id),
-          ],
           counterfactuals: [
             { id: 'cf.in', forkEventId: inside.id, alternativeActionIds: [], label: 'In' },
             { id: 'cf.out', forkEventId: later.id, alternativeActionIds: [], label: 'Out' },
@@ -182,6 +187,7 @@ describe('facts of the engine analysis', () => {
       );
       expect(early.conflicts?.map((c) => c.id)).toEqual(['c.in']);
       expect(early.counterfactuals.map((c) => c.id)).toEqual(['cf.in']);
+      expect(deterministicFactsOf(analysis).conflicts?.map((c) => c.id)).toEqual(['c.in', 'c.out']);
     });
   });
 });

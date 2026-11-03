@@ -353,7 +353,8 @@ async function review(
   if (input.view.events.length === 0) return finish('off', 'no_events');
 
   const base = taskBase(input);
-  const facts = input.facts ?? deterministicFactsOf(input.analysis, {}, { view: base.view });
+  const facts =
+    input.facts ?? deterministicFactsOf(input.analysis, { pack: input.pack }, { view: base.view });
   const ceiling = ceilingOf(deps);
 
   // 1. The reasoner proposes.
