@@ -27,8 +27,8 @@ tiers for this document**; only the end-to-end tiers below were run for it.
 
 ## 2. The last full run
 
-**The latest full run is CI's.** GitHub Actions run 41546529865 (commit `69c4c85` of `build/wave-1`, 2 November 2026, the last
-commit that changed code or tests) passed all 8 jobs: **6,152 unit tests** (256 files; 4 more are expected failures that pin
+**The latest full run is CI's.** GitHub Actions run 41546529865 (commit `69c4c85` of `build/wave-1`, 2 November 2026; the commits
+after it change documents and the tolerance of one property test) passed all 8 jobs: **6,152 unit tests** (256 files; 4 more are expected failures that pin
 known defects of the signal detectors), **1,033 integration tests on PostgreSQL 16** (56 files) and **374 Playwright tests**
 (desktop and mobile, axe checks included, 15.5 minutes), plus the compose smoke test (12 checks), the secret scan with gitleaks
 and the dependency audit. The 374 are the 342 of the run described below, the 29 of `pages/review.spec.ts` (the guided review and
@@ -308,6 +308,10 @@ replaced by a wait on the condition.
   that had not been tried before found it on a documents-only commit, and the test now uses the parser's rule
   (`packages/domain/test/ingest-parsers-properties.test.ts`). A failing run prints its seed and counterexample, so a red property
   test is a finding to read, not a flake to retry.
+- A property's tolerance has to match the precision the code reports. The Avoidable Support Effort reports each renormalised weight
+  to four decimals, so the weights of two components can sum to 1.0001 (found on a documents-only commit, fast-check seed
+  105150624, with two denormal numbers as the only effort); the test demanded 5e-7 and now allows half a unit of the last place per
+  component (`packages/domain/test/metrics-ase.test.ts`). Six further rounds of all 18 property files on fresh seeds found nothing.
 
 **Open** (reproductions; the lead routes them):
 

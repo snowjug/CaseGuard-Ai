@@ -20,7 +20,7 @@ nodes for evidence, a decision fork and a hypothesis); besides the screenshots b
 are the workflows in [`.github/workflows`](.github/workflows) (`ci`, `codeql`, `dependency-review` and the manual `deploy`;
 `deploy-environment` is the reusable part of `deploy` and has no badge of its own). **A badge reports the latest run of its workflow
 on the default branch.** Before the foundation work all 27 CI runs failed; the first fully green run
-(41495498658) is on the unmerged branch `build/p0-foundation`, and `build/wave-1` is green too (run 41546529865 is the last that changed code), so
+(41495498658) is on the unmerged branch `build/p0-foundation`, and `build/wave-1` is green too (for example run 41546529865), so
 the CI badge cannot show a pass until that work reaches the default branch. Dependency review (13 runs, all failed) fails because the repository's
 Dependency graph setting is off. No CodeQL or Deploy run
 is recorded here (CodeQL runs on pushes and pull requests to `main`, which does not exist yet, on a weekly schedule and on demand), so those two badges say nothing yet.
@@ -35,7 +35,7 @@ is recorded here (CodeQL runs on pushes and pull requests to `main`, which does 
 > **PGlite** locally and on PostgreSQL 16 in the CI integration job.
 > **CI was never fully green until the foundation branch**: all 27 earlier runs failed (the one on `2ecb454`, run 41182982903,
 > had only the production build fully green). The first fully green run is 41495498658 on the unmerged branch
-> `build/p0-foundation`; run 41546529865 on `build/wave-1` is the last that changed code (8 of 8 jobs: 6,152 unit tests, 1,033 integration tests on
+> `build/p0-foundation`; run 41546529865 on `build/wave-1` is fully green too (8 of 8 jobs: 6,152 unit tests, 1,033 integration tests on
 > PostgreSQL 16 and 374 end-to-end tests passed, none failed; see [Running tests](#running-tests)). None of this has reached the
 > default branch.
 > Every score is an **estimate**, shown with its basis and range. CaseGuard AI is not a Microsoft product.
@@ -863,8 +863,8 @@ deterministic results, retrying every 60 seconds. Full rules: [AI_ORCHESTRATION.
 
 Everything below runs offline. Counts, timings and coverage are not repeated here from memory: each result cell is the outcome of
 [GitHub Actions run 41546529865](https://github.com/snowjug/CaseGuard-Ai/actions/runs/41546529865) (the CI workflow on commit
-`69c4c85` of the unmerged branch `build/wave-1`, 2026-11-02, fully green; it is the last commit that changed code or tests, and
-later commits change documents only), a local measurement that says so, or "NOT RUN in CI". The 27 runs before the foundation work
+`69c4c85` of the unmerged branch `build/wave-1`, 2026-11-02, fully green; the commits after it change documents and the tolerance
+of one property test, see [CI_CD.md](docs/CI_CD.md#9-what-was-and-was-not-validated)), a local measurement that says so, or "NOT RUN in CI". The 27 runs before the foundation work
 all failed; run 41182982903 on `2ecb454` is the last one whose counts were recorded, and run 41495498658 on `build/p0-foundation`
 (5,843 unit, 1,011 integration and 342 end-to-end tests) was the first fully green
 ([CI_CD.md](docs/CI_CD.md#9-what-was-and-was-not-validated)). [EVALUATION.md](docs/EVALUATION.md#2-test-inventory) records how the earlier local counts were taken.
@@ -909,10 +909,10 @@ cases are in [docs/runbooks](docs/runbooks/README.md).
 ## CI/CD
 
 Five workflows exist in [`.github/workflows`](.github/workflows). **Two have run on GitHub; CI is green only on the unmerged
-branches**: `ci.yml` has run 43 times, 27 of them failing before the foundation work. Of the 16 runs since, 7 were fully green (1 on
-`build/p0-foundation`, 6 on `build/wave-1`; the last that changed code, run 41546529865: 8 jobs, all green), 2 failed on `build/wave-1` and were
-fixed there, and 7 were cancelled by newer pushes (one of them after its unit job had found a counterexample to a property test on a
-documents-only commit, fixed in `69c4c85`). `dependency-review.yml` has run 13 times and failed every
+branches**: `ci.yml` ran 27 times before the foundation work and every run failed. Since then it has been fully green on
+`build/p0-foundation` (run 41495498658) and on `build/wave-1` (for example run 41546529865: 8 jobs, all green); the wave's own failed
+and cancelled runs, among them two whose unit job found a counterexample to a property test on a documents-only commit (test-side
+flaws, fixed), are accounted for in [CI_CD.md](docs/CI_CD.md#9-what-was-and-was-not-validated). `dependency-review.yml` has run 13 times and failed every
 time because the repository's Dependency graph setting is off. No CodeQL or deploy run is recorded here, so every statement about
 those two is a reading of the configuration, not an observed result ([CI_CD.md](docs/CI_CD.md#9-what-was-and-was-not-validated)).
 
