@@ -577,6 +577,42 @@ separate, governed `skillMatches.apply`.
   recorded and no with-skill figure and say why; and the API does not match the skill extracted from the case itself as of
   an earlier instant at all, because its triggers were learned partly from what happened later.
 
+### 13.1 Is the skill genuinely reusable? (quality and use)
+
+`skills/quality.ts` answers two different questions. Neither writes anything or changes a skill: the result explains and
+flags, and approval, retirement and every other decision stay with governance.
+
+**`assessSkillQuality`: is the skill itself any good?** It rates twelve dimensions from what the skill records, each
+`strong`, `adequate`, `weak` or `missing`, with the reasons: specificity (do any triggers tell causes apart, judged from the
+knowledge pack's likelihoods), the evidence it rests on, its trigger conditions (known signals, text conditions that can be
+run safely), the context it needs, the context where it must not be used, the risk of matching the wrong case (a score from
+missing required triggers, too few telling signals, no exclusion), where it carries over, the action it recommends (do the
+steps exist in the pack), what shows it worked, review and approval (independent review, validation), version, and the
+evidence that it helps (synthetic applications are counted and never called evidence). It also flags seven things a reusable
+skill must not do. A **blocking** issue means the skill should not be suggested until it is fixed:
+
+| Issue                    | Severity           | What triggers it                                                                                                                                                                                        |
+| ------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| too generic              | blocking           | nothing is required and no trigger tells one cause from another (a general-guide name alone is a warning)                                                                                               |
+| case-specific data       | blocking           | a customer's IP address, mailbox, GUID, token, password or long hexadecimal value (never repeated in the message)                                                                                       |
+| unsupported causal claim | blocking / warning | learned from the recorded cause without saying which parts (blocking); a required trigger from the cause, a branch with only a hindsight probability, or a general cause stated from one case (warning) |
+| duplicate                | blocking / warning | the same signals and first step as another skill of the workload (blocking when identical, otherwise a warning)                                                                                         |
+| contradictory            | warning            | the same situation (80% of the trigger signals) but another first step: a reviewer decides which stands                                                                                                 |
+| stale                    | warning            | in use and not validated for 180 days, or never dated                                                                                                                                                   |
+| cross-tenant             | blocking           | the skill belongs to another tenant than the reader                                                                                                                                                     |
+
+The verdict is `blocked` (a blocking issue), `needs_work` (anything missing, three weak dimensions or a warning) or `ready`.
+Example addresses after "e.g." or "for example", the documentation ranges and the best-known public resolvers are not case
+data (the pack's own templates use them). On the seeded skill, even published, the answer is `needs_work`: nothing records
+that it helped, and its cause rests on the one case it came from.
+
+**`assessSkillUse`: can this matched skill be used on this case?** Five answers, checked in this order so that the first rule
+that applies decides: `does_not_apply` (an exclusion holds, or a required trigger does not), `unsafe_to_apply` (its next step
+is destructive, at the risk ceiling, or rated high risk by the skill without asking for approval), `requires_approval` (its
+next step needs approval, or the skill has not passed the gates that allow it to be suggested), `partially_applies` and
+`applies`. Approval never makes a destructive step acceptable. `packages/domain/test/skills-quality.test.ts` holds the
+evaluation cases, with at least two for each answer, built on the real samples and the real seeded skill.
+
 ## 14. Hardening notes
 
 - **As-of views.** `buildTimelineResponse` ranks hypotheses by the last belief step known at `asOf`, never by final

@@ -73,6 +73,15 @@ export {
 } from './matching';
 export { isSafeConditionPattern, type CaseInfo } from './evidence';
 export {
+  STALE_AFTER_DAYS,
+  SAME_SITUATION_SIMILARITY,
+  assessSkillQuality,
+  assessSkillUse,
+  type LibrarySkill,
+  type SkillQualityInput,
+  type SkillUseInput,
+} from './quality';
+export {
   skillApplicabilityFor,
   withSkillApplicability,
   type PathForSkills,
