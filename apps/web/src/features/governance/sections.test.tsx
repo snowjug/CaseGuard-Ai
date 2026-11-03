@@ -321,6 +321,8 @@ describe('[FR-GOV-21] model configuration', () => {
       'Communication Coach',
       'Token Governor',
       'Safety and Policy Validator',
+      'Case Reasoner',
+      'Case Critic',
     ]);
   });
 
