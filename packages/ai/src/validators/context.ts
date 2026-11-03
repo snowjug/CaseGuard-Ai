@@ -64,5 +64,9 @@ export function buildValidationContext(
         : null,
     scanInjection: deps.scanInjection,
     promptGuard: { templateShingles: prompt.templateShingles, nonce },
+    stored:
+      task.agent === 'case_reasoner' || task.agent === 'case_critic'
+        ? new Map(input.view.events.map((e) => [e.id, { id: e.id, title: e.title, body: e.body }]))
+        : null,
   };
 }

@@ -19,7 +19,7 @@ export interface RouteDecision {
 }
 
 export type BudgetRefusalCode =
-  'request_tokens' | 'day_tokens' | 'case_tokens' | 'cost_limit' | 'cost_unknown';
+  'request_tokens' | 'day_tokens' | 'case_tokens' | 'run_tokens' | 'cost_limit' | 'cost_unknown';
 
 export type BudgetVerdict =
   { allowed: true } | { allowed: false; code: BudgetRefusalCode; reason: string };
@@ -50,6 +50,8 @@ export interface BudgetRequest {
   agent: AgentName;
   estimatedInputTokens: number;
   maxOutputTokens: number;
+  /** The ceiling of the larger unit of work this call belongs to, and what it has already used (see `AgentRunRequest`). */
+  run?: { ceiling: number; used: number };
 }
 
 export interface GovernorOptions {
@@ -204,6 +206,12 @@ export class TokenGovernor {
       );
     }
     const day = this.daily.get(this.dailyKey(request.tenantId));
+    if (request.run && request.run.used + worstTokens > request.run.ceiling) {
+      return refuse(
+        'run_tokens',
+        `The token ceiling of this review is reached: ${fmt(request.run.used)} of ${fmt(request.run.ceiling)} tokens used; this request needs about ${fmt(worstTokens)}.`,
+      );
+    }
     if (
       this.limits.perDayMaxTokens !== null &&
       (day?.tokens ?? 0) + worstTokens > this.limits.perDayMaxTokens

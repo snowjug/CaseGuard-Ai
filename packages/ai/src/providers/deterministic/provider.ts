@@ -20,6 +20,7 @@ import {
 } from './analysis-handlers';
 import { runSafetyValidator, runTokenGovernor } from './control-handlers';
 import { runCounterfactualSimulator } from './counterfactual-handler';
+import { runCaseCritic, runCaseReasoner } from './reasoning-handlers';
 import { runCommunicationCoach, runQualityJudge } from './review-handlers';
 import { runSkillExtractor } from './skill-handler';
 
@@ -70,6 +71,10 @@ function dispatch(task: AgentTask, options: DeterministicRunOptions): unknown {
       return runTokenGovernor(task.input, options.governor);
     case 'safety_policy_validator':
       return runSafetyValidator(task.input);
+    case 'case_reasoner':
+      return runCaseReasoner(task.input);
+    case 'case_critic':
+      return runCaseCritic(task.input);
   }
 }
 

@@ -44,6 +44,8 @@ const CLAIM_LIMIT: Record<TrimLevel, number> = { 0: 300, 1: 240, 2: 200, 3: 160,
 const DUPLICATE_WINDOW = 30;
 const DUPLICATE_MIN_CHARS = 80;
 const DUPLICATE_SIMILARITY = 0.92;
+/** The longest description a vocabulary entry carries (ids and labels are never cut). */
+const VOCABULARY_DESCRIPTION_LIMIT = 200;
 
 interface PreparedEvent {
   event: CaseEvent;
@@ -88,6 +90,7 @@ function prepareEvents(events: readonly CaseEvent[], redact: Redactor): Prepared
 function knowledgeFor(
   pack: CompiledPack,
   sections: readonly KnowledgeSection[],
+  vocabulary: boolean,
 ): ContextKnowledge | null {
   if (sections.length === 0) return null;
   const p = pack.pack;
@@ -98,23 +101,41 @@ function knowledgeFor(
       ? p.hypotheses.map((h) => ({ id: h.id, name: h.name, description: clip(h.description, 240) }))
       : [],
     actions: sections.includes('actions')
-      ? p.actions.map((a) => ({
-          id: a.id,
-          label: a.label,
-          kind: a.kind,
-          executor: a.executor,
-          valueClass: a.valueClass,
-          customerEffort: a.customerEffort,
-          operationalRisk: a.operationalRisk,
-          destructive: a.destructive,
-          requiresApproval: a.requiresApproval,
-        }))
+      ? vocabulary
+        ? p.actions.map((a) => ({
+            id: a.id,
+            label: a.label,
+            description: clip(a.description, VOCABULARY_DESCRIPTION_LIMIT),
+          }))
+        : p.actions.map((a) => ({
+            id: a.id,
+            label: a.label,
+            kind: a.kind,
+            executor: a.executor,
+            valueClass: a.valueClass,
+            customerEffort: a.customerEffort,
+            operationalRisk: a.operationalRisk,
+            destructive: a.destructive,
+            requiresApproval: a.requiresApproval,
+          }))
       : [],
     requirements: sections.includes('requirements')
-      ? p.requirements.map((r) => ({ id: r.id, label: r.label, criticality: r.criticality }))
+      ? vocabulary
+        ? p.requirements.map((r) => ({
+            id: r.id,
+            label: r.label,
+            description: clip(r.description, VOCABULARY_DESCRIPTION_LIMIT),
+          }))
+        : p.requirements.map((r) => ({ id: r.id, label: r.label, criticality: r.criticality }))
       : [],
     signals: sections.includes('signals')
-      ? p.signals.map((s) => ({ id: s.id, label: s.label }))
+      ? vocabulary
+        ? p.signals.map((s) => ({
+            id: s.id,
+            label: s.label,
+            description: clip(s.description, VOCABULARY_DESCRIPTION_LIMIT),
+          }))
+        : p.signals.map((s) => ({ id: s.id, label: s.label }))
       : [],
   };
 }
@@ -370,7 +391,11 @@ export function buildContext(task: AgentTask, level: TrimLevel, deps: ContextDep
   const prepared = prepareEvents(view.events, deps.redact);
   const { findings, flagged } = scanEvents(prepared, deps.scanInjection);
   const selected = selectEvents(prepared, scoped, level);
-  const actionByEvent = new Map(scoped.actions.map((a) => [a.eventId, a.label]));
+  // An agent that must not see the engine's findings is not told which action the engine recognised in an event.
+  const actionByEvent =
+    meta.sections.recognisedActions === false
+      ? new Map<string, string>()
+      : new Map(scoped.actions.map((a) => [a.eventId, a.label]));
 
   const events: ContextEvent[] = selected.map((p) => ({
     id: p.event.id,
@@ -409,7 +434,11 @@ export function buildContext(task: AgentTask, level: TrimLevel, deps: ContextDep
           level,
           deps.redact,
         );
-  const knowledge = knowledgeFor(input.pack, meta.sections.knowledge);
+  const knowledge = knowledgeFor(
+    input.pack,
+    meta.sections.knowledge,
+    meta.sections.vocabulary === true,
+  );
   const { focus, anchors, actionIds } = buildFocus(task, scoped, deps);
 
   const context: AgentContext = {

@@ -52,20 +52,26 @@ export interface ContextClaim {
 export interface ContextKnowledge {
   packId: string;
   packVersion: string;
+  /** With a vocabulary the descriptions are the point; otherwise only the first 240 characters of each hypothesis. */
   hypotheses: { id: string; name: string; description: string }[];
+  /**
+   * An entry of the ranking catalogue carries the attributes the ranking uses; an entry of a vocabulary carries its
+   * description instead (and nothing else but the id and the label).
+   */
   actions: {
     id: string;
     label: string;
-    kind: string;
-    executor: string;
-    valueClass: string;
-    customerEffort: string;
-    operationalRisk: number;
-    destructive: boolean;
-    requiresApproval: boolean;
+    description?: string;
+    kind?: string;
+    executor?: string;
+    valueClass?: string;
+    customerEffort?: string;
+    operationalRisk?: number;
+    destructive?: boolean;
+    requiresApproval?: boolean;
   }[];
-  requirements: { id: string; label: string; criticality: string }[];
-  signals: { id: string; label: string }[];
+  requirements: { id: string; label: string; description?: string; criticality?: string }[];
+  signals: { id: string; label: string; description?: string }[];
 }
 
 export interface AgentContext {

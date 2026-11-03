@@ -2,6 +2,7 @@ import type { ActionValueConfig, AgentName, ValidationOutcome } from '@caseguard
 import type { CompiledPack, RankingState } from '@caseguard/domain';
 import type { IssueKind } from '../agents/outputs';
 import type { BuiltContext } from '../context/types';
+import type { ProposalReport, StoredEvent } from '../reasoning/types';
 import type { InjectionScanner } from '../types';
 
 export interface OutputIssue {
@@ -51,6 +52,11 @@ export interface ValidationContext {
   scanInjection: InjectionScanner;
   /** Fingerprints of the instructions sent to the model, to detect prompt leakage in outputs. */
   promptGuard: { templateShingles: ReadonlySet<string>; nonce: string | null };
+  /**
+   * The text of the events of the view as stored, by id. Set for the agents whose proposals quote the record (the
+   * reasoner and the critic): a quotation is located in the stored text, not in what the model was shown.
+   */
+  stored?: ReadonlyMap<string, StoredEvent> | null;
 }
 
 export interface ValidationStats {
@@ -72,6 +78,12 @@ export interface ValidationReport<T = unknown> {
   /** One repair attempt with validator feedback may help (schema, citation, grounding, size). */
   repairable: boolean;
   stats: ValidationStats;
+  /**
+   * What happened to each proposal of a reasoning agent's reply (the reasoner and the critic). Such a reply is not
+   * accepted or rejected as a whole: a proposal that fails a grounding rule is dropped and counted, the rest survives,
+   * and `output` holds the survivors. Absent for every other agent.
+   */
+  proposals?: ProposalReport;
 }
 
 /** Issues that must never be "repaired": the model is not given a second chance to leak or misbehave. */

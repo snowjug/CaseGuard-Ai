@@ -249,6 +249,8 @@ export function extractClaimItems(typed: TypedOutput): ClaimItem[] {
     }
     case 'token_governor':
     case 'safety_policy_validator':
+    case 'case_reasoner':
+    case 'case_critic':
       return [];
   }
 }
@@ -304,6 +306,8 @@ export function recommendationTexts(typed: TypedOutput): { path: string; text: s
     case 'decision_fork_detector':
     case 'token_governor':
     case 'safety_policy_validator':
+    case 'case_reasoner':
+    case 'case_critic':
       return [];
   }
 }

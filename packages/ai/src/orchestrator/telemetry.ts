@@ -48,6 +48,13 @@ export function emitExecution(
       agent: run.agent,
     });
   }
+  if (result.proposals) {
+    // Codes and counts only: a dropped proposal's text never reaches a metric or a log.
+    metrics.increment('ai.proposals.kept', result.proposals.kept, { agent: run.agent });
+    for (const [code, count] of Object.entries(result.proposals.rejectedByCode)) {
+      metrics.increment('ai.proposals.dropped', count, { agent: run.agent, code });
+    }
+  }
   logger.info(
     {
       event: 'ai.model.execution',

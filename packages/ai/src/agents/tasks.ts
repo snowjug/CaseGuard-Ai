@@ -14,6 +14,7 @@ import type {
   EngineContext,
   TemporalView,
 } from '@caseguard/domain';
+import type { ReviewConclusion } from '../reasoning/types';
 import type { ValidationContext } from '../validators/types';
 
 /** Material used only to detect leakage in outputs; it is never rendered into a prompt. */
@@ -73,6 +74,12 @@ export interface SafetyTaskInput {
   validation: ValidationContext;
 }
 
+/** The reasoner reads the redacted events and the vocabulary. It is not given the engine's findings. */
+export type CaseReasonerTaskInput = TaskBase;
+
+/** The critic reads the same events and a numbered list of conclusions under review (and may critique only those). */
+export type CaseCriticTaskInput = TaskBase & { conclusions: readonly ReviewConclusion[] };
+
 export interface TaskInputs {
   timeline_analyzer: TimelineTaskInput;
   evidence_classifier: EvidenceTaskInput;
@@ -84,6 +91,8 @@ export interface TaskInputs {
   communication_coach: CoachTaskInput;
   token_governor: GovernorTaskInput;
   safety_policy_validator: SafetyTaskInput;
+  case_reasoner: CaseReasonerTaskInput;
+  case_critic: CaseCriticTaskInput;
 }
 
 export type AgentTaskOf<A extends AgentName> = { agent: A; input: TaskInputs[A] };

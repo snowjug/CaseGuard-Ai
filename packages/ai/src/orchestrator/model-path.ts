@@ -1,3 +1,4 @@
+import type { ProviderKind } from '@caseguard/schemas';
 import type { SemanticCache } from '../cache/semantic-cache';
 import { ProviderError, describeError, executionStatusFor } from '../errors';
 import type { RouteDecision, TokenGovernor } from '../governor/token-governor';
@@ -34,7 +35,7 @@ export type ModelPathOutcome =
       prepared: PreparedTask;
       value: unknown;
       meta: {
-        provider: 'deterministic' | 'azure-openai';
+        provider: ProviderKind;
         model: string;
         usage: { totalTokens: number };
       };
@@ -199,13 +200,18 @@ export class ModelPath {
     run: RunState,
     prepared: PreparedTask,
     estimatedInputTokens = prepared.fit.tokensAfter,
+    calls: readonly CallFacts[] = [],
   ) {
+    const unit = run.request.runTokenBudget;
+    const spent = calls.reduce((s, c) => s + c.usage.promptTokens + c.usage.completionTokens, 0);
     return this.deps.governor.checkBudget({
       tenantId: run.tenantId,
       caseId: run.caseId,
       agent: run.agent,
       estimatedInputTokens,
       maxOutputTokens: prepared.limits.maxOutputTokens,
+      // What this task has already used counts against the unit it belongs to, the repair included.
+      ...(unit ? { run: { ceiling: unit.ceiling, used: unit.used + spent } } : {}),
     });
   }
 
@@ -257,6 +263,10 @@ export class ModelPath {
     let repairSkipped: string | null = null;
     let report: ValidationReport<unknown> | null = null;
     let rawOutput: string | null = null;
+    const maxRepairs = Math.min(
+      this.deps.maxRepairAttempts,
+      run.request.maxRepairAttempts ?? Number.MAX_SAFE_INTEGER,
+    );
     for (;;) {
       if ('error' in outcome) {
         const failure = outcome.error;
@@ -277,7 +287,7 @@ export class ModelPath {
       rawOutput = response.outputText;
       report = validateAgentOutput(run.agent, response.output, prepared.vctx);
       if (report.ok) break;
-      if (!report.repairable || repairs >= this.deps.maxRepairAttempts) break;
+      if (!report.repairable || repairs >= maxRepairs) break;
       const feedback = [
         ...report.issues.slice(0, 8).map((i) => `${i.path}: ${i.message}`),
         ...(response.finishReason === 'length' ? ['The reply was cut off; keep it shorter.'] : []),
@@ -287,7 +297,7 @@ export class ModelPath {
         repairFeedback: feedback,
       });
       // The first call is already booked, and the repair prompt is longer than the first one.
-      const allowance = this.budgetFor(run, prepared, messageTokens(repairMessages));
+      const allowance = this.budgetFor(run, prepared, messageTokens(repairMessages), calls);
       if (!allowance.allowed) {
         repairSkipped = allowance.reason;
         break;
@@ -298,7 +308,18 @@ export class ModelPath {
 
     const last = calls[calls.length - 1];
     if (report.ok && last) {
-      if (cache && prepared.cacheScope && prepared.cacheInput && report.output !== null) {
+      // A reply whose every proposal was dropped was, in effect, rejected: it is not kept for the next identical request.
+      const everyProposalDropped =
+        report.proposals !== undefined &&
+        report.proposals.proposed > 0 &&
+        report.proposals.kept === 0;
+      if (
+        cache &&
+        prepared.cacheScope &&
+        prepared.cacheInput &&
+        report.output !== null &&
+        !everyProposalDropped
+      ) {
         cache.set(prepared.cacheScope, prepared.cacheInput, report.output, {
           provider: this.deps.provider.kind,
           model,

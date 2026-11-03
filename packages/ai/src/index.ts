@@ -16,6 +16,19 @@ export {
   type AzureOpenAiProviderOptions,
   type AzureRetryPolicy,
 } from './providers/azure/provider';
+// Test-only provider: replays a stated script. The configuration loader refuses it outside local and test runtimes.
+export {
+  ScriptedProvider as ScriptedTestProvider,
+  createScriptedTestProvider,
+  SCRIPTED_MODEL,
+  SCRIPTED_VALIDATION_NOTE,
+  type Script,
+  type ScriptEntry,
+  type ScriptFailure,
+  type ScriptStep,
+  type ScriptedCall,
+  type ScriptedProviderOptions,
+} from './providers/scripted/provider';
 
 // Agents, tasks and output contracts
 export * from './agents/outputs';
@@ -112,3 +125,58 @@ export { runAdversarialSuite, runControlSuite } from './eval/adversarial';
 export { planSamples, type PlanOptions, type PlannedSample } from './eval/plan';
 export { evalReportToJson, evalReportToMarkdown } from './eval/report';
 export * from './eval/types';
+
+// Optional model-assisted review: proposals, grounding rules, hybrid policy, orchestration entry
+export {
+  runModelAssistedReview,
+  ASSISTANCE_REASON_CODES,
+  type Assistance,
+  type AssistanceMode,
+  type AssistanceReasonCode,
+  type ReviewDeps,
+  type ReviewInput,
+  type ReviewResult,
+} from './reasoning/run';
+export {
+  combine,
+  critiquesOfEngine,
+  findingKey,
+  stanceOf,
+  type CombineInput,
+  type ConclusionRef,
+  type CriticInput,
+  type EngineNote,
+} from './reasoning/policy';
+export {
+  deterministicFactsOf,
+  isAtOrBefore,
+  isBefore,
+  mentions,
+  unmetRequirementsAt,
+  type ActionFact,
+  type CounterfactualFact,
+  type DeterministicFacts,
+  type FactsExtras,
+  type FactsScope,
+  type ForkFact,
+  type HypothesisFact,
+  type RecommendationFact,
+  type RequirementFact,
+  type SignalFact,
+  type Stamp,
+} from './reasoning/facts';
+export { buildConclusions } from './reasoning/conclusions';
+export { validateProposalOutput } from './reasoning/validate';
+export { locateCitation } from './reasoning/locate';
+export {
+  PROPOSAL_CODES,
+  PROPOSAL_CODE_DESCRIPTIONS,
+  type DroppedItem,
+  type KeptCritic,
+  type KeptCritique,
+  type KeptProposal,
+  type ProposalCode,
+  type ProposalIssue,
+  type ProposalReport,
+  type ReviewConclusion,
+} from './reasoning/types';

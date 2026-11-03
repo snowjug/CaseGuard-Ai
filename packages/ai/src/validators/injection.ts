@@ -141,8 +141,14 @@ const OUTPUT_RULES: readonly OutputRule[] = [
 const SHINGLE_SIZE = 6;
 const MAX_ISSUES = 20;
 
+/** What the output-side checks read: the lower-cased text the model was shown and the fingerprints of the instructions. */
+export interface OutputInjectionContext {
+  built: { allText: string };
+  promptGuard: ValidationContext['promptGuard'];
+}
+
 /** Behavioural indicators that a model followed injected instructions or leaked internals. */
-export function checkOutputInjection(output: unknown, vctx: ValidationContext): OutputIssue[] {
+export function checkOutputInjection(output: unknown, vctx: OutputInjectionContext): OutputIssue[] {
   const issues: OutputIssue[] = [];
   const texts = collectTexts(output);
   const context = vctx.built.allText;
