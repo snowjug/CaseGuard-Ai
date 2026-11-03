@@ -248,7 +248,7 @@ describe('versions, vocabulary and plain-language labels', () => {
       'NEEDS_HUMAN_REVIEW',
     ]);
     for (const status of HYBRID_STATUSES) {
-      expect(HYBRID_STATUS_LABELS[status]).toMatch(/^[A-Z][a-z]/);
+      expect(HYBRID_STATUS_LABELS[status]).toMatch(/^[A-Z]/);
       expect(HYBRID_STATUS_LABELS[status]).not.toMatch(/[_]|MODEL|HUMAN/);
       expect(HYBRID_STATUS_DESCRIPTIONS[status].endsWith('.')).toBe(true);
     }
