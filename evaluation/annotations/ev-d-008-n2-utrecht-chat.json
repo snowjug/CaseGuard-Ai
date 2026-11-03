@@ -1,0 +1,65 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-008-n2-utrecht-chat",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave1",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-02T19:59:46Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        {
+          "event": "ev01",
+          "id": "sig.multiple-users-affected"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.error-timeout"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.intermittent-failures"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.site-correlated"
+        },
+        {
+          "event": "ev03",
+          "id": "sig.cache-clear-no-effect"
+        },
+        {
+          "event": "ev03",
+          "id": "sig.web-client-also-fails"
+        },
+        {
+          "event": "ev05",
+          "id": "sig.revoke-sessions-no-effect"
+        },
+        {
+          "event": "ev06",
+          "id": "sig.no-server-side-failure-records"
+        },
+        {
+          "event": "ev07",
+          "id": "sig.proxy-node-inconsistent"
+        },
+        {
+          "event": "ev08",
+          "id": "sig.recent-network-change-reported"
+        },
+        {
+          "event": "ev09",
+          "id": "sig.proxy-fix-resolved"
+        }
+      ],
+      "earliestMissed": "ev02",
+      "causes": ["hyp.proxy-egress"],
+      "rationale": "Migrated without change from the Wave 1 corpus. Every event lists the signals a reader of that event would say it states, judged against the signal descriptions and not against the detector patterns; the story names the cause or causes a reader of the whole story accepts and the earliest missed moment where there is one. An AI assistant wrote these labels, no human checked them, and Wave 1 recorded no uncertainty per label.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

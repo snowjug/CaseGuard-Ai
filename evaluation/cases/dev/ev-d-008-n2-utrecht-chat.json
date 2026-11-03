@@ -1,0 +1,105 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-008-n2-utrecht-chat",
+  "split": "dev",
+  "family": "fam-002",
+  "title": "Evaluation case n2-utrecht-chat: the Utrecht proxy story as chat fragments, with a pasted printer log that looks like a Teams error",
+  "scenario": "The Utrecht proxy story as chat fragments, with a pasted printer log that looks like a Teams error.",
+  "categories": ["noisy"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-02T08:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "utrecht teams",
+      "text": "utrecht. about 70 ppl. teams says connection timed out at login. comes and goes. other sites ok as far as i know"
+    },
+    {
+      "key": "ev02",
+      "at": 30,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: utrecht teams",
+      "text": "pls clear the teams cache and reinstall on one pc and tell me what happens"
+    },
+    {
+      "key": "ev03",
+      "at": 150,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: utrecht teams",
+      "text": "did both on 5 pcs. nothing changed. teams in the browser fails the same way.\n\nunrelated, our print server logged this today:\nspooler: job 1432 timed out waiting for device HP-2F-03\nspooler: name HP-2F-03.corp could not be resolved\nspooler: job 1432 cancelled"
+    },
+    {
+      "key": "ev04",
+      "at": 175,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: utrecht teams",
+      "text": "ok. pls sign the pilot group out of all sessions and back in"
+    },
+    {
+      "key": "ev05",
+      "at": 260,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: utrecht teams",
+      "text": "did it. same failures."
+    },
+    {
+      "key": "ev06",
+      "at": 290,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "sign-in logs",
+      "text": "checked the entra sign-in logs of the pilot users. no failure rows for the times they failed"
+    },
+    {
+      "key": "ev07",
+      "at": 330,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "proxies",
+      "text": "tried login.microsoftonline.com through all 4 proxies. 3 are fine. proxy-04 times out every time"
+    },
+    {
+      "key": "ev08",
+      "at": 400,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: proxies",
+      "text": "new cert inspection profile went on that cluster last tue. proxy-04 is out of the lb now"
+    },
+    {
+      "key": "ev09",
+      "at": 460,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: proxies",
+      "text": "no more timeouts. 20 logins ok"
+    },
+    {
+      "key": "ev10",
+      "at": 480,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: proxies",
+      "text": "thanks, have a good weekend!"
+    }
+  ]
+}

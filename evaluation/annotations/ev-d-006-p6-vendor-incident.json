@@ -1,0 +1,37 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-006-p6-vendor-incident",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave1",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-02T19:59:46Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        {
+          "event": "ev01",
+          "id": "sig.multiple-users-affected"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.intermittent-failures"
+        },
+        {
+          "event": "ev02",
+          "id": "sig.service-health-incident"
+        },
+        {
+          "event": "ev04",
+          "id": "sig.error-timeout"
+        }
+      ],
+      "earliestMissed": null,
+      "causes": ["hyp.service-incident"],
+      "rationale": "Migrated without change from the Wave 1 corpus. Every event lists the signals a reader of that event would say it states, judged against the signal descriptions and not against the detector patterns; the story names the cause or causes a reader of the whole story accepts and the earliest missed moment where there is one. An AI assistant wrote these labels, no human checked them, and Wave 1 recorded no uncertainty per label.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

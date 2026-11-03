@@ -1,0 +1,96 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-001-p1-warsaw-resolver",
+  "split": "dev",
+  "family": "fam-001",
+  "title": "Evaluation case p1-warsaw-resolver: a branch office is thrown out of Teams while one of its two name servers is not answering",
+  "scenario": "A branch office is thrown out of Teams while one of its two name servers is not answering.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-02T08:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams logins failing in Warsaw",
+      "text": "Hi, since about nine this morning our Warsaw office, roughly 45 people, keeps getting thrown out of Teams when they sign in. If you wait a minute and try once more it sometimes goes through, sometimes it does not. Colleagues at our Gdansk office have no trouble at all."
+    },
+    {
+      "key": "ev02",
+      "at": 25,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams logins failing in Warsaw",
+      "text": "Thanks for the quick description. To narrow it down: please name three people who were affected and, for each of them, the UTC time at which one sign-in failed. Also, which DNS servers and which proxy do the Warsaw computers use?"
+    },
+    {
+      "key": "ev03",
+      "at": 80,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams logins failing in Warsaw",
+      "text": "Users: a.kowal 08:14:10 UTC, m.nowak 08:16:55 UTC, t.wisniewski 08:20:31 UTC. Warsaw computers get 10.20.1.10 and 10.20.1.11 as DNS servers and go out directly, there is no proxy. The message in the Teams window says the name of the server could not be resolved."
+    },
+    {
+      "key": "ev04",
+      "at": 115,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log check",
+      "text": "Looked up the three users in the Entra sign-in logs, around the minutes of their failed attempts. There is nothing at all for those attempts, which means the requests never got as far as Entra."
+    },
+    {
+      "key": "ev05",
+      "at": 140,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Name server test",
+      "text": "Asked each of the two Warsaw name servers for login.microsoftonline.com five times. 10.20.1.10 answered every time within milliseconds. 10.20.1.11 did not answer on four of the five tries."
+    },
+    {
+      "key": "ev06",
+      "at": 155,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Name server 10.20.1.11",
+      "text": "One of your two name servers, 10.20.1.11, is not answering for the Microsoft sign-in host names, while the other one is fine. Did anyone change anything on it lately? For now, please take it out of the addresses that Warsaw clients receive."
+    },
+    {
+      "key": "ev07",
+      "at": 210,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Name server 10.20.1.11",
+      "text": "Yes, last Thursday we switched on a new web filtering policy on that server. I have removed it from the DHCP scope, the clients are renewing their leases now."
+    },
+    {
+      "key": "ev08",
+      "at": 275,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Name server 10.20.1.11",
+      "text": "Fifteen sign-ins in Warsaw since the change, every one of them worked. Nobody has complained again."
+    },
+    {
+      "key": "ev09",
+      "at": 300,
+      "who": "engineer",
+      "type": "resolution_note",
+      "channel": "email",
+      "title": "Closing note",
+      "text": "Closing with the customer's agreement. They will correct the filtering policy on that server before it goes back into use."
+    }
+  ]
+}

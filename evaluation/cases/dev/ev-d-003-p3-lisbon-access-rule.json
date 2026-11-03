@@ -1,0 +1,96 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-003-p3-lisbon-access-rule",
+  "split": "dev",
+  "family": "fam-003",
+  "title": "Evaluation case p3-lisbon-access-rule: people at every office are blocked after a new device-compliance access rule",
+  "scenario": "People at every office are blocked after a new device-compliance access rule.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-02T08:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Staff blocked from Teams",
+      "text": "Since Monday morning many of our staff cannot get into Teams. After typing the password they are told that access is blocked by their organisation, or they are asked for a second factor again and again. It affects people at all of our offices, more than a hundred so far."
+    },
+    {
+      "key": "ev02",
+      "at": 30,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Staff blocked from Teams",
+      "text": "Thank you. Please give me the names of three blocked users and, for every one of them, a UTC timestamp at which a sign-in was refused. Also tell me whether any security or access settings were changed shortly before Monday."
+    },
+    {
+      "key": "ev03",
+      "at": 95,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Staff blocked from Teams",
+      "text": "Yes. On Friday afternoon our security team switched on a new access rule that requires a managed, compliant device for Teams. The three users are r.silva 08:02 UTC, c.santos 08:07 UTC and p.costa 08:11 UTC."
+    },
+    {
+      "key": "ev04",
+      "at": 130,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log check",
+      "text": "All three failed attempts are in the Entra sign-in logs. Each one is marked as stopped by Conditional Access, by the new device-compliance rule, and one of them also shows an interrupted multi-factor step."
+    },
+    {
+      "key": "ev05",
+      "at": 150,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Service health check",
+      "text": "Looked at the Microsoft service health page and the message centre: there is no incident about sign-in or Teams right now."
+    },
+    {
+      "key": "ev06",
+      "at": 170,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Next step",
+      "text": "The logs point at the new device-compliance rule. Could you exclude one affected test user from that rule and tell me whether signing in works for them afterwards?"
+    },
+    {
+      "key": "ev07",
+      "at": 260,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Next step",
+      "text": "We excluded the test user and waited twenty minutes. They are still blocked with the same message."
+    },
+    {
+      "key": "ev08",
+      "at": 285,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Exclusion check",
+      "text": "Looked at the exclusion more closely: the test user was left out of the older rule, not the new one. The block comes from the newer rule."
+    },
+    {
+      "key": "ev09",
+      "at": 330,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Next step",
+      "text": "We left the user out of the new rule as well and sign-in works now. We will adjust the rule for devices that are not enrolled yet."
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-011-z2-licence-question",
+  "split": "dev",
+  "family": "fam-008",
+  "title": "Evaluation case z2-licence-question: a licensing question with no failure in it",
+  "scenario": "A licensing question with no failure in it.",
+  "categories": ["negative-control"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-02T08:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Licences for phone calls",
+      "text": "Which licence do our sales staff need to make and receive phone calls in Teams, and can we limit which external guests are allowed to join our meetings?"
+    },
+    {
+      "key": "ev02",
+      "at": 35,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Licences for phone calls",
+      "text": "Phone calls need a Teams Phone licence plus either a calling plan or direct routing. Guests can be limited in the Teams admin centre under external access, either to named domains or to none."
+    },
+    {
+      "key": "ev03",
+      "at": 80,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Licences for phone calls",
+      "text": "That answers it, thank you. We will assign the licences next week."
+    }
+  ]
+}

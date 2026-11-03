@@ -1,0 +1,33 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-012-z3-printer-lookalike",
+  "split": "dev",
+  "family": "fam-009",
+  "title": "Evaluation case z3-printer-lookalike: a printer problem whose error text looks like a Teams error, and no Teams failure at all",
+  "scenario": "A printer problem whose error text looks like a Teams error, and no Teams failure at all.",
+  "categories": ["negative-control"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-02T08:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Label printer on floor 2",
+      "text": "The label printer on the second floor says the connection timed out and that the name of the print server could not be resolved. It is only my desk that has the problem. Teams works fine for all of us."
+    },
+    {
+      "key": "ev02",
+      "at": 30,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Label printer on floor 2",
+      "text": "That sounds like a printer or print server matter, not Teams. Please contact your print administrator and check the printer settings."
+    }
+  ]
+}

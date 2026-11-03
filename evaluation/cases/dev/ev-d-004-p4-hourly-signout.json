@@ -1,0 +1,78 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-004-p4-hourly-signout",
+  "split": "dev",
+  "family": "fam-004",
+  "title": "Evaluation case p4-hourly-signout: people are signed out about once an hour after a session rule was shortened",
+  "scenario": "People are signed out about once an hour after a session rule was shortened.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-02T08:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Signed out of Teams every hour",
+      "text": "Users are signed out of Teams about once an hour and have to log in again. About 30 people have reported it, from several locations. Our security admin did shorten the session time in an access policy two weeks ago, but we assumed that would be one day, not one hour."
+    },
+    {
+      "key": "ev02",
+      "at": 35,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Signed out of Teams every hour",
+      "text": "Thanks. Please give me three names from among those affected, and for each one the UTC time of a forced sign-out; and an export of the access policy that was changed."
+    },
+    {
+      "key": "ev03",
+      "at": 110,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Signed out of Teams every hour",
+      "text": "Users: d.meyer 10:12 UTC, s.fischer 10:48 UTC, l.weber 11:05 UTC. The exported policy is attached; the sign-in frequency in it is set to one hour."
+    },
+    {
+      "key": "ev04",
+      "at": 150,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log check",
+      "text": "For these users the logs show errors 70043 and 700082 at exactly the times they were signed out, both saying that the token has expired because of the session lifetime."
+    },
+    {
+      "key": "ev05",
+      "at": 165,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Service health check",
+      "text": "Service health lists nothing active for sign-in or Teams."
+    },
+    {
+      "key": "ev06",
+      "at": 190,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Cause and suggestion",
+      "text": "The one-hour sign-in frequency in your new policy ends the sessions. If you want users to stay signed in for a working day, raise it and tell me how it behaves."
+    },
+    {
+      "key": "ev07",
+      "at": 400,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Cause and suggestion",
+      "text": "We set it to 24 hours. Five users tested through a whole afternoon and nobody was signed out again."
+    }
+  ]
+}

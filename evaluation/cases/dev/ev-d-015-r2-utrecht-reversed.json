@@ -1,0 +1,116 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-015-r2-utrecht-reversed",
+  "split": "dev",
+  "family": "fam-002",
+  "title": "Evaluation case r2-utrecht-reversed: timeouts at one site while one proxy server of four is not answering, after a first step that did not help",
+  "scenario": "Timeouts at one site while one proxy server of four is not answering, after a first step that did not help.",
+  "categories": ["reordered"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-02T08:00:00Z",
+  "derivedFrom": "ev-d-002-p2-utrecht-proxy",
+  "handedOverOrder": [
+    "ev10",
+    "ev09",
+    "ev08",
+    "ev07",
+    "ev06",
+    "ev05",
+    "ev04",
+    "ev03",
+    "ev02",
+    "ev01"
+  ],
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams times out in Utrecht",
+      "text": "Good morning. Around 70 colleagues at the Utrecht site get a message that the connection timed out when they open Teams and sign in. It is not constant; restarting the app fixes it for some people for a while. The other sites are not affected as far as we know."
+    },
+    {
+      "key": "ev02",
+      "at": 30,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams times out in Utrecht",
+      "text": "Hello, sorry to hear that. Please try this on one affected PC: close Teams completely, delete the Teams cache folder and sign in again. If that does not help, a clean reinstall of the Teams app is the next step."
+    },
+    {
+      "key": "ev03",
+      "at": 150,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams times out in Utrecht",
+      "text": "We deleted the cache and did a full reinstall on five computers. No difference, the timeout message still comes up. The browser version of Teams fails in exactly the same way."
+    },
+    {
+      "key": "ev04",
+      "at": 170,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams times out in Utrecht",
+      "text": "Thanks. Next, please have a few of the affected users sign out everywhere and sign back in, so that any old sessions are dropped."
+    },
+    {
+      "key": "ev05",
+      "at": 260,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams times out in Utrecht",
+      "text": "We signed everyone in the pilot group out of all sessions yesterday evening and they signed in again this morning. Exactly the same failures as before."
+    },
+    {
+      "key": "ev06",
+      "at": 290,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log check",
+      "text": "Pulled the Entra sign-in logs and looked at the users and times you named. No failures are recorded for any of them; whatever is going wrong stops before it reaches Entra."
+    },
+    {
+      "key": "ev07",
+      "at": 330,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Proxy test",
+      "text": "Requested login.microsoftonline.com through each of the four proxy servers of the Utrecht cluster. Three returned the page in under a second. proxy-04 timed out every single time."
+    },
+    {
+      "key": "ev08",
+      "at": 345,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Proxy server proxy-04",
+      "text": "One of the four proxy servers, proxy-04, times out for the Microsoft sign-in addresses; the other three are fine. Was anything done on that cluster recently?"
+    },
+    {
+      "key": "ev09",
+      "at": 400,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Proxy server proxy-04",
+      "text": "We rolled out a new certificate inspection profile on the cluster last Tuesday. I have taken proxy-04 out of the load balancer for now."
+    },
+    {
+      "key": "ev10",
+      "at": 460,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Proxy server proxy-04",
+      "text": "No timeouts reported since proxy-04 was taken out. I watched twenty sign-ins and all of them were fine."
+    }
+  ]
+}

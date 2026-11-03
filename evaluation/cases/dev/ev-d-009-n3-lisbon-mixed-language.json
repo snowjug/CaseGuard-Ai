@@ -1,0 +1,69 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-009-n3-lisbon-mixed-language",
+  "split": "dev",
+  "family": "fam-003",
+  "title": "Evaluation case n3-lisbon-mixed-language: the access-rule story with one message written mostly in Portuguese",
+  "scenario": "The access-rule story with one message written mostly in Portuguese.",
+  "categories": ["noisy"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-02T08:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams bloqueado",
+      "text": "Olá. Desde segunda-feira muitos utilizadores estão bloqueados no Teams, in all offices, more than 100 people. It says access is blocked by the organisation, or it asks for the second factor again and again."
+    },
+    {
+      "key": "ev02",
+      "at": 30,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams bloqueado",
+      "text": "Thank you. Could you list three affected users and one UTC time at which each of them was refused? Please also tell me whether any access settings changed shortly before Monday."
+    },
+    {
+      "key": "ev03",
+      "at": 95,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams bloqueado",
+      "text": "Sim, na sexta-feira a equipa de segurança ativou uma nova regra de acesso que só permite dispositivos geridos e conformes. Utilizadores: r.silva 08:02 UTC, c.santos 08:07 UTC, p.costa 08:11 UTC."
+    },
+    {
+      "key": "ev04",
+      "at": 130,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log check",
+      "text": "The failed attempts of all three users are in the Entra sign-in logs, each one stopped by Conditional Access because of the device-compliance rule."
+    },
+    {
+      "key": "ev05",
+      "at": 150,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Service health check",
+      "text": "Service health has no active incident for sign-in or Teams."
+    },
+    {
+      "key": "ev06",
+      "at": 260,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams bloqueado",
+      "text": "We left the test user out of that rule and waited, still blocked, same message."
+    }
+  ]
+}
