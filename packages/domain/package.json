@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "bench": "tsx bench/bench.ts",
-    "eval": "tsx test/evaluation/report.ts"
+    "eval": "tsx test/evaluation/report.ts",
+    "eval:vocabulary": "tsx test/evaluation/vocabulary.ts"
   },
   "dependencies": {
     "@caseguard/schemas": "workspace:*",

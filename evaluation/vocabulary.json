@@ -1,0 +1,632 @@
+{
+  "schema": "caseguard.eval-vocabulary/1",
+  "workload": "teams-authentication",
+  "packId": "kp.teams-authentication",
+  "packVersion": "1.0.0",
+  "dimensions": [
+    {
+      "id": "scope",
+      "description": "Who or what is affected, and how the failures are spread."
+    },
+    {
+      "id": "client-error",
+      "description": "What the sign-in client reports to the user."
+    },
+    {
+      "id": "server-evidence",
+      "description": "What the identity service logs show, or do not show."
+    },
+    {
+      "id": "device-state",
+      "description": "The state of the device, its registration and its client."
+    },
+    {
+      "id": "change-history",
+      "description": "Changes to policy or network made before the problem."
+    },
+    {
+      "id": "service-health",
+      "description": "What the provider status or incident feed says."
+    },
+    {
+      "id": "network-checks",
+      "description": "Results of name-resolution, proxy and federation checks."
+    },
+    {
+      "id": "remediation-outcome",
+      "description": "What a fix or a clean-up step did to the problem."
+    },
+    {
+      "id": "action",
+      "description": "What an engineer did, asked for or arranged."
+    }
+  ],
+  "signals": [
+    {
+      "id": "sig.ca-config-unchanged",
+      "label": "Conditional Access configuration has not changed recently",
+      "description": "The customer or a config review shows no recent policy change.",
+      "dimension": "change-history",
+      "kind": "absence"
+    },
+    {
+      "id": "sig.ca-exclusion-no-effect",
+      "label": "Excluding users from the MFA policy did not help",
+      "description": "After users were excluded from the MFA / Conditional Access policy, failures continued.",
+      "dimension": "remediation-outcome",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.cache-clear-no-effect",
+      "label": "Clearing the client cache or reinstalling did not help",
+      "description": "Cache clearing, a clean profile, or a reinstall left the failures unchanged.",
+      "dimension": "remediation-outcome",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.cache-clear-resolved",
+      "label": "Clearing the client cache fixed the device",
+      "description": "The device signs in successfully after clearing cache or reinstalling.",
+      "dimension": "remediation-outcome",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.dns-fix-resolved",
+      "label": "Failures stopped after the DNS resolver fix",
+      "description": "After the failing resolver was removed or the DNS policy corrected, failures stopped.",
+      "dimension": "remediation-outcome",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.error-name-not-resolved",
+      "label": "Client reports a name-resolution failure",
+      "description": "The Teams client error tag caa82ee7 (a WinINET \"name not resolved\" style code) or an ERR_NAME_NOT_RESOLVED / NXDOMAIN message appears.",
+      "dimension": "client-error",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.error-timeout",
+      "label": "Client reports a connection timeout",
+      "description": "The Teams client error tag caa82ee2 or an ERR_TIMED_OUT style message appears.",
+      "dimension": "client-error",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.federation-node-error",
+      "label": "Federation server errors, certificate or clock problems",
+      "description": "AD FS or STS logs show certificate, clock-skew or node errors.",
+      "dimension": "network-checks",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.intermittent-failures",
+      "label": "Failures are intermittent",
+      "description": "A retry sometimes succeeds; the failure is not deterministic.",
+      "dimension": "scope",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.mfa-ca-events-in-logs",
+      "label": "MFA / Conditional Access events exist in sign-in logs",
+      "description": "Sign-in log rows with AADSTS50076, 50074 or Conditional Access failure results are present.",
+      "dimension": "server-evidence",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.multiple-users-affected",
+      "label": "Multiple users affected at once",
+      "description": "More than a handful of users report the same problem in the same period.",
+      "dimension": "scope",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.no-server-side-failure-records",
+      "label": "No server-side sign-in records for the failing attempts",
+      "description": "Correlating failing attempts (user + UTC time) with Entra sign-in logs finds no matching failure records: the requests never reached the identity service.",
+      "dimension": "server-evidence",
+      "kind": "absence"
+    },
+    {
+      "id": "sig.policy-events-outside-failure-window",
+      "label": "Policy-related log events do not coincide with the failures",
+      "description": "Query output was annotated as having zero rows inside the reported failure window, so the policy-related events it found are unrelated background.",
+      "dimension": "server-evidence",
+      "kind": "absence"
+    },
+    {
+      "id": "sig.proxy-fix-resolved",
+      "label": "Failures stopped after the proxy fix",
+      "description": "After the failing proxy node was removed from rotation or inspection was bypassed, failures stopped.",
+      "dimension": "remediation-outcome",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.proxy-node-inconsistent",
+      "label": "One proxy node times out while others respond",
+      "description": "A per-node test shows at least one proxy node timing out or failing for sign-in hosts.",
+      "dimension": "network-checks",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.proxy-nodes-consistent",
+      "label": "All proxy nodes respond consistently",
+      "description": "A per-node test shows every proxy node responding normally.",
+      "dimension": "network-checks",
+      "kind": "absence"
+    },
+    {
+      "id": "sig.prt-healthy",
+      "label": "Primary refresh token is healthy on sampled devices",
+      "description": "dsregcmd output shows AzureAdPrt: YES.",
+      "dimension": "device-state",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.prt-missing",
+      "label": "Primary refresh token is missing on sampled devices",
+      "description": "dsregcmd output shows AzureAdPrt: NO.",
+      "dimension": "device-state",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.recent-ca-change-reported",
+      "label": "Customer reports a recent Conditional Access change",
+      "description": "A Conditional Access or MFA policy was changed shortly before onset.",
+      "dimension": "change-history",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.recent-network-change-reported",
+      "label": "A DNS, proxy or filtering change was deployed shortly before onset",
+      "description": "A network-side policy change (DNS filtering, proxy/TLS inspection, firewall) preceded the failures.",
+      "dimension": "change-history",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.resolver-inconsistent",
+      "label": "One DNS resolver fails or blocks sign-in hosts while others answer",
+      "description": "A per-resolver name-resolution test shows at least one resolver failing for sign-in or CDN hosts.",
+      "dimension": "network-checks",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.resolvers-consistent",
+      "label": "All DNS resolvers answer sign-in hosts consistently",
+      "description": "A per-resolver test shows every resolver answering normally.",
+      "dimension": "network-checks",
+      "kind": "absence"
+    },
+    {
+      "id": "sig.revoke-sessions-no-effect",
+      "label": "Revoking user sessions did not change the failure rate",
+      "description": "After sessions were revoked and users signed in again, failures continued unchanged.",
+      "dimension": "remediation-outcome",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.server-side-failure-records-present",
+      "label": "Failing attempts have matching server-side failure records",
+      "description": "Correlation finds failed sign-in records at the reported times.",
+      "dimension": "server-evidence",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.service-health-clear",
+      "label": "No active Microsoft service incident",
+      "description": "Service health and the Message center show no relevant incident.",
+      "dimension": "service-health",
+      "kind": "absence"
+    },
+    {
+      "id": "sig.service-health-incident",
+      "label": "An active Microsoft service incident matches the symptoms",
+      "description": "Service health lists an active incident affecting sign-in or Teams.",
+      "dimension": "service-health",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.single-user-scope",
+      "label": "Only one user or device is affected",
+      "description": "The report is confined to a single user or a single device.",
+      "dimension": "scope",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.site-correlated",
+      "label": "Failures concentrate at specific sites or networks",
+      "description": "Some sites or networks are affected much more than others.",
+      "dimension": "scope",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.token-expiry-errors",
+      "label": "Token expiry or session revocation errors in logs",
+      "description": "Sign-in logs show AADSTS70043, 700082, 50173, 50132 or 50133.",
+      "dimension": "client-error",
+      "kind": "presence"
+    },
+    {
+      "id": "sig.web-client-also-fails",
+      "label": "The browser version of Teams also fails",
+      "description": "Teams on the web fails too, so the desktop client is not the sole factor.",
+      "dimension": "device-state",
+      "kind": "presence"
+    }
+  ],
+  "actions": [
+    {
+      "id": "act.bypass-proxy-inspection",
+      "label": "Bypass TLS inspection for Microsoft 365 endpoints (permanent fix)",
+      "description": "Exempt Microsoft 365 endpoints from TLS inspection per Microsoft published endpoint guidance, under change control.",
+      "valueClass": "remediation",
+      "executor": "customer_network_admin"
+    },
+    {
+      "id": "act.check-federation-health",
+      "label": "Review federation server health, certificates and clocks",
+      "description": "Check AD FS / STS node health, token-signing certificate validity and clock synchronisation.",
+      "valueClass": "diagnostic",
+      "executor": "customer_admin"
+    },
+    {
+      "id": "act.check-service-health",
+      "label": "Check Microsoft 365 service health",
+      "description": "Review Service health and the Message center for active incidents affecting Teams or Microsoft Entra ID.",
+      "valueClass": "diagnostic",
+      "executor": "engineer"
+    },
+    {
+      "id": "act.clear-teams-cache",
+      "label": "Clear the Teams client cache on a device",
+      "description": "Ask the customer to clear the Teams cache on an affected device and retry.",
+      "valueClass": "diagnostic",
+      "executor": "customer_end_user"
+    },
+    {
+      "id": "act.communicate-status",
+      "label": "Send the customer a status update with next steps and timing",
+      "description": "Tell the customer what was found, what happens next and when they will hear back.",
+      "valueClass": "communication",
+      "executor": "engineer"
+    },
+    {
+      "id": "act.device-registration-check",
+      "label": "Check device registration and PRT health (dsregcmd)",
+      "description": "Run dsregcmd /status on sampled affected devices and inspect AzureAdPrt and join state.",
+      "valueClass": "diagnostic",
+      "executor": "customer_end_user"
+    },
+    {
+      "id": "act.dns-resolver-comparison",
+      "label": "Compare name resolution across each DNS resolver",
+      "description": "Run Resolve-DnsName for the sign-in and CDN hosts against every DNS resolver used by the affected site and compare the answers.",
+      "valueClass": "diagnostic",
+      "executor": "customer_network_admin"
+    },
+    {
+      "id": "act.escalate-to-identity-team",
+      "label": "Escalate to the identity backend team",
+      "description": "Escalate with the evidence collected so far and request backend traces.",
+      "valueClass": "enabling",
+      "executor": "engineer"
+    },
+    {
+      "id": "act.exclude-users-from-mfa-ca",
+      "label": "Temporarily exclude users from the MFA policy",
+      "description": "Exclude affected users from the MFA Conditional Access policy as a test.",
+      "valueClass": "remediation",
+      "executor": "customer_admin"
+    },
+    {
+      "id": "act.proxy-node-comparison",
+      "label": "Compare sign-in connectivity through each proxy node",
+      "description": "Test the sign-in endpoints through every proxy or TLS-inspection node from an affected site and compare timings.",
+      "valueClass": "diagnostic",
+      "executor": "customer_network_admin"
+    },
+    {
+      "id": "act.reinstall-teams",
+      "label": "Reinstall Teams on affected devices",
+      "description": "Ask the customer to uninstall and reinstall the Teams client.",
+      "valueClass": "remediation",
+      "executor": "customer_end_user"
+    },
+    {
+      "id": "act.remove-proxy-node-from-rotation",
+      "label": "Take the failing proxy node out of rotation (workaround)",
+      "description": "Temporarily remove the failing proxy node from the PAC file or load balancer.",
+      "valueClass": "remediation",
+      "executor": "customer_network_admin"
+    },
+    {
+      "id": "act.remove-resolver-from-service",
+      "label": "Remove the failing DNS resolver from the affected scopes (workaround)",
+      "description": "Temporarily remove the failing resolver from DHCP scopes so clients use healthy resolvers.",
+      "valueClass": "remediation",
+      "executor": "customer_network_admin"
+    },
+    {
+      "id": "act.request-har-capture",
+      "label": "Request HAR / Fiddler traces from end users",
+      "description": "Ask users to capture a network trace while a sign-in fails, then analyse the large capture.",
+      "valueClass": "diagnostic",
+      "executor": "customer_end_user"
+    },
+    {
+      "id": "act.request-minimal-scoping",
+      "label": "Ask for minimal scoping data",
+      "description": "Ask the customer for the exact client error text or code, three failing sample users with UTC failure times, and which sites or networks are affected versus unaffected.",
+      "valueClass": "enabling",
+      "executor": "customer_admin"
+    },
+    {
+      "id": "act.request-recent-changes",
+      "label": "Ask about recent identity, network or policy changes",
+      "description": "Ask the customer which identity, network, DNS, proxy or policy changes were made in the 48 hours before onset.",
+      "valueClass": "diagnostic",
+      "executor": "customer_admin"
+    },
+    {
+      "id": "act.restore-dns-policy",
+      "label": "Correct the DNS filtering policy (permanent fix)",
+      "description": "Roll back the faulty DNS filtering rule and add an exception for published Microsoft 365 endpoints, under change control.",
+      "valueClass": "remediation",
+      "executor": "customer_network_admin"
+    },
+    {
+      "id": "act.review-ca-policy-config",
+      "label": "Review Conditional Access configuration and recent changes",
+      "description": "Review policy assignments, sign-in frequency settings and the audit log for recent Conditional Access changes.",
+      "valueClass": "diagnostic",
+      "executor": "engineer"
+    },
+    {
+      "id": "act.revoke-user-sessions",
+      "label": "Revoke refresh tokens and sessions for affected users",
+      "description": "Revoke sign-in sessions so every affected user must authenticate again.",
+      "valueClass": "remediation",
+      "executor": "customer_admin"
+    },
+    {
+      "id": "act.signin-log-correlation",
+      "label": "Correlate failing attempts with Entra sign-in logs",
+      "description": "Look up each failing attempt (user + UTC time) in SigninLogs and AADNonInteractiveUserSignInLogs. No matching failure record means the attempt never reached the identity service.",
+      "valueClass": "diagnostic",
+      "executor": "engineer"
+    },
+    {
+      "id": "act.validate-fix",
+      "label": "Validate the fix with a before/after comparison",
+      "description": "Compare failure rates over a monitoring window, re-run the discriminating test, and get customer confirmation.",
+      "valueClass": "validation",
+      "executor": "engineer"
+    }
+  ],
+  "requirements": [
+    {
+      "id": "req.affected-scope",
+      "label": "Scope of impact (who, how many, where)",
+      "description": "How many users are affected and whether it is one user, one site, or many."
+    },
+    {
+      "id": "req.business-impact",
+      "label": "Business impact confirmed",
+      "description": "What the failure prevents the customer from doing and how urgent it is."
+    },
+    {
+      "id": "req.change-history",
+      "label": "Recent environment changes",
+      "description": "Network, identity or policy changes shortly before onset."
+    },
+    {
+      "id": "req.client-diagnostics",
+      "label": "Client-side diagnostics from a failing attempt",
+      "description": "Client logs, network trace or device registration output from a failing attempt."
+    },
+    {
+      "id": "req.customer-confirmation",
+      "label": "Customer confirms users can sign in",
+      "description": "The customer confirms the problem is resolved for affected users."
+    },
+    {
+      "id": "req.error-code",
+      "label": "Exact client error code or text",
+      "description": "The error tag or message shown on a failing client."
+    },
+    {
+      "id": "req.failure-timestamps",
+      "label": "Exact failure timestamps (UTC)",
+      "description": "UTC times of specific failed attempts, precise enough to correlate with logs."
+    },
+    {
+      "id": "req.fix-validation",
+      "label": "Fix validated with a before/after comparison",
+      "description": "Evidence that failures stopped after the change, over a monitoring window."
+    },
+    {
+      "id": "req.network-path-check",
+      "label": "Network path check (DNS or proxy) from an affected site",
+      "description": "A per-resolver or per-proxy-node test run from an affected site."
+    },
+    {
+      "id": "req.sample-users",
+      "label": "Sample affected users",
+      "description": "At least one affected user identifier for log lookups."
+    },
+    {
+      "id": "req.server-side-correlation",
+      "label": "Server-side sign-in log correlation",
+      "description": "Whether failing attempts appear in the identity service logs."
+    },
+    {
+      "id": "req.site-pattern",
+      "label": "Affected versus unaffected sites or networks",
+      "description": "Which locations, networks or device groups are affected and which are not."
+    },
+    {
+      "id": "req.workaround-vs-fix",
+      "label": "Workaround and permanent fix documented separately",
+      "description": "The resolution distinguishes the temporary workaround from the permanent fix."
+    }
+  ],
+  "hypotheses": [
+    {
+      "id": "hyp.client-cache",
+      "name": "Corrupted Teams client cache or WAM broker state",
+      "description": "Local Teams cache or Web Account Manager state on affected devices is corrupted, so sign-in fails on those devices regardless of network or policy.",
+      "category": "client"
+    },
+    {
+      "id": "hyp.conditional-access",
+      "name": "Conditional Access or MFA policy enforcement",
+      "description": "A Conditional Access or MFA policy change forces interactive sign-in or blocks attempts, producing server-side sign-in failures that align in time with the reported failures.",
+      "category": "identity"
+    },
+    {
+      "id": "hyp.device-state",
+      "name": "Device registration or primary refresh token health",
+      "description": "Affected devices have unhealthy registration or no primary refresh token, so silent sign-in fails and the user is prompted or blocked.",
+      "category": "client"
+    },
+    {
+      "id": "hyp.dns-resolution",
+      "name": "DNS resolution failure for sign-in endpoints",
+      "description": "One or more DNS resolvers used by the affected network intermittently fail to resolve Microsoft sign-in or CDN hosts, so the sign-in page never finishes loading before authentication starts.",
+      "category": "network"
+    },
+    {
+      "id": "hyp.federation",
+      "name": "Federation or identity-provider node issue",
+      "description": "A federation server (STS) node has an expired certificate, clock skew, or a fault, causing sign-in failures for the share of users routed to it.",
+      "category": "identity"
+    },
+    {
+      "id": "hyp.other",
+      "name": "Other or not yet characterised",
+      "description": "Probability mass the pack cannot attribute to a named hypothesis. It shrinks as evidence accumulates.",
+      "category": "unknown"
+    },
+    {
+      "id": "hyp.proxy-egress",
+      "name": "Egress proxy or TLS-inspection node failure",
+      "description": "A web proxy or TLS-inspection node in a proxy pool times out or drops connections to sign-in endpoints, so some attempts fail depending on which node serves the request.",
+      "category": "network"
+    },
+    {
+      "id": "hyp.service-incident",
+      "name": "Microsoft-side service incident",
+      "description": "A service incident or regional degradation affects sign-in for many tenants at once.",
+      "category": "service"
+    },
+    {
+      "id": "hyp.token-session",
+      "name": "Token or session lifetime problem",
+      "description": "Refresh tokens or sessions expire, are revoked, or hit sign-in frequency limits, forcing repeated authentication that sometimes fails.",
+      "category": "identity"
+    }
+  ],
+  "forkCategories": [
+    {
+      "id": "alternative_action_available",
+      "label": "Better action was available"
+    },
+    {
+      "id": "assumption_as_fact",
+      "label": "Assumption treated as fact"
+    },
+    {
+      "id": "contradiction_ignored",
+      "label": "Contradictory evidence ignored"
+    },
+    {
+      "id": "low_value_action",
+      "label": "Low-value action selected"
+    },
+    {
+      "id": "premature_destructive_action",
+      "label": "Destructive action selected prematurely"
+    },
+    {
+      "id": "premature_escalation",
+      "label": "Escalation before minimum evidence"
+    },
+    {
+      "id": "disproportionate_customer_effort",
+      "label": "Customer effort without proportional value"
+    },
+    {
+      "id": "high_value_signal_unused",
+      "label": "High-value signal available but unused"
+    }
+  ],
+  "conflictClasses": [
+    {
+      "id": "direct_contradiction",
+      "label": "Direct contradiction"
+    },
+    {
+      "id": "temporal_update",
+      "label": "Changed over time"
+    },
+    {
+      "id": "source_disagreement",
+      "label": "Sources disagree"
+    },
+    {
+      "id": "ambiguous_wording",
+      "label": "Ambiguous wording"
+    },
+    {
+      "id": "unresolved_conflict",
+      "label": "Unresolved conflict"
+    },
+    {
+      "id": "corrected_information",
+      "label": "Corrected"
+    }
+  ],
+  "modalities": [
+    {
+      "id": "asserted",
+      "label": "States it as fact"
+    },
+    {
+      "id": "negated",
+      "label": "Denies it"
+    },
+    {
+      "id": "speculative",
+      "label": "A guess"
+    },
+    {
+      "id": "future_intent",
+      "label": "Intended, not done"
+    },
+    {
+      "id": "conditional",
+      "label": "Depends on a condition"
+    },
+    {
+      "id": "attributed",
+      "label": "Reported from someone else"
+    },
+    {
+      "id": "requested",
+      "label": "Asked for, not yet done"
+    },
+    {
+      "id": "corrected",
+      "label": "Corrects an earlier statement"
+    }
+  ],
+  "absentReasons": [
+    "negated",
+    "speculative",
+    "future_intent",
+    "conditional",
+    "attributed",
+    "corrected",
+    "requested",
+    "other"
+  ]
+}
