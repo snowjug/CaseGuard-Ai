@@ -120,7 +120,9 @@ export function evaluateCase(
 ): CaseEvaluation {
   if (split === 'test') throw new Error(LOCKED_MESSAGE);
   const dataset = datasetFor(split, options);
-  const loaded = dataset.cases.find((entry) => entry.case.id === caseId && entry.case.split === split);
+  const loaded = dataset.cases.find(
+    (entry) => entry.case.id === caseId && entry.case.split === split,
+  );
   if (!loaded) throw new Error(`There is no case ${caseId} in the ${split} split.`);
   const accepted = acceptedFor(dataset, loaded);
   const labelled = accepted?.labels?.signals.map((label) => `${label.event}|${label.id}`) ?? [];
@@ -179,7 +181,9 @@ function assemble(
       lines: [
         `engine ${artifact.meta.engine.version} (${artifact.meta.engine.package}), pack ${artifact.meta.pack.id}@${artifact.meta.pack.version} (sha256 ${artifact.meta.pack.sha256.slice(0, 12)})`,
         `case set sha256 ${artifact.meta.dataset.caseSetSha256.slice(0, 12)}, results sha256 ${artifact.resultsSha256.slice(0, 12)}`,
-        artifact.meta.gitCommit ? `git commit ${artifact.meta.gitCommit.slice(0, 10)}` : 'no git commit available',
+        artifact.meta.gitCommit
+          ? `git commit ${artifact.meta.gitCommit.slice(0, 10)}`
+          : 'no git commit available',
       ],
     },
     { perId, details: detail ? outcome.details : null },
@@ -210,8 +214,6 @@ export function evaluateSplit(split: Split, options: EvaluationOptions = {}): Sp
 
 // ---------------------------------------------------------------- the locked split
 
-
-
 export interface LockedOptions {
   /** Per-case lines. They are recorded in the log as given, and must never be used to change a detector. */
   readonly detail?: boolean;
@@ -239,7 +241,8 @@ export async function evaluateLocked(options: LockedOptions = {}): Promise<Locke
     testHash,
     log,
   });
-  if (problems.length > 0) throw new Error(`Refusing to run the locked split.\n${problems.join('\n')}`);
+  if (problems.length > 0)
+    throw new Error(`Refusing to run the locked split.\n${problems.join('\n')}`);
 
   const detail = options.detail === true;
   const evaluation = assemble(

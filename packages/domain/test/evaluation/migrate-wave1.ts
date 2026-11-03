@@ -10,7 +10,13 @@ import {
   type AnnotationFile,
   type EvalCase,
 } from './schema';
-import { WAVE1_ANNOTATOR, WAVE1_COMMIT, WAVE1_PLAN, wave1IdOf, type MigrationPlan } from './wave1-plan';
+import {
+  WAVE1_ANNOTATOR,
+  WAVE1_COMMIT,
+  WAVE1_PLAN,
+  wave1IdOf,
+  type MigrationPlan,
+} from './wave1-plan';
 
 /**
  * One-off: turns the 16 cases of the Wave 1 corpus (`corpus-*.ts` as of commit c5f5d96, deleted afterwards) into the JSON

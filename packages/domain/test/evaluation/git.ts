@@ -2,7 +2,11 @@ import { execFileSync } from 'node:child_process';
 import { REPOSITORY_ROOT } from './dataset';
 
 const git = (args: readonly string[]): string =>
-  execFileSync('git', [...args], { cwd: REPOSITORY_ROOT, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+  execFileSync('git', [...args], {
+    cwd: REPOSITORY_ROOT,
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
+  });
 
 /** The commit the working tree is on. */
 export const gitHead = (): string => git(['rev-parse', 'HEAD']).trim();

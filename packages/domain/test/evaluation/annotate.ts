@@ -2,13 +2,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkRecord } from './check';
-import {
-  EVALUATION_ROOT,
-  loadDataset,
-  loadVocabulary,
-  writeJson,
-  type Dataset,
-} from './dataset';
+import { EVALUATION_ROOT, loadDataset, loadVocabulary, writeJson, type Dataset } from './dataset';
 import {
   ANNOTATOR_KINDS,
   AnnotationDraftSchema,
@@ -89,8 +83,14 @@ export function mergeRecord(
     annotations: [],
     adjudication: null,
   };
-  if (base.annotations.some((entry) => entry.annotatorId === record.annotatorId && entry.version === record.version)) {
-    throw new Error(`${caseId}: ${record.annotatorId} already has a record of version ${record.version}; use a higher version`);
+  if (
+    base.annotations.some(
+      (entry) => entry.annotatorId === record.annotatorId && entry.version === record.version,
+    )
+  ) {
+    throw new Error(
+      `${caseId}: ${record.annotatorId} already has a record of version ${record.version}; use a higher version`,
+    );
   }
   return { ...base, annotations: [...base.annotations, record] };
 }
@@ -110,10 +110,14 @@ export function registerAnnotator(
 function validateDraft(dataset: Dataset, draft: AnnotationDraft, source: string): string[] {
   const loaded = dataset.cases.find((entry) => entry.case.id === draft.caseId);
   if (!loaded) return [`${source}: there is no case ${draft.caseId}`];
-  if (loaded.case.derivedFrom !== null) return [`${source}: ${draft.caseId} is a reordered copy and has no labels of its own`];
+  if (loaded.case.derivedFrom !== null)
+    return [`${source}: ${draft.caseId} is a reordered copy and has no labels of its own`];
   const errors: string[] = [];
-  if (JSON.stringify(draft).includes(PLACEHOLDER)) errors.push(`${source}: the draft still holds "${PLACEHOLDER}"`);
-  const registry = new Map((dataset.annotators?.annotators ?? []).map((entry) => [entry.id, entry.kind as string]));
+  if (JSON.stringify(draft).includes(PLACEHOLDER))
+    errors.push(`${source}: the draft still holds "${PLACEHOLDER}"`);
+  const registry = new Map(
+    (dataset.annotators?.annotators ?? []).map((entry) => [entry.id, entry.kind as string]),
+  );
   checkRecord(loaded, draft.record, loadVocabulary(dataset.root), registry, errors);
   return errors;
 }
@@ -137,9 +141,13 @@ async function main(args: readonly string[]): Promise<void> {
     if (files.length === 0) return fail('usage: annotate.ts --merge <draft.json>...');
     const problems: string[] = [];
     const drafts = files.map((file) => {
-      const parsed = AnnotationDraftSchema.safeParse(JSON.parse(readFileSync(resolve(file), 'utf8')));
+      const parsed = AnnotationDraftSchema.safeParse(
+        JSON.parse(readFileSync(resolve(file), 'utf8')),
+      );
       if (!parsed.success) {
-        problems.push(`${file}: ${parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')}`);
+        problems.push(
+          `${file}: ${parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')}`,
+        );
         return null;
       }
       problems.push(...validateDraft(dataset, parsed.data, file));
@@ -151,7 +159,9 @@ async function main(args: readonly string[]): Promise<void> {
       const loaded = dataset.cases.find((entry) => entry.case.id === draft.caseId);
       const target = join(EVALUATION_ROOT, 'annotations', `${draft.caseId}.json`);
       await writeJson(target, mergeRecord(loaded?.annotations ?? null, draft.caseId, draft.record));
-      process.stdout.write(`merged ${draft.record.annotatorId} v${draft.record.version} into annotations/${draft.caseId}.json\n`);
+      process.stdout.write(
+        `merged ${draft.record.annotatorId} v${draft.record.version} into annotations/${draft.caseId}.json\n`,
+      );
     }
     process.stdout.write('Now run eval:manifest, then eval:agreement.\n');
     return;
@@ -160,23 +170,34 @@ async function main(args: readonly string[]): Promise<void> {
   const caseId = option('--case');
   const annotatorId = option('--annotator');
   const kind = (option('--kind') ?? 'ai_draft') as AnnotatorKind;
-  if (!caseId || !annotatorId) return fail('usage: annotate.ts --case <case id> --annotator <annotator id> [--kind ai_draft|human] [--register "<description>"]');
-  if (!ANNOTATOR_KINDS.includes(kind)) return fail(`--kind must be one of ${ANNOTATOR_KINDS.join(', ')}`);
+  if (!caseId || !annotatorId)
+    return fail(
+      'usage: annotate.ts --case <case id> --annotator <annotator id> [--kind ai_draft|human] [--register "<description>"]',
+    );
+  if (!ANNOTATOR_KINDS.includes(kind))
+    return fail(`--kind must be one of ${ANNOTATOR_KINDS.join(', ')}`);
   const source = dataset.cases.find((entry) => entry.case.id === caseId);
   if (!source) return fail(`there is no case ${caseId}`);
-  if (source.case.derivedFrom !== null) return fail(`${caseId} is a reordered copy and has no labels of its own`);
+  if (source.case.derivedFrom !== null)
+    return fail(`${caseId} is a reordered copy and has no labels of its own`);
 
   const description = option('--register');
   if (description !== undefined) {
-    await writeJson(join(EVALUATION_ROOT, 'annotators.json'), registerAnnotator(dataset.annotators, annotatorId, kind, description, now()));
+    await writeJson(
+      join(EVALUATION_ROOT, 'annotators.json'),
+      registerAnnotator(dataset.annotators, annotatorId, kind, description, now()),
+    );
     process.stdout.write(`registered ${annotatorId} (${kind}) in annotators.json\n`);
   }
   const target = option('--out') ?? join(EVALUATION_ROOT, 'pending', annotatorId, `${caseId}.json`);
   if (existsSync(target)) return fail(`${target} already exists; fill it in, or delete it first`);
   mkdirSync(dirname(target), { recursive: true });
   await writeJson(target, makeDraft(source.case, annotatorId, kind, now()));
-  process.stdout.write(`wrote ${target}\nFill it in (the case file is cases/${source.case.split}/${caseId}.json), then ask for it to be merged.\n`);
+  process.stdout.write(
+    `wrote ${target}\nFill it in (the case file is cases/${source.case.split}/${caseId}.json), then ask for it to be merged.\n`,
+  );
 }
 
-const isMain = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isMain =
+  process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) await main(process.argv.slice(2));

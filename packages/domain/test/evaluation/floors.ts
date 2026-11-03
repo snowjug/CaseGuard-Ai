@@ -43,7 +43,8 @@ export const FLOOR_METRICS: Readonly<Record<string, FloorMetric>> = {
     value: (m) => m.negation.all.value,
   },
   negationSilence: {
-    description: 'labelled absences (denied, guessed, intended...) on which the engine stayed silent',
+    description:
+      'labelled absences (denied, guessed, intended...) on which the engine stayed silent',
     value: (m) => m.negation.onAbsent.value,
   },
   negativeControlSilence: {
@@ -62,8 +63,14 @@ export const FLOOR_METRICS: Readonly<Record<string, FloorMetric>> = {
     description: 'class right among the conflicts found',
     value: (m) => m.contradiction.classAccuracy?.value ?? null,
   },
-  forkPrecision: { description: 'precision of the decision points', value: (m) => m.forks.precision.value },
-  forkRecall: { description: 'recall of the labelled decision points', value: (m) => m.forks.recall.value },
+  forkPrecision: {
+    description: 'precision of the decision points',
+    value: (m) => m.forks.precision.value,
+  },
+  forkRecall: {
+    description: 'recall of the labelled decision points',
+    value: (m) => m.forks.recall.value,
+  },
   earliestAgreement: {
     description: 'earliest missed moment: exact, or both say there is none',
     value: (m) => m.earliest.agree.value,
@@ -84,7 +91,8 @@ export const FLOOR_METRICS: Readonly<Record<string, FloorMetric>> = {
   counterfactualAgreement: {
     description: 'counterfactual direction agrees with the label',
     needs: 'counterfactual',
-    value: (m) => (m.counterfactual.status === 'measured' ? m.counterfactual.agreement.value : null),
+    value: (m) =>
+      m.counterfactual.status === 'measured' ? m.counterfactual.agreement.value : null,
   },
 };
 
@@ -109,7 +117,8 @@ export function parseFloors(text: string): FloorsFile {
   return parsed;
 }
 
-export const readFloors = (path = FLOORS_PATH): FloorsFile => parseFloors(readFileSync(path, 'utf8'));
+export const readFloors = (path = FLOORS_PATH): FloorsFile =>
+  parseFloors(readFileSync(path, 'utf8'));
 
 export interface FloorViolation {
   readonly metric: string;

@@ -9,7 +9,10 @@ import {
   type AnnotationRecord,
 } from './schema';
 
-const record = (annotatorId: string, overrides: Partial<AnnotationRecord> = {}): AnnotationRecord => ({
+const record = (
+  annotatorId: string,
+  overrides: Partial<AnnotationRecord> = {},
+): AnnotationRecord => ({
   annotatorId,
   kind: 'ai_draft',
   version: 1,
@@ -22,7 +25,10 @@ const record = (annotatorId: string, overrides: Partial<AnnotationRecord> = {}):
   ...overrides,
 });
 
-const file = (annotations: AnnotationRecord[], adjudication: Adjudication | null = null): AnnotationFile => ({
+const file = (
+  annotations: AnnotationRecord[],
+  adjudication: Adjudication | null = null,
+): AnnotationFile => ({
   schema: EVAL_ANNOTATIONS_SCHEMA,
   caseId: 'ev-d-901-made-up',
   annotations,
@@ -52,22 +58,36 @@ describe('which labels count as the reference', () => {
   it('reads the latest version of an annotator, and treats an excluded record as excluded', () => {
     const accepted = acceptLabels(file([record('a'), record('a', { version: 2, signals: [] })]));
     expect(accepted.labels?.signals).toEqual([]);
-    const excluded = acceptLabels(file([record('a', { excluded: true, exclusionReason: 'unreadable' })]));
+    const excluded = acceptLabels(
+      file([record('a', { excluded: true, exclusionReason: 'unreadable' })]),
+    );
     expect(excluded).toMatchObject({ status: 'excluded', labels: null, note: 'unreadable' });
   });
 
   it('does not count a case with two annotators and no decision', () => {
     const accepted = acceptLabels(file([record('a'), record('b')]));
-    expect(accepted).toMatchObject({ status: 'unadjudicated', labels: null, annotators: ['a', 'b'] });
+    expect(accepted).toMatchObject({
+      status: 'unadjudicated',
+      labels: null,
+      annotators: ['a', 'b'],
+    });
   });
 
   it('builds the accepted labels of an adjudicated case from the chosen record and the values accepted per field', () => {
     const accepted = acceptLabels(
       file(
-        [record('a', { earliestMissed: 'ev02' }), record('b', { earliestMissed: null, causes: ['hyp.dns-resolution'] })],
+        [
+          record('a', { earliestMissed: 'ev02' }),
+          record('b', { earliestMissed: null, causes: ['hyp.dns-resolution'] }),
+        ],
         decision({
           disagreements: [
-            { field: 'signals', values: { a: [], b: [] }, accepted: [{ event: 'ev03', id: 'sig.prt-missing' }], rationale: 'the later message says so' },
+            {
+              field: 'signals',
+              values: { a: [], b: [] },
+              accepted: [{ event: 'ev03', id: 'sig.prt-missing' }],
+              rationale: 'the later message says so',
+            },
           ],
         }),
       ),
@@ -77,15 +97,21 @@ describe('which labels count as the reference', () => {
     expect(accepted.labels?.signals).toEqual([{ event: 'ev03', id: 'sig.prt-missing' }]);
     expect(accepted.labels?.earliestMissed).toBeNull();
     expect(accepted.labels?.causes).toEqual(['hyp.dns-resolution']);
-    expect(acceptLabels(file([record('a'), record('b')], decision({ status: 'agreed' }))).status).toBe('agreed');
+    expect(
+      acceptLabels(file([record('a'), record('b')], decision({ status: 'agreed' }))).status,
+    ).toBe('agreed');
   });
 
   it('drops a decision that is older than a record, and refuses an accepted value that is not a label', () => {
     const newer = record('b', { annotatedAt: '2026-11-03T10:00:00Z' });
     expect(acceptLabels(file([record('a'), newer], decision())).status).toBe('unadjudicated');
-    const bad = decision({ disagreements: [{ field: 'signals', values: {}, accepted: 'not a list', rationale: 'x' }] });
+    const bad = decision({
+      disagreements: [{ field: 'signals', values: {}, accepted: 'not a list', rationale: 'x' }],
+    });
     expect(() => acceptLabels(file([record('a'), record('b')], bad))).toThrow(/signals/);
-    expect(acceptLabels(file([record('a'), record('b')], decision({ status: 'excluded' }))).status).toBe('excluded');
+    expect(
+      acceptLabels(file([record('a'), record('b')], decision({ status: 'excluded' }))).status,
+    ).toBe('excluded');
   });
 
   it('gives a reordered copy the labels of its source, and a case with no annotation file none', () => {
@@ -99,13 +125,23 @@ describe('which labels count as the reference', () => {
     };
     const copy: LoadedCase = {
       ...source,
-      case: evalCase({ id: 'ev-d-902-copy', derivedFrom: 'ev-d-901-source', handedOverOrder: ['ev02', 'ev01', 'ev03'] }),
+      case: evalCase({
+        id: 'ev-d-902-copy',
+        derivedFrom: 'ev-d-901-source',
+        handedOverOrder: ['ev02', 'ev01', 'ev03'],
+      }),
       annotations: null,
       annotationsFile: null,
       annotationsSha256: null,
     };
     const bare: LoadedCase = { ...copy, case: evalCase({ id: 'ev-d-903-bare' }) };
-    const dataset: Dataset = { root: '', cases: [source, copy, bare], annotators: null, manifest: null, problems: [] };
+    const dataset: Dataset = {
+      root: '',
+      cases: [source, copy, bare],
+      annotators: null,
+      manifest: null,
+      problems: [],
+    };
     expect(acceptedFor(dataset, copy)?.status).toBe('single_annotator');
     expect(acceptedFor(dataset, bare)).toBeNull();
   });

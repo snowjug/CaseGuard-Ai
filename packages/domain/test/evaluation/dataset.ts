@@ -176,13 +176,23 @@ export function loadDataset(options: LoadOptions = {}): Dataset {
   return {
     root,
     cases,
-    annotators: readOptional(join(root, 'annotators.json'), 'annotators.json', AnnotatorRegistrySchema, problems),
+    annotators: readOptional(
+      join(root, 'annotators.json'),
+      'annotators.json',
+      AnnotatorRegistrySchema,
+      problems,
+    ),
     manifest: readOptional(join(root, 'manifest.json'), 'manifest.json', ManifestSchema, problems),
     problems,
   };
 }
 
-function readOptional<T>(path: string, label: string, schema: z.ZodType<T>, problems: string[]): T | null {
+function readOptional<T>(
+  path: string,
+  label: string,
+  schema: z.ZodType<T>,
+  problems: string[],
+): T | null {
   if (!existsSync(path)) return null;
   const parsed = readParsed(path, label, schema);
   if (parsed.problem !== null) problems.push(parsed.problem);
@@ -191,7 +201,12 @@ function readOptional<T>(path: string, label: string, schema: z.ZodType<T>, prob
 
 export const readManifest = (root = EVALUATION_ROOT): Manifest | null => {
   const problems: string[] = [];
-  const manifest = readOptional(join(root, 'manifest.json'), 'manifest.json', ManifestSchema, problems);
+  const manifest = readOptional(
+    join(root, 'manifest.json'),
+    'manifest.json',
+    ManifestSchema,
+    problems,
+  );
   if (problems.length > 0) throw new Error(problems.join('\n'));
   return manifest;
 };

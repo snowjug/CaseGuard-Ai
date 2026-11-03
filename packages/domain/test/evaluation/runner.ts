@@ -34,7 +34,8 @@ export interface RunOutcome {
   readonly details: readonly CaseDetail[];
 }
 
-const byId = (a: LoadedCase, b: LoadedCase): number => (a.case.id < b.case.id ? -1 : a.case.id > b.case.id ? 1 : 0);
+const byId = (a: LoadedCase, b: LoadedCase): number =>
+  a.case.id < b.case.id ? -1 : a.case.id > b.case.id ? 1 : 0;
 
 /**
  * Runs the engine over the cases of a selection and measures the result. Reordered copies are run too, but only to check
@@ -50,7 +51,10 @@ export function runDataset(dataset: Dataset, request: RunRequest): RunOutcome {
   const outputs = new Map<string, EngineCaseOutput>();
   for (const loaded of independents) {
     const accepted = acceptedFor(dataset, loaded);
-    if (request.selection.annotator !== undefined && accepted?.acceptedFrom !== request.selection.annotator) {
+    if (
+      request.selection.annotator !== undefined &&
+      accepted?.acceptedFrom !== request.selection.annotator
+    ) {
       continue;
     }
     const labelled = accepted?.labels?.signals.map((label) => `${label.event}|${label.id}`) ?? [];

@@ -26,11 +26,11 @@ checker rejects any six-word run that a case shares with a shipped sample, the v
 
 ## Splits
 
-| Split | Used for | Who may look at its engine output |
-| --- | --- | --- |
-| `dev` | tuning and debugging the detectors; floors guard it in CI | anyone |
+| Split        | Used for                                                    | Who may look at its engine output                                     |
+| ------------ | ----------------------------------------------------------- | --------------------------------------------------------------------- |
+| `dev`        | tuning and debugging the detectors; floors guard it in CI   | anyone                                                                |
 | `validation` | checking that a change helps beyond dev; **never tuned on** | numbers and aggregates; do not read it case by case to fix a detector |
-| `test` | the final, locked estimate | `eval:locked` only, aggregates only, appended to a log |
+| `test`       | the final, locked estimate                                  | `eval:locked` only, aggregates only, appended to a log                |
 
 A **family** is one scenario told in more than one way; every family lives in exactly one split. A **reordered copy** (`derivedFrom`) repeats a case with its
 events handed over in another order, has no labels of its own, and is checked for invariance (it must give exactly the analysis of its source).
@@ -41,16 +41,16 @@ Wave 1's 16 cases are migrated into dev with their original labels (annotator `c
 
 All commands are `pnpm --filter @caseguard/domain run <script> [-- flags]`; the heavy ones go through the machine guard (`cg-run`) on shared machines.
 
-| Script | What it does |
-| --- | --- |
-| `eval:check` | structure, vocabulary, hashes, family and split placement, overlaps, who reads what. Never runs the engine. Run it after every change. |
+| Script                         | What it does                                                                                                                                                                                                |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `eval:check`                   | structure, vocabulary, hashes, family and split placement, overlaps, who reads what. Never runs the engine. Run it after every change.                                                                      |
 | `eval:dev` / `eval:validation` | run the engine on a split and print the report (`--annotator <id>`, `--detail`, `--counterfactual`, `--no-recommendations`, `--json`); the latest run is kept in `runs/<split>-latest.json` (not committed) |
-| `eval:locked` | the only way to run the engine on the test split; refuses when the split or its labels changed since the lock; prints aggregates; appends a record to `runs/locked-runs.json` |
-| `eval:manifest` | rewrite `manifest.json` (run after the last edit of a case or an annotation; `--check` verifies, `--lock` is for the parent when the test split is complete) |
-| `eval:coverage` | what the corpus covers and what each split still lacks against the minima (`--for-test` shows the test author only the test split) |
-| `eval:annotate` | an empty draft for a blind second annotator (`-- --case <id> --annotator <id>`); `-- --merge <draft>...` adds a filled draft to the case's annotation file as a record |
-| `eval:agreement` | Cohen's kappa per label kind between two annotators (`-- <annotator A> <annotator B> [--split dev]`) and the disagreements to adjudicate |
-| `eval:vocabulary` | regenerates `vocabulary.json` from the knowledge pack (only when the pack changes) |
+| `eval:locked`                  | the only way to run the engine on the test split; refuses when the split or its labels changed since the lock; prints aggregates; appends a record to `runs/locked-runs.json`                               |
+| `eval:manifest`                | rewrite `manifest.json` (run after the last edit of a case or an annotation; `--check` verifies, `--lock` is for the parent when the test split is complete)                                                |
+| `eval:coverage`                | what the corpus covers and what each split still lacks against the minima (`--for-test` shows the test author only the test split)                                                                          |
+| `eval:annotate`                | an empty draft for a blind second annotator (`-- --case <id> --annotator <id>`); `-- --merge <draft>...` adds a filled draft to the case's annotation file as a record                                      |
+| `eval:agreement`               | Cohen's kappa per label kind between two annotators (`-- <annotator A> <annotator B> [--split dev]`) and the disagreements to adjudicate                                                                    |
+| `eval:vocabulary`              | regenerates `vocabulary.json` from the knowledge pack (only when the pack changes)                                                                                                                          |
 
 From code: `evaluateCase(caseId, split)` and `evaluateSplit(split, options)` (`packages/domain/test/evaluation/evaluate.ts`) return the structured results that the CLIs
 print. They refuse the test split; `evaluateLocked()` is the only path to it.

@@ -36,11 +36,7 @@ export interface LabelSet {
  * - `excluded`: the case must not be measured.
  */
 export type LabelStatus =
-  | 'single_annotator'
-  | 'agreed'
-  | 'adjudicated'
-  | 'unadjudicated'
-  | 'excluded';
+  'single_annotator' | 'agreed' | 'adjudicated' | 'unadjudicated' | 'excluded';
 
 export interface AcceptedLabels {
   readonly status: LabelStatus;
@@ -79,7 +75,8 @@ export function latestRecords(file: AnnotationFile): AnnotationRecord[] {
 /** A value for a label kind, as an adjudication accepted it. */
 function overlay(base: LabelSet, kind: LabelKind, value: unknown): LabelSet {
   const parsed = labelValueSchema(kind).safeParse(value);
-  if (!parsed.success) throw new Error(`the accepted value of "${kind}" is not a valid ${kind} label`);
+  if (!parsed.success)
+    throw new Error(`the accepted value of "${kind}" is not a valid ${kind} label`);
   return { ...base, [kind]: parsed.data };
 }
 
@@ -92,7 +89,13 @@ export function acceptLabels(file: AnnotationFile): AcceptedLabels {
   const adjudication = file.adjudication;
 
   if (adjudication?.status === 'excluded') {
-    return { ...base, status: 'excluded', acceptedFrom: null, labels: null, note: 'excluded by adjudication' };
+    return {
+      ...base,
+      status: 'excluded',
+      acceptedFrom: null,
+      labels: null,
+      note: 'excluded by adjudication',
+    };
   }
   const only = records.length === 1 ? records[0] : undefined;
   if (only) {
@@ -105,13 +108,28 @@ export function acceptLabels(file: AnnotationFile): AcceptedLabels {
         note: only.exclusionReason,
       };
     }
-    return { ...base, status: 'single_annotator', acceptedFrom: only.annotatorId, labels: labelsOf(only), note: null };
+    return {
+      ...base,
+      status: 'single_annotator',
+      acceptedFrom: only.annotatorId,
+      labels: labelsOf(only),
+      note: null,
+    };
   }
 
   if (!adjudication) {
-    return { ...base, status: 'unadjudicated', acceptedFrom: null, labels: null, note: 'two annotators, no decision' };
+    return {
+      ...base,
+      status: 'unadjudicated',
+      acceptedFrom: null,
+      labels: null,
+      note: 'two annotators, no decision',
+    };
   }
-  const newest = records.reduce((latest, record) => (record.annotatedAt > latest ? record.annotatedAt : latest), '');
+  const newest = records.reduce(
+    (latest, record) => (record.annotatedAt > latest ? record.annotatedAt : latest),
+    '',
+  );
   if (newest > adjudication.decidedAt) {
     return {
       ...base,
@@ -122,9 +140,18 @@ export function acceptLabels(file: AnnotationFile): AcceptedLabels {
     };
   }
   const source = records.find((record) => record.annotatorId === adjudication.acceptedFrom);
-  if (!source) throw new Error(`the adjudication accepts a record of "${adjudication.acceptedFrom}", which does not exist`);
+  if (!source)
+    throw new Error(
+      `the adjudication accepts a record of "${adjudication.acceptedFrom}", which does not exist`,
+    );
   if (source.excluded) {
-    return { ...base, status: 'excluded', acceptedFrom: source.annotatorId, labels: null, note: source.exclusionReason };
+    return {
+      ...base,
+      status: 'excluded',
+      acceptedFrom: source.annotatorId,
+      labels: null,
+      note: source.exclusionReason,
+    };
   }
   let labels = labelsOf(source);
   for (const disagreement of adjudication.disagreements) {

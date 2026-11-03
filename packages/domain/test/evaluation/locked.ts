@@ -23,9 +23,12 @@ export function verifyChain(log: LockedRuns, lockHash: string | null): string[] 
   let previous: string | null = null;
   log.runs.forEach((record, position) => {
     const { hash, ...body } = record;
-    if (record.index !== position + 1) problems.push(`record ${position + 1} has index ${record.index}`);
-    if (record.previous !== previous) problems.push(`record ${record.index}: "previous" is not the hash of the record before`);
-    if (recordHash(body) !== hash) problems.push(`record ${record.index}: its hash does not match its content`);
+    if (record.index !== position + 1)
+      problems.push(`record ${position + 1} has index ${record.index}`);
+    if (record.previous !== previous)
+      problems.push(`record ${record.index}: "previous" is not the hash of the record before`);
+    if (recordHash(body) !== hash)
+      problems.push(`record ${record.index}: its hash does not match its content`);
     if (lockHash !== null && record.testSetSha256 !== lockHash) {
       problems.push(`record ${record.index}: it ran a test split other than the locked one`);
     }

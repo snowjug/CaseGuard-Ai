@@ -26,7 +26,9 @@ const metrics = computeMetrics([
         { event: 'ev03', id: SITE },
       ],
     },
-    engine: { signals: [`ev01|${INTERMITTENT}`, `ev01|${TIMEOUT}`, `ev03|sig.token-expiry-errors`] },
+    engine: {
+      signals: [`ev01|${INTERMITTENT}`, `ev01|${TIMEOUT}`, `ev03|sig.token-expiry-errors`],
+    },
   }),
 ]);
 
@@ -78,6 +80,8 @@ describe('the floors of the dev split', () => {
       expect(floor, name).toBeGreaterThanOrEqual(0);
       expect(floor, name).toBeLessThanOrEqual(1);
     }
-    expect(Object.keys(dev)).toEqual(expect.arrayContaining(['recall', 'precision', 'negationAccuracy']));
+    expect(Object.keys(dev)).toEqual(
+      expect.arrayContaining(['recall', 'precision', 'negationAccuracy']),
+    );
   });
 });

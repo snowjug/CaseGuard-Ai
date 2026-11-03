@@ -33,7 +33,11 @@ export const SPLIT_LETTER: Readonly<Record<Split, 'd' | 'v' | 't'>> = {
   validation: 'v',
   test: 't',
 };
-export const LETTER_SPLIT: Readonly<Record<string, Split>> = { d: 'dev', v: 'validation', t: 'test' };
+export const LETTER_SPLIT: Readonly<Record<string, Split>> = {
+  d: 'dev',
+  v: 'validation',
+  t: 'test',
+};
 
 /** `ev-d-014-gdansk-conditional-access`: prefix, split letter, number, slug. */
 export const CASE_ID_PATTERN = /^ev-([dvt])-(\d{3})-([a-z0-9]+(?:-[a-z0-9]+)*)$/;
@@ -73,7 +77,11 @@ const EventKey = z.string().regex(EVENT_KEY_PATTERN);
 export const EvalEventSchema = z.strictObject({
   key: EventKey,
   /** Minutes after the case was opened. */
-  at: z.number().int().min(0).max(60 * 24 * 60),
+  at: z
+    .number()
+    .int()
+    .min(0)
+    .max(60 * 24 * 60),
   who: z.enum(EVAL_WHO),
   type: EventTypeSchema,
   channel: ChannelSchema,
@@ -207,7 +215,12 @@ export const AnnotationRecordSchema = z.strictObject({
 });
 export type AnnotationRecord = z.infer<typeof AnnotationRecordSchema>;
 
-export const ADJUDICATION_STATUSES = ['single_annotator', 'agreed', 'adjudicated', 'excluded'] as const;
+export const ADJUDICATION_STATUSES = [
+  'single_annotator',
+  'agreed',
+  'adjudicated',
+  'excluded',
+] as const;
 
 export const AdjudicationSchema = z.strictObject({
   status: z.enum(ADJUDICATION_STATUSES),

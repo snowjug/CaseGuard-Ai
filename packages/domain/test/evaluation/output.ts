@@ -92,7 +92,12 @@ export interface EngineCaseOutput {
   readonly fingerprint: string;
 }
 
-export const emptyCitations: CitationCounts = { total: 0, verified: 0, mismatch: 0, notCheckable: 0 };
+export const emptyCitations: CitationCounts = {
+  total: 0,
+  verified: 0,
+  mismatch: 0,
+  notCheckable: 0,
+};
 
 /** What a refused case looks like: the engine produced nothing. */
 export function refusedOutput(

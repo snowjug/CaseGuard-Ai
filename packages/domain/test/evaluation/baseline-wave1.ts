@@ -24,7 +24,12 @@ import { WAVE1_ANNOTATOR, WAVE1_COMMIT, WAVE1_PLAN, wave1Id } from './wave1-plan
  */
 
 const LEGACY_DIRECTORY = 'packages/domain/test/evaluation';
-const LEGACY_FILES = ['types.ts', 'corpus-paraphrase.ts', 'corpus-other.ts', 'evaluate.ts'] as const;
+const LEGACY_FILES = [
+  'types.ts',
+  'corpus-paraphrase.ts',
+  'corpus-other.ts',
+  'evaluate.ts',
+] as const;
 
 interface LegacyEvent {
   key: string;
@@ -90,7 +95,9 @@ function readLegacyHarness(scratch: string): Promise<LegacyModule> {
       maxBuffer: 16 * 1024 * 1024,
     });
     // The scratch directory is one level deeper than the directory the files were written for.
-    source = source.replace("from '../../src'", "from '../../../src'").replace("from '../helpers'", "from '../../helpers'");
+    source = source
+      .replace("from '../../src'", "from '../../../src'")
+      .replace("from '../helpers'", "from '../../helpers'");
     writeFileSync(join(scratch, name), source);
   }
   return import(pathToFileURL(join(scratch, 'evaluate.ts')).href) as Promise<LegacyModule>;
@@ -111,7 +118,9 @@ async function main(): Promise<void> {
       const source = casesById.get(plan.legacyId);
       const result = byLegacyId.get(plan.legacyId);
       if (!source || !result) throw new Error(`the old harness has no case ${plan.legacyId}`);
-      const expected = source.events.flatMap((event) => (event.signals ?? []).map((signal) => `${event.key}|${signal}`));
+      const expected = source.events.flatMap((event) =>
+        (event.signals ?? []).map((signal) => `${event.key}|${signal}`),
+      );
       return {
         legacyId: plan.legacyId,
         caseId: wave1Id(plan.legacyId),
@@ -124,7 +133,9 @@ async function main(): Promise<void> {
             at: event.at,
             who: event.who,
             type: event.type,
-            channel: event.channel ?? ((TOOL_EVENT_TYPES as ReadonlySet<string>).has(event.type) ? 'tool' : 'email'),
+            channel:
+              event.channel ??
+              ((TOOL_EVENT_TYPES as ReadonlySet<string>).has(event.type) ? 'tool' : 'email'),
             title: event.title,
             text: event.text,
           })),
@@ -160,18 +171,30 @@ async function main(): Promise<void> {
         'What the Wave 1 harness measured on the 16 cases of its independent evaluation set (13 independent cases, 3 reordered copies), with the engine and knowledge pack of that time. It is a historical record, not a test: detectors improve, so the live engine moves away from these numbers and nothing pins them.',
       reproduce: {
         commit: WAVE1_COMMIT,
-        commands: ['git checkout c5f5d96', 'pnpm install --frozen-lockfile', 'pnpm --filter @caseguard/domain run eval'],
+        commands: [
+          'git checkout c5f5d96',
+          'pnpm install --frozen-lockfile',
+          'pnpm --filter @caseguard/domain run eval',
+        ],
         note: 'The old harness, its TypeScript corpus and its report script exist only at that commit and before. This file was derived from that harness on the migrated cases, then checked against the framework v2 harness (see migration.checkedAgainst).',
       },
-      engine: { version: version.version, package: version.package, source: 'ENGINE_VERSION in apps/api/src/services/analysis/inputs.ts' },
+      engine: {
+        version: version.version,
+        package: version.package,
+        source: 'ENGINE_VERSION in apps/api/src/services/analysis/inputs.ts',
+      },
       pack: { id: pack.id, version: pack.version },
       annotator: WAVE1_ANNOTATOR,
       totals: {
         cases: results.length,
         independentCases: scored.length,
         reorderedCopies: results.length - scored.length,
-        events: cases.filter((entry) => entry.derivedFrom === null).reduce((sum, entry) => sum + entry.eventCount, 0),
-        labelledSignals: cases.filter((entry) => entry.derivedFrom === null).reduce((sum, entry) => sum + entry.expected.length, 0),
+        events: cases
+          .filter((entry) => entry.derivedFrom === null)
+          .reduce((sum, entry) => sum + entry.eventCount, 0),
+        labelledSignals: cases
+          .filter((entry) => entry.derivedFrom === null)
+          .reduce((sum, entry) => sum + entry.expected.length, 0),
       },
       groups: {
         paraphrase: group('paraphrase'),
@@ -181,13 +204,17 @@ async function main(): Promise<void> {
       },
       missCauses: legacy.missSummary(scored),
       reachableRecall: legacy.reachableRecall(scored),
-      perSignal: [...legacy.rateBySignal(scored).entries()].map(([signal, rate]) => ({ signal, ...rate })),
+      perSignal: [...legacy.rateBySignal(scored).entries()].map(([signal, rate]) => ({
+        signal,
+        ...rate,
+      })),
       forkAgreement: legacy.forkSummary(scored),
       leaderAgreement: legacy.leaderSummary(scored),
       migration: {
         annotatorOfTheMigratedLabels: WAVE1_ANNOTATOR,
         caseIds: Object.fromEntries(cases.map((entry) => [entry.legacyId, entry.caseId])),
-        checkedAgainst: 'framework v2 harness (evaluateSplit on the migrated cases of the dev split)',
+        checkedAgainst:
+          'framework v2 harness (evaluateSplit on the migrated cases of the dev split)',
       },
       cases,
     };
@@ -201,19 +228,30 @@ async function main(): Promise<void> {
         problems.push(`${entry.legacyId}: not measured by the framework v2 harness`);
         continue;
       }
-      if (!same(sorted(detail.signals.tp), sorted(entry.truePositives))) problems.push(`${entry.legacyId}: reported-and-labelled signals differ`);
-      if (!same(sorted(detail.signals.fp), sorted(entry.falsePositives))) problems.push(`${entry.legacyId}: reported-only signals differ`);
-      if (!same(sorted(detail.signals.fn), sorted(entry.misses))) problems.push(`${entry.legacyId}: labelled-only signals differ`);
-      if (detail.earliest?.agreement !== entry.forkAgreement) problems.push(`${entry.legacyId}: earliest decision point agreement differs`);
-      if ((detail.leader?.agreement ?? 'n/a') !== entry.leaderAgreement) problems.push(`${entry.legacyId}: leader agreement differs`);
+      if (!same(sorted(detail.signals.tp), sorted(entry.truePositives)))
+        problems.push(`${entry.legacyId}: reported-and-labelled signals differ`);
+      if (!same(sorted(detail.signals.fp), sorted(entry.falsePositives)))
+        problems.push(`${entry.legacyId}: reported-only signals differ`);
+      if (!same(sorted(detail.signals.fn), sorted(entry.misses)))
+        problems.push(`${entry.legacyId}: labelled-only signals differ`);
+      if (detail.earliest?.agreement !== entry.forkAgreement)
+        problems.push(`${entry.legacyId}: earliest decision point agreement differs`);
+      if ((detail.leader?.agreement ?? 'n/a') !== entry.leaderAgreement)
+        problems.push(`${entry.legacyId}: leader agreement differs`);
     }
     const overall = live.metrics.signals.overall;
     const legacyAll = baseline.groups.all;
     if (overall.tp !== legacyAll.tp || overall.fp !== legacyAll.fp || overall.fn !== legacyAll.fn) {
-      problems.push(`totals differ: ${overall.tp}/${overall.fp}/${overall.fn} against ${legacyAll.tp}/${legacyAll.fp}/${legacyAll.fn}`);
+      problems.push(
+        `totals differ: ${overall.tp}/${overall.fp}/${overall.fn} against ${legacyAll.tp}/${legacyAll.fp}/${legacyAll.fn}`,
+      );
     }
-    if (live.invariance.length !== 3 || live.invariance.some((entry) => !entry.identical)) problems.push('a reordered copy does not give the analysis of its source');
-    if (problems.length > 0) throw new Error(`The framework v2 harness does not reproduce the Wave 1 harness:\n${problems.join('\n')}`);
+    if (live.invariance.length !== 3 || live.invariance.some((entry) => !entry.identical))
+      problems.push('a reordered copy does not give the analysis of its source');
+    if (problems.length > 0)
+      throw new Error(
+        `The framework v2 harness does not reproduce the Wave 1 harness:\n${problems.join('\n')}`,
+      );
 
     await writeJson(join(EVALUATION_ROOT, 'runs', 'baseline-wave1.json'), baseline);
     process.stdout.write(

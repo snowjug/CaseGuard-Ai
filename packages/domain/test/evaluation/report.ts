@@ -27,7 +27,8 @@ export interface RenderOptions {
   readonly details: readonly CaseDetail[] | null;
 }
 
-const pct = (value: number | null): string => (value === null ? 'n/a' : `${Math.round(value * 100)}%`);
+const pct = (value: number | null): string =>
+  value === null ? 'n/a' : `${Math.round(value * 100)}%`;
 const fixed = (value: number | null): string => (value === null ? 'n/a' : value.toFixed(3));
 
 /** `76% [53–90%] n=17`, with ` too_few` when n is under 20. */
@@ -74,7 +75,10 @@ function kindSection(
 ): string[] {
   const out: string[] = [`## ${title}`, ''];
   if (measures.cases === 0) {
-    out.push('No case in this run is annotated for this kind of label, so nothing is measured.', '');
+    out.push(
+      'No case in this run is annotated for this kind of label, so nothing is measured.',
+      '',
+    );
     return out;
   }
   out.push(`${measures.cases} cases counted.`, '');
@@ -82,14 +86,26 @@ function kindSection(
   const categories = Object.entries(measures.byCategory);
   if (categories.length > 0) {
     out.push('By case category (a case counts in each of its categories):', '');
-    out.push(...table(PR_HEADERS, categories.map(([name, pr]) => prRow(name, pr))), '');
+    out.push(
+      ...table(
+        PR_HEADERS,
+        categories.map(([name, pr]) => prRow(name, pr)),
+      ),
+      '',
+    );
   }
   const byDimension = dimensions
     .map((dimension) => [dimension, measures.byDimension[dimension]] as const)
     .filter((entry): entry is readonly [string, PrecisionRecall] => entry[1] !== undefined);
   if (byDimension.length > 0) {
     out.push('By dimension:', '');
-    out.push(...table(PR_HEADERS, byDimension.map(([name, pr]) => prRow(name, pr))), '');
+    out.push(
+      ...table(
+        PR_HEADERS,
+        byDimension.map(([name, pr]) => prRow(name, pr)),
+      ),
+      '',
+    );
   }
   if (perId) {
     out.push(`By ${idLabel}:`, '');
@@ -386,7 +402,14 @@ export function renderMarkdown(
       'Per-case detail is for understanding a result. It must never be used to change a detector.',
       '',
       ...table(
-        ['Case', 'Labels', 'Reported, not labelled', 'Labelled, not reported', 'Earliest', 'Leader'],
+        [
+          'Case',
+          'Labels',
+          'Reported, not labelled',
+          'Labelled, not reported',
+          'Earliest',
+          'Leader',
+        ],
         options.details.map((d) => [
           d.id,
           d.status,

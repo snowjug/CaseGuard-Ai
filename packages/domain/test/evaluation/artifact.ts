@@ -1,6 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { canonicalJson, sha256, caseSetHash, REPOSITORY_ROOT, type Dataset, type LoadedCase } from './dataset';
+import {
+  canonicalJson,
+  sha256,
+  caseSetHash,
+  REPOSITORY_ROOT,
+  type Dataset,
+  type LoadedCase,
+} from './dataset';
 import { enginePackIdentity } from './engine';
 import type { CaseDetail, InvarianceResult, MetricsResult } from './metrics';
 import { EVAL_RUN_SCHEMA } from './schema';
@@ -50,7 +57,10 @@ export function engineVersion(): { version: string; package: string } {
   ) as { name: string; version: string };
   let version = manifest.version;
   try {
-    const source = readFileSync(resolve(REPOSITORY_ROOT, 'apps/api/src/services/analysis/inputs.ts'), 'utf8');
+    const source = readFileSync(
+      resolve(REPOSITORY_ROOT, 'apps/api/src/services/analysis/inputs.ts'),
+      'utf8',
+    );
     version = /export const ENGINE_VERSION = '([^']+)'/.exec(source)?.[1] ?? version;
   } catch {
     // Without the API source (a partial checkout) the package version stands in.

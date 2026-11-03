@@ -24,11 +24,17 @@ const migrated = (legacyId: string): LoadedCase => {
   if (!found) throw new Error(`the migrated case ${legacyId} is missing`);
   return found;
 };
-const independent = WAVE1_PLAN.filter((plan) => !plan.categories.includes('reordered')).map((plan) => migrated(plan.legacyId));
-const copies = WAVE1_PLAN.filter((plan) => plan.categories.includes('reordered')).map((plan) => migrated(plan.legacyId));
+const independent = WAVE1_PLAN.filter((plan) => !plan.categories.includes('reordered')).map(
+  (plan) => migrated(plan.legacyId),
+);
+const copies = WAVE1_PLAN.filter((plan) => plan.categories.includes('reordered')).map((plan) =>
+  migrated(plan.legacyId),
+);
 
 const pairsOf = (loaded: LoadedCase): string[] =>
-  (loaded.annotations?.annotations[0]?.signals ?? []).map((label) => `${label.event}|${label.id}`).sort();
+  (loaded.annotations?.annotations[0]?.signals ?? [])
+    .map((label) => `${label.event}|${label.id}`)
+    .sort();
 
 describe('[eval] the migrated Wave 1 set is intact', () => {
   it('has the 13 independent cases and the 3 reordered copies Wave 1 had, in the dev split', () => {
@@ -38,7 +44,11 @@ describe('[eval] the migrated Wave 1 set is intact', () => {
     for (const loaded of [...independent, ...copies]) expect(loaded.case.split).toBe('dev');
     const counts = (category: CaseCategory): number =>
       independent.filter((loaded) => loaded.case.categories.includes(category)).length;
-    expect({ paraphrase: counts('paraphrase'), noisy: counts('noisy'), negative: counts('negative-control') }).toEqual({
+    expect({
+      paraphrase: counts('paraphrase'),
+      noisy: counts('noisy'),
+      negative: counts('negative-control'),
+    }).toEqual({
       paraphrase: 6,
       noisy: 3,
       negative: 4,
@@ -80,7 +90,8 @@ describe('[eval] the migrated Wave 1 set is intact', () => {
       ['r3-warsaw-noisy-swapped', 'n1-warsaw-noisy'],
     ]);
     for (const loaded of copies) {
-      const legacyId = WAVE1_PLAN.find((plan) => wave1Id(plan.legacyId) === loaded.case.id)?.legacyId ?? '';
+      const legacyId =
+        WAVE1_PLAN.find((plan) => wave1Id(plan.legacyId) === loaded.case.id)?.legacyId ?? '';
       const source = migrated(sources.get(legacyId) ?? '');
       expect(loaded.case.derivedFrom, legacyId).toBe(source.case.id);
       expect(loaded.case.events, legacyId).toEqual(source.case.events);
@@ -102,8 +113,10 @@ describe('[eval] the migrated Wave 1 set is intact', () => {
         expect(signals.has(label.id), `${loaded.case.id} ${label.id}`).toBe(true);
         expect(keys.has(label.event), `${loaded.case.id} ${label.event}`).toBe(true);
       }
-      for (const cause of record?.causes ?? []) expect(hypotheses.has(cause), `${loaded.case.id} ${cause}`).toBe(true);
-      if (record?.earliestMissed) expect(keys.has(record.earliestMissed), loaded.case.id).toBe(true);
+      for (const cause of record?.causes ?? [])
+        expect(hypotheses.has(cause), `${loaded.case.id} ${cause}`).toBe(true);
+      if (record?.earliestMissed)
+        expect(keys.has(record.earliestMissed), loaded.case.id).toBe(true);
     }
   });
 

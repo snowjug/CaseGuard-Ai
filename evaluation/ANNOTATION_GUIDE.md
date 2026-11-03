@@ -28,16 +28,16 @@ reports that is not on the list as a false positive.
 
 A signal is **absent** when its words, or those of an action, appear and the fact is not stated. Give the reason:
 
-| Reason          | Example of the shape (not of the wording)                          |
-| --------------- | ------------------------------------------------------------------ |
-| `negated`       | the fact is denied                                                 |
-| `speculative`   | a guess: it might be, possibly                                     |
-| `future_intent` | intended, not done: will check, next step                          |
-| `conditional`   | depends on a condition: if it had been, unless                     |
-| `attributed`    | reported on someone else's authority and not endorsed              |
-| `corrected`     | the author replaces an earlier statement                           |
-| `requested`     | asked for, not yet done                                            |
-| `other`         | the words appear in an unrelated context (look-alike text)         |
+| Reason          | Example of the shape (not of the wording)                  |
+| --------------- | ---------------------------------------------------------- |
+| `negated`       | the fact is denied                                         |
+| `speculative`   | a guess: it might be, possibly                             |
+| `future_intent` | intended, not done: will check, next step                  |
+| `conditional`   | depends on a condition: if it had been, unless             |
+| `attributed`    | reported on someone else's authority and not endorsed      |
+| `corrected`     | the author replaces an earlier statement                   |
+| `requested`     | asked for, not yet done                                    |
+| `other`         | the words appear in an unrelated context (look-alike text) |
 
 Mark an absence only where an engine could plausibly fire: where the words really appear. Do not list every signal that is
 not there. The negation measure reads every reason except `other`.

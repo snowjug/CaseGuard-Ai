@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { checkDataset, independenceSources } from './check';
-import { loadDataset, loadVocabulary, readLockedRuns, testSetHash, type Dataset, type LoadedCase } from './dataset';
+import {
+  loadDataset,
+  loadVocabulary,
+  readLockedRuns,
+  testSetHash,
+  type Dataset,
+  type LoadedCase,
+} from './dataset';
 import { evalCase, evalEvent } from './fixtures';
 import {
   describeOverlap,
@@ -33,9 +40,14 @@ describe('the evaluation dataset', () => {
     expect(new Set(ids).size).toBe(ids.length);
     const splitsOfFamily = new Map<string, Set<string>>();
     for (const { case: entry } of dataset.cases) {
-      splitsOfFamily.set(entry.family, (splitsOfFamily.get(entry.family) ?? new Set<string>()).add(entry.split));
+      splitsOfFamily.set(
+        entry.family,
+        (splitsOfFamily.get(entry.family) ?? new Set<string>()).add(entry.split),
+      );
     }
-    const split = [...splitsOfFamily].filter(([, splits]) => splits.size > 1).map(([family]) => family);
+    const split = [...splitsOfFamily]
+      .filter(([, splits]) => splits.size > 1)
+      .map(([family]) => family);
     expect(split).toEqual([]);
   });
 
@@ -63,43 +75,104 @@ describe('the evaluation dataset', () => {
 });
 
 describe('the overlap guard', () => {
-  const source = (kind: OverlapSource['kind'], text: string, name = `a ${kind}`): OverlapSource => ({
+  const source = (
+    kind: OverlapSource['kind'],
+    text: string,
+    name = `a ${kind}`,
+  ): OverlapSource => ({
     kind,
     name,
     shingles: shingles(wordsOf(text)),
   });
   const copied = evalCase({
-    events: [evalEvent('ev01', 0, 'customer', 'Everyone in the Gdansk office lost the connection at nine this morning.')],
+    events: [
+      evalEvent(
+        'ev01',
+        0,
+        'customer',
+        'Everyone in the Gdansk office lost the connection at nine this morning.',
+      ),
+    ],
   });
 
   it('reads words the way a person does: case and dots around a word do not matter, dots inside one do', () => {
-    expect(wordsOf('Sign-in FAILED. See a.kowal at 10.20.1.10!')).toEqual(['sign', 'in', 'failed', 'see', 'a.kowal', 'at', '10.20.1.10']);
+    expect(wordsOf('Sign-in FAILED. See a.kowal at 10.20.1.10!')).toEqual([
+      'sign',
+      'in',
+      'failed',
+      'see',
+      'a.kowal',
+      'at',
+      '10.20.1.10',
+    ]);
   });
 
   it('flags six shared words and shows the phrase only for a source that may be shown', () => {
     const phrase = 'the Gdansk office lost the connection';
-    const [sample] = findOverlaps([copied], [source('shipped-sample', `Reported: ${phrase} twice.`)]);
-    expect(sample).toMatchObject({ caseId: copied.id, where: 'ev01', source: 'shipped-sample', phrase: 'the gdansk office lost the connection' });
+    const [sample] = findOverlaps(
+      [copied],
+      [source('shipped-sample', `Reported: ${phrase} twice.`)],
+    );
+    expect(sample).toMatchObject({
+      caseId: copied.id,
+      where: 'ev01',
+      source: 'shipped-sample',
+      phrase: 'the gdansk office lost the connection',
+    });
     const [pack] = findOverlaps([copied], [source('knowledge-pack', phrase)]);
     expect(pack?.phrase).toBeNull();
     expect(describeOverlap(pack as NonNullable<typeof pack>)).toContain('phrase withheld');
   });
 
   it('lets five shared words pass, and does not compare a case with its own split', () => {
-    expect(findOverlaps([copied], [source('vocabulary', 'the Gdansk office lost the')])).toEqual([]);
-    expect(findOverlaps([copied], [source('other-split', 'lost the connection at nine this morning', 'dev:')])).toEqual([]);
-    expect(findOverlaps([copied], [source('other-split', 'lost the connection at nine this morning', 'validation:')])).toHaveLength(1);
+    expect(findOverlaps([copied], [source('vocabulary', 'the Gdansk office lost the')])).toEqual(
+      [],
+    );
+    expect(
+      findOverlaps(
+        [copied],
+        [source('other-split', 'lost the connection at nine this morning', 'dev:')],
+      ),
+    ).toEqual([]);
+    expect(
+      findOverlaps(
+        [copied],
+        [source('other-split', 'lost the connection at nine this morning', 'validation:')],
+      ),
+    ).toHaveLength(1);
   });
 });
 
 describe('who may read the cases', () => {
   it('lets the engine source know nothing of the evaluation, and keeps other code away from validation, test and the loaders', () => {
-    expect(readerViolation('packages/domain/src/engine/x.ts', "const dir = 'evaluation/cases/dev';")).not.toBeNull();
+    expect(
+      readerViolation('packages/domain/src/engine/x.ts', "const dir = 'evaluation/cases/dev';"),
+    ).not.toBeNull();
     expect(readerViolation('packages/domain/src/engine/x.ts', 'const pattern = /a|b/;')).toBeNull();
-    expect(readerViolation('packages/domain/test/signals.test.ts', "readFileSync('evaluation/cases/validation/x.json')")).not.toBeNull();
-    expect(readerViolation('packages/domain/test/signals.test.ts', "import { loadDataset } from './evaluation/dataset';")).not.toBeNull();
-    expect(readerViolation('packages/domain/test/signals.test.ts', "readFileSync('evaluation/annotations/x.json')")).not.toBeNull();
-    expect(readerViolation('packages/domain/test/signals.test.ts', "import { prepareBundle } from './helpers';")).toBeNull();
+    expect(
+      readerViolation(
+        'packages/domain/test/signals.test.ts',
+        "readFileSync('evaluation/cases/validation/x.json')",
+      ),
+    ).not.toBeNull();
+    expect(
+      readerViolation(
+        'packages/domain/test/signals.test.ts',
+        "import { loadDataset } from './evaluation/dataset';",
+      ),
+    ).not.toBeNull();
+    expect(
+      readerViolation(
+        'packages/domain/test/signals.test.ts',
+        "readFileSync('evaluation/annotations/x.json')",
+      ),
+    ).not.toBeNull();
+    expect(
+      readerViolation(
+        'packages/domain/test/signals.test.ts',
+        "import { prepareBundle } from './helpers';",
+      ),
+    ).toBeNull();
   });
 });
 
@@ -123,7 +196,10 @@ describe('the log of locked runs', () => {
     expect(twice.runs.map((run) => run.index)).toEqual([1, 2]);
     expect(twice.runs[1]?.previous).toBe(twice.runs[0]?.hash);
     expect(verifyChain(twice, body.testSetSha256)).toEqual([]);
-    const edited: LockedRuns = { ...twice, runs: [{ ...twice.runs[0]!, resultsSha256: '0'.repeat(64) }, twice.runs[1]!] };
+    const edited: LockedRuns = {
+      ...twice,
+      runs: [{ ...twice.runs[0]!, resultsSha256: '0'.repeat(64) }, twice.runs[1]!],
+    };
     expect(verifyChain(edited, null).length).toBeGreaterThan(0);
     const removed: LockedRuns = { ...twice, runs: [twice.runs[1]!] };
     expect(verifyChain(removed, null).length).toBeGreaterThan(0);
@@ -144,27 +220,52 @@ describe('the manifest of a locked set', () => {
     annotationsFile: `annotations/${id}.json`,
     annotationsSha256: 'a'.repeat(64),
   });
-  const build = (cases: LoadedCase[]): Dataset => ({ root: '', cases, annotators: null, manifest: null, problems: [] });
+  const build = (cases: LoadedCase[]): Dataset => ({
+    root: '',
+    cases,
+    annotators: null,
+    manifest: null,
+    problems: [],
+  });
 
   it('refuses to be rewritten once the test split has changed, and does not lock twice', () => {
     const first = build([loaded('ev-d-001-one', 'dev', 'b'), loaded('ev-t-001-two', 'test', 'c')]);
-    const locked = buildManifest(first, null, { at: '2026-11-10T10:00:00Z', commit: 'a'.repeat(40) });
+    const locked = buildManifest(first, null, {
+      at: '2026-11-10T10:00:00Z',
+      commit: 'a'.repeat(40),
+    });
     expect(locked.locked?.testSetSha256).toMatch(/^[0-9a-f]{64}$/);
     expect(locked.schema).toBe(EVAL_MANIFEST_SCHEMA);
     expect(Object.keys(locked.splits)).toEqual([...SPLITS]);
-    const changed = build([loaded('ev-d-001-one', 'dev', 'b'), loaded('ev-t-001-two', 'test', 'd')]);
+    const changed = build([
+      loaded('ev-d-001-one', 'dev', 'b'),
+      loaded('ev-t-001-two', 'test', 'd'),
+    ]);
     expect(() => buildManifest(changed, locked, null)).toThrow(/locked test split has changed/);
-    expect(() => buildManifest(first, locked, { at: '2026-11-11T10:00:00Z', commit: 'a'.repeat(40) })).toThrow(/already locked/);
+    expect(() =>
+      buildManifest(first, locked, { at: '2026-11-11T10:00:00Z', commit: 'a'.repeat(40) }),
+    ).toThrow(/already locked/);
     // A change to the dev split is allowed, and bumps the annotation version only when an annotation file changed.
-    const devChanged = build([{ ...loaded('ev-d-001-one', 'dev', 'e'), annotationsSha256: 'f'.repeat(64) }, loaded('ev-t-001-two', 'test', 'c')]);
-    expect(buildManifest(devChanged, locked, null).annotationVersion).toBe(locked.annotationVersion + 1);
+    const devChanged = build([
+      { ...loaded('ev-d-001-one', 'dev', 'e'), annotationsSha256: 'f'.repeat(64) },
+      loaded('ev-t-001-two', 'test', 'c'),
+    ]);
+    expect(buildManifest(devChanged, locked, null).annotationVersion).toBe(
+      locked.annotationVersion + 1,
+    );
   });
 
   it('reports a case file or an annotation file that no longer matches its hash', () => {
     const files = build([loaded('ev-d-001-one', 'dev', 'b')]);
     const manifest = buildManifest(files, null, null);
     expect(verifyManifest({ ...files, manifest })).toEqual([]);
-    const drifted = build([{ ...loaded('ev-d-001-one', 'dev', 'b'), eventsSha256: 'c'.repeat(64), annotationsSha256: 'd'.repeat(64) }]);
+    const drifted = build([
+      {
+        ...loaded('ev-d-001-one', 'dev', 'b'),
+        eventsSha256: 'c'.repeat(64),
+        annotationsSha256: 'd'.repeat(64),
+      },
+    ]);
     const problems = verifyManifest({ ...drifted, manifest });
     expect(problems.join('\n')).toMatch(/case file does not match/);
     expect(problems.join('\n')).toMatch(/annotation file does not match/);
@@ -175,12 +276,27 @@ describe('the manifest of a locked set', () => {
     const testHash = testSetHash(files.cases.filter((entry) => entry.case.split === 'test'));
     const empty: LockedRuns = { schema: EVAL_LOCKED_RUNS_SCHEMA, runs: [] };
     const unlocked = buildManifest(files, null, null);
-    expect(lockProblems({ manifest: unlocked, uncommitted: [], testHash, log: empty })[0]).toMatch(/not locked yet/);
-    const locked = buildManifest(files, null, { at: '2026-11-10T10:00:00Z', commit: 'a'.repeat(40) });
+    expect(lockProblems({ manifest: unlocked, uncommitted: [], testHash, log: empty })[0]).toMatch(
+      /not locked yet/,
+    );
+    const locked = buildManifest(files, null, {
+      at: '2026-11-10T10:00:00Z',
+      commit: 'a'.repeat(40),
+    });
     expect(lockProblems({ manifest: locked, uncommitted: [], testHash, log: empty })).toEqual([]);
-    const dirty = lockProblems({ manifest: locked, uncommitted: [' M evaluation/cases/test/ev-t-001-two.json'], testHash, log: empty });
+    const dirty = lockProblems({
+      manifest: locked,
+      uncommitted: [' M evaluation/cases/test/ev-t-001-two.json'],
+      testHash,
+      log: empty,
+    });
     expect(dirty.join(' ')).toMatch(/Uncommitted changes/);
-    const changed = lockProblems({ manifest: locked, uncommitted: [], testHash: 'z'.repeat(64), log: empty });
+    const changed = lockProblems({
+      manifest: locked,
+      uncommitted: [],
+      testHash: 'z'.repeat(64),
+      log: empty,
+    });
     expect(changed.join(' ')).toMatch(/differs from the one that was locked/);
     const other = appendRun(empty, {
       ranAt: '2026-11-10T10:00:00Z',
@@ -194,6 +310,8 @@ describe('the manifest of a locked set', () => {
       resultsSha256: 'e'.repeat(64),
       detail: false,
     });
-    expect(lockProblems({ manifest: locked, uncommitted: [], testHash, log: other }).join(' ')).toMatch(/log of locked runs is broken/);
+    expect(
+      lockProblems({ manifest: locked, uncommitted: [], testHash, log: other }).join(' '),
+    ).toMatch(/log of locked runs is broken/);
   });
 });

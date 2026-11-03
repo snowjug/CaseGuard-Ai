@@ -5,11 +5,26 @@ import { EVAL_CASE_SCHEMA, type CaseCategory, type EvalCase, type EvalEvent } fr
 
 /** Small builders for the tests of the evaluation tooling. Nothing here is a case of the corpus. */
 
-const customer = (key: string): EngineEventInfo => ({ key, type: 'customer_email', role: 'customer_admin', who: 'customer' });
-const engineer = (key: string): EngineEventInfo => ({ key, type: 'engineer_email', role: 'support_engineer', who: 'engineer' });
+const customer = (key: string): EngineEventInfo => ({
+  key,
+  type: 'customer_email',
+  role: 'customer_admin',
+  who: 'customer',
+});
+const engineer = (key: string): EngineEventInfo => ({
+  key,
+  type: 'engineer_email',
+  role: 'support_engineer',
+  who: 'engineer',
+});
 
 /** Four events: a customer, an engineer, a customer, an engineer. */
-export const FOUR_EVENTS: readonly EngineEventInfo[] = [customer('ev01'), engineer('ev02'), customer('ev03'), engineer('ev04')];
+export const FOUR_EVENTS: readonly EngineEventInfo[] = [
+  customer('ev01'),
+  engineer('ev02'),
+  customer('ev03'),
+  engineer('ev04'),
+];
 
 export function engineOutput(overrides: Partial<EngineCaseOutput> = {}): EngineCaseOutput {
   return {
@@ -58,7 +73,8 @@ export function evalEvent(key: string, at: number, who: EvalEvent['who'], text: 
     key,
     at,
     who,
-    type: who === 'engineer' ? 'engineer_email' : who === 'system' ? 'system_event' : 'customer_email',
+    type:
+      who === 'engineer' ? 'engineer_email' : who === 'system' ? 'system_event' : 'customer_email',
     channel: tool ? 'tool' : 'email',
     text,
   };

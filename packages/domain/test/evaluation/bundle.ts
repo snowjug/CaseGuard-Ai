@@ -46,7 +46,8 @@ export function caseToBundle(source: EvalCase): CaseBundle {
   const ordered = source.handedOverOrder
     ? source.handedOverOrder.map((key) => {
         const event = byKey.get(key);
-        if (!event) throw new Error(`${source.id}: handedOverOrder names an unknown event "${key}"`);
+        if (!event)
+          throw new Error(`${source.id}: handedOverOrder names an unknown event "${key}"`);
         return event;
       })
     : source.events;

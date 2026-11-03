@@ -29,11 +29,13 @@ export function wordsOf(text: string): string[] {
 
 export function shingles(words: readonly string[], size = SHINGLE_WORDS): Set<string> {
   const out = new Set<string>();
-  for (let index = 0; index + size <= words.length; index += 1) out.add(words.slice(index, index + size).join(' '));
+  for (let index = 0; index + size <= words.length; index += 1)
+    out.add(words.slice(index, index + size).join(' '));
   return out;
 }
 
-export type OverlapSourceKind = 'shipped-sample' | 'vocabulary' | 'knowledge-pack' | 'detector-test' | 'other-split';
+export type OverlapSourceKind =
+  'shipped-sample' | 'vocabulary' | 'knowledge-pack' | 'detector-test' | 'other-split';
 const SHOWN: ReadonlySet<OverlapSourceKind> = new Set(['shipped-sample', 'vocabulary']);
 
 export interface OverlapSource {
@@ -65,11 +67,17 @@ export function textUnits(source: EvalCase): { where: string; text: string }[] {
   return [
     { where: 'title', text: source.title },
     { where: 'scenario', text: source.scenario },
-    ...source.events.map((event) => ({ where: event.key, text: `${event.title ?? ''}\n${event.text}` })),
+    ...source.events.map((event) => ({
+      where: event.key,
+      text: `${event.title ?? ''}\n${event.text}`,
+    })),
   ];
 }
 
-export function findOverlaps(cases: readonly EvalCase[], sources: readonly OverlapSource[]): Overlap[] {
+export function findOverlaps(
+  cases: readonly EvalCase[],
+  sources: readonly OverlapSource[],
+): Overlap[] {
   const found: Overlap[] = [];
   for (const source of cases) {
     for (const unit of textUnits(source)) {
@@ -90,7 +98,10 @@ export function findOverlaps(cases: readonly EvalCase[], sources: readonly Overl
             caseId: source.id,
             where: unit.where,
             source: known.kind,
-            sourceName: known.kind === 'other-split' ? `a case of another split (${known.name.split(':')[0] ?? ''})` : known.name,
+            sourceName:
+              known.kind === 'other-split'
+                ? `a case of another split (${known.name.split(':')[0] ?? ''})`
+                : known.name,
             firstWords: first,
             windows,
             phrase: SHOWN.has(known.kind) ? words.slice(first[0] - 1, first[1]).join(' ') : null,
@@ -108,7 +119,8 @@ function collectStrings(value: unknown, into: string[]): void {
   if (typeof value === 'string') into.push(value);
   else if (Array.isArray(value)) for (const item of value) collectStrings(item, into);
   else if (value !== null && typeof value === 'object') {
-    for (const inner of Object.values(value as Record<string, unknown>)) collectStrings(inner, into);
+    for (const inner of Object.values(value as Record<string, unknown>))
+      collectStrings(inner, into);
   }
 }
 
@@ -118,12 +130,17 @@ function shinglesOfStrings(strings: readonly string[]): Set<string> {
   return out;
 }
 
-function walk(directory: string, accept: (path: string) => boolean, skip: (path: string) => boolean): string[] {
+function walk(
+  directory: string,
+  accept: (path: string) => boolean,
+  skip: (path: string) => boolean,
+): string[] {
   if (!existsSync(directory)) return [];
   const out: string[] = [];
   for (const name of readdirSync(directory).sort()) {
     const path = join(directory, name);
-    if (name === 'node_modules' || name === 'dist' || name === '.next' || name.startsWith('.')) continue;
+    if (name === 'node_modules' || name === 'dist' || name === '.next' || name.startsWith('.'))
+      continue;
     if (skip(path)) continue;
     if (statSync(path).isDirectory()) out.push(...walk(path, accept, skip));
     else if (accept(path)) out.push(path);
@@ -136,7 +153,11 @@ const posix = (path: string): string => relative(REPOSITORY_ROOT, path).split(se
 /** The two shipped samples (every string of the bundle). */
 export function sampleSource(root = REPOSITORY_ROOT): OverlapSource {
   const strings: string[] = [];
-  for (const file of walk(join(root, 'synthetic-data', 'cases'), (path) => path.endsWith('.json'), () => false)) {
+  for (const file of walk(
+    join(root, 'synthetic-data', 'cases'),
+    (path) => path.endsWith('.json'),
+    () => false,
+  )) {
     collectStrings(JSON.parse(readFileSync(file, 'utf8')) as unknown, strings);
   }
   return { kind: 'shipped-sample', name: 'a shipped sample', shingles: shinglesOfStrings(strings) };
@@ -145,7 +166,10 @@ export function sampleSource(root = REPOSITORY_ROOT): OverlapSource {
 /** The labels and descriptions of `evaluation/vocabulary.json`. */
 export function vocabularySource(evaluationRoot: string): OverlapSource {
   const strings: string[] = [];
-  collectStrings(JSON.parse(readFileSync(join(evaluationRoot, 'vocabulary.json'), 'utf8')) as unknown, strings);
+  collectStrings(
+    JSON.parse(readFileSync(join(evaluationRoot, 'vocabulary.json'), 'utf8')) as unknown,
+    strings,
+  );
   return { kind: 'vocabulary', name: 'the vocabulary', shingles: shinglesOfStrings(strings) };
 }
 
@@ -153,12 +177,19 @@ export function vocabularySource(evaluationRoot: string): OverlapSource {
 export function packSource(): OverlapSource {
   const strings: string[] = [];
   collectStrings(TEAMS_AUTH_PACK, strings);
-  return { kind: 'knowledge-pack', name: 'the knowledge pack', shingles: shinglesOfStrings(strings) };
+  return {
+    kind: 'knowledge-pack',
+    name: 'the knowledge pack',
+    shingles: shinglesOfStrings(strings),
+  };
 }
 
 const isEvaluationTooling = (path: string): boolean => {
   const name = posix(path);
-  return name.startsWith('packages/domain/test/evaluation/') || /^packages\/domain\/test\/evaluation[^/]*\.test\.ts$/.test(name);
+  return (
+    name.startsWith('packages/domain/test/evaluation/') ||
+    /^packages\/domain\/test\/evaluation[^/]*\.test\.ts$/.test(name)
+  );
 };
 
 /** The unit tests and fixtures of the detectors: everything under `packages/domain/test` except the evaluation tooling. */
@@ -193,7 +224,8 @@ const SOURCE_ROOTS = ['packages', 'apps'];
 const READER_EXTENSIONS = /\.(ts|tsx|mjs|cjs|js)$/;
 
 /** What the engine's own source may not mention at all: the evaluation data, its runs or its tooling. */
-const ANY_EVALUATION_DATA = /evaluation\/(cases|annotations|runs)|eval-case\/2|eval-annotations\/2|test\/evaluation\//;
+const ANY_EVALUATION_DATA =
+  /evaluation\/(cases|annotations|runs)|eval-case\/2|eval-annotations\/2|test\/evaluation\//;
 /** What no other source may reach: the validation and test cases, any annotation, or the tooling that loads them. */
 const HIDDEN_EVALUATION_DATA =
   /(^|[^\w-])evaluation\/cases\/(test|validation)\b|evaluation\/annotations|evaluation\/(dataset|runner|run|labels|artifact|manifest|guard|engine|check|coverage|agreement|annotate)['"]/;
@@ -217,7 +249,9 @@ export function findForbiddenReaders(root = REPOSITORY_ROOT): { file: string; re
   const offenders: { file: string; reason: string }[] = [];
   const files: string[] = [];
   for (const name of SOURCE_ROOTS) {
-    files.push(...walk(join(root, name), (path) => READER_EXTENSIONS.test(path), isEvaluationTooling));
+    files.push(
+      ...walk(join(root, name), (path) => READER_EXTENSIONS.test(path), isEvaluationTooling),
+    );
   }
   for (const file of files) {
     const reason = readerViolation(posix(file), readFileSync(file, 'utf8'));

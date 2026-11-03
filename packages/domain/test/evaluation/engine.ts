@@ -134,9 +134,16 @@ function recommendationCounts(prepared: Prepared): {
 
 function counterfactualOutput(prepared: Prepared): CounterfactualOutput {
   const { analysis, normalized, pack, ctx } = prepared;
-  const fork = analysis.forks.find((candidate) => candidate.isEarliestMeaningful && candidate.eligibility.eligible);
+  const fork = analysis.forks.find(
+    (candidate) => candidate.isEarliestMeaningful && candidate.eligibility.eligible,
+  );
   if (!fork) {
-    return { simulated: false, timeToDiagnosisGain: null, customerEffortGain: null, clearlyBetter: false };
+    return {
+      simulated: false,
+      timeToDiagnosisGain: null,
+      customerEffortGain: null,
+      clearlyBetter: false,
+    };
   }
   const { scenarios } = generateCounterfactuals({
     analysis,
@@ -173,7 +180,12 @@ export function runEngine(source: EvalCase, options: RunOptions = {}): EngineCas
   if (!pack) {
     return refusedOutput(
       source.id,
-      byTime.map((event) => ({ key: event.key, type: event.type, role: event.who, who: event.who })),
+      byTime.map((event) => ({
+        key: event.key,
+        type: event.type,
+        role: event.who,
+        who: event.who,
+      })),
     );
   }
 
@@ -206,7 +218,10 @@ export function runEngine(source: EvalCase, options: RunOptions = {}): EngineCas
     notCheckable: 0,
   };
   const cite = (eventId: string | null, ref: Parameters<typeof verifyExcerpt>[1]): void => {
-    const event = eventId === null ? undefined : normalized.events.find((candidate) => candidate.id === eventId);
+    const event =
+      eventId === null
+        ? undefined
+        : normalized.events.find((candidate) => candidate.id === eventId);
     const check = verifyExcerpt(event ?? { id: '', title: null, body: '' }, ref);
     citations.total += 1;
     if (check.verification === 'verified') citations.verified += 1;

@@ -1,11 +1,7 @@
 import type { QualityBand } from '@caseguard/schemas';
 import type { AcceptedLabels, LabelSet, LabelStatus } from './labels';
 import type { EngineCaseOutput, MissCause } from './output';
-import {
-  NEGATION_REASONS,
-  type CaseCategory,
-  type Split,
-} from './schema';
+import { NEGATION_REASONS, type CaseCategory, type Split } from './schema';
 import {
   addCounts,
   calibrationOf,
@@ -116,7 +112,8 @@ function measure(
     record(fp, { tp: 0, fp: 1, fn: 0 });
     record(fn, { tp: 0, fp: 0, fn: 1 });
     // A case with no labelled or reported pair still counts as a case of its categories.
-    for (const category of input.categories) if (!byCategory.has(category)) byCategory.set(category, ZERO_COUNTS);
+    for (const category of input.categories)
+      if (!byCategory.has(category)) byCategory.set(category, ZERO_COUNTS);
   }
   return {
     cases: comparisons.length,
@@ -165,7 +162,8 @@ export function actionMeasures(cases: readonly CaseInput[]): ActionMeasures {
   for (const input of cases) {
     if (input.labels?.actions === undefined || !supported(input)) continue;
     const events = engineEvents(input);
-    const engineerSide = (pair: string): boolean => events.get(eventOfPair(pair))?.who === 'engineer';
+    const engineerSide = (pair: string): boolean =>
+      events.get(eventOfPair(pair))?.who === 'engineer';
     const expected = new Set(input.labels.actions.map((label) => pairKey(label.event, label.id)));
     const reported = new Set(input.engine.actions.filter(engineerSide));
     comparisons.push({ input, ...compareSets(expected, reported) });
@@ -241,7 +239,12 @@ export function negationMeasures(cases: readonly CaseInput[]): NegationMeasures 
     onAbsent: proportion(silent, absences),
     onPresent: proportion(fired, presences),
     byReason: sortedRecord(
-      new Map([...reasons.entries()].map(([reason, entry]) => [reason, proportion(entry.silent, entry.n)])),
+      new Map(
+        [...reasons.entries()].map(([reason, entry]) => [
+          reason,
+          proportion(entry.silent, entry.n),
+        ]),
+      ),
     ),
   };
 }
@@ -290,14 +293,19 @@ export function contradictionMeasures(cases: readonly CaseInput[]): Contradictio
       const pair = unorderedPair(label.events);
       const candidates = conflicts
         .map((conflict, index) => ({ conflict, index }))
-        .filter(({ conflict, index }) => !used.has(index) && unorderedPair([conflict.events[0], conflict.events[1]]) === pair);
-      const match = candidates.find(({ conflict }) => conflict.class === label.class) ?? candidates[0];
+        .filter(
+          ({ conflict, index }) =>
+            !used.has(index) && unorderedPair([conflict.events[0], conflict.events[1]]) === pair,
+        );
+      const match =
+        candidates.find(({ conflict }) => conflict.class === label.class) ?? candidates[0];
       if (!match) continue;
       used.add(match.index);
       found += 1;
       matchedEngine += 1;
       if (match.conflict.class === label.class) classRight += 1;
-      if (normalizeSubject(match.conflict.subject) === normalizeSubject(label.subject)) subjectRight += 1;
+      if (normalizeSubject(match.conflict.subject) === normalizeSubject(label.subject))
+        subjectRight += 1;
     }
   }
   if (counted === 0) {
@@ -354,9 +362,14 @@ export function rejectionMeasures(cases: readonly CaseInput[]): RejectionMeasure
       input.labels.signals.length === 0,
   );
   return {
-    unsupported: proportion(unsupported.filter((input) => input.engine.refused).length, unsupported.length),
+    unsupported: proportion(
+      unsupported.filter((input) => input.engine.refused).length,
+      unsupported.length,
+    ),
     negativeControls: proportion(
-      controls.filter((input) => input.engine.signals.length === 0 && input.engine.forks.length === 0).length,
+      controls.filter(
+        (input) => input.engine.signals.length === 0 && input.engine.forks.length === 0,
+      ).length,
       controls.length,
     ),
   };
@@ -389,7 +402,11 @@ export function forkMeasures(cases: readonly CaseInput[]): ForkMeasures {
     labelled += labels.length;
     reported += input.engine.forks.length;
     for (const fork of input.engine.forks) {
-      if (labels.some((label) => label.event === fork.event && fork.categories.includes(label.category))) {
+      if (
+        labels.some(
+          (label) => label.event === fork.event && fork.categories.includes(label.category),
+        )
+      ) {
         engineMatched += 1;
       }
     }
@@ -411,12 +428,18 @@ export function forkMeasures(cases: readonly CaseInput[]): ForkMeasures {
     precision: proportion(engineMatched, reported),
     recall: proportion(labelMatched, labelled),
     recallByCategory: sortedRecord(
-      new Map([...byCategory.entries()].map(([category, entry]) => [category, proportion(entry.found, entry.n)])),
+      new Map(
+        [...byCategory.entries()].map(([category, entry]) => [
+          category,
+          proportion(entry.found, entry.n),
+        ]),
+      ),
     ),
   };
 }
 
-export type EarliestAgreement = 'exact' | 'near' | 'different' | 'missed' | 'spurious' | 'agree-none';
+export type EarliestAgreement =
+  'exact' | 'near' | 'different' | 'missed' | 'spurious' | 'agree-none';
 export const EARLIEST_AGREEMENTS: readonly EarliestAgreement[] = [
   'exact',
   'near',
@@ -435,7 +458,9 @@ export function earliestAgreement(input: CaseInput): EarliestAgreement | null {
   if (actual === null) return 'missed';
   if (actual === expected) return 'exact';
   const position = new Map(input.engine.events.map((event, index) => [event.key, index]));
-  return Math.abs((position.get(actual) ?? 99) - (position.get(expected) ?? -99)) <= 1 ? 'near' : 'different';
+  return Math.abs((position.get(actual) ?? 99) - (position.get(expected) ?? -99)) <= 1
+    ? 'near'
+    : 'different';
 }
 
 export interface EarliestMeasures {
@@ -479,7 +504,13 @@ export function earliestMeasures(cases: readonly CaseInput[]): EarliestMeasures 
  * the catch-all leads; `wrong` that another named cause leads; `n/a` that the story names no cause.
  */
 export type LeaderAgreement = 'right' | 'right-by-prior' | 'other' | 'wrong' | 'n/a';
-export const LEADER_AGREEMENTS: readonly LeaderAgreement[] = ['right', 'right-by-prior', 'other', 'wrong', 'n/a'];
+export const LEADER_AGREEMENTS: readonly LeaderAgreement[] = [
+  'right',
+  'right-by-prior',
+  'other',
+  'wrong',
+  'n/a',
+];
 
 /** A confidence this close to the prior counts as not moved by evidence. */
 export const PRIOR_TOLERANCE = 0.02;
@@ -510,7 +541,13 @@ export interface HypothesisMeasures {
 }
 
 export function hypothesisMeasures(cases: readonly CaseInput[]): HypothesisMeasures {
-  const leader: Record<LeaderAgreement, number> = { right: 0, 'right-by-prior': 0, other: 0, wrong: 0, 'n/a': 0 };
+  const leader: Record<LeaderAgreement, number> = {
+    right: 0,
+    'right-by-prior': 0,
+    other: 0,
+    wrong: 0,
+    'n/a': 0,
+  };
   const points: { p: number; outcome: boolean }[] = [];
   let withCause = 0;
   for (const input of cases) {
@@ -583,7 +620,13 @@ export function recommendationMeasures(cases: readonly CaseInput[]): Recommendat
     withEvidence += counts.withEvidence;
     general += counts.general;
   }
-  return { cases: counted, total, linked: proportion(withEvidence + general, total), withEvidence, general };
+  return {
+    cases: counted,
+    total,
+    linked: proportion(withEvidence + general, total),
+    withEvidence,
+    general,
+  };
 }
 
 // ---------------------------------------------------------------- counterfactual direction, quality band
@@ -593,7 +636,9 @@ export interface CounterfactualMeasures {
   readonly cases: number;
   readonly agreement: Proportion;
   /** Rows: the label. Columns: what the engine's simulated better path says. */
-  readonly confusion: Readonly<Record<'better' | 'none', Readonly<Record<'better' | 'none', number>>>>;
+  readonly confusion: Readonly<
+    Record<'better' | 'none', Readonly<Record<'better' | 'none', number>>>
+  >;
 }
 
 export function counterfactualMeasures(cases: readonly CaseInput[]): CounterfactualMeasures {
@@ -610,7 +655,12 @@ export function counterfactualMeasures(cases: readonly CaseInput[]): Counterfact
     n += 1;
     if (label === engine) agree += 1;
   }
-  return { status: anyRun ? 'measured' : 'not_run', cases: n, agreement: proportion(agree, n), confusion };
+  return {
+    status: anyRun ? 'measured' : 'not_run',
+    cases: n,
+    agreement: proportion(agree, n),
+    confusion,
+  };
 }
 
 const BAND_ORDER: readonly QualityBand[] = ['poor', 'needs_attention', 'adequate', 'strong'];
@@ -674,7 +724,8 @@ function summarizeCases(cases: readonly CaseInput[]): CaseSummary {
   let events = 0;
   for (const input of cases) {
     byStatus.set(input.status, (byStatus.get(input.status) ?? 0) + 1);
-    for (const category of input.categories) byCategory.set(category, (byCategory.get(category) ?? 0) + 1);
+    for (const category of input.categories)
+      byCategory.set(category, (byCategory.get(category) ?? 0) + 1);
     for (const annotator of input.annotators) annotators.add(annotator);
     labelledSignals += input.labels?.signals.length ?? 0;
     events += input.engine.events.length;
@@ -716,12 +767,32 @@ export interface CaseDetail {
   readonly status: string;
   readonly categories: readonly CaseCategory[];
   readonly refused: boolean;
-  readonly signals: { readonly tp: readonly string[]; readonly fp: readonly string[]; readonly fn: readonly string[] } | null;
-  readonly actions: { readonly tp: readonly string[]; readonly fp: readonly string[]; readonly fn: readonly string[] } | null;
-  readonly earliest: { readonly engine: string | null; readonly label: string | null; readonly agreement: EarliestAgreement } | null;
-  readonly leader: { readonly key: string; readonly confidence: number; readonly agreement: LeaderAgreement } | null;
+  readonly signals: {
+    readonly tp: readonly string[];
+    readonly fp: readonly string[];
+    readonly fn: readonly string[];
+  } | null;
+  readonly actions: {
+    readonly tp: readonly string[];
+    readonly fp: readonly string[];
+    readonly fn: readonly string[];
+  } | null;
+  readonly earliest: {
+    readonly engine: string | null;
+    readonly label: string | null;
+    readonly agreement: EarliestAgreement;
+  } | null;
+  readonly leader: {
+    readonly key: string;
+    readonly confidence: number;
+    readonly agreement: LeaderAgreement;
+  } | null;
   /** The best-placed accepted cause: its rank among the hypotheses, its confidence and its prior. */
-  readonly cause: { readonly rank: number; readonly confidence: number; readonly prior: number } | null;
+  readonly cause: {
+    readonly rank: number;
+    readonly confidence: number;
+    readonly prior: number;
+  } | null;
   readonly forkCount: number;
 }
 
@@ -741,7 +812,9 @@ export function caseDetail(input: CaseInput): CaseDetail {
     const events = engineEvents(input);
     actions = compareSets(
       new Set(labels.actions.map((label) => pairKey(label.event, label.id))),
-      new Set(input.engine.actions.filter((pair) => events.get(eventOfPair(pair))?.who === 'engineer')),
+      new Set(
+        input.engine.actions.filter((pair) => events.get(eventOfPair(pair))?.who === 'engineer'),
+      ),
     );
   }
   const agreement = earliestAgreement(input);
@@ -763,8 +836,13 @@ export function caseDetail(input: CaseInput): CaseDetail {
       agreement === null
         ? null
         : { engine: input.engine.earliestFork, label: labels?.earliestMissed ?? null, agreement },
-    leader: top && leader !== null ? { key: top.key, confidence: top.confidence, agreement: leader } : null,
-    cause: cause ? { rank: causeIndex + 1, confidence: cause.confidence, prior: cause.prior } : null,
+    leader:
+      top && leader !== null
+        ? { key: top.key, confidence: top.confidence, agreement: leader }
+        : null,
+    cause: cause
+      ? { rank: causeIndex + 1, confidence: cause.confidence, prior: cause.prior }
+      : null,
     forkCount: input.engine.forks.length,
   };
 }
