@@ -1,4 +1,4 @@
-import { AZURE_VALIDATION_NOTE } from '@caseguard/ai';
+import { AZURE_VALIDATION_NOTE, SCRIPTED_VALIDATION_NOTE } from '@caseguard/ai';
 import type { AppConfig } from '@caseguard/config';
 import { AZURE_BLOB_VALIDATION_NOTE } from '../../storage';
 import { AZURE_SEARCH_VALIDATION_NOTE } from '../search/validation-note';
@@ -14,7 +14,9 @@ export function integrationNotices(config: AppConfig): string[] {
   notices.push(
     config.ai.provider === 'deterministic'
       ? 'AI reasoning runs on the deterministic evidence engine. No cloud language model is connected; model values are simulated or estimated.'
-      : AZURE_VALIDATION_NOTE,
+      : config.ai.provider === 'scripted'
+        ? SCRIPTED_VALIDATION_NOTE
+        : AZURE_VALIDATION_NOTE,
   );
   notices.push(
     config.search.provider === 'azure-ai-search'

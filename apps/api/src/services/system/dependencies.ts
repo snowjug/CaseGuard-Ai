@@ -31,7 +31,7 @@ export function modelProviderRow(
     latencyMs: null,
     detail: 'The AI provider could not be initialised; see the server log.',
     checkedAt,
-    simulated: config.ai.provider === 'deterministic',
+    simulated: config.ai.provider !== 'azure-openai',
   };
 }
 

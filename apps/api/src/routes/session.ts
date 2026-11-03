@@ -27,6 +27,10 @@ export function buildNotices(
     notices.push(
       'Reasoning runs on the deterministic evidence engine. No cloud language model is connected in this environment.',
     );
+  } else if (config.ai.provider === 'scripted') {
+    notices.push(
+      'A scripted test provider is configured: every model reply comes from a test script and no language model is connected.',
+    );
   } else {
     notices.push(
       'Azure OpenAI is configured, but the integration has only been validated against mocks in this build.',

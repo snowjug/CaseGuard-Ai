@@ -111,7 +111,7 @@ function registerHealthChecks(
     'modelProvider',
     () => ({ detail: 'deterministic engine runs in-process' }),
     {
-      simulated: config.ai.provider === 'deterministic',
+      simulated: config.ai.provider !== 'azure-openai',
       enabled: config.ai.provider === 'deterministic',
     },
   );

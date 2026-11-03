@@ -1,5 +1,6 @@
 import {
   AzureOpenAiProvider,
+  createScriptedTestProvider,
   type AzureAuth,
   type Logger as AiLogger,
   type ModelProvider,
@@ -17,9 +18,17 @@ export type ProviderFactory = (
  * is accepted only outside deployed environments (the configuration loader already refuses it there,
  * this is the second lock). `@azure/identity` loads lazily so a deterministic deployment never pays
  * for it. NOT validated against a live Azure OpenAI deployment: see `AZURE_VALIDATION_NOTE`.
+ *
+ * The scripted test provider is built only for a runtime that is not deployed (the configuration loader refuses it
+ * elsewhere; the provider refuses to be constructed without `allowScripted`, which is set here from the same
+ * condition). It is given no script, so any call fails and the deterministic engine answers; a test that needs replies
+ * supplies its own factory.
  */
 export const createConfiguredProvider: ProviderFactory = async (config, logger) => {
   const ai = config.ai;
+  if (ai.provider === 'scripted') {
+    return createScriptedTestProvider({ script: {}, allowScripted: !config.runtime.deployed });
+  }
   if (ai.provider !== 'azure-openai') return undefined;
 
   let auth: AzureAuth;

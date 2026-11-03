@@ -63,7 +63,7 @@ export async function getEfficiencyOverview(
     now: ctx.now().toISOString(),
     telemetry,
     model: effectiveModelConfig(tenantModel, ctx.config),
-    simulated: ai?.provider.simulated ?? ctx.config.ai.provider === 'deterministic',
+    simulated: ai?.provider.simulated ?? ctx.config.ai.provider !== 'azure-openai',
     breakers:
       ai === null
         ? null
