@@ -43,6 +43,12 @@
       ],
       "absent": [
         {
+          "event": "ev09",
+          "id": "sig.ca-exclusion-no-effect",
+          "reason": "other",
+          "note": "The exclusion had worked and was overwritten by a template job; it did not fail to help."
+        },
+        {
           "event": "ev01",
           "id": "sig.recent-ca-change-reported",
           "reason": "negated",

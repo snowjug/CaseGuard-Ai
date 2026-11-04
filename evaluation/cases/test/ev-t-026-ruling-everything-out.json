@@ -1,0 +1,240 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-026-ruling-everything-out",
+  "split": "test",
+  "family": "fam-226",
+  "title": "Reinsurer: about a third of Teams sign-ins fail at every office, nobody changed anything",
+  "scenario": "A long, methodical ticket in which service health, policy, token codes, proxy nodes, resolvers and device registration are each tested and set aside, with many hedged or hearsay claims along the way, until a per-node check of a federation farm finds one server still holding an expired signing certificate.",
+  "categories": ["negation"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-10-27T09:10:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Teams sign-in fails roughly one time in three, all offices",
+      "text": "Teams sign-in fails for roughly one attempt in three since yesterday morning, across all our offices; about 120 people have complained. Retrying usually works. A colleague says Microsoft is having a bad day, though I haven't looked, and someone else is sure it's our proxy. I doubt it's the MFA setup, since we haven't changed any of that this year.\n\nPia Lindqvist, Tavistock Reinsurance"
+    },
+    {
+      "key": "ev02",
+      "at": 1,
+      "who": "system",
+      "type": "system_event",
+      "channel": "tool",
+      "title": "Ticket logged",
+      "text": "Ticket logged at priority P2. First response due 10:10 UTC."
+    },
+    {
+      "key": "ev03",
+      "at": 14,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Teams sign-in fails roughly one time in three, all offices",
+      "text": "Hello Pia. Before guessing, three things: (a) three people it hit, with an approximate UTC minute each, and what the failing screen says; (b) whether any site fares better or worse than the others; (c) anything at all that changed on identity, network, DNS, proxy or firewall in the last week, including things you consider unrelated.\n\nElif"
+    },
+    {
+      "key": "ev04",
+      "at": 49,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Teams sign-in fails roughly one time in three, all offices",
+      "text": "(a) Monday: m.sorensen 08:41 UTC, k.adeyemi 09:03, p.laurent 09:30. Screen: a short error, then back to the sign-in box, no code visible. (b) No pattern by site that I can see; London, Madrid and Leeds all report it. (c) Honestly nothing: no CA edits, no network changes, no new proxy rules. Jorge looks after our AD FS and says he hasn't touched it either."
+    },
+    {
+      "key": "ev05",
+      "at": 65,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Service health",
+      "text": "09:55 UTC: Service health is clear for Teams and Entra; nothing in the Message center that fits."
+    },
+    {
+      "key": "ev06",
+      "at": 95,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Entra lookup and policy audit",
+      "text": "Entra, interactive and non-interactive, +/- 5 min, m.sorensen / k.adeyemi / p.laurent: a failure row for each (a federated sign-in that failed). No 50076 or 50074 and no CA failure results anywhere in the window. No token-expiry codes either. CA audit query: four policy edits, every one dated earlier than September; the failure window itself returned zero rows."
+    },
+    {
+      "key": "ev07",
+      "at": 110,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "What the evidence says so far",
+      "text": "Pia - what I can say so far: Service health is clear, the attempts do reach Entra and fail as federated sign-ins, there are no MFA or Conditional Access results, and the policy audit has nothing in the window. I have not tested your proxy nodes or resolvers yet, so I cannot say whether they play a part. Please have Jorge or a network colleague (1) reach the sign-in hosts via every proxy node in turn, (2) resolve the sign-in and CDN names against each resolver, and (3) inspect each AD FS node: certificate expiry, clock offset, plus whatever the AD FS event log has recorded since Monday 08:00 UTC. I'll update you at 13:00 UTC.\n\nElif"
+    },
+    {
+      "key": "ev08",
+      "at": 170,
+      "who": "network",
+      "type": "diagnostic_result",
+      "channel": "email",
+      "title": "proxy and resolver tests",
+      "text": "Mattias (network). Proxy: login.microsoftonline.com via px-a, px-b, px-c, px-d from the London LAN, 5 runs each: 0.3-0.5 s on all four. Resolvers 10.55.0.2, .3 and .4: every query for the login and CDN names answered, 8-14 ms, 10 of 10 on each."
+    },
+    {
+      "key": "ev09",
+      "at": 205,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Two things we tried",
+      "text": "Two things we tried meanwhile, as people were desperate: Jorge revoked sessions for 10 test users and had them sign in again; no change in how often it fails. And we cleared the Teams cache on 5 PCs, also no change. We have not excluded anybody from the MFA policy, there's no sign it matters.\n\nPia"
+    },
+    {
+      "key": "ev10",
+      "at": 230,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "its random",
+      "text": "its really random. i click sign in, 'something went wrong', click again and its fine. same on the website version, fails then works\n\nKwabena, London"
+    },
+    {
+      "key": "ev11",
+      "at": 250,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Device state, to close that door",
+      "text": "Thanks Pia. To close the device door as well, please run dsregcmd /status on two PCs of people who fail and paste back the SSO State block of each.\n\nElif"
+    },
+    {
+      "key": "ev12",
+      "at": 290,
+      "who": "customer",
+      "type": "diagnostic_result",
+      "channel": "portal",
+      "title": "dsregcmd, two PCs",
+      "text": "dsregcmd, two PCs (LON-114 and MAD-052), both people fail intermittently:\nDomainJoined : YES\nDomain Name : tavistock-example.local\nAzureAdJoined : YES\nDeviceAuthStatus : SUCCESS\nAzureAdPrt : YES\n(identical on both)\n\nPia"
+    },
+    {
+      "key": "ev13",
+      "at": 300,
+      "who": "engineer",
+      "type": "case_note",
+      "channel": "internal",
+      "title": "Elimination so far",
+      "text": "Not Microsoft health, not CA/MFA policy, not token expiry, not the proxy nodes, not the resolvers, not device PRT as far as sampled. What remains is the AD FS path. Jorge hasn't checked the three nodes yet."
+    },
+    {
+      "key": "ev14",
+      "at": 305,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "AD FS node check, please",
+      "text": "Jorge, Pia: please check each AD FS node now: token-signing and service-communications certificate dates and thumbprints against what Entra has, w32tm /query /status on each, and the admin event log since Monday morning. Send me what you find.\n\nElif"
+    },
+    {
+      "key": "ev15",
+      "at": 315,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: AD FS node check, please",
+      "text": "Jorge is travelling until Monday. Soledad Ortiz, his deputy, will look at the nodes this afternoon.\n\nPia"
+    },
+    {
+      "key": "ev16",
+      "at": 320,
+      "who": "system",
+      "type": "system_event",
+      "channel": "tool",
+      "title": "SLA notice",
+      "text": "Next customer update due 16:30 UTC."
+    },
+    {
+      "key": "ev17",
+      "at": 370,
+      "who": "network",
+      "type": "log_sample",
+      "channel": "email",
+      "title": "node report",
+      "text": "Soledad (AD FS deputy). Node report:\nadfs01  token-signing cert ...A1F4, valid to 2027-08-30 | clock +0.015 s | log clean\nadfs02  token-signing cert ...A1F4, valid to 2027-08-30 | clock +0.011 s | log clean\nadfs03  token-signing cert ...9C02 EXPIRED 2026-10-25 23:59 | automatic rollover not applied on this node | clock +0.020 s | EventID 364 'The signing certificate has expired' x431 since Mon 00:05\nOnly adfs03 is still on the old certificate."
+    },
+    {
+      "key": "ev18",
+      "at": 385,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Entra rows against the node report",
+      "text": "The failure rows for the three sample users cite signature validation against the old token-signing certificate; the same users get through when the retry lands on another node. Consistent with adfs03."
+    },
+    {
+      "key": "ev19",
+      "at": 395,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Cause found",
+      "text": "Soledad, Pia: cause found. adfs03 still serves the expired token-signing certificate, so about a third of the attempts (the ones the load balancer sends to it) are rejected. Fix: pull adfs03 from the balancer's pool straight away, install the current certificate on it (the farm's rollover did not reach it), then return it to service. I'll check back at 16:30 UTC.\n\nElif"
+    },
+    {
+      "key": "ev20",
+      "at": 420,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "adfs03 out of the pool",
+      "text": "Soledad pulled adfs03 from the pool at 15:55 UTC. Five of us each tried ten sign-ins: no failures.\n\nPia"
+    },
+    {
+      "key": "ev21",
+      "at": 500,
+      "who": "network",
+      "type": "diagnostic_result",
+      "channel": "email",
+      "title": "adfs03 repaired",
+      "text": "adfs03 now has the current certificate (...A1F4), clock +0.02 s, back in the pool at 17:05 UTC. I also switched on a rollover check for the whole farm so this cannot silently skip a node.\n\nSoledad"
+    },
+    {
+      "key": "ev22",
+      "at": 1500,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "portal",
+      "title": "Next-day check",
+      "text": "The hourly federated failure count in Entra has been zero since 15:55 UTC yesterday, also after adfs03 returned at 17:05. I had the certificate and clock check re-run on all three nodes today: identical thumbprints, offsets under 50 ms. Closing after tomorrow morning's look.\n\nElif"
+    },
+    {
+      "key": "ev23",
+      "at": 1520,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Next-day check",
+      "text": "Quiet all morning, no complaints from any office. Thanks for working through everything so methodically.\n\nPia"
+    },
+    {
+      "key": "ev24",
+      "at": 1530,
+      "who": "engineer",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Resolution",
+      "text": "Resolution: adfs03 kept the expired token-signing certificate after the farm rolled it over, so a third of federated sign-ins were rejected. Workaround: the node was taken out of the balancer. Permanent: current certificate installed, rollover checks enabled."
+    },
+    {
+      "key": "ev25",
+      "at": 1535,
+      "who": "system",
+      "type": "status_change",
+      "channel": "tool",
+      "title": "Case closed",
+      "text": "Status changed from Resolved to Closed."
+    }
+  ]
+}

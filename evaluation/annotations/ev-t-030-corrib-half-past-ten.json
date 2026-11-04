@@ -1,0 +1,70 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-030-corrib-half-past-ten",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T15:00:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.error-timeout" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev04", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev05", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev06", "id": "sig.service-health-incident" },
+        {
+          "event": "ev06",
+          "id": "sig.intermittent-failures",
+          "uncertainty": "low",
+          "note": "The incident title itself says intermittent sign-in delays."
+        },
+        { "event": "ev07", "id": "sig.resolvers-consistent" },
+        { "event": "ev07", "id": "sig.proxy-nodes-consistent" },
+        { "event": "ev08", "id": "sig.service-health-incident" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.dns-resolver-comparison" },
+        { "event": "ev05", "id": "act.proxy-node-comparison" },
+        { "event": "ev05", "id": "act.communicate-status" },
+        { "event": "ev06", "id": "act.check-service-health" },
+        { "event": "ev08", "id": "act.communicate-status" }
+      ],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.recent-network-change-reported",
+          "reason": "negated",
+          "note": "Nothing deliberate has changed on the customer's side."
+        },
+        {
+          "event": "ev03",
+          "id": "sig.site-correlated",
+          "reason": "negated",
+          "note": "Both depots are affected, Dublin only slightly more."
+        },
+        {
+          "event": "ev05",
+          "id": "act.check-service-health",
+          "reason": "future_intent",
+          "note": "The engineer is about to look at Service health; the result comes in ev06."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.service-incident"],
+      "rationale": "Many people stall at login at the same moment in both depots (ev01); the sampled attempts never reach Entra (ev04), which could mean the customer's path or Microsoft's front door, so the engineer asks for the resolver and proxy tests and looks at Service health (ev05, ev06). The customer's tests are clean (ev07) and an active incident with a matching start time is on the board (ev06, ev08). Nothing needs changing on the customer's side, and the engineer says so with a time for the next update (ev08).",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

@@ -63,7 +63,7 @@
       "type": "engineer_email",
       "channel": "portal",
       "title": "That's the answer, passing it on",
-      "text": "Thank you, that's what I needed. The three new laptops are joined but hold no primary refresh token (AzureAdPrt NO), while the old one has one. Without a PRT silent single sign-on can't happen, which is why Teams keeps asking. I'm passing the output to our identity team to look at the registration of those three device objects, and I'll update you at 16:00 UTC.\n\nHamza"
+      "text": "Thank you, that's what I needed. The three new laptops are joined but hold no primary refresh token (AzureAdPrt NO), while the old one has one. Without a PRT silent single sign-on can't happen, which is why Teams keeps asking. I'm passing the output to our identity team to look at the registration of those three device objects, and I'll update you tomorrow morning.\n\nHamza"
     },
     {
       "key": "ev07",
@@ -94,7 +94,7 @@
     },
     {
       "key": "ev10",
-      "at": 2600,
+      "at": 3000,
       "who": "customer",
       "type": "customer_email",
       "channel": "portal",

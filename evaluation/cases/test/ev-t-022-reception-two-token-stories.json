@@ -81,7 +81,7 @@
       "type": "engineer_email",
       "channel": "portal",
       "title": "Next step: device registration",
-      "text": "Right, that clears it up. The front-desk laptops hold no PRT, so silent sign-in can't work; it's a device registration problem. I'm passing it to our identity team to look at the device objects and registration logs for PEN-FD-03 and -07, and I'll write again at 12:00 UTC.\n\nBruna"
+      "text": "Right, that clears it up. The front-desk laptops hold no PRT, so silent sign-in can't work; it's a device registration problem. I'm passing it to our identity team to look at the device objects and registration logs for PEN-FD-03 and -07, and I'll come back to you at 15:00 UTC with what they say.\n\nBruna"
     },
     {
       "key": "ev09",

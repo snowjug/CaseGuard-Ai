@@ -63,7 +63,7 @@
       "type": "diagnostic_result",
       "channel": "email",
       "title": "adfs02 resynced",
-      "text": "adfs02 was pulled out of the pool at 15:52 UTC, resynced against the PDC, offset now +0.03s, and hypervisor time sync is switched off for that VM. Back in the pool at 16:20. Five of us have signed in to Teams ten times each since: no failures."
+      "text": "adfs02 was pulled out of the pool at 16:20 UTC, resynced against the PDC, offset now +0.03s, and hypervisor time sync is switched off for that VM. Back in the pool at 16:50. Five of us have signed in to Teams ten times each since: no failures."
     },
     {
       "key": "ev07",
@@ -72,7 +72,7 @@
       "type": "validation_result",
       "channel": "portal",
       "title": "Next-day check",
-      "text": "Morning Sofia. The hourly count of federated failures in the sign-in logs has been flat at zero from 16:00 UTC yesterday onwards, and is still zero this morning. I also had Jonas re-run the clock check on all three nodes today: all within 50 ms. The case stays open until Friday as agreed.\n\nMateo"
+      "text": "Morning Sofia. The hourly count of federated failures in the sign-in logs has been flat at zero from 17:00 UTC yesterday onwards, and is still zero this morning. I also had Jonas re-run the clock check on all three nodes today: all within 50 ms. The case stays open until Friday as agreed.\n\nMateo"
     },
     {
       "key": "ev08",

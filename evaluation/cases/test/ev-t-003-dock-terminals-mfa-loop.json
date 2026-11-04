@@ -18,7 +18,7 @@
       "type": "customer_email",
       "channel": "portal",
       "title": "Teams keeps bouncing people back to sign-in since our MFA rollout",
-      "text": "Hello support,\n\nOn Tuesday afternoon our security lead pushed out a fresh Conditional Access rule that demands MFA for every cloud app, for all users, with a fresh prompt at each sign-in and no exceptions. Since yesterday morning the staff on the shared terminals in the dock office are asked for MFA and Teams drops them back on the sign-in page in a loop. Phones aren't allowed on the dock floor, so nobody there can approve a prompt anyway. About 40 of our 130 users have complained so far.\n\nImre Solheim, Nordhaven Shipping"
+      "text": "Hello support,\n\nOn Monday afternoon our security lead pushed out a fresh Conditional Access rule that demands MFA for every cloud app, for all users, with a fresh prompt at each sign-in and no exceptions. Since yesterday morning the staff on the shared terminals in the dock office are asked for MFA and Teams drops them back on the sign-in page in a loop. Phones aren't allowed on the dock floor, so nobody there can approve a prompt anyway. About 40 of our 130 users have complained so far.\n\nImre Solheim, Nordhaven Shipping"
     },
     {
       "key": "ev02",
@@ -45,7 +45,7 @@
       "type": "engineer_action",
       "channel": "internal",
       "title": "Log lookup and audit log",
-      "text": "Interactive sign-in logs for o.nilsen / d.petrov / k.asante at 06:58 / 07:05 / 07:19 UTC: each has a failure row at that minute, error AADSTS50076, Conditional Access status 'failure', policy 'Require MFA - all apps (v2)' applied. Audit log: that policy was created Tue 14:12 UTC. So the attempts do reach Entra and the new policy is what stops them."
+      "text": "Interactive sign-in logs for o.nilsen / d.petrov / k.asante at 06:58 / 07:05 / 07:19 UTC: each has a failure row at that minute, error AADSTS50076, Conditional Access status 'failure', policy 'Require MFA - all apps (v2)' applied. Audit log: that policy was created Mon 14:12 UTC. So the attempts do reach Entra and the new policy is what stops them."
     },
     {
       "key": "ev05",

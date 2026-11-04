@@ -7,7 +7,7 @@
   "scenario": "A single clinic user cannot start the Teams desktop client while colleagues and the browser version are fine. The first engineer reply demands traces from a non-technical user; a later simple cache deletion fixes the laptop.",
   "categories": ["paraphrase"],
   "workload": "teams-authentication",
-  "openedAt": "2026-04-27T09:12:00Z",
+  "openedAt": "2026-04-28T09:12:00Z",
   "derivedFrom": null,
   "handedOverOrder": null,
   "events": [
@@ -49,7 +49,7 @@
     },
     {
       "key": "ev05",
-      "at": 300,
+      "at": 390,
       "who": "customer",
       "type": "customer_email",
       "channel": "portal",
@@ -58,7 +58,7 @@
     },
     {
       "key": "ev06",
-      "at": 320,
+      "at": 410,
       "who": "engineer",
       "type": "engineer_email",
       "channel": "portal",

@@ -1,0 +1,60 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-028-signing-cert-renewal-planning",
+  "split": "test",
+  "family": "fam-228",
+  "title": "Sysadmin plans an AD FS certificate renewal and a time-source change; nothing is failing",
+  "scenario": "A planning conversation: an upcoming certificate expiry and a future clock-source change are discussed, with certificate errors and clock drift appearing only as conditionals. The engineer sends a checklist for the node checks.",
+  "categories": ["negative-control"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-09-22T11:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Planning question about our AD FS certificate",
+      "text": "Planning question, nothing is failing. Our AD FS token-signing certificate expires in about 60 days (13 November). Is automatic rollover enough, or should we renew by hand? And what would happen if we forget? Separately, the time source for our domain controllers changes next month, so I would like to know whether that can bother AD FS.\n\nLena Hartmann, Glasmoor Estates"
+    },
+    {
+      "key": "ev02",
+      "at": 40,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Planning question about our AD FS certificate",
+      "text": "Hi Lena. Automatic rollover is fine if it is enabled and the metadata is reachable. I would still look at every node afterwards: a node that misses the new certificate would reject the sign-ins that land on it with certificate errors, which is how this goes wrong in practice. On the time source: if the clocks drifted several minutes apart, tokens from the drifting node would be refused, so keep all nodes on the same source. I'll send you a checklist for the node checks before the rollover date.\n\nPascal"
+    },
+    {
+      "key": "ev03",
+      "at": 90,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Planning question about our AD FS certificate",
+      "text": "Thanks. Rollover is enabled here. Our change window for the time source is the 2nd of October; I will check the clocks on all three nodes afterwards, and again after the certificate rolls on 13 November.\n\nLena"
+    },
+    {
+      "key": "ev04",
+      "at": 130,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Node checklist",
+      "text": "Checklist attached: for each node note the certificate thumbprint and dates, the clock offset, and any certificate or time warnings in the AD FS admin log. Please run it after each of the two changes. Nothing else needed from our side.\n\nPascal"
+    },
+    {
+      "key": "ev05",
+      "at": 1500,
+      "who": "system",
+      "type": "status_change",
+      "channel": "tool",
+      "title": "Case resolved",
+      "text": "Status changed from Open to Resolved. Reason: advice given."
+    }
+  ]
+}

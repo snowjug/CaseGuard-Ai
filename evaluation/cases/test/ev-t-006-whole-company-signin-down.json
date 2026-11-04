@@ -63,7 +63,7 @@
       "type": "customer_email",
       "channel": "email",
       "title": "is it just me?",
-      "text": "is it just me or is everyone down?? Edge shows ERR_CONNECTION_TIMED_OUT every time i press sign in. i have tried 6 times. i have a client call at 11:30 pls help"
+      "text": "is it just me or is everyone down?? the sign-in window shows ERR_CONNECTION_TIMED_OUT every time i press sign in. i have tried 6 times. i have a client call at 11:30 pls help"
     },
     {
       "key": "ev07",

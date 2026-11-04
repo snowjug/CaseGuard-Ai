@@ -19,6 +19,12 @@
         { "event": "ev06", "id": "sig.prt-healthy" },
         { "event": "ev07", "id": "sig.prt-missing" },
         { "event": "ev07", "id": "sig.prt-healthy" },
+        {
+          "event": "ev07",
+          "id": "sig.multiple-users-affected",
+          "uncertainty": "low",
+          "note": "The escalation restates that 18 new laptops loop on sign-in."
+        },
         { "event": "ev07", "id": "sig.cache-clear-no-effect" },
         { "event": "ev09", "id": "sig.prt-missing" },
         { "event": "ev10", "id": "sig.prt-healthy" }

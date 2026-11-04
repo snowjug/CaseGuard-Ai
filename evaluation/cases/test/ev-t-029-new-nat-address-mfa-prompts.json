@@ -1,0 +1,78 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-029-new-nat-address-mfa-prompts",
+  "split": "test",
+  "family": "fam-229",
+  "title": "One branch is prompted for MFA at every Teams sign-in since a NAT change",
+  "scenario": "A location-based Conditional Access policy skips MFA from office addresses; a firewall change moved one branch onto a public address that the named location does not list. The policy was not edited, but its effect changed for that branch.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-04-21T08:20:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Hartlepool asked for MFA at every Teams sign-in since Monday",
+      "text": "Since Monday morning about 30 people at our Hartlepool branch get an MFA prompt every time Teams signs in, and some cannot complete it because there is hardly any phone signal in the basement office. Our other branches are not prompted at all. On Friday night our firewall admin moved Hartlepool's outbound NAT onto a second public address.\n\nColin Metcalfe, Teesdale Engineering"
+    },
+    {
+      "key": "ev02",
+      "at": 20,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Hartlepool asked for MFA at every Teams sign-in since Monday",
+      "text": "Hi Colin. Thank you, that helps. Please send three affected people with a rough UTC time each, the wording shown at the prompt, and tell me whether any Conditional Access policy of yours depends on locations or IP addresses (for instance 'MFA unless on the office network').\n\nYusuf"
+    },
+    {
+      "key": "ev03",
+      "at": 55,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Hartlepool asked for MFA at every Teams sign-in since Monday",
+      "text": "People: b.thornton 07:31 UTC, s.okoye 07:48, l.marsh 08:05. The prompt says it needs more information to keep the account secure. And yes: one policy, 'MFA away from office', skips MFA when the sign-in comes from our named location 'Offices', which lists our public addresses. Nobody has edited that policy since spring.\n\nColin"
+    },
+    {
+      "key": "ev04",
+      "at": 95,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Entra and audit lookup",
+      "text": "Entra, 07:31 / 07:48 / 08:05 UTC +/- 5 min for the three: a failure row for each, AADSTS50074 (strong authentication required), policy 'MFA away from office' applied, client address the second public one. That address is not in the named location 'Offices'. The audit query for policy edits returned two edits, both in the spring; I still have to confirm that none falls inside the failure window."
+    },
+    {
+      "key": "ev05",
+      "at": 115,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Cause found",
+      "text": "Colin: cause found. The three failing attempts came from the second public address, which is not in your named location 'Offices', so the policy treats them as away from the office and demands MFA each time. Options: add the new address to the named location (quickest), or move Hartlepool's NAT back to the old address. Whoever owns the policy should do it under your change control. Nobody edited the policy this week; the audit log has no edits inside the window. I will write again at 11:30 UTC.\n\nYusuf"
+    },
+    {
+      "key": "ev06",
+      "at": 235,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Cause found",
+      "text": "Added the new public address to 'Offices' at 11:10 UTC. People in Hartlepool are no longer prompted, the basement included. We will make the NAT change a ticketed one in future.\n\nColin"
+    },
+    {
+      "key": "ev07",
+      "at": 1500,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "portal",
+      "title": "Next-day check",
+      "text": "Repeated the log query for 11:30 to 14:00 UTC and for this morning: no more 50074 rows for the Hartlepool users. The case stays open until tomorrow in case the evening shift sees anything.\n\nYusuf"
+    }
+  ]
+}

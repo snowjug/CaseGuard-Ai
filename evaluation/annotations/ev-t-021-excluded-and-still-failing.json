@@ -48,6 +48,12 @@
       "absent": [
         {
           "event": "ev06",
+          "id": "sig.ca-exclusion-no-effect",
+          "reason": "other",
+          "note": "A judgement about why the test could not matter, not a new report of its outcome."
+        },
+        {
+          "event": "ev06",
           "id": "sig.mfa-ca-events-in-logs",
           "reason": "negated",
           "note": "No MFA or CA failure results for the three users since Friday."

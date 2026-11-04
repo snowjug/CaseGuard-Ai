@@ -81,7 +81,7 @@
       "type": "customer_email",
       "channel": "portal",
       "title": "Re: Workaround and the proper fix",
-      "text": "Tomasz took .3 out of the three shop scopes at 10:55 and we rebooted the till laptops. I've just rung each shop lead: seventeen people have signed in since, every one first time, and nobody has seen the error page again. Fingers crossed it holds."
+      "text": "Tomasz took .3 out of the three shop scopes at 12:10 and we rebooted the till laptops. I've just rung each shop lead: seventeen people have signed in since, every one first time, and nobody has seen the error page again. Fingers crossed it holds."
     },
     {
       "key": "ev09",
@@ -90,7 +90,7 @@
       "type": "engineer_email",
       "channel": "portal",
       "title": "Before/after check",
-      "text": "Morning Marguerite. Before/after on my side: between 06:00 and 11:00 UTC yesterday we had 31 contacts about the sign-in page from the three shops; from 11:00 UTC yesterday to now, none. I re-ran the resolver test from Harbourside this morning: .2 and .4 still answer everything. Meridian has the rule correction booked for Thursday's window. Can you confirm your three shop leads see no failures today? I'll keep the case open until Thursday's change is done."
+      "text": "Morning Marguerite. Before/after on my side: until midday yesterday the three shops kept contacting us about the sign-in page; from 12:10 UTC yesterday to now, nothing. I re-ran the resolver test from Harbourside this morning: .2 and .4 still answer everything. Meridian has the rule correction booked for Thursday's window. Can you confirm your three shop leads see no failures today? I'll keep the case open until Thursday's change is done."
     },
     {
       "key": "ev10",

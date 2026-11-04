@@ -18,7 +18,7 @@
       "type": "customer_email",
       "channel": "portal",
       "title": "TEAMS DOWN - microsoft outage?",
-      "text": "Teams will not let any of us in, Microsoft must be down - it's all over social media and one of the tech sites says it's a major outage. All three of our offices (Dunmore, Galway, Cork), about 60 people, none can sign in. The browser says ERR_CONNECTION_TIMED_OUT. What are Microsoft saying?\n\nCathal Brennan, Dunmore Estates"
+      "text": "Teams will not let any of us in, Microsoft must be down - it's all over social media and one of the tech sites says it's a major outage. All three of our offices (Dunmore, Galway, Cork), about 60 people, none can sign in. The sign-in window says ERR_CONNECTION_TIMED_OUT. What are Microsoft saying?\n\nCathal Brennan, Dunmore Estates"
     },
     {
       "key": "ev02",
@@ -72,7 +72,7 @@
       "type": "engineer_email",
       "channel": "portal",
       "title": "Incident posted",
-      "text": "Cathal, Orla: update. Microsoft has now posted an incident (TM618204) for Teams sign-ins in Europe, beginning 09:48 UTC. What I told you earlier was right at 08:40 and is no longer true. That fits Dunmore and Galway; Cork may simply be routed through a different part of the service. Nothing needs changing on your side. I'll write as soon as Microsoft marks it resolved, and by 13:00 UTC in any case.\n\nOdalys"
+      "text": "Cathal, Orla: update. Microsoft has now posted an incident (TM618204) for Teams sign-ins in Europe, beginning 09:48 UTC. What I told you earlier was right at 08:40 and is no longer true. That fits the reports you have. Nothing needs changing on your side. I'll write as soon as Microsoft marks it resolved, and by 13:00 UTC in any case.\n\nOdalys"
     },
     {
       "key": "ev08",

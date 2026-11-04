@@ -1,0 +1,157 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-026-ruling-everything-out",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T14:20:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev01", "id": "sig.ca-config-unchanged" },
+        { "event": "ev04", "id": "sig.ca-config-unchanged" },
+        { "event": "ev05", "id": "sig.service-health-clear" },
+        { "event": "ev06", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev06", "id": "sig.policy-events-outside-failure-window" },
+        { "event": "ev07", "id": "sig.service-health-clear" },
+        { "event": "ev07", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev07", "id": "sig.policy-events-outside-failure-window" },
+        { "event": "ev08", "id": "sig.proxy-nodes-consistent" },
+        { "event": "ev08", "id": "sig.resolvers-consistent" },
+        { "event": "ev09", "id": "sig.revoke-sessions-no-effect" },
+        { "event": "ev09", "id": "sig.cache-clear-no-effect" },
+        { "event": "ev10", "id": "sig.intermittent-failures" },
+        { "event": "ev10", "id": "sig.web-client-also-fails" },
+        { "event": "ev12", "id": "sig.prt-healthy" },
+        { "event": "ev12", "id": "sig.intermittent-failures" },
+        { "event": "ev17", "id": "sig.federation-node-error" },
+        { "event": "ev18", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev18", "id": "sig.federation-node-error" },
+        { "event": "ev18", "id": "sig.intermittent-failures" },
+        { "event": "ev19", "id": "sig.federation-node-error" },
+        { "event": "ev24", "id": "sig.federation-node-error" }
+      ],
+      "actions": [
+        { "event": "ev03", "id": "act.request-minimal-scoping" },
+        { "event": "ev03", "id": "act.request-recent-changes" },
+        { "event": "ev05", "id": "act.check-service-health" },
+        { "event": "ev06", "id": "act.signin-log-correlation" },
+        { "event": "ev06", "id": "act.review-ca-policy-config" },
+        { "event": "ev07", "id": "act.proxy-node-comparison" },
+        { "event": "ev07", "id": "act.dns-resolver-comparison" },
+        { "event": "ev07", "id": "act.check-federation-health" },
+        { "event": "ev07", "id": "act.communicate-status" },
+        { "event": "ev11", "id": "act.device-registration-check" },
+        { "event": "ev14", "id": "act.check-federation-health" },
+        { "event": "ev19", "id": "act.communicate-status" },
+        { "event": "ev22", "id": "act.validate-fix" },
+        { "event": "ev22", "id": "act.check-federation-health" }
+      ],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.service-health-incident",
+          "reason": "attributed",
+          "note": "A colleague's claim that Microsoft is having a bad day, not looked at by the writer."
+        },
+        {
+          "event": "ev01",
+          "id": "sig.proxy-node-inconsistent",
+          "reason": "attributed",
+          "note": "Someone else is sure it is the proxy; no test and the writer does not endorse it."
+        },
+        {
+          "event": "ev01",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "negated",
+          "note": "No change to the MFA setup this year."
+        },
+        {
+          "event": "ev04",
+          "id": "sig.site-correlated",
+          "reason": "negated",
+          "note": "No pattern by site."
+        },
+        {
+          "event": "ev04",
+          "id": "sig.recent-network-change-reported",
+          "reason": "negated",
+          "note": "No network changes, no new proxy rules."
+        },
+        {
+          "event": "ev04",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "negated",
+          "note": "No CA edits."
+        },
+        {
+          "event": "ev06",
+          "id": "sig.mfa-ca-events-in-logs",
+          "reason": "negated",
+          "note": "No 50076 or 50074 and no CA failure results."
+        },
+        {
+          "event": "ev06",
+          "id": "sig.token-expiry-errors",
+          "reason": "negated",
+          "note": "No token-expiry codes."
+        },
+        {
+          "event": "ev07",
+          "id": "sig.mfa-ca-events-in-logs",
+          "reason": "negated",
+          "note": "No MFA or Conditional Access results."
+        },
+        {
+          "event": "ev09",
+          "id": "sig.ca-exclusion-no-effect",
+          "reason": "negated",
+          "note": "Nobody has been excluded from the MFA policy."
+        },
+        {
+          "event": "ev13",
+          "id": "sig.service-health-incident",
+          "reason": "negated",
+          "note": "Not Microsoft health."
+        },
+        {
+          "event": "ev13",
+          "id": "sig.token-expiry-errors",
+          "reason": "negated",
+          "note": "Not token expiry."
+        },
+        {
+          "event": "ev13",
+          "id": "sig.proxy-node-inconsistent",
+          "reason": "negated",
+          "note": "Not the proxy nodes."
+        },
+        {
+          "event": "ev13",
+          "id": "sig.resolver-inconsistent",
+          "reason": "negated",
+          "note": "Not the resolvers."
+        },
+        {
+          "event": "ev13",
+          "id": "sig.prt-missing",
+          "reason": "negated",
+          "note": "Not device PRT, as far as sampled."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.federation"],
+      "rationale": "A methodical elimination. Service health is checked first (ev05), the log lookup shows the attempts do reach Entra and fail as federated rejections with no policy or token results (ev06), the proxy and resolver tests are clean (ev08), cache, session and device checks add nothing (ev09, ev12), and the engineer's own note (ev13) lists what is set aside. The node report (ev17) then shows one federation server on an expired signing certificate, which matches the rows and the one-in-three pattern (ev18). Hearsay about Microsoft and the proxy (ev01) and the hedged first statements of the engineer in ev07 about untested nodes carry no signals. Workaround and permanent fix are kept apart (ev19, ev24) and checked (ev22).",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

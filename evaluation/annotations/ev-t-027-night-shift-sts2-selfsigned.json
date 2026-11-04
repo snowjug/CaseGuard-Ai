@@ -1,0 +1,48 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-027-night-shift-sts2-selfsigned",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T14:30:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev01", "id": "sig.web-client-also-fails" },
+        { "event": "ev03", "id": "sig.federation-node-error" },
+        { "event": "ev04", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev04", "id": "sig.intermittent-failures" },
+        { "event": "ev05", "id": "sig.federation-node-error" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.check-federation-health" },
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.communicate-status" },
+        { "event": "ev07", "id": "act.validate-fix" },
+        { "event": "ev07", "id": "act.check-federation-health" }
+      ],
+      "absent": [
+        {
+          "event": "ev03",
+          "id": "sig.site-correlated",
+          "reason": "negated",
+          "note": "No ward is better or worse; it depends on which server the balancer picks."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.federation"],
+      "rationale": "A random third of attempts failing in app and browser alike, with a Sunday maintenance touching the certificates (ev01), sends the engineer straight to the two federation servers (ev02). The server report (ev03) shows one presenting a self-signed certificate, the log lookup finds failure rows followed by successes a minute later (ev04), and the cause and the fix are stated plainly (ev05). The repair and the next-day check complete the case (ev06, ev07).",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

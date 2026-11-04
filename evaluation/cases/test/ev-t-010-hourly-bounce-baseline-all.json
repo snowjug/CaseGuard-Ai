@@ -90,7 +90,7 @@
       "type": "validation_result",
       "channel": "portal",
       "title": "Log check after the change",
-      "text": "Checked the log for the affected group: no 70043 rows since 08:30 UTC today. I'd call it fixed; keeping the case open until tomorrow in case the evening shift disagrees.\n\nSoren"
+      "text": "Checked the log for the affected group: no 70043 rows since 08:30 UTC today. I'd call it fixed; keeping the case open until tomorrow in case the late shift disagrees.\n\nSoren"
     },
     {
       "key": "ev10",
@@ -99,7 +99,7 @@
       "type": "customer_email",
       "channel": "portal",
       "title": "Re: Log check after the change",
-      "text": "Evening shift reports nothing. Thanks for the quick diagnosis."
+      "text": "Everyone I asked over lunch reports nothing. Thanks for the quick diagnosis."
     }
   ]
 }

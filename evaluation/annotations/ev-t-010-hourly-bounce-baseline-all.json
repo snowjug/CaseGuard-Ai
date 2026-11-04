@@ -33,6 +33,24 @@
       ],
       "absent": [
         {
+          "event": "ev05",
+          "id": "sig.proxy-node-inconsistent",
+          "reason": "negated",
+          "note": "Nothing points at the proxy."
+        },
+        {
+          "event": "ev05",
+          "id": "sig.resolver-inconsistent",
+          "reason": "negated",
+          "note": "Nothing points at DNS."
+        },
+        {
+          "event": "ev05",
+          "id": "sig.federation-node-error",
+          "reason": "negated",
+          "note": "Nothing points at federation."
+        },
+        {
           "event": "ev01",
           "id": "sig.service-health-incident",
           "reason": "attributed",

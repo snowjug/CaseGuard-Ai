@@ -63,7 +63,7 @@
       "type": "engineer_email",
       "channel": "portal",
       "title": "It is on the path, not in Entra",
-      "text": "Beatrix, Gareth: the two attempts never show up in Entra, so the trouble sits on the path from the 3rd floor to Microsoft. Gareth, please test login.microsoftonline.com through each proxy node from a 3rd-floor PC and compare them, and query your resolvers for it while you're at it. I'll be back here at 12:30 UTC.\n\nMateus"
+      "text": "Beatrix, Gareth: the two attempts never show up in Entra, so the trouble sits on the path from the 3rd floor to Microsoft. Gareth, please test login.microsoftonline.com through each proxy node from a 3rd-floor PC and compare them, and query your resolvers for it while you're at it. I'll be back here at 15:00 UTC.\n\nMateus"
     },
     {
       "key": "ev07",
@@ -90,7 +90,7 @@
       "type": "customer_email",
       "channel": "portal",
       "title": "Re: Workaround and permanent change",
-      "text": "wp3 has been out of the PAC since 11:55 UTC. Dev and I both signed in first time just now. Thanks!"
+      "text": "wp3 has been out of the PAC since 14:35 UTC. Dev and I both signed in first time just now. Thanks!"
     },
     {
       "key": "ev10",
@@ -99,7 +99,7 @@
       "type": "validation_result",
       "channel": "portal",
       "title": "Next-day check",
-      "text": "No further failures reported from the studio since 11:55 UTC, and a per-node test from a 3rd-floor PC through wp1 and wp2 passes. The vendor ticket for wp3 is with Gareth. Closing after your change board has the exemption.\n\nMateus"
+      "text": "No further failures reported from the studio since 14:35 UTC, and a per-node test from a 3rd-floor PC through wp1 and wp2 passes. The vendor ticket for wp3 is with Gareth. Closing after your change board has the exemption.\n\nMateus"
     }
   ]
 }

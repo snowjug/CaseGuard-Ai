@@ -7,7 +7,7 @@
   "scenario": "After an administrator revoked all sessions following a phishing scare, many staff loop on sign-in; the logs show revoked-grant results, clearing the client cache fixes most devices, and a reinstall fixes the last two.",
   "categories": ["paraphrase"],
   "workload": "teams-authentication",
-  "openedAt": "2026-10-20T08:20:00Z",
+  "openedAt": "2026-10-19T08:20:00Z",
   "derivedFrom": null,
   "handedOverOrder": null,
   "events": [

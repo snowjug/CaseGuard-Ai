@@ -22,6 +22,12 @@
       ],
       "absent": [
         {
+          "event": "ev02",
+          "id": "sig.web-client-also-fails",
+          "reason": "negated",
+          "note": "The engineer refers to the browser sign-in as the one that works."
+        },
+        {
           "event": "ev01",
           "id": "sig.web-client-also-fails",
           "reason": "negated",

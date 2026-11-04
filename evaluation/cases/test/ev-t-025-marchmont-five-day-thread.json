@@ -1,0 +1,276 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-025-marchmont-five-day-thread",
+  "split": "test",
+  "family": "fam-225",
+  "title": "Two branch offices lose Teams sign-in; a long thread with a wrong first theory",
+  "scenario": "A long ticket over five days. The customer's attention is on a new Conditional Access baseline, the engineer follows it despite a log lookup that shows nothing arriving, and only a user's remark about a lookup failure sends the work to name resolution, where a newly added filtering resolver is the cause.",
+  "categories": ["noisy"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-03-02T08:55:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Leith and Dalkeith cannot get into Teams",
+      "text": "Hello. Since Friday afternoon about 40 people across our Leith and Dalkeith branches can't sign in to Teams; Edinburgh head office is untouched. Some see a window with caa82ee7 on it, others only a spinner, and a handful get in after repeated tries. Possibly relevant: a new Conditional Access baseline went live on Thursday (MFA for everything, 4-hour sign-in frequency).\n\nFiona Rae, service desk lead, Marchmont Group"
+    },
+    {
+      "key": "ev02",
+      "at": 1,
+      "who": "system",
+      "type": "system_event",
+      "channel": "tool",
+      "title": "Ticket created",
+      "text": "Ticket MG-20418 created. Priority P2. Next update due 11:00 UTC."
+    },
+    {
+      "key": "ev03",
+      "at": 20,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Leith and Dalkeith cannot get into Teams",
+      "text": "Hi Fiona, thanks, that is a good start. Could you send: three people it happened to with a rough UTC time each, the exact text the failing ones see, and a list of what is fine versus broken (branches, floors, networks)? Also whatever else changed since Wednesday on the network, DNS, proxy or firewall side, however minor.\n\nHamish"
+    },
+    {
+      "key": "ev04",
+      "at": 55,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Leith and Dalkeith cannot get into Teams",
+      "text": "Fri: s.ferguson 14:12 UTC, a.mcleod 14:40; Mon: d.imrie 08:20. The caa82ee7 window is on s.ferguson's PC; the other two just spin. HQ is fine; Leith and Dalkeith aren't. Nobody has told me of any network change, but the branch network is run by a different team who don't always tell me.\n\nFiona"
+    },
+    {
+      "key": "ev05",
+      "at": 90,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Entra lookup and CA audit",
+      "text": "s.ferguson 14:12, a.mcleod 14:40 (Fri), d.imrie 08:20 (Mon), all UTC, +/- 5 min, interactive and non-interactive: no rows for any of them. CA audit: policy 'Baseline-v2' created Thu 17:20 UTC, MFA on all apps, sign-in frequency 4 h."
+    },
+    {
+      "key": "ev06",
+      "at": 95,
+      "who": "engineer",
+      "type": "case_note",
+      "channel": "internal",
+      "title": "Where I am",
+      "text": "Entra shows nothing for the three, so strictly these attempts never arrived. But the new CA baseline is the only recorded change since Wednesday, so I want it ruled out first by excluding a few users from it. Name resolution can wait."
+    },
+    {
+      "key": "ev07",
+      "at": 110,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Rule out the new policy",
+      "text": "Fiona, please have an admin exclude s.ferguson, a.mcleod and d.imrie from 'Baseline-v2' for now, and on d.imrie's PC also clear the Teams cache, then try signing in. Tell me what each of the three sees.\n\nHamish"
+    },
+    {
+      "key": "ev08",
+      "at": 190,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Rule out the new policy",
+      "text": "Excluded all three from Baseline-v2 at 11:40 UTC and cleared d.imrie's cache. Still failing for all three: s.ferguson gets the same caa82ee7 window, d.imrie and a.mcleod just spin.\n\nFiona"
+    },
+    {
+      "key": "ev09",
+      "at": 200,
+      "who": "system",
+      "type": "system_event",
+      "channel": "tool",
+      "title": "SLA notice",
+      "text": "First-response target met. Next customer update due 13:00 UTC."
+    },
+    {
+      "key": "ev10",
+      "at": 240,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Client-side trace",
+      "text": "Thanks. Next I would like to see what the client itself does: please have two of the affected users capture a Fiddler or HAR trace of a failing sign-in, and zip the Teams log bundle (Ctrl+Alt+Shift+1 inside the app), and send them over.\n\nHamish"
+    },
+    {
+      "key": "ev11",
+      "at": 330,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Client-side trace",
+      "text": "Two of our people are trying the trace. Meanwhile it has spread: about 15 more people in Dalkeith are now reporting the same thing this afternoon.\n\nFiona"
+    },
+    {
+      "key": "ev12",
+      "at": 400,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "fiddler",
+      "text": "i tried the fiddler thing and it wants an admin password which i dont have. fiona said to tell you the page says DNS_PROBE_FINISHED_NXDOMAIN when it shows anything. sorry.\n\nIan, Dalkeith"
+    },
+    {
+      "key": "ev13",
+      "at": 410,
+      "who": "system",
+      "type": "status_change",
+      "channel": "tool",
+      "title": "Status change",
+      "text": "Status changed from Open to Waiting on customer (client-side trace outstanding)."
+    },
+    {
+      "key": "ev14",
+      "at": 1445,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "New direction: name resolution",
+      "text": "> fiona said to tell you the page says DNS_PROBE_FINISHED_NXDOMAIN when it shows anything\n\nFiona, a user's remark from yesterday (quoted above) changes my thinking: this looks like name resolution at the two branches rather than policy. Forget the trace. Please ask your branch network admin to resolve login.microsoftonline.com and the CDN host the sign-in page uses against every resolver that the Leith and Dalkeith DHCP scopes list, from a Leith PC, ten tries per resolver, and send me the raw answers. You can put the CA exclusions back as they were. I will chase this at 12:00 UTC.\n\nHamish"
+    },
+    {
+      "key": "ev15",
+      "at": 1500,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: New direction: name resolution",
+      "text": "OK. Our branch network admin Callum Reid is on leave until Thursday; his deputy Zofia Nowak will do it. Please bear with us. Also, can you tell me who at Microsoft I should talk to about the Teams errors?\n\nFiona"
+    },
+    {
+      "key": "ev16",
+      "at": 1625,
+      "who": "system",
+      "type": "system_event",
+      "channel": "tool",
+      "title": "Follow-up reminder",
+      "text": "Reminder: engineer follow-up due 12:00 UTC. No customer reply since Tue 09:55 UTC."
+    },
+    {
+      "key": "ev17",
+      "at": 1770,
+      "who": "network",
+      "type": "diagnostic_result",
+      "channel": "email",
+      "title": "resolver tests from Leith",
+      "text": "Zofia (network, covering for Callum). From LTH-021 in Leith, 10 tries each:\n10.80.1.2   login.microsoftonline.com  answered 10/10\n10.80.1.3   login.microsoftonline.com  answered 10/10\n10.80.9.10  login.microsoftonline.com  NXDOMAIN 10/10, the CDN name the same\n10.80.9.10 is the CloudShield filtering resolver that Callum's team added to the Leith and Dalkeith scopes on Thursday evening. HQ doesn't use it."
+    },
+    {
+      "key": "ev18",
+      "at": 1815,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "That is the cause; workaround and fix",
+      "text": "Thank you Zofia, that is it: 10.80.9.10 fails for the Microsoft names while .2 and .3 answer. Workaround, now: remove 10.80.9.10 from the Leith and Dalkeith scopes and renew leases (a reboot does it). Permanent: the CloudShield admin amends the rule so Microsoft's published endpoint hostnames are never blocked, under your change control. I will look at reports until 17:30 UTC today and again tomorrow at 09:00.\n\nHamish"
+    },
+    {
+      "key": "ev19",
+      "at": 1875,
+      "who": "network",
+      "type": "diagnostic_result",
+      "channel": "email",
+      "title": "scope change done",
+      "text": "Removed 10.80.9.10 from the Leith and Dalkeith scopes at 16:05 UTC. Leith PCs have been told to reboot; Dalkeith closes at 16:00 so they will pick it up tomorrow morning.\n\nZofia"
+    },
+    {
+      "key": "ev20",
+      "at": 1925,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "First word from Leith",
+      "text": "First word from Leith: people there are signing in again, no error windows so far. Dalkeith will reboot in the morning.\n\nFiona"
+    },
+    {
+      "key": "ev21",
+      "at": 1930,
+      "who": "system",
+      "type": "system_event",
+      "channel": "tool",
+      "title": "SLA notice",
+      "text": "Next update due Wed 09:00 UTC."
+    },
+    {
+      "key": "ev22",
+      "at": 3000,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Dalkeith update",
+      "text": "Dalkeith rebooted first thing and all fifteen are in. Leith still fine. No new reports since yesterday 16:05 UTC.\n\nFiona"
+    },
+    {
+      "key": "ev23",
+      "at": 3035,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "portal",
+      "title": "Check after the workaround",
+      "text": "Resolver test from LTH-021 and from a Dalkeith PC this morning: .2 and .3 answer, .9.10 still fails but is no longer handed out. No new contacts since Tue 16:05 UTC. The CloudShield rule fix is booked for Friday; keeping the case open until then.\n\nHamish"
+    },
+    {
+      "key": "ev24",
+      "at": 3185,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "CloudShield's answer",
+      "text": "CloudShield's support says their 'newly registered domains' category wrongly caught the Microsoft CDN name. Their fix is a category exception, scheduled for Friday 09:30 UTC.\n\nFiona"
+    },
+    {
+      "key": "ev25",
+      "at": 3195,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: CloudShield's answer",
+      "text": "Understood. Once the exception is in, please put 10.80.9.10 back into one branch scope as a test and tell me how sign-in goes, so that we confirm the permanent fix.\n\nHamish"
+    },
+    {
+      "key": "ev26",
+      "at": 5835,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Exception in place",
+      "text": "CloudShield's exception has been in since 09:30 UTC. I put 10.80.9.10 back into the Leith scope at 10:00 as you asked: Leith PCs sign in fine, and Zofia's test from LTH-021 shows all three resolvers answering the Microsoft names.\n\nFiona"
+    },
+    {
+      "key": "ev27",
+      "at": 5885,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "portal",
+      "title": "Before and after",
+      "text": "Before/after: from Monday to Tuesday afternoon there were new reports every hour from the two branches; since the scope change on Tuesday and the exception this morning, none. The resolver test is clean for all three resolvers. Good to close.\n\nHamish"
+    },
+    {
+      "key": "ev28",
+      "at": 5895,
+      "who": "engineer",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Resolution",
+      "text": "Resolution. Cause: the new CloudShield filtering resolver 10.80.9.10, added to the Leith and Dalkeith DHCP scopes on Thursday evening, mishandled the Microsoft sign-in and CDN names while the other two resolvers answered correctly. Workaround (Tue 16:05 UTC): resolver removed from the scopes. Permanent fix (Fri 09:30 UTC): category exception at CloudShield. The CA exclusions I asked for on Monday were a wrong turn and have been reverted."
+    },
+    {
+      "key": "ev29",
+      "at": 5900,
+      "who": "system",
+      "type": "status_change",
+      "channel": "tool",
+      "title": "Case closed",
+      "text": "Status changed from Resolved to Closed."
+    }
+  ]
+}

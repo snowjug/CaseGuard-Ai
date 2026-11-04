@@ -32,6 +32,18 @@
       ],
       "absent": [
         {
+          "event": "ev03",
+          "id": "act.device-registration-check",
+          "reason": "future_intent",
+          "note": "The admin only says he will paste dsregcmd output later."
+        },
+        {
+          "event": "ev07",
+          "id": "sig.web-client-also-fails",
+          "reason": "other",
+          "note": "The admin says he has not looked at the browser yet; no statement either way."
+        },
+        {
           "event": "ev01",
           "id": "sig.web-client-also-fails",
           "reason": "negated",

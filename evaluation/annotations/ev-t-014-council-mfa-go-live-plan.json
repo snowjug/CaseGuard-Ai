@@ -13,6 +13,18 @@
       "actions": [{ "event": "ev04", "id": "act.review-ca-policy-config" }],
       "absent": [
         {
+          "event": "ev03",
+          "id": "sig.ca-exclusion-no-effect",
+          "reason": "other",
+          "note": "Break-glass accounts are excluded from the draft policy by design, not as a test."
+        },
+        {
+          "event": "ev04",
+          "id": "act.exclude-users-from-mfa-ca",
+          "reason": "other",
+          "note": "The break-glass exclusion in the draft is a design choice, not a test exclusion."
+        },
+        {
           "event": "ev01",
           "id": "sig.recent-ca-change-reported",
           "reason": "future_intent",

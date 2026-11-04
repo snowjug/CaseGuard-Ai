@@ -1,0 +1,96 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-030-corrib-half-past-ten",
+  "split": "test",
+  "family": "fam-230",
+  "title": "Logistics firm: Teams login gives up after a minute, from half past ten",
+  "scenario": "Two depots see the login screen stall and time out from mid-morning. The three sampled attempts never reach Entra, the customer's own resolver and proxy tests are clean, and an active Microsoft incident for sign-in delays in the region matches the start time.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-02-17T11:05:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Teams login gives up after a minute, from half past ten",
+      "text": "Around half past ten this morning the Teams login screen started sitting for a minute and then giving up, for most of us in the Dublin and Cork depots (about 130 people). When it does let someone in, a second try seems to have better odds. Some of the screens show caa82ee2. Nothing deliberate has changed on our side since last month.\n\nAoife Brady, Corrib Logistics"
+    },
+    {
+      "key": "ev02",
+      "at": 12,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Teams login gives up after a minute, from half past ten",
+      "text": "Hi Aoife. Please send three people it hit with an approximate UTC time each, the wording or code on the failing screen, and which depots are better or worse. Also anything changed on DNS, proxy, firewall or MFA in the last two days, deliberate or not.\n\nNikolai"
+    },
+    {
+      "key": "ev03",
+      "at": 35,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Teams login gives up after a minute, from half past ten",
+      "text": "c.ryan 10:36 UTC, e.walsh 10:52, f.byrne 11:01. Both depots are affected, Dublin a bit more than Cork, but both. No other changes that I know of.\n\nAoife"
+    },
+    {
+      "key": "ev04",
+      "at": 60,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Entra check",
+      "text": "Entra, 10:36 / 10:52 / 11:01 UTC +/- 5 min for c.ryan, e.walsh, f.byrne: no rows for any of them."
+    },
+    {
+      "key": "ev05",
+      "at": 70,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Not arriving at Entra",
+      "text": "Aoife, the three attempts never show up in Entra, so they are stopped on the way to Microsoft or by something at Microsoft's front door. I will check Service health now. Meanwhile please ask a network colleague to query login.microsoftonline.com on every resolver your sites use and to reach it through each proxy node, and send me the results.\n\nNikolai"
+    },
+    {
+      "key": "ev06",
+      "at": 95,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Service health",
+      "text": "12:20 UTC, Service health: an active incident, TM702935, 'Intermittent sign-in delays for Teams and other apps in North Europe', started 10:21 UTC. Fits the reports."
+    },
+    {
+      "key": "ev07",
+      "at": 105,
+      "who": "network",
+      "type": "diagnostic_result",
+      "channel": "email",
+      "title": "resolver and proxy test",
+      "text": "Cormac (network). Resolvers 10.90.0.2 and .3 answer the login and CDN names 10/10 each, 9-12 ms. Proxy: both nodes px1 and px2 reach login.microsoftonline.com in about 0.4 s. Nothing odd on our side."
+    },
+    {
+      "key": "ev08",
+      "at": 120,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Microsoft incident matches",
+      "text": "Aoife, Microsoft has an active incident (TM702935) for sign-in delays in North Europe that began at 10:21 UTC, which matches your timing, and Cormac's tests on your side are clean. Your side needs no changes at all. I'll write by 14:00 UTC or when Microsoft closes the incident, whichever comes first.\n\nNikolai"
+    },
+    {
+      "key": "ev09",
+      "at": 215,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Microsoft incident matches",
+      "text": "Back to normal for most people since about 13:30 UTC. Thanks.\n\nAoife"
+    }
+  ]
+}
