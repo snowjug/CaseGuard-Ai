@@ -318,6 +318,12 @@ Rules of thumb:
   decision on a claim is never copied into the cache by hand: the ledger is reloaded and each window answers for
   itself, so an earlier window keeps the classification it had and says that the decision is recorded but not
   shown there.
+- **What the record itself shows** (`features/evidence/RecordFindingsPanel.tsx`): under the claims, a panel reads
+  `recordFindings.get` for the selected moment and lists the statements of the case that cannot both stand (both sides
+  quoted, with the class and an uncertainty), the patterns that need more than one event, and the sentences a detector
+  read and did not count, each with the words that decided it. It is requested only once the ledger has loaded, so it
+  reuses the engine pass the ledger already paid for, and a failure of it (a 429 included) is a calm note with a Try again
+  button and never takes the ledger down. It says "no model" because nothing in it comes from one.
 - **Earlier views** (`components/case/as-of.tsx`, used by every case page): the API meters cold engine passes,
   and one pass serves every instant between two events. So the time cursor snaps to event instants
   (`useAsOfCursor`; the instants come from the unmetered whole-record timeline), sends one request when a drag

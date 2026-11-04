@@ -297,3 +297,26 @@ test.describe('[FR-TL-06] the ledger is a window onto the past too', () => {
     await expect(mainRegion(page)).toContainText(/withheld|later/i);
   });
 });
+
+test.describe('[FR-EV-04] the ledger shows what the record itself shows', () => {
+  test('lists the patterns across events of Case One, which holds no statements that disagree, and quotes none that it does not have', async ({
+    page,
+    demo,
+  }) => {
+    await openPage(page, `/cases/${demo.caseOneId}/evidence`);
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'What the record itself shows' }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Read without a model from the events of the whole record.'),
+    ).toBeVisible();
+    // A domain test pins that the shipped sample holds no two statements that cannot both stand.
+    await expect(
+      page.getByRole('button', { name: /^Statements that disagree \(0\)/ }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: /^Patterns across events \(\d+\)/ }).click();
+    const patterns = page.getByRole('list', { name: 'Patterns across events' });
+    await expect(patterns).toContainText('The earliest moment a better step was open');
+    await expect(patterns.getByRole('listitem').first()).toBeVisible();
+  });
+});

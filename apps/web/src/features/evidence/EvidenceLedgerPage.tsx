@@ -59,6 +59,7 @@ import {
   type LedgerFilterValues,
 } from './ledger-filters';
 import { MissingEvidencePanel } from './MissingEvidencePanel';
+import { RecordFindingsSection } from './RecordFindingsPanel';
 import { LedgerSkeleton } from './Skeleton';
 
 const useStyles = makeStyles({
@@ -519,6 +520,11 @@ export function EvidenceLedgerPage({ caseId }: { caseId: string }) {
               </p>
               {asOf ? <LaterDecisionsNote /> : null}
               <MissingEvidencePanel items={first?.missing ?? []} asOf={asOf} />
+              <RecordFindingsSection
+                caseId={caseId}
+                asOf={asOf}
+                enabled={ready && cursor.ready && pages.data !== undefined}
+              />
               {claims.length === 0 ? (
                 <EmptyState
                   headingLevel={2}

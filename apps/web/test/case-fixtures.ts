@@ -13,6 +13,7 @@ import {
   IngestionPreviewSchema,
   JobSchema,
   MissingEvidenceSchema,
+  RecordFindingsSchema,
   SampleBundleInfoSchema,
   TimelineEventSchema,
   TimelineResponseSchema,
@@ -30,6 +31,7 @@ import {
   type IngestionPreview,
   type Job,
   type MissingEvidence,
+  type RecordFindings,
   type SampleBundleInfo,
   type TimelineEvent,
   type TimelineResponse,
@@ -658,6 +660,95 @@ export function missingEvidence(overrides: Partial<MissingEvidence> = {}): Missi
     resolvedByEventId: null,
     neededFor: ['DNS resolution failure for sign-in endpoints'],
     askText: 'Please run Resolve-DnsName from an affected device.',
+    ...overrides,
+  });
+}
+
+/** What the record shows when nothing disagrees and nothing was set aside. */
+export function recordFindings(overrides: Partial<RecordFindings> = {}): RecordFindings {
+  return RecordFindingsSchema.parse({
+    asOf: null,
+    conflicts: [],
+    sequenceFindings: [],
+    setAside: [],
+    setAsideTotal: 0,
+    ...overrides,
+  });
+}
+
+/** One conflict (two statements of how many users are affected), one sequence finding and two sentences set aside. */
+export function recordFindingsWithFindings(
+  overrides: Partial<RecordFindings> = {},
+): RecordFindings {
+  const side = (eventId: string, timestamp: string, statement: string, excerpt: string) => ({
+    eventId,
+    participantRole: 'customer_admin' as const,
+    timestamp,
+    statement,
+    subject: 'Number of affected users',
+    polarity: 'asserts' as const,
+    modality: 'asserted' as const,
+    sourceRef: { eventId, sourceId: 'src_1', pointer: `/events/${eventId}`, excerpt },
+  });
+  return recordFindings({
+    conflicts: [
+      {
+        id: 'cfl_1',
+        class: 'temporal_update',
+        subject: 'Number of affected users',
+        sides: [
+          side('evt_1', '2026-03-09T09:12:00Z', 'Number of affected users: 60', '60 users'),
+          side('evt_2', '2026-03-09T11:30:00Z', 'Number of affected users: 300', '300 users'),
+        ],
+        favours: 'second',
+        explanation:
+          'At 09:12 UTC the customer admin said: Number of affected users: 60. At 11:30 UTC the customer admin said: Number of affected users: 300.',
+        uncertainty: {
+          level: 'medium',
+          note: 'Found by reading the wording of the two statements; check them against the quoted source text.',
+        },
+        ruleId: 'same-source-later-state',
+      },
+    ],
+    sequenceFindings: [
+      {
+        id: 'seq_1',
+        rule: 'requested_never_completed',
+        events: [
+          {
+            eventId: 'evt_3',
+            timestamp: '2026-03-09T09:41:00Z',
+            role: 'support_engineer',
+            sourceRef: { eventId: 'evt_3', excerpt: 'Please send the HAR capture.' },
+          },
+        ],
+        asOf: '2026-03-09T12:00:00Z',
+        knownThen:
+          'The engineer asked for a HAR capture at 09:41 UTC and the customer never sent one.',
+        conclusion: 'A request the customer never answered before the case was escalated.',
+        uncertainty: { level: 'low', note: 'Read from the order of the events.' },
+        evidenceIds: [],
+      },
+    ],
+    setAside: [
+      {
+        signalId: 'sig.single-user-scope',
+        signalLabel: 'Only one user or device is affected',
+        eventId: 'evt_2',
+        modality: 'negated',
+        cue: 'not',
+        excerpt: 'This is not just one user.',
+      },
+      {
+        signalId: 'sig.service-health-incident',
+        signalLabel: 'An active Microsoft service incident matches the symptoms',
+        eventId: 'evt_4',
+        modality: 'speculative',
+        cue: 'might be',
+        excerpt: 'There might be an incident on the Microsoft side.',
+      },
+    ],
+    setAsideTotal: 2,
     ...overrides,
   });
 }

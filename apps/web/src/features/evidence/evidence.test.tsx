@@ -12,6 +12,8 @@ import {
   ledger,
   missingEvidence,
   notAnalysedError,
+  recordFindings,
+  recordFindingsWithFindings,
   timelineResponse,
 } from '../../../test/case-fixtures';
 import { session } from '../../../test/fixtures';
@@ -51,6 +53,7 @@ function api(overrides: FakeHandlers = {}) {
     'cases.get': () => caseDetail(),
     'evidence.list': () => ledger(),
     'hypotheses.list': () => hypothesesResponse(),
+    'recordFindings.get': () => recordFindings(),
     'timeline.get': () => timelineResponse(),
     ...overrides,
   });
@@ -1412,5 +1415,127 @@ describe('ledger filter helpers', () => {
 
   it('builds fixtures that satisfy the schema', () => {
     expect(evidenceItem().id).toBe('evd_1');
+  });
+});
+
+describe('[FR-LEDGER-07] what the record itself shows', () => {
+  it('says so when nothing disagrees and nothing was set aside', async () => {
+    renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: api() });
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'What the record itself shows' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Read without a model from the events of the whole record.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/No two statements contradict each other/)).toBeInTheDocument();
+  });
+
+  it('lists the statements that disagree with both sides quoted, and the words it read and did not count', async () => {
+    const user = userEvent.setup();
+    renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, {
+      api: api({ 'recordFindings.get': () => recordFindingsWithFindings() }),
+    });
+    await user.click(await screen.findByRole('button', { name: /Statements that disagree \(1\)/ }));
+    const conflicts = await screen.findByRole('list', { name: 'Statements that disagree' });
+    expect(within(conflicts).getByText('Changed over time')).toBeInTheDocument();
+    const sides = within(conflicts).getByRole('list', {
+      name: 'The two statements about Number of affected users',
+    });
+    expect(within(sides).getByText('“60 users”')).toBeInTheDocument();
+    expect(within(sides).getByText('“300 users”')).toBeInTheDocument();
+    expect(
+      within(conflicts).getByText('The record favours the second statement.'),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Patterns across events \(1\)/ }));
+    const patterns = await screen.findByRole('list', { name: 'Patterns across events' });
+    expect(within(patterns).getByText('A request nobody answered')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Read but not counted \(2\)/ }));
+    const setAside = await screen.findByRole('list', { name: 'Sentences read but not counted' });
+    expect(within(setAside).getByText('Denies it')).toBeInTheDocument();
+    expect(within(setAside).getByText('A guess')).toBeInTheDocument();
+    expect(within(setAside).getByText('“This is not just one user.”')).toBeInTheDocument();
+    expect(within(setAside).getByText(/the words that decided it: “not”/)).toBeInTheDocument();
+  });
+
+  it('says how many were set aside in all when the list was cut', async () => {
+    renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, {
+      api: api({ 'recordFindings.get': () => recordFindingsWithFindings({ setAsideTotal: 640 }) }),
+    });
+    expect(
+      await screen.findByRole('button', { name: /Read but not counted \(2 of 640\)/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('asks about the selected moment only, and says so', async () => {
+    navigateTo(`/cases/case_1/evidence?asOf=${encodeURIComponent(AS_OF)}`);
+    const handler = api({
+      'recordFindings.get': () => recordFindings({ asOf: AS_OF }),
+    });
+    renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: handler });
+    expect(
+      await screen.findByText('Read without a model from the events up to the selected moment.'),
+    ).toBeInTheDocument();
+    // Like every earlier view, it asks about the last event at or before the instant that was chosen.
+    expect(lastQuery(handler, 'recordFindings.get')).toEqual({ asOf: '2026-03-09T09:41:00Z' });
+  });
+
+  it('keeps the ledger usable when it cannot be read, and offers another try', async () => {
+    const user = userEvent.setup();
+    let attempts = 0;
+    const handler = api({
+      'recordFindings.get': () => {
+        attempts += 1;
+        if (attempts === 1)
+          throw new ApiError({
+            status: 500,
+            code: 'internal',
+            title: 'Server error',
+            message: 'The server failed.',
+          });
+        return recordFindingsWithFindings();
+      },
+    });
+    renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: handler });
+    expect(await screen.findByRole('list', { name: 'Claims, 2 shown' })).toBeInTheDocument();
+    expect(await screen.findByText(/could not be loaded/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(
+      await screen.findByRole('button', { name: /Statements that disagree \(1\)/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('is not shown for a case that was never analysed, where the page says so itself', async () => {
+    renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, {
+      api: api({
+        'evidence.list': () => {
+          throw notAnalysedError();
+        },
+        'recordFindings.get': () => {
+          throw notAnalysedError();
+        },
+      }),
+    });
+    await screen.findByText(/not been analysed|Analyse/i);
+    expect(
+      screen.queryByRole('heading', { name: 'What the record itself shows' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('has no accessibility violations with its three lists open', async () => {
+    const user = userEvent.setup();
+    const { container } = renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, {
+      api: api({ 'recordFindings.get': () => recordFindingsWithFindings() }),
+    });
+    for (const name of [
+      /Statements that disagree \(1\)/,
+      /Patterns across events \(1\)/,
+      /Read but not counted \(2\)/,
+    ]) {
+      await user.click(await screen.findByRole('button', { name }));
+    }
+    await screen.findByRole('list', { name: 'Sentences read but not counted' });
+    await expectNoAxeViolations(container);
   });
 });
