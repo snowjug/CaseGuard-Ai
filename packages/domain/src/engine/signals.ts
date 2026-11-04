@@ -1,7 +1,13 @@
 import type { CaseEvent, SignalDetector, SourceField, StatementModality } from '@caseguard/schemas';
 import type { CompiledDetector, CompiledPack } from '../knowledge/compile';
 import { stableId } from '../util/ids';
-import { assessModality, firesFor, maskQuotedHistory, type DetectionUse } from './modality';
+import {
+  assessModality,
+  firesFor,
+  maskQuotedHistory,
+  maskReplyTitle,
+  type DetectionUse,
+} from './modality';
 import { normaliseChatStyle, toOriginalSpan, type ScanMap } from './normalise-chat';
 import type { TemporalView } from './temporal';
 
@@ -151,8 +157,9 @@ export const MAX_MATCHES_PER_DETECTOR = 12;
 
 /**
  * What the detectors read in one event: the stored text (excerpts and offsets are taken from it) and the text matching runs
- * on, which is the same text with the earlier messages an e-mail quotes blanked out and the listed chat shorthand and typos
- * replaced. `map` leads from a position in `scan` back to the word it came from in `text` (null when nothing was replaced).
+ * on, which is the same text with the earlier messages an e-mail quotes and the title of a reply blanked out and the listed
+ * chat shorthand and typos replaced. `map` leads from a position in `scan` back to the word it came from in `text` (null
+ * when nothing was replaced).
  */
 export interface EventTexts {
   text: string;
@@ -160,14 +167,18 @@ export interface EventTexts {
   map: ScanMap | null;
 }
 
-const scanTextOf = (text: string, type: string): { scan: string; map: ScanMap | null } => {
-  const normalised = normaliseChatStyle(maskQuotedHistory(text, type));
+const scanTextOf = (
+  text: string,
+  type: string,
+  title: string | null | undefined,
+): { scan: string; map: ScanMap | null } => {
+  const normalised = normaliseChatStyle(maskQuotedHistory(maskReplyTitle(text, title), type));
   return { scan: normalised.text, map: normalised.map };
 };
 
 export function eventTexts(event: Pick<CaseEvent, 'title' | 'body' | 'type'>): EventTexts {
   const text = eventText(event);
-  return { text, ...scanTextOf(text, event.type) };
+  return { text, ...scanTextOf(text, event.type, event.title) };
 }
 
 const resolveTexts = (
@@ -177,7 +188,7 @@ const resolveTexts = (
   texts === undefined
     ? eventTexts(event)
     : typeof texts === 'string'
-      ? { text: texts, ...scanTextOf(texts, event.type) }
+      ? { text: texts, ...scanTextOf(texts, event.type, event.title) }
       : texts;
 
 function excerptAround(haystack: string, start: number, end: number): string {

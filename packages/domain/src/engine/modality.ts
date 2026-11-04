@@ -84,6 +84,21 @@ const CUE_DEFINITIONS: readonly ModalityCue[] = [
     quiet: ['Please send the HAR capture if possible, and [the logs] too.'],
   },
   {
+    id: 'whether',
+    modality: 'conditional',
+    priority: 3,
+    pattern: /\bwhether\b(?!\s+or\s+not\b)/i,
+    reach: 10,
+    stopsAtComma: true,
+    purpose:
+      'An embedded question: the clause asks whether something holds, so it says neither that it does nor that it does not.',
+    fires: [
+      'Please check whether [Entra holds a failed row].',
+      'It is not clear whether [the proxy times out].',
+    ],
+    quiet: ['It fails whether or not [the VPN is on].'],
+  },
+  {
     id: 'counterfactual',
     modality: 'conditional',
     priority: 3,
@@ -148,7 +163,7 @@ const CUE_DEFINITIONS: readonly ModalityCue[] = [
     modality: 'speculative',
     priority: 5,
     pattern:
-      /\b(?:might|maybe|perhaps|possibly|probably|presumably|supposedly|conceivably|potentially)\b|\bmay\s+(?:be|well|have|also)\b|\bcould\s+(?:also\s+)?(?:be|have\s+been|indicate|point|explain|mean)\b|\b(?:i|we)\s+(?:suspect|guess|assume|suppose|speculate)\b|\b(?:suspect(?:s|ed)?|suspicion)\b|\bhypothes(?:is|e|ise|ize)\b|\blikely\s+(?:a|an|the|due|caused|because|related)\b/i,
+      /\b(?:might|maybe|perhaps|possibly|probably|presumably|supposedly|conceivably|potentially)\b|\bmay\s+(?:be|well|have|also)\b|\bcould\s+(?:also\s+)?(?:be|have\s+been|indicate|point|explain|mean)\b|\b(?:i|we)\s+(?:suspect|guess|assume|suppose|speculate|presume|reckon|imagine)\b|\b(?:suspect(?:s|ed)?|suspicion)\b|\bhypothes(?:is|e|ise|ize)\b|\blikely\s+(?:a|an|the|due|caused|because|related)\b/i,
     reach: 8,
     stopsAtComma: false,
     purpose: 'A guess or hypothesis, not an observation.',
@@ -318,12 +333,52 @@ const HABITUAL =
 const isHabitual = (text: string, start: number, end: number): boolean =>
   HABITUAL.test(text.slice(Math.max(0, start - 30), Math.min(end, start + 40)));
 
+/**
+ * The first word of a clause that asks: the auxiliary of an inverted question or a wh-word, after the small words that
+ * lead into one ("and", "so", "also").
+ */
+const QUESTION_OPENER =
+  /^(?:(?:and|so|also|then|now|ok|okay|hi|hello|thanks|but|or)[,\s]+)*(?:is|are|was|were|do|does|did|can|could|would|will|shall|should|has|have|had|may|might|what|why|when|where|which|who|whom|whose|how|any|anyone|anybody|(?:is|are|was|were|do|does|did|can|could|would|will|should|has|have|had)n['’]t)\b/i;
+/** How far after a span a question mark is looked for. */
+const QUESTION_REACH = 200;
+
+/** A span that lies in a question asks about the fact; it does not state it. */
+const QUESTION: ModalityAssessment = { modality: 'requested', cueId: 'question', cue: '?' };
+
+/**
+ * Whether the span lies in a question: the clause opens with an auxiliary or a wh-word and ends with a question mark,
+ * with no comma between the span and the mark, except the one before "or" in an alternative question. "40 users cannot
+ * sign in, does anyone know why?" states the 40 users and then asks; "Does Entra hold a failed row for them, or none?"
+ * only asks.
+ */
+function inQuestion(text: string, start: number, end: number): boolean {
+  const after = text.slice(end, end + QUESTION_REACH);
+  if (!after.includes('?')) return false;
+  let mark: string | null = null;
+  let markAt = 0;
+  for (const boundary of after.matchAll(CLAUSE_BOUNDARY)) {
+    const found = boundary[0] ?? '';
+    const index = boundary.index ?? 0;
+    if (found === '.') {
+      const word = /([A-Za-z][A-Za-z.]*)$/.exec(after.slice(Math.max(0, index - 8), index));
+      if (word?.[1] && ABBREVIATIONS.has(word[1].toLowerCase())) continue;
+    }
+    mark = found;
+    markAt = index;
+    break;
+  }
+  if (mark !== '?') return false;
+  const between = after.slice(0, markAt).replace(/,\s+or\b/gi, ' or');
+  if (/,|\s[-–—]\s/.test(between)) return false;
+  return QUESTION_OPENER.test(clauseBefore(text, start).trimStart());
+}
+
 /** The first cue, by priority, that reaches the span `[start, end)` of `text`; asserted when none does. */
-export function assessModality(
+function cueModality(
   text: string,
   start: number,
   end: number,
-  options: AssessOptions = {},
+  options: AssessOptions,
 ): ModalityAssessment {
   const before = clauseBefore(text, start);
   const inside = options.negativeContent
@@ -350,6 +405,29 @@ export function assessModality(
     if (nearest) return { modality: cue.modality, cueId: cue.id, cue: nearest[0] ?? null };
   }
   return ASSERTED;
+}
+
+/** What a request, a condition or a plan already says: it is not a statement, so a question adds nothing to it. */
+const NOT_STATING: ReadonlySet<StatementModality> = new Set<StatementModality>([
+  'requested',
+  'conditional',
+  'future_intent',
+]);
+
+/**
+ * How the sentence stands to the span `[start, end)` of `text`: the first cue, by priority, that reaches it, and asserted
+ * when none does. A span in a question is requested, whatever else reaches it: a question that holds a denial ("are no
+ * failed rows recorded?") does not deny anything, and one that holds a guess or a report does not state it.
+ */
+export function assessModality(
+  text: string,
+  start: number,
+  end: number,
+  options: AssessOptions = {},
+): ModalityAssessment {
+  const base = cueModality(text, start, end, options);
+  if (NOT_STATING.has(base.modality)) return base;
+  return inQuestion(text, start, end) ? QUESTION : base;
 }
 
 const HEDGE =
@@ -433,4 +511,17 @@ export function maskQuotedHistory(text: string, eventType: string): string {
     return line;
   });
   return changed ? masked.join('\n') : text;
+}
+
+/** A title that opens with a reply or forward marker: "Re:", "Fwd:", "AW:", "SV:", "Odp:", "Re[2]:". */
+const REPLY_TITLE = /^[ \t]*(?:re|fw|fwd|aw|wg|sv|vs|odp|rv|tr)(?:\[\d{1,2}\])?[ \t]*:/i;
+
+/**
+ * The text with the title of a reply blanked out, character for character. A reply carries the subject of the first
+ * message of its thread, and the first event already holds those words, so a detector that read them again would count
+ * the same statement at every reply and put the replier's name to it. `text` is the title, a line break and the body.
+ */
+export function maskReplyTitle(text: string, title: string | null | undefined): string {
+  if (!title || !REPLY_TITLE.test(title) || !text.startsWith(title)) return text;
+  return title.replace(/[^\r\n]/g, ' ') + text.slice(title.length);
 }

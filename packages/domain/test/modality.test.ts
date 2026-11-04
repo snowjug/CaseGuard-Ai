@@ -6,6 +6,7 @@ import {
   assessModality,
   firesFor,
   maskQuotedHistory,
+  maskReplyTitle,
   type AssessOptions,
 } from '../src/engine/modality';
 
@@ -166,6 +167,61 @@ describe('what each use lets fire', () => {
       expect(firesFor('delegated_action', modality)).toBe(true);
     for (const modality of ['negated', 'conditional', 'speculative', 'attributed'] as const)
       expect(firesFor('delegated_action', modality)).toBe(false);
+  });
+});
+
+describe('a question asks about the fact and does not state it', () => {
+  it.each([
+    'Does Entra hold [a failed row] for them?',
+    'Are [no failed rows] recorded for these users?',
+    "Isn't [the proxy] failing for everyone?",
+    'And what do the [sign-in logs] show for the Warsaw users?',
+    'Is it [only one laptop] that fails to sign in?',
+  ])('%s', (marked) => {
+    expect(assess(marked)).toMatchObject({ modality: 'requested', cueId: 'question' });
+  });
+
+  it.each([
+    '[40 users] cannot sign in, does anyone know why?',
+    'Teams is [broken for 40 users] again?',
+    'No [failed rows] were recorded. Is that normal?',
+    'Check https://example.test/a?b=1 for [40 users] who fail.',
+    'We asked the Warsaw office, is it [DNS] - or the proxy?',
+  ])('does not take %s for a question', (marked) => {
+    expect(assess(marked).cueId).not.toBe('question');
+  });
+
+  it('leaves a full stop of an abbreviation inside the question', () => {
+    expect(assess('Does it fail e.g. for [the Warsaw users]?').cueId).toBe('question');
+  });
+});
+
+describe('the title of a reply', () => {
+  const title = 'Re: Teams cannot resolve the sign-in host';
+  const text = `${title}\nThanks, looking now.`;
+
+  it('is blanked character for character, and only when it opens like a reply', () => {
+    const masked = maskReplyTitle(text, title);
+    expect(masked).toHaveLength(text.length);
+    expect(masked.startsWith(' '.repeat(title.length))).toBe(true);
+    expect(masked.endsWith('\nThanks, looking now.')).toBe(true);
+    for (const marker of ['RE:', 'Fwd:', 'AW:', 'SV:', 'Odp:', 'Re[2]:', ' re :']) {
+      const own = `${marker} subject`;
+      expect(maskReplyTitle(`${own}\nbody`, own), marker).toBe(`${' '.repeat(own.length)}\nbody`);
+    }
+  });
+
+  it('is kept when it is the title of a message that is not a reply', () => {
+    const plain = 'Teams cannot resolve the sign-in host';
+    expect(maskReplyTitle(`${plain}\nbody`, plain)).toBe(`${plain}\nbody`);
+    expect(maskReplyTitle('Reply\nbody', 'Reply')).toBe('Reply\nbody');
+    expect(maskReplyTitle('Release notes\nbody', 'Release notes')).toBe('Release notes\nbody');
+    expect(maskReplyTitle('body only', null)).toBe('body only');
+    expect(maskReplyTitle(text, undefined)).toBe(text);
+  });
+
+  it('is not touched when the text does not start with the title', () => {
+    expect(maskReplyTitle('Something else\nbody', title)).toBe('Something else\nbody');
   });
 });
 

@@ -1965,10 +1965,9 @@ const actions: KnowledgeAction[] = [
       ),
     ],
     detectors: [
-      rx(
-        String.raw`(Resolve-DnsName|nslookup)[^.\n]{0,100}(each|both|every|all)?[^.\n]{0,40}(dns server|resolver)`,
-        { roles: [...ENG] },
-      ),
+      rx(String.raw`(?:Resolve-DnsName|nslookup)[^.\n]{0,140}(?:dns server|resolver)`, {
+        roles: [...ENG],
+      }),
     ],
     templates: { powershell: PS_DNS },
     safetyNotes: 'Read-only DNS queries from an affected site.',

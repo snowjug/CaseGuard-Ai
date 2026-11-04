@@ -213,6 +213,66 @@ describe('an engineer action is a step that was done, or one the customer was as
   });
 });
 
+describe('a question and the title of a reply are not statements', () => {
+  const engineerNote = (body: string, title: string | null = null) =>
+    eventOf('support_engineer', 'diagnostic_result', body, title);
+  it('reads a denial as a denial, but not when it is asked about or the writer is only checking it', () => {
+    const stated = engineerNote(
+      'Checked: service health lists nothing active for sign-in or Teams.',
+    );
+    expect(read(stated).signals(stated)).toEqual(['sig.service-health-clear']);
+    for (const body of [
+      'Please check whether service health lists nothing active for sign-in or Teams.',
+      'Does service health list nothing active for sign-in or Teams?',
+      'And does service health list nothing active for Teams, or is there an incident?',
+    ]) {
+      const event = engineerNote(body);
+      expect(read(event).signals(event), body).toEqual([]);
+    }
+  });
+
+  it('keeps a statement that is followed by a question', () => {
+    const event = eventOf(
+      'customer_end_user',
+      'customer_email',
+      'Around 120 users cannot sign in to Teams, does anyone know why?',
+    );
+    expect(read(event).signals(event)).toContain('sig.multiple-users-affected');
+  });
+
+  it('does not read the subject of a thread again at each reply', () => {
+    const subject = 'Teams says the name could not be resolved in Gdansk';
+    const first = eventOf('customer_end_user', 'customer_email', 'Please help.', subject);
+    expect(read(first).signals(first)).toContain('sig.error-name-not-resolved');
+    const reply = eventOf(
+      'support_engineer',
+      'engineer_email',
+      'Thanks, I am looking at it now.',
+      `Re: ${subject}`,
+    );
+    expect(read(reply).signals(reply)).toEqual([]);
+    for (const marker of ['RE:', 'Fwd:', 'AW:', 'Re[2]:']) {
+      const other = eventOf(
+        'support_engineer',
+        'engineer_email',
+        'Thanks, I am looking at it now.',
+        `${marker} ${subject}`,
+      );
+      expect(read(other).signals(other), marker).toEqual([]);
+    }
+  });
+
+  it('still reads what a reply says in its own body', () => {
+    const reply = eventOf(
+      'customer_end_user',
+      'customer_email',
+      'The Teams window says the name of the server could not be resolved.',
+      'Re: Cannot sign in to Teams',
+    );
+    expect(read(reply).signals(reply)).toContain('sig.error-name-not-resolved');
+  });
+});
+
 describe('the older entry point still answers as it did', () => {
   it('returns a match for a stated fact, with its modality', () => {
     const event = eventOf('customer_end_user', 'customer_email', 'Users fail intermittently.');
