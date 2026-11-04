@@ -9,7 +9,9 @@ import type { EvalCase } from './schema';
  * echo something? None of them runs the engine.
  *
  *  - overlap: no six-word run of any case text may appear in the two shipped samples, in the vocabulary descriptions, in
- *    the string literals of the knowledge pack, in the unit-test fixtures of the detectors, or in a case of another split;
+ *    the string literals of the knowledge pack, in the unit-test fixtures of the detectors, or in a case of another split.
+ *    A dev case is the one exception for the detector tests: dev is what the detectors are tuned on, and a test written
+ *    from a dev miss quotes it;
  *  - reach: nothing under `packages/*` or `apps/*` source, and no test of a detector, may import or read the validation or
  *    the test cases (the evaluation tooling and the guard are the only readers).
  *
@@ -42,6 +44,8 @@ export interface OverlapSource {
   readonly kind: OverlapSourceKind;
   readonly name: string;
   readonly shingles: ReadonlySet<string>;
+  /** Splits whose cases may share text with this source without it being a finding. */
+  readonly exceptSplits?: readonly string[];
 }
 
 export interface Overlap {
@@ -85,6 +89,7 @@ export function findOverlaps(
       for (const known of sources) {
         // A reordered copy repeats its source on purpose, and a family is one scenario told more than once.
         if (known.kind === 'other-split' && known.name.startsWith(`${source.split}:`)) continue;
+        if (known.exceptSplits?.includes(source.split)) continue;
         let first: [number, number] | null = null;
         let windows = 0;
         for (let index = 0; index + SHINGLE_WORDS <= words.length; index += 1) {
@@ -192,7 +197,11 @@ const isEvaluationTooling = (path: string): boolean => {
   );
 };
 
-/** The unit tests and fixtures of the detectors: everything under `packages/domain/test` except the evaluation tooling. */
+/**
+ * The unit tests and fixtures of the detectors: everything under `packages/domain/test` except the evaluation tooling.
+ * Dev is the tuning set, so a detector test written from a dev miss may quote the case; the validation and test splits
+ * may not share a phrase with any detector test, which is what keeps them independent of what the detectors were fitted to.
+ */
 export function detectorTestSource(root = REPOSITORY_ROOT): OverlapSource {
   const files = walk(
     join(root, 'packages', 'domain', 'test'),
@@ -205,7 +214,12 @@ export function detectorTestSource(root = REPOSITORY_ROOT): OverlapSource {
     const text = readFileSync(file, 'utf8').replace(/\\[nrt]/g, ' ');
     words.push(...wordsOf(text), '\u0000');
   }
-  return { kind: 'detector-test', name: 'a detector test fixture', shingles: shingles(words) };
+  return {
+    kind: 'detector-test',
+    name: 'a detector test fixture',
+    shingles: shingles(words),
+    exceptSplits: ['dev'],
+  };
 }
 
 /** The case texts of one split, as a source for the cases of the others. */

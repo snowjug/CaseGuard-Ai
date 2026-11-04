@@ -5,28 +5,29 @@ import { wave1Id } from './evaluation/wave1-plan';
 import { prepareBundle } from './helpers';
 
 /**
- * Defects the first independent evaluation found. Each test states what should be true, as an ordinary test would, and is
- * marked as known to fail (`it.fails`) while the defect is open: the suite stays green, and goes red the day the defect is
- * fixed, which is the cue to turn the test into a normal one (drop `.fails`) and to update docs/EVALUATION.md and
- * docs/KNOWN_LIMITATIONS.md. The cases are the migrated Wave 1 cases of `evaluation/cases/dev`.
+ * What the first independent evaluation found wrong, kept as regression tests now that it is fixed. Each test states what
+ * must stay true: a sentence that denies a signal is not read as stating it, and the same finding is read whichever word
+ * opens a pasted message. While the defects were open these tests were marked `it.fails`, so the suite stayed green until
+ * the day it was fixed; they went red on that day, which was the cue to make them ordinary tests. The cases are the migrated
+ * Wave 1 cases of `evaluation/cases/dev`.
  */
 const p4 = evaluateCase(wave1Id('p4-hourly-signout'), 'dev', { recommendations: false });
 const z4 = evaluateCase(wave1Id('z4-negations'), 'dev', { recommendations: false });
 
-describe('[eval] known defects: a statement that denies a signal must not report it', () => {
-  it.fails('"nothing active in service health" is not read as an incident (p4)', () => {
+describe('[eval] a statement that denies a signal is not read as stating it', () => {
+  it('"nothing active in service health" is not read as an incident (p4)', () => {
     expect(p4.detail.signals?.fp).toEqual([]);
   });
 
-  it.fails('and so does not make an incident the leading cause of an unrelated story (p4)', () => {
+  it('and so does not make an incident the leading cause of an unrelated story (p4)', () => {
     expect(p4.detail.leader?.agreement).not.toBe('wrong');
   });
 
-  it.fails('"this is not intermittent" is not read as intermittent failures (z4)', () => {
+  it('"this is not intermittent" is not read as intermittent failures (z4)', () => {
     expect(z4.detail.signals?.fp).toEqual([]);
   });
 
-  it.fails('the same log finding is read whichever word opens a pasted message', () => {
+  it('the same log finding is read whichever word opens a pasted message', () => {
     const parsed = parsePastedTranscript(
       [
         '[2026-06-02 08:00 UTC] Customer: About 45 people in our Warsaw office get thrown out of Teams.',

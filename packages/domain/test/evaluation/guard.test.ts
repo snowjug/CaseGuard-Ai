@@ -141,6 +141,25 @@ describe('the overlap guard', () => {
       ),
     ).toHaveLength(1);
   });
+  it('lets a dev case quote a detector test, and refuses it for validation and test', () => {
+    const detectorTest: OverlapSource = {
+      ...source('detector-test', 'the Gdansk office lost the connection'),
+      exceptSplits: ['dev'],
+    };
+    expect(findOverlaps([evalCase({ ...copied, split: 'dev' })], [detectorTest])).toEqual([]);
+    for (const split of ['validation', 'test'] as const) {
+      const found = findOverlaps([evalCase({ ...copied, split })], [detectorTest]);
+      expect(found, split).toHaveLength(1);
+      expect(found[0]?.source).toBe('detector-test');
+    }
+  });
+
+  it('exempts only dev from the detector tests, in the source the check really uses', () => {
+    const real = independenceSources(dataset);
+    expect(real.find((entry) => entry.kind === 'detector-test')?.exceptSplits).toEqual(['dev']);
+    for (const entry of real.filter((item) => item.kind !== 'detector-test'))
+      expect(entry.exceptSplits ?? [], entry.kind).toEqual([]);
+  });
 });
 
 describe('who may read the cases', () => {

@@ -264,8 +264,11 @@ export function runEngine(source: EvalCase, options: RunOptions = {}): EngineCas
       earliest: fork.isEarliestMeaningful,
     })),
     earliestFork: earliest ? key(earliest.eventId) : null,
-    // The engine does not report conflicts yet. When it does, map its output here (event keys, class, subject).
-    conflicts: 'not_available',
+    conflicts: analysis.conflicts.map((conflict) => ({
+      class: conflict.class,
+      events: [key(conflict.sides[0].eventId), key(conflict.sides[1].eventId)] as const,
+      subject: conflict.subject,
+    })),
     hypotheses: analysis.hypotheses.map((hypothesis) => ({
       key: hypothesis.key,
       prior: hypothesis.prior,

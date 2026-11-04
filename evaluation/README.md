@@ -39,7 +39,7 @@ Wave 1's 16 cases are migrated into dev with their original labels (annotator `c
 
 ## How to run
 
-All commands are `pnpm --filter @caseguard/domain run <script> [-- flags]`; the heavy ones go through the machine guard (`cg-run`) on shared machines.
+All commands are `pnpm --filter @caseguard/domain run <script> [-- flags]`. A run of one split takes a few seconds; `--counterfactual` is slow, so on a shared machine run it at low priority (`nice -n 19`).
 
 | Script                         | What it does                                                                                                                                                                                                |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
