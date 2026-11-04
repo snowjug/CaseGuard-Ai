@@ -294,7 +294,7 @@ const signals: KnowledgeSignal[] = [
     description: 'Some sites or networks are affected much more than others.',
     detectors: [
       rx(
-        String.raw`\b(only|mostly|mainly|primarily|much worse|worse|more (often|frequent(ly)?))\b[^.\n]{0,70}\b(office|site|branch|network|subnet|vlan|location)\b`,
+        String.raw`\b(only|mostly|mainly|primarily|much worse|worse|more (often|frequent(ly)?))\b(?!\s+(?:one|1|a single|a|an|two|three)\s+(?:user|person|people|device|laptop|pc|machine|account|colleague|employee|member)\b)[^.\n]{0,70}\b(office|site|branch|network|subnet|vlan|location)\b`,
         { roles: [...CUSTOMER_ROLES] },
       ),
       rx(
@@ -1084,7 +1084,7 @@ const WORDING_FAMILIES_SCOPE: Readonly<Record<string, readonly SignalDetector[]>
     ),
     // "only the Graz office is hit", "just the warehouse fails": a place named as the only one with the failure.
     rx(
-      String.raw`\b(?:only|just|mainly|mostly)\s+(?:the\s+|our\s+)?[\p{L} ]{0,30}?(?:site|office|branch|building|campus|floor|location|plant|depot|warehouse|store|region|subnet|vlan)s?\b${GAP}{0,60}\b(?:affect\w*|fail\w*|impact\w*|problems?|cannot|can['’]?t|unable)\b`,
+      String.raw`\b(?:only|just|mainly|mostly)\s+(?!(?:one|1|a single|a|an|two|three)\s+(?:user|person|people|device|laptop|pc|machine|account|colleague|employee|member)\b)(?:the\s+|our\s+)?[\p{L} ]{0,30}?(?:site|office|branch|building|campus|floor|location|plant|depot|warehouse|store|region|subnet|vlan)s?\b${GAP}{0,60}\b(?:affect\w*|fail\w*|impact\w*|problems?|cannot|can['’]?t|unable)\b`,
       { roles: [...CUSTOMER_ROLES], flags: 'iu' },
     ),
     // From home, over the VPN or outside the office it works: the failure follows the network.
@@ -1293,6 +1293,23 @@ const IPV4 = String.raw`\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}`;
 const DNS_NOUN_WIDE = String.raw`(?:${DNS_NOUN}|(?:primary|secondary|second|first|backup|internal|upstream|other) dns|ns ?\d)`;
 /** More ways of pointing at a proxy node: "PRX-B", "the proxy at 10.1.9.14". */
 const PROXY_NODE_MORE = String.raw`(?:\b(?:prx|pxy|swg|wsg|proxy)-[a-h]\b|\bproxy (?:at |on |server |node )?${IPV4}\b)`;
+/** A place where people work: "the Lyon branch", "our Porto depot", "the 10.4.8.0/24 subnet". */
+const SITE_NOUN = String.raw`(?:office|branch|site|plant|depot|warehouse|building|campus|floor|location|subnet|store)`;
+/** The place with its name, never "all of our offices" or "every office": a place that is one among others. */
+const SITE_NAME = String.raw`(?:(?:the|our|this) )?(?!(?:all|every|each|any|both|most)\b)(?:[\p{L}\d./-]{2,20} )?`;
+/** The same with the name required ("the Lyon branch", never just "our office"). */
+const SITE_NAMED = String.raw`(?:(?:the|our|this) )?(?!(?:all|every|each|any|both|most|our|the|this|that|my|your|a|an|other|same|office|site|branch|floor)\b)[\p{L}\d./-]{2,20} `;
+const SITE_GROUP = String.raw`(?:everyone|everybody|all|sales|finance|we|they)`;
+const SITE_TROUBLE = String.raw`(?:cannot|can['’]?t|unable|locked out|stuck|fail\w*|errors?|affected|down|(?:gets?|have|has) (?:it|the (?:error|problem|issue)))`;
+/** The places that are not affected, said in the plural or as the rest. */
+const SITE_REST = String.raw`(?:offices|branches|sites|plants|depots|warehouses|buildings|campuses|floors|locations|subnets|stores|regions|networks|company|rest)`;
+const SITE_FINE = String.raw`(?:(?:(?:is|are) )?(?:fine|ok|okay|good|unaffected|normal(?:ly)?|not (?:affected|impacted)|working)|works?\b|no (?:issues?|problems?|trouble)|nothing)`;
+/** What a customer does to a Teams installation to repair it, and what it was done to. */
+const CC_ACT = String.raw`(?:clear(?:ed|ing)?|delet(?:e|ed|ing)|wip(?:e|ed|ing)|remov(?:e|ed|ing)|reset(?:ting)?|re-?install(?:ed|ing|ation)?|clean install|installed it again)`;
+const CC_OBJ = String.raw`(?:cache|folder|profile|credentials?|teams|app|client|data)`;
+const CC_OBJ_STRICT = String.raw`(?:cache|folder|profile|credentials?)`;
+/** The browser and the website: where Teams runs without the desktop client. */
+const WEB_WHERE = String.raw`(?:browser|web|website|teams web|chrome|edge|firefox|safari|incognito|inprivate|teams\.microsoft\.com)`;
 
 /**
  * Wording families for the signals about the server side: what the logs and the infrastructure show (name servers, proxy
@@ -1648,6 +1665,68 @@ const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetec
         roles: [...ENG_ROLES],
         eventTypes: [...FINDING_TYPES, 'validation_result'],
       }),
+    ),
+  ],
+  // The web version of Teams fails as well: the web, the browser or the site named with a failure and "too", "either", "the same".
+  'sig.web-client-also-fails': [
+    ...[
+      String.raw`\b${WEB_WHERE}\b${gap(40)}\b(?:(?:does|do|did)(?:n['’]?t| not) work|not working|fail(?:s|ed|ing)?|time[sd]? out|timing out|hang(?:s|ing)?|spins?|errors?|break|breaks)\b${gap(25)}\b(?:too|also|either|as well)\b`,
+      String.raw`\b(?:in|on|through|via|using|with|from) (?:the |a )?${WEB_WHERE}\b${gap(50)}\b(?:the same|same|identical|exactly the same)\b${gap(6)}\b(?:error|message|screen|code|problem|issue|thing|result|behaviou?r)\b`,
+      String.raw`\b(?:desktop|app|client)\b${gap(20)}\band\b${gap(10)}\b(?:the )?(?:web|browser)(?: app| version| client)?\b${gap(15)}\b(?:both|all)\b${gap(10)}\b(?:fail\w*|(?:do|does)(?:n['’]?t| not) work|time[sd]? out)\b`,
+      String.raw`\bboth\b${gap(25)}\b(?:web|browser)\b${gap(25)}\b(?:fail\w*|(?:do|does)(?:n['’]?t| not) work|time[sd]? out|errors?)\b`,
+      String.raw`\b(?:in|on) (?:the )?(?:browser|web)\b${gap(10)}\b(?:too|also|as well)\b${gap(30)}\b(?:the same|same|identical|exactly)\b`,
+      String.raw`\b(?:(?:does|do)(?:n['’]?t| not) work|not working|fail(?:s|ed)?)\b${gap(15)}\b(?:in|on|via|through) (?:the )?(?:browser|web|website)\b${gap(15)}\b(?:either|too|also)\b`,
+      String.raw`\bsame (?:thing|error|problem|result|message)\b${gap(40)}\b(?:teams\.microsoft\.com|the web(?:site| version| app)?|the browser|in (?:the )?browser)\b`,
+    ].map((pattern) => rx(pattern, { roles: [...CUSTOMER_ROLES] })),
+  ],
+  // Clearing, deleting, resetting or reinstalling changed nothing: the action, what it was done to, and a result that is the
+  // same, still there or "no luck", in the sentence.
+  'sig.cache-clear-no-effect': [
+    ...[
+      String.raw`\b${CC_ACT}\b${SENT}{0,50}\b${CC_OBJ}\b${SENT}{0,100}\bstill (?:fail\w*|there|the same|happens?|happening|broken|blocked|not|asks?|shows?|says?|gets?|getting|seeing|have|has|can['’]?t|cannot)\b`,
+      String.raw`\b${CC_ACT}\b${SENT}{0,50}\b${CC_OBJ}\b${SENT}{0,100}\b(?:continues?|persists?|stays?|remains?|(?:it|that|everything) is (?:still )?the same|the same|same (?:error|result|thing|problem)|unchanged)\b`,
+      String.raw`\b${CC_ACT}\b${SENT}{0,50}\b${CC_OBJ}\b${SENT}{0,100}\b(?:nothing (?:changes?|changed|happens?|worked)|no (?:change|difference|effect|luck)|(?:did ?n['’]?t|did not) (?:help|change|fix|work)|did nothing|not (?:fixed|helped))\b`,
+      String.raw`\b(?:cache|clearing|re-?install(?:ing|ation)?|reset(?:ting)?|clean install)\b${gap(25)}\b(?:did ?n['’]?t|did not|does ?n['’]?t|does not|made no|had no|has no)\b${gap(10)}\b(?:do anything|help|change|fix|work|difference|effect)\b`,
+      String.raw`\b(?:tried|did) (?:everything|all|it all)\b${gap(60)}\b(?:cache|re-?install\w*|profile)\b[^\n]{0,40}?\bno (?:luck|change|difference|effect)\b`,
+    ].map((pattern) => rx(pattern, { roles: [...CUSTOMER_ROLES] })),
+  ],
+  // Clearing, deleting, resetting or reinstalling fixed it: a result stated, or the repair named as what fixed it.
+  'sig.cache-clear-resolved': [
+    ...[
+      String.raw`\b${CC_ACT}\b${gap(50)}\b${CC_OBJ_STRICT}\b${gap(80)}\b(?:fixed|solved|resolved|cured|corrected|worked|works|working|did the trick)\b`,
+      String.raw`\b${CC_ACT}\b${gap(50)}\b${CC_OBJ}\b${gap(60)}\b(?:(?:now|then|after(?:wards)?) (?:\w+ )?(?:can|could|is able to) (?:log|sign) ?in|(?:log|sign)(?:s)? in (?:now|fine)|(?:logs|signs) in again)`,
+      String.raw`\b${CC_ACT}\b${gap(50)}\b${CC_OBJ}\b${gap(60)}\b(?:(?:ok|okay|fine|good|works?|working)(?: again)? now|works again|(?:problem|issue|error|loop) (?:is |was |has )?(?:gone|solved|fixed|resolved|disappeared))`,
+      String.raw`\b(?:the )?(?:re-?install\w*|reset|clean install|cache (?:clear\w*|reset|delet\w*)|clearing the cache|deleting the cache|wiping the cache)\b${gap(25)}\b(?:fixed|solved|resolved|cured|worked|did the trick)\b`,
+    ].map((pattern) => rx(pattern)),
+  ],
+  // The browser's own wording of a name that could not be found.
+  'sig.error-name-not-resolved': [
+    rx(String.raw`\bserver (?:ip )?address (?:could not|couldn['’]?t) be found\b`, {
+      roles: [...CUSTOMER_ROLES],
+    }),
+  ],
+  // The failure concentrates at one place, said the way a customer or an engineer says it: a group at a place that cannot, a
+  // limit to a place, "mostly at", every affected user in one office, the other places that are fine. Never "all of our offices".
+  'sig.site-correlated': [
+    ...[
+      String.raw`\b${SITE_GROUP}\b${gap(20)}\b(?:in|at|on|from) ${SITE_NAMED}${SITE_NOUN}\b${gap(60)}\b${SITE_TROUBLE}\b`,
+      String.raw`\b(?:staff|people|users|colleagues)\b${gap(20)}\b(?:in|at|on|from) ${SITE_NAMED}${SITE_NOUN}\b${gap(20)}\b(?:are|were) all ${SITE_TROUBLE}\b`,
+      String.raw`\b(?:limited|restricted|confined|isolated) to ${SITE_NAME}${SITE_NOUN}\b`,
+      String.raw`\b(?:only|just|solely) (?:at|in|on|for) ${SITE_NAME}${SITE_NOUN}\b`,
+      String.raw`\b(?:at|in|on) ${SITE_NAME}${SITE_NOUN} only\b`,
+      String.raw`\b(?:see|seen|happens?|happening|occurs?|occurring|reported|errors?|failures?|problems?)\b${gap(30)}\b(?:mostly|mainly|primarily|especially|only)\b${gap(25)}\b(?:at|in|on|for) ${SITE_NAME}${SITE_NOUN}\b`,
+      String.raw`\b(?:only|just|solely)\b${gap(15)}\b(?:happens?|happening|occurs?|occurring|fails?|failing)\b${gap(10)}\b(?:at|in|on|for) ${SITE_NAME}${SITE_NOUN}\b`,
+      String.raw`\b(?:the )?(?:other|others|rest|remaining)\b${gap(25)}\b${SITE_REST}\b${gap(40)}\b${SITE_FINE}\b`,
+      String.raw`\b(?:nobody|no ?one|none)\b${gap(15)}\b(?:at|in|from)\b${gap(8)}\b(?:the )?(?:other|another|any other)\b${gap(10)}\b${SITE_NOUN}s?\b`,
+      String.raw`\b(?:from|at) (?:my |his |her |their |our )?(?:home|house)\b${gap(30)}\b(?:works?|worked|is fine|ok|okay|no problem|signs? in|fine)\b`,
+    ].map((pattern) => rx(pattern, { roles: [...CUSTOMER_ROLES], flags: 'iu' })),
+    ...[
+      String.raw`(?:^|[.!?;,]\s*|\b(?:and|but|while|so) )(?:The |Our )?[A-Z]\p{L}{2,20}(?: [A-Z]\p{L}{2,20})? ${SITE_NOUN} (?:is|are) (?:down|affected|impacted|broken|failing|hit)\b`,
+      String.raw`(?!(?:Teams|Outlook|Word|Excel|OneDrive|SharePoint|Chrome|Edge|Windows|Office|Zoom|Slack|Microsoft)\b)\b[A-Z]\p{L}{2,20} (?:and|or|&) [A-Z]\p{L}{2,20} (?:work|works|are|is) normally\b`,
+    ].map((pattern) => rx(pattern, { roles: [...CUSTOMER_ROLES], flags: 'u' })),
+    rx(
+      String.raw`\ball\b${gap(15)}\b(?:affected|failing|impacted)\b${gap(25)}\b(?:users|people|accounts|devices|clients|machines|laptops|colleagues)\b${gap(40)}\b(?:are|sit|work|come|connect|share|behind|on|in|at|from)\b${gap(40)}\b${SITE_NOUN}\b`,
+      { roles: [...CUSTOMER_ROLES, ...ENG_ROLES], flags: 'iu' },
     ),
   ],
 };

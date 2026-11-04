@@ -1039,3 +1039,62 @@ describeFamilies(
   'wording families of the server side: precision of two older detectors',
   PRECISION,
 );
+
+const SCOPE_WORDING: readonly Family[] = [
+  {
+    id: 'site-correlated: a named group at a place, a limit to a place, the others fine',
+    signal: 'sig.site-correlated',
+    role: 'customer_admin',
+    type: 'customer_email',
+    reads: [
+      'Everybody at the Wroclaw branch hits the error since eight; Opole and Katowice behave normally.',
+      'The trouble is confined to the Antwerp warehouse.',
+      'This only happens in the Bremen plant.',
+      'All failing accounts sit in the Gothenburg office.',
+      'Errors are reported mostly at the Cluj depot and rarely anywhere else.',
+      'Nobody at any other location has written in about it.',
+      'From the Valencia office it fails, but at home it works.',
+      'Porto office is down for sign-in, and the rest of the group has no trouble.',
+    ],
+    doesNotRead: [
+      'Users at every one of our offices see this error.',
+      'The label printer in the Oslo office jammed.',
+      'Just one user in the Oslo office has the problem.',
+      'We have offices in Oslo, Bergen and Trondheim.',
+      'Please tell me which sites are affected.',
+      'If only the Berlin office were affected we would blame the network.',
+      'Everyone in the company is affected, all sites.',
+    ],
+  },
+  {
+    id: 'web client: the browser version fails as well',
+    signal: 'sig.web-client-also-fails',
+    role: 'customer_end_user',
+    type: 'customer_email',
+    reads: [
+      "Teams in the browser doesn't work either.",
+      'In Safari we get the same screen as in the app.',
+      'Both the app and the web client fail for us.',
+      'It fails in the browser too.',
+      'On teams.microsoft.com too it is exactly the same behaviour.',
+      'Through the web page we receive the identical message.',
+    ],
+    doesNotRead: [
+      'The web client works fine for everyone.',
+      'Please try the browser version of Teams.',
+      'Does the web version fail as well?',
+      'Our intranet web portal is slow today.',
+      'If the browser version fails too, we will call you.',
+    ],
+  },
+  {
+    id: 'name not found, in the words of a browser',
+    signal: 'sig.error-name-not-resolved',
+    role: 'customer_end_user',
+    type: 'customer_email',
+    reads: ['The browser tells her the server address could not be found.'],
+    doesNotRead: ['The server address will be sent to you by the network team.'],
+  },
+];
+
+describeFamilies('wording families of the server side: scope and what was tried', SCOPE_WORDING);
