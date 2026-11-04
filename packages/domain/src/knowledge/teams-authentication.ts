@@ -1179,13 +1179,432 @@ const WORDING_FAMILIES_SCOPE: Readonly<Record<string, readonly SignalDetector[]>
 };
 
 /**
+ * Pieces of the server-side families below. As above, each one is bounded and nests no repetition.
+ */
+/** Like `GAP`, and a full stop in front of a word character stays inside the sentence (a host name such as login.microsoftonline.com). */
+const HOST_GAP = String.raw`(?:[^.\n]|\.(?=\w))`;
+/** A verb that is denied, with or without the apostrophe: "did not", "doesn't", "never". */
+const NOT_DONE = String.raw`(?:(?:do|does|did|is|are|was|were|has|have|had|ca|could)n['’]?t|(?:do|does|did|is|are|was|were|has|have|had|can|could) not|cannot|never)`;
+/** Where an identity service keeps the record of a sign-in, in the words engineers use for it. */
+const SIGNIN_LOG = String.raw`(?:sign[- ]?in ?logs?|entra(?: id)?|azure ad|the logs?)`;
+/** One line of such a log, in the singular or the plural. */
+const LOG_ROW = String.raw`(?:records?|rows?|entr(?:y|ies)|events?|traces?|hits?|lines?)`;
+/** "no", "zero" and "not a single": what is said to be missing. */
+const NO_ANY = String.raw`(?:no|zero|0|not (?:a single|one))`;
+/**
+ * The modality cues know "no" and "none", not a count of nothing, so a statement of what is there must not start right after
+ * "zero" or "0" (and the words that follow its verb are checked where that matters).
+ */
+const NOT_ZERO = String.raw`(?<!\b(?:zero|nil|0 \w{2,8})[^.\n]{0,40})`;
+/** A bounded gap of at most `max` characters inside one sentence, as short as it can be. */
+const gap = (max: number): string => String.raw`${HOST_GAP}{0,${max}}?`;
+/** The same, and it stays inside one clause: no comma, colon or semicolon either. */
+const clauseGap = (max: number): string => String.raw`(?:[^.,;:\n]|\.(?=\w)){0,${max}}?`;
+/**
+ * What an engineer writes after looking at something. A case note is left out on purpose: plans, hypotheses and findings meet
+ * there, and the detectors written before these families already read it.
+ */
+const FINDING_TYPES: typeof LOG_RESULT_TYPES = [
+  'query_output',
+  'diagnostic_result',
+  'escalation_response',
+  'engineer_action',
+  'engineer_email',
+  'resolution_note',
+  'log_sample',
+];
+/** The customer's administrators, who can open the sign-in logs of their own tenant. */
+const CUSTOMER_LOG_ROLES = ['customer_admin', 'customer_network_admin'] as const;
+const CUSTOMER_LOG_TYPES: typeof LOG_RESULT_TYPES = ['customer_email', 'customer_call'];
+/**
+ * A statement of what is there, read by the engineer's words: a denial inside it ("no failed rows") counts against it, even
+ * when the pattern holds a word such as "zero" that its own look-around needs.
+ */
+const AS_FOUND: Parameters<typeof rx>[1] = { eventTypes: FINDING_TYPES, negativeContent: false };
+/** The same statement with the log named before it or after it, in the one sentence: a phrase that needs a log to be about one. */
+const withLog = (statement: string, before = 80, after = 60): string[] => [
+  String.raw`\b${SIGNIN_LOG}\b${gap(before)}${statement}`,
+  String.raw`${statement}${gap(after)}\b${SIGNIN_LOG}\b`,
+];
+/**
+ * What a test of the network is reported in (the engineer's findings, the validation after a fix, the network
+ * administrator's own mail) and who runs one: the engineers and the customer's network administrator, not the helpdesk that
+ * passes on what it was told.
+ */
+const NETWORK_TEST_TYPES: typeof LOG_RESULT_TYPES = [
+  ...FINDING_TYPES,
+  'validation_result',
+  'case_note',
+  'customer_email',
+  'customer_call',
+];
+const TESTER_ROLES = [...ENG_ROLES, 'customer_network_admin'] as const;
+/** A test result that states what is there: a denial inside its words ("does not time out") counts against it. */
+const AS_TESTED: Parameters<typeof rx>[1] = {
+  roles: [...TESTER_ROLES],
+  eventTypes: NETWORK_TEST_TYPES,
+  negativeContent: false,
+};
+/** A test result whose words are themselves a denial ("did not answer"): the failure it reports. */
+const AS_TESTED_DENIAL: Parameters<typeof rx>[1] = { ...AS_TESTED, negativeContent: true };
+/** A test as it is run, not the recap of a closed case, which names the cause ("a filter rule sinkholes the CDN names"). */
+const AS_TESTED_NOW: Parameters<typeof rx>[1] = {
+  ...AS_TESTED,
+  eventTypes: NETWORK_TEST_TYPES.filter((type) => type !== 'resolution_note'),
+};
+/** A subject line that repeats the one of an earlier message ("Re: One DNS server is failing") says nothing new. */
+const NOT_A_REPLY_TITLE = String.raw`(?<!^(?:re|fwd?):[^\n]{0,80})`;
+/** A name server, as an engineer points at it: a noun, an address (10.30.4.6) or the last part of one (.6). */
+const DNS_NOUN = String.raw`(?:resolvers?|dns servers?|name ?servers?|forwarders?)`;
+const DNS_REF = String.raw`(?:\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|\B\.\d{1,3}\b|\b(?:dns|ns|resolver)-?\d{1,2}\b|\b${DNS_NOUN}\b)`;
+/** A proxy node by its name (gbg-prx2, proxy-04, swg3), by its number ("proxy node 3"), by its letter or by its place in the list. */
+const PROXY_NODE = String.raw`(?:\b[a-z0-9-]{0,16}(?:prx|proxy|pxy|swg|wsg)[a-z0-9-]{0,10}\d\b|\bproxy (?:node |server )?#?\d{1,2}\b|\bproxy[- ][a-h]\b|\b(?:first|second|third|fourth|fifth|last) proxy\b)`;
+/** A node that does not answer, in the affirmative: what a timeout or a drop is called. */
+const NODE_FAILS = String.raw`(?:times? out|timed out|timing out|time-?outs?|fail(?:s|ed|ing)?\b(?!\s?over)|drops?|dropped|hung|hangs?|stall(?:s|ed)?|unresponsive|returns? (?:a )?(?:gateway time-?out|50[234]))`;
+/** "All answered normally": the way a test that finds nothing wrong is worded. */
+const ALL_FINE = String.raw`(?:normally|fine|(?:the )?(?:correct|right)\w*|every time|okay?|properly|as expected|within|under|identical|\d+ of \d+|(?:ten|five|three|four|two|twenty) of \w+)`;
+const ANSWERS = String.raw`(?:answer\w*|respond\w*|repl(?:y|ies|ied)|return\w*|resolve[sd]?|work(?:s|ed)?|succeeded|complet\w+)`;
+/** When something changed, as a customer says it: a relative time, a day, "last Thursday", "on Monday night". Not a time of day. */
+const WHEN_ANY = String.raw`(?:yesterday|tonight|today|this (?:morning|week)|last (?:night|week|weekend|\w{3,9}day|wed|mon|sat|sun)|on (?:\w{3,9}day|wed|mon|sat|sun)|(?:\d+|two|three|few) (?:days?|weeks?) ago|recently)`;
+/** The parts of a network, in the words a customer uses for them: a change to one of them is a network change. */
+const NET_PART = String.raw`(?:dns|resolvers?|dhcp|proxy|proxies|pac file|firewall|gateway|web ?filter\w*|vpn|wan|egress|isp|inspection|rack)`;
+/** What was done to them. A removal, a rollback and a restore are not in it: they are what the fix did, not what broke it. */
+const NET_DID = String.raw`(?:moved|migrated|switched|changed|replaced|upgraded|updated|added|enabled|deployed|pushed|applied|rolled out|turned on|went live)`;
+/** What the access policy is made of, beyond the rule nouns of `ACCESS_RULE`. */
+const POLICY_THAT = String.raw`polic(?:y|ies) (?:that|which) (?:requires?|blocks?|enforces?|forces?|mandates?|restricts?)`;
+const CA_THING = String.raw`(?:${ACCESS_RULE}|sign-?in frequency|session (?:limit|lifetime|timeout)|token lifetime)`;
+const MONTH = String.raw`(?:january|february|march|april|may|june|july|august|september|october|november|december)`;
+/** What a customer says when excluding users from a policy changed nothing: "still blocked", "the same error", "no change". */
+const NO_EFFECT = String.raw`(?:still (?:blocked|fail\w*|prompted|asked|gets?|getting|seeing|the same|broken|happening)|same (?:error|message|block\w*|result|failure\w*|thing|behaviou?r|pattern|problem|issue|prompt)|(?:failures?|errors?|blocks?|prompts?) (?:continue|persist|remain)\w*)`;
+const PRT = String.raw`(?:primary refresh token|prt)`;
+/** Where a device's token is told in words. The case note, which sums the case up, is left to the older detectors. */
+const PRT_TYPES: typeof LOG_RESULT_TYPES = [
+  ...FINDING_TYPES,
+  'validation_result',
+  ...CUSTOMER_LOG_TYPES,
+];
+/** A federation server or node, as it is named: AD FS (ADFS03), the STS, the federation farm, the web application proxy. */
+const FED_NODE = String.raw`(?:ad ?fs\w{0,10}|sts|federation (?:server|farm|node|service|proxy)|web application proxy)`;
+/** Where Microsoft says whether it has an incident. */
+const HEALTH_PAGE = String.raw`(?:service health|the (?:service )?status page|the message center|microsoft(?:['’]s)? status)`;
+const FED_CLOCK = String.raw`(?:fast|slow|ahead|behind|drift\w*|skew\w*|out of sync|wrong|off by)`;
+
+/**
  * Wording families for the signals about the server side: what the logs and the infrastructure show (name servers, proxy
  * nodes, federation, device tokens, service health) and what changed in the access policy. Kept apart from the maps above
  * so that two authors can add families at the same time; read both when looking for what detects a signal. The same
  * rules hold: a family is a way of saying a thing, never a list of the sentences that failed; every family has
- * look-alike sentences it must not read in `test/detector-families.test.ts`; gaps are bounded.
+ * look-alike sentences it must not read in `test/detector-families-server-side.test.ts`; gaps are bounded.
  */
-const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetector[]>> = {};
+const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetector[]>> = {
+  // A failed row that is not there, said in the many ways engineers say it: the row noun in the singular or the plural, the
+  // log as the subject ("held nothing", "are clean"), the attempt as the subject ("do not appear"), or the service never reached.
+  'sig.no-server-side-failure-records': [
+    ...[
+      String.raw`\b${NO_ANY}\b[\w -]{0,20}?\b(?:fail(?:ed|ures?|ing)|errors?|blocked|rejected)\b[\w -]{0,16}?\b${LOG_ROW}\b`,
+      String.raw`\b${NO_ANY}\b[\w -]{0,12}?\b(?:sign-?in|log-?in|logon|authentication)\b[\w -]{0,12}?\b${LOG_ROW}\b`,
+      String.raw`\b${NO_ANY}\b[\w -]{0,12}?\b(?:matching|corresponding|relevant)\b[\w -]{0,12}?\b${LOG_ROW}\b${gap(80)}\b(?:fail\w*|attempts?|sign-?ins?|users?|${SIGNIN_LOG})\b`,
+      String.raw`\b${NO_ANY} (?:[\w-]+ )?${LOG_ROW}\b${gap(40)}\b(?:for|of|from|at|around|during|matching)\b${gap(40)}\b(?:attempts?|failures?|users?|sign-?ins?|them|those|these)\b`,
+      String.raw`\b(?:could ?n['’]?t|could not|did ?n['’]?t|did not|cannot|can['’]t|unable to) (?:find|see|locate) (?:any|an?|one)\b[\w -]{0,30}?\b${LOG_ROW}\b${gap(60)}\b(?:fail\w*|attempts?|users?|${SIGNIN_LOG})\b`,
+      String.raw`\b(?:nothing|no (?:[\w-]+ )?(?:failures?|errors?|failed (?:sign-?ins?|attempts?|logins?)))\b (?:is |was |were |are |has been |have been |had been )?(?:logged|recorded|captured|registered|written|stored)\b`,
+      String.raw`\b(?:never|(?:did|does|do)n['’]?t|(?:did|does|do) not|fail(?:s|ed|ing)? before|stops? before|stopped before)\b${gap(15)}\b(?:even )?(?:reach(?:es|ed|ing)?|get(?:s|ting)? (?:as far as|to|there)|got (?:as far as|to|there)|make it to|made it to|arriv(?:e|es|ed|ing) (?:at|in))\b${gap(30)}\b(?:entra|azure ad|the identity (?:provider|service|platform)|the (?:sign-?in |authentication |auth )?service|microsoft(?: 365| entra)?|the tenant)\b`,
+    ].map((pattern) => rx(pattern, { eventTypes: FINDING_TYPES })),
+    // With the log named in the sentence: an engineer's, and the customer administrator's who looked into it as well.
+    ...[
+      String.raw`\b${SIGNIN_LOG}\b${clauseGap(30)}\b(?:held|holds?|had|has|have|contain(?:s|ed)?|show(?:s|ed)?|list(?:s|ed)?|return(?:s|ed)?|gave|gives?|came back|comes back|turned up|are|is|were|was|look(?:s|ed)?)\b${clauseGap(12)}\b(?:nothing|none|(?:no|zero) (?:[\w-]+ )?(?:${LOG_ROW}|failures?|errors?|results?|matches)|empty|blank|clean|quiet)\b`,
+      String.raw`\b${SIGNIN_LOG}\b${gap(60)}: ?(?:nothing|none|nil|(?:no|zero) (?:[\w-]+ )?(?:${LOG_ROW}|failures?|errors?|hits|results?|matches))\b`,
+      String.raw`\b(?:nothing|nil|none|(?:no|zero) (?:[\w-]+ )?(?:${LOG_ROW}|failures?|errors?|hits|results?|matches|sign|evidence|mention))\b${gap(45)}\b(?:in|on|from|within|inside)\b${gap(14)}\b${SIGNIN_LOG}\b(?!${HOST_GAP}{0,60}\bsince (?:the|your|our|this) (?:change|fix|removal|update|workaround)\b)`,
+      String.raw`\b(?:attempts?|sign-?ins?|failures?|requests?|them|these|those|they)\b${gap(40)}\b${NOT_DONE} (?:even )?(?:appear|show(?: up)?|be (?:found|seen|listed|logged|recorded)|exist|registered|visible|listed|recorded|logged|found|present|there)\b${gap(40)}\b${SIGNIN_LOG}\b`,
+      String.raw`\bnone of (?:them|these|those|the [\w ]{0,20}?(?:attempts|failures|users|sign-?ins))\b${gap(40)}\b(?:appear|show(?:s)?(?: up)?|are|were|is|was|exist|found|listed|logged|recorded|visible|present)\b${gap(30)}\b${SIGNIN_LOG}\b`,
+      String.raw`\b${SIGNIN_LOG}\b${clauseGap(20)}\b${NOT_DONE} (?:log|record|show|list|contain|have|hold|see)\b${clauseGap(20)}\b(?:anything|any (?:[\w-]+ )?${LOG_ROW}|a single (?:row|record|entry|event))`,
+      String.raw`\b${SIGNIN_LOG}\b${gap(40)}\b(?:found|find|saw|see|got|get|returned|there (?:is|are|was|were))\b${gap(6)}\b(?:nothing|no (?:[\w-]+ )?(?:${LOG_ROW}|failures?|errors?|results?|matches))`,
+      String.raw`\b${SIGNIN_LOG}\b${clauseGap(10)}\bnever (?:saw|received|got|logged|recorded|heard)\b`,
+      ...withLog(
+        String.raw`\b(?:no|zero|not (?:a single|one)) (?:failed|failing|blocked|unsuccessful) (?:sign-?ins?|attempts?|logins?)\b(?!${gap(60)}\bsince (?:the|your|our|this) (?:change|fix|removal|update|workaround)\b)`,
+        60,
+        50,
+      ),
+    ].flatMap((pattern) => [
+      rx(pattern, { eventTypes: FINDING_TYPES }),
+      rx(pattern, { roles: [...CUSTOMER_LOG_ROLES], eventTypes: CUSTOMER_LOG_TYPES }),
+    ]),
+  ],
+  // A failed row that is there: at each of the times given, one for each user, "matching" the attempts, or listed by the log.
+  'sig.server-side-failure-records-present': [
+    ...[
+      String.raw`${NOT_ZERO}\b(?:fail(?:ed|ures?|ing)|blocked|rejected|interrupted|denied)\b${gap(25)}\b(?:rows?|records?|entr(?:y|ies)|events?)\b${gap(40)}\b(?:at|for|around|within|on|in)\b${gap(12)}\b(?:each|every|all|those|these|the|that|their|your) (?:of )?(?:the )?(?=[\w -]{0,20}\b(?:times?|moments?|timestamps?)\b)`,
+      String.raw`${NOT_ZERO}\b(?:each|every|all|both)\b${gap(30)}\b(?:has|have|had|show(?:s|ed)?|with)\b${gap(10)}\b(?:an? |one |at least one |several |multiple |the )?(?!(?:zero|nil|0)\b)(?:[\w-]+ )?(?:fail(?:ed|ures?|ing)|blocked|rejected|interrupted)\b${gap(30)}\b(?:rows?|records?|entr(?:y|ies)|events?)\b`,
+      String.raw`${NOT_ZERO}\b(?:found|find|see|saw|there (?:is|are|was|were)|have|has|had|returned|show(?:s|ed)?)\b${gap(12)}\b(?:matching|corresponding)\b[\w -]{0,24}?${LOG_ROW}\b`,
+      String.raw`${NOT_ZERO}\b(?:matching|corresponding) (?:[\w-]+ )?${LOG_ROW}\b${gap(20)}\b(?:were|are|was|is) (?:found|present|there|returned|logged)\b`,
+      String.raw`${NOT_ZERO}\bthere (?:is|are|was|were)\b${gap(10)}\b(?:an? |one |several |multiple |\d+ )?(?!(?:zero|nil|0)\b)(?:[\w-]+ )?(?:fail(?:ed|ures?)|blocked|rejected)\b${gap(16)}\b(?:rows?|records?|entr(?:y|ies)|events?)\b`,
+      String.raw`${NOT_ZERO}\b(?:fail(?:ed|ure)|blocked|rejected)\b[\w -]{0,16}?\b(?:rows?|records?|entr(?:y|ies)|events?)\b${gap(12)}\b(?:exists?|is present|are present|was found|were found|is there|are there|appears?|shows? up|is logged|are logged|is recorded|are recorded)\b`,
+    ].map((pattern) => rx(pattern, AS_FOUND)),
+    // What a failed attempt or sign-in is only when the sentence says that the log holds it.
+    ...[
+      ...withLog(
+        String.raw`${NOT_ZERO}\b(?:fail(?:ed|ures?|ing)|blocked|rejected|interrupted|denied)\b${gap(25)}\b(?:attempts?|sign-?ins?|requests?)\b${gap(40)}\b(?:at|for|around|within|on|in)\b${gap(12)}\b(?:each|every|all|those|these|the|that|their|your) (?:of )?(?:the )?(?=[\w -]{0,20}\b(?:times?|moments?|timestamps?)\b)`,
+      ),
+      ...withLog(
+        String.raw`${NOT_ZERO}\b(?:each|every|all|both)\b${gap(30)}\b(?:has|have|had|show(?:s|ed)?|with)\b${gap(10)}\b(?:an? |one |at least one |several |multiple |the )?(?!(?:zero|nil|0)\b)(?:[\w-]+ )?(?:fail(?:ed|ures?|ing)|blocked|rejected|interrupted)\b${gap(30)}\b(?:attempts?|sign-?ins?)\b`,
+        100,
+        40,
+      ),
+      ...withLog(
+        String.raw`${NOT_ZERO}\b(?:every|each|all|both)\b${gap(35)}\b(?:attempts?|failures?|sign-?ins?|rows?)\b${gap(20)}\b(?:is|are|was|were)\b${gap(6)}\b(?:there|logged|recorded|listed|visible|present|found)\b`,
+        100,
+        20,
+      ),
+    ].map((pattern) => rx(pattern, AS_FOUND)),
+    rx(
+      String.raw`\b${SIGNIN_LOG}\b${gap(30)}\b(?:hold|holds|held|have|has|had|contain(?:s|ed)?|show(?:s|ed)?|list(?:s|ed)?|record(?:s|ed)?|log(?:s|ged)?|include[sd]?|display(?:s|ed)?|confirm(?:s|ed)?|returned|returns?)\b(?!\s+(?:zero|nil|0)\b)${gap(20)}\b(?:fail(?:ed|ures?|ing)|blocked|rejected|interrupted|errors?)\b`,
+      AS_FOUND,
+    ),
+  ],
+  // An audit of policy changes that finds nothing in the failure window: none of its rows inside it, or only old ones, which
+  // are background.
+  'sig.policy-events-outside-failure-window': [
+    String.raw`\b(?:audit|polic(?:y|ies)|conditional access|configuration|change log)\b${gap(120)}\b(?:zero|no|0|none)\b${gap(40)}\b(?:in|inside|within|during)\b${gap(20)}\b(?:failure|incident|outage|problem|failing|affected|reported)\b[\w -]{0,12}?\b(?:window|period|time ?frame|time range|interval)\b`,
+    String.raw`\b(?:audit|polic(?:y|ies)|conditional access|configuration)\b${gap(100)}\boutside (?:of )?(?:the )?[\w ]{0,20}?\b(?:window|period|time ?frame|time range)\b`,
+    String.raw`\b(?:only|closest|nearest|last|latest|most recent)\b${gap(30)}\b(?:polic(?:y|ies)|audit|configuration)\b${gap(60)}\b(?:dated|from|in|on)\b${gap(25)}\b(?:january|february|march|april|may|june|july|august|september|october|november|december|\d+ (?:weeks?|months?) ago)\b${gap(80)}\b(?:unrelated|background|nothing to do with|not related|irrelevant)\b`,
+  ].map((pattern) => rx(pattern, { eventTypes: FINDING_TYPES })),
+  // A session or token that ran out, in the words of the log and of the client: a code, "the refresh token has expired", "session
+  // expired", and how an engineer explains it ("a password change ends the existing sessions").
+  'sig.token-expiry-errors': [
+    rx(String.raw`\bAADSTS(?:70008|70043|70044|700082|700084|50173|50132|50133)\b`),
+    rx(
+      String.raw`\b(?:sessions?|tokens?|refresh tokens?|access tokens?|grants?)\b (?:has |had |have |is |are |was |were |got |gets )?(?:been )?expired\b`,
+    ),
+    rx(String.raw`\bexpired (?:refresh |access |sign-?in )?(?:tokens?(?!-)|sessions?|grants?)\b`),
+    // The mechanism, as an engineer explains it: "a password change ends the existing sessions", "ends every session".
+    rx(
+      String.raw`\b(?:ends|invalidates|expires|revokes|terminates|kills)\b${gap(10)}\b(?:every|all|each|the existing|existing|their) (?:[\w-]+ )?(?:sessions?|(?:refresh )?tokens?)\b`,
+    ),
+  ],
+  // Conditional Access or MFA that stopped a sign-in, as the log shows it: a code, "the policy is blocking them", "the rows show
+  // the policy applied", "the result interrupted because multi-factor is required".
+  'sig.mfa-ca-events-in-logs': [
+    rx(
+      String.raw`\bAADSTS(?:50076|50074|50072|50079|50097|50131|50158|53000|53001|53002|53003|53004|530003|530032)\b`,
+      { eventTypes: FINDING_TYPES },
+    ),
+    ...[
+      String.raw`\b(?:conditional access|ca)\b${gap(20)}\b(?:polic(?:y|ies)|rule)\b${gap(50)}\b(?:(?:is|are|was|were|has been|have been) (?:blocking|denying|rejecting|interrupting)|(?:blocked|denied|rejected|interrupted) (?:them|those|these|all|every|each|their|the))\b`,
+      String.raw`\b(?:rows?|entries|records?|events?|results?)\b${gap(40)}\b(?:show(?:s|ed)?|list(?:s|ed)?|say|says|indicate[sd]?)\b${gap(30)}\b(?:the |a )?(?:conditional access |ca |mfa )?polic(?:y|ies)\b${gap(25)}\b(?:applied|enforced|blocked|triggered|blocking|failed)\b`,
+      String.raw`\b(?:results?|rows?|entries|sign-?ins?|attempts?|events?)\b${gap(60)}\b(?:mfa|multi-?factor)\b${gap(25)}\b(?:required|interrupted|not completed|not satisfied|failed|abandoned|challenge)`,
+      String.raw`\bconditional ?access ?(?:result|status|outcome)s?\b[^.\n]{0,15}\b(?:failure|failed|blocked|denied|interrupted)\b`,
+    ].map((pattern) => rx(pattern, { eventTypes: FINDING_TYPES })),
+  ],
+  // One name server that does not answer, or answers wrongly: a code (SERVFAIL, NXDOMAIN, a sinkhole) next to an address or a
+  // name server, a name server that fails, times out or drops the queries, an address that fails for the sign-in hosts, a
+  // filter that blocks them. Whoever tested it: an engineer or the network administrator.
+  'sig.resolver-inconsistent': [
+    // A code and an address: as a test is run, not as the recap of a closed case explains it.
+    ...[
+      String.raw`${NOT_A_REPLY_TITLE}${DNS_REF}${gap(70)}\b(?:servfail|nxdomain|non-?existent domain|sinkhole\w*)\b`,
+      String.raw`${NOT_A_REPLY_TITLE}\b(?:servfail|nxdomain|non-?existent domain|sinkhole\w*)\b${gap(60)}${DNS_REF}`,
+      String.raw`${NOT_A_REPLY_TITLE}\b(?:dns (?:filter\w*|security)(?: service)?|${DNS_NOUN})\b${gap(60)}\b(?:blocks?|blocked|blocking|sinkholes?|sinkholed)\b${gap(40)}\b(?:login\.microsoftonline\.com|cdn|aadcdn|microsoft|sign-?in)`,
+    ].map((pattern) => rx(pattern, AS_TESTED_NOW)),
+    ...[
+      String.raw`${NOT_A_REPLY_TITLE}\b${DNS_NOUN}\b${gap(70)}\b(?:fail(?:s|ed|ing)?\b(?!\s?over)|times? out|timed out|timing out|(?:is|was|are|were) (?:silent|unresponsive|down|unreachable)|drops? (?:the )?quer\w+|refus(?:es|ed|ing) (?:the )?quer\w+|(?:returns?|gives?|answers? with) (?:an? |the )?(?:wrong|bogus|invalid|empty|null|blank)\b)`,
+      String.raw`${NOT_A_REPLY_TITLE}${DNS_REF}${gap(40)}\b(?:fail(?:s|ed|ing)?\b(?!\s?over)|unresponsive)\b${gap(30)}\b(?:to resolve|(?:the )?(?:microsoft|sign-?in|cdn)\b[\w -]{0,12}\b(?:host ?names?|names))`,
+    ].map((pattern) => rx(pattern, AS_TESTED)),
+    ...[
+      String.raw`${NOT_A_REPLY_TITLE}\b${DNS_NOUN}\b${gap(70)}\b(?:(?:did|does|do)(?:n['’]t| not) (?:answer|respond|reply|resolve)|not (?:answering|responding|replying)|(?:could ?n['’]?t|could not|cannot|can['’]t|unable to) resolve|stays? silent|no answers?)`,
+      String.raw`${NOT_A_REPLY_TITLE}\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b${gap(60)}\b(?:(?:did|does|do)(?:n['’]t| not) (?:answer|reply|resolve)|not (?:answering|replying)|(?:could ?n['’]?t|could not|cannot|can['’]t|unable to) resolve|no answers?)`,
+    ].map((pattern) => rx(pattern, AS_TESTED_DENIAL)),
+  ],
+  // Every name server answers: "all three answered every time", "both servers resolve the sign-in hosts normally", "DNS is fine",
+  // "no DNS problems". An engineer's word, or the network administrator's own test; a dashboard's colour is not a test.
+  'sig.resolvers-consistent': [
+    ...[
+      String.raw`\b(?:all|every|each|both)\b(?! (?:the )?other)${gap(14)}\b${DNS_NOUN}\b${gap(40)}\b${ANSWERS}\b${gap(50)}\b${ALL_FINE}\b(?!${gap(40)}\bexcept\b)`,
+      String.raw`\b${DNS_NOUN}\b[^\n]{0,140}?[.!?] (?:all|both) (?:three|two|four|five|of them)\b${gap(10)}\b(?:answer\w*|respond\w*|repl(?:y|ies|ied)|worked|resolved)\b${gap(30)}\b(?:every time|normally|fine|correct\w*|within|in under|each time)`,
+    ].map((pattern) => rx(pattern, AS_TESTED)),
+    rx(
+      String.raw`\b(?:dns|name resolution|the resolvers?)\b${gap(8)}\b(?:is|are|was|were|looks?|looked|seems?|seemed|works?|worked|checks? out)\b${gap(12)}\b(?:fine|healthy|ok|okay|normal|good|clean|in order|working)\b`,
+      { roles: [...ENG_ROLES], eventTypes: NETWORK_TEST_TYPES, negativeContent: false },
+    ),
+    rx(String.raw`\b(?:dns|name resolution)\b${gap(6)}\b(?:checks?|checked) out\b`, {
+      roles: [...ENG_ROLES],
+      eventTypes: NETWORK_TEST_TYPES,
+      negativeContent: false,
+    }),
+    rx(
+      String.raw`\b(?:succeed(?:s|ed)?|passed|worked|answered|resolved)\b${gap(20)}\b(?:on|for|against|from|across|with)\b${gap(6)}\b(?:all|both|every|each)\b(?! (?:the )?other)${gap(14)}\b${DNS_NOUN}\b`,
+      AS_TESTED,
+    ),
+    ...[
+      String.raw`\bno (?:dns|name[- ]resolution|resolver)\b${gap(25)}\b(?:issues?|problems?|errors?|failures?|faults?)\b`,
+      String.raw`\b(?:no|zero|0) (?:servfail|nxdomain)s?\b${gap(40)}\b(?:from|on|for|across|at)\b${gap(15)}\b(?:any|all|every|each|either|both|the)\b${gap(10)}\b${DNS_NOUN}\b`,
+      String.raw`\b(?:all|every|each|both)\b(?! (?:the )?other)${gap(14)}\b${DNS_NOUN}\b${gap(40)}\b${ANSWERS}\b${gap(30)}\bwithout (?:a |any )?(?:servfail|nxdomain|errors?|failures?|timeouts?)\b`,
+    ].map((pattern) => rx(pattern, AS_TESTED_DENIAL)),
+  ],
+  // One proxy node that does not answer: its name (gbg-prx2, proxy-04, "proxy node 3") next to a timeout or a drop, "one proxy
+  // server out of four times out", "node 3 timed out" in a list of the proxy nodes.
+  'sig.proxy-node-inconsistent': [
+    ...[
+      String.raw`${NOT_A_REPLY_TITLE}${PROXY_NODE}${gap(60)}\b${NODE_FAILS}\b`,
+      String.raw`${NOT_A_REPLY_TITLE}\b(?:one|1|a single|only one)\b${gap(8)}\bprox(?:y|ies)(?: nodes?| servers?| gateways?)?\b${gap(60)}\b${NODE_FAILS}\b`,
+      String.raw`${NOT_A_REPLY_TITLE}\bproxy (?:nodes?|servers?|pool|cluster)\b${gap(80)}\bnode ?\d{1,2}\b${gap(40)}\b${NODE_FAILS}\b`,
+      String.raw`${NOT_A_REPLY_TITLE}\bnode ?\d{1,2}\b${gap(20)}\bproxy (?:pool|cluster|farm)\b${gap(40)}\b${NODE_FAILS}\b`,
+    ].map((pattern) => rx(pattern, AS_TESTED)),
+    ...[
+      String.raw`${NOT_A_REPLY_TITLE}${PROXY_NODE}${gap(60)}\b(?:not (?:responding|answering)|(?:did|does|do)(?:n['’]t| not) (?:respond|answer|reply))\b`,
+      String.raw`${NOT_A_REPLY_TITLE}\b(?:one|1|a single|only one)\b${gap(8)}\bprox(?:y|ies)(?: nodes?| servers?| gateways?)?\b${gap(60)}\b(?:not (?:responding|answering)|(?:did|does|do)(?:n['’]t| not) (?:respond|answer|reply))\b`,
+    ].map((pattern) => rx(pattern, AS_TESTED_DENIAL)),
+  ],
+  // Every proxy node answers: "all four proxy nodes respond normally", "the proxy test: all three nodes answered within a
+  // second", "none of the proxies timed out", "no timeouts through any proxy".
+  'sig.proxy-nodes-consistent': [
+    ...[
+      String.raw`\b(?:all|every|each|both)\b(?! (?:the )?other)${gap(14)}\b(?:proxy|proxies|proxy (?:nodes?|servers?))\b${gap(30)}\b${ANSWERS}\b${gap(40)}\b${ALL_FINE}\b(?!${gap(40)}\bexcept\b)`,
+      String.raw`\bproxy\b${gap(60)}\b(?:all|every|each|both)\b(?! (?:the )?other)${gap(10)}\bnodes?\b${gap(30)}\b${ANSWERS}\b${gap(40)}\b${ALL_FINE}\b`,
+    ].map((pattern) => rx(pattern, AS_TESTED)),
+    ...[
+      String.raw`\b(?:no|zero|none of)\b${gap(25)}\b(?:proxy|proxies)\b${gap(20)}\b(?:times? out|timed out|failed|fail|dropped|timeouts?)\b`,
+      String.raw`\b(?:no|zero) (?:timeouts?|time-?outs?|failures?|errors?|drops?)\b${gap(30)}\b(?:through|on|from|at|via|across)\b${gap(15)}\b(?:any|all|every|each|the|a)\b${gap(8)}\b(?:proxy|proxies|nodes?)\b`,
+      String.raw`\b(?:all|every|each|both)\b(?! (?:the )?other)${gap(14)}\b(?:proxy|proxies|proxy (?:nodes?|servers?))\b${gap(30)}\b${ANSWERS}\b${gap(30)}\bwithout (?:a |any )?(?:timeouts?|time-?outs?|errors?|failures?|drops?)\b`,
+    ].map((pattern) => rx(pattern, AS_TESTED_DENIAL)),
+  ],
+  // A change to the customer's network, told by the customer in its own words: what was moved, replaced, upgraded, enabled or
+  // renewed, and when ("last Thursday", "on Monday night"). A time of day is not a when: it is what a fix is dated with.
+  'sig.recent-network-change-reported': [
+    ...[
+      String.raw`\b${NET_PART}\b${gap(50)}\b${NET_DID}\b${gap(40)}\b${WHEN_ANY}\b`,
+      String.raw`\b${NET_DID}\b${gap(40)}\b${NET_PART}\b${gap(50)}\b${WHEN_ANY}\b`,
+      String.raw`\b${WHEN_ANY}\b${gap(60)}\b${NET_DID}\b${gap(40)}\b${NET_PART}\b`,
+      String.raw`\b(?:got|received|has|have|had|installed|pushed|renewed|replaced|updated)\b${gap(25)}\b(?:inspection|tls|ssl|proxy|gateway|firewall) certificate\b${gap(30)}\b${WHEN_ANY}\b`,
+    ].map((pattern) => rx(pattern, { roles: [...CUSTOMER_ROLES] })),
+  ],
+  // A change to the access policy, told by the customer (a policy that requires MFA rolled out, the sign-in frequency set) or read
+  // by the engineer in the audit log or the recap of the case.
+  'sig.recent-ca-change-reported': [
+    ...[
+      String.raw`\b${WHEN_ANY}\b${gap(60)}\b(?:rolled out|deployed|enabled|introduced|created|turned on|put in place|activated|assigned)\b${gap(30)}\b(?:a |an |the |new )${POLICY_THAT}\b`,
+      String.raw`\b(?:rolled out|deployed|enabled|introduced|created|turned on|put in place|activated|assigned)\b${gap(30)}\b(?:a |an |the |new )${POLICY_THAT}\b${gap(60)}\b${WHEN_ANY}\b`,
+      String.raw`\b${WHEN_ANY}\b${gap(60)}\b(?:set|changed|updated|reduced|lowered|raised|extended|shortened|increased|configured)\b${gap(40)}\b(?:sign-?in frequency|session (?:limit|lifetime|timeout)|token lifetime)\b`,
+      String.raw`\b(?:set|changed|updated|reduced|lowered|raised|extended|shortened|increased|configured)\b${gap(40)}\b(?:sign-?in frequency|session (?:limit|lifetime|timeout)|token lifetime)\b${gap(60)}\b${WHEN_ANY}\b`,
+    ].map((pattern) => rx(pattern, { roles: [...CUSTOMER_ROLES] })),
+    ...[
+      String.raw`\baudit\b${gap(60)}\bpolic(?:y|ies)\b${gap(50)}\b(?:updated|changed|modified|created|edited|added)\b${gap(20)}\b(?:on|last|yesterday|today|this)\b`,
+      String.raw`\bnew\b${gap(20)}\b(?:conditional access|ca)\b${gap(8)}\bpolic(?:y|ies)\b${gap(15)}\b(?:was|were|got|has been|had been)\b${gap(4)}\b(?:assigned|created|added|configured|deployed|enabled|applied|introduced|rolled out)`,
+    ].map((pattern) => rx(pattern, { roles: [...ENG_ROLES], eventTypes: FINDING_TYPES })),
+  ],
+  // The access policy left alone: "has not been changed", "nobody touched it", "unchanged", and the audit that finds only old
+  // events.
+  'sig.ca-config-unchanged': [
+    String.raw`\b${CA_THING}\b${gap(30)}\b(?:(?:has|have|had|was|were)(?: ?n['’]?t| not)|never)\b(?: been)? (?:changed|touched|modified|updated|edited|altered|adjusted)\b`,
+    String.raw`\b(?:nobody|no one|none of us)\b${gap(20)}\b(?:changed|touched|edited|modified|updated|altered)\b${gap(40)}\b${CA_THING}\b`,
+    String.raw`\b${CA_THING}\b${gap(30)}\b(?:remains?|remained|stays?|stayed|is|are|was|were)\b${gap(10)}\b(?:the same|unchanged|untouched|as (?:it|they) (?:was|were)|as before)\b`,
+    String.raw`\b(?:the )?(?:only|last|latest|most recent|newest)\b${gap(25)}\b(?:polic(?:y|ies)|ca|conditional access|configuration|access rule)\b${gap(25)}\b(?:changes?|edits?|events?|modifications?|updates?)\b${gap(60)}\b(?:dated|from|in|on|was|were|are|is)\b${gap(20)}\b(?:${MONTH}|\d+ (?:weeks?|months?) ago|last (?:month|year|quarter))\b`,
+  ].map((pattern) => rx(pattern)),
+  // Leaving users out of the policy changed nothing, said by the customer, in the sentence or the one after: "excluded the three
+  // users. They got the same error", "excluded the group, people still blocked".
+  'sig.ca-exclusion-no-effect': [
+    rx(
+      String.raw`\b(?:excluded|excluding|exempted|left out|took out|bypassed)\b[^\n]{0,100}?\b(?:users?|accounts?|groups?|people|staff|members|them|everyone|admins?)\b[^\n]{0,160}?\b${NO_EFFECT}\b`,
+      { roles: [...CUSTOMER_ROLES], negativeContent: false },
+    ),
+    rx(
+      String.raw`\b(?:excluded|excluding|exempted|left out|took out|bypassed)\b[^\n]{0,100}?\b(?:users?|accounts?|groups?|people|staff|members|them|everyone|admins?)\b[^\n]{0,160}?\b(?:no (?:change|difference|effect|improvement)|nothing (?:changed|happened)|did ?n['’]?t (?:help|change|fix|work)|made no difference|unchanged)\b`,
+      { roles: [...CUSTOMER_ROLES], negativeContent: true },
+    ),
+    rx(
+      String.raw`\bexclusions?\b[^\n]{0,140}?\b(?:still (?:blocked|applied|show\w*|fail\w*|prompt\w*)|same (?:error|message|block\w*)|no (?:change|effect))\b`,
+      { roles: [...ENG_ROLES], eventTypes: FINDING_TYPES },
+    ),
+  ],
+  // The primary refresh token of a device that is there: "AzureAdPrt YES", "AzureAdPrt is NO on yours and YES on hers", "has a
+  // valid PRT", "shows a fresh primary refresh token".
+  'sig.prt-healthy': [
+    rx(String.raw`\bAzureAdPrt\b(?:\s*[:=]|\s+(?:is|shows|says|reads))?\s*YES\b`),
+    ...[
+      String.raw`\bAzureAdPrt\b${gap(25)}\bNO\b${gap(15)}(?:[,;]|\b(?:and|while|but|whereas)\b)${gap(15)}\bYES\b`,
+      String.raw`\bAzureAdPrt\b${gap(25)}\bYES\b${gap(15)}(?:[,;]|\b(?:and|while|but|whereas)\b)${gap(15)}\bNO\b`,
+    ].map((pattern) => rx(pattern)),
+    ...[
+      String.raw`\b(?:has|have|had|shows?|showed|with|got|gets?) (?:an? |the )?(?:valid |fresh |healthy |current |new |working )?${PRT}\b(?!${gap(25)}\b(?:expired|stale|invalid|revoked|corrupt\w*)\b)`,
+      String.raw`\b${PRT}\b${gap(20)}\b(?:present|healthy|valid|fresh|issued|ok|okay|fine|good|up to date)\b(?!${gap(25)}\b(?:expired|stale|invalid|revoked)\b)`,
+      String.raw`\b${PRT}\b${gap(20)}\b(?:is|are|was|were|be|been|got|gets?) (?:\w+ )?(?:there|available|obtained|acquired|received|in place|intact|working|refreshed)\b`,
+    ].map((pattern) => rx(pattern, { eventTypes: PRT_TYPES, negativeContent: false })),
+    rx(
+      String.raw`\b(?:no|without) (?:\w+ )?${PRT}\b${gap(50)}(?:[,;]|\b(?:and|while|but|whereas)\b)${gap(40)}\b(?:(?:does|do)\b(?=\s*(?:[.;,!?\n]|$)|\s+have\b)|(?:has|have|got) one\b|there (?:is|are)\b)`,
+      { eventTypes: PRT_TYPES, negativeContent: true },
+    ),
+  ],
+  // The primary refresh token of a device that is gone: "AzureAdPrt is NO", "has lost its PRT", "never got a primary refresh token".
+  'sig.prt-missing': [
+    rx(String.raw`\bAzureAdPrt\b(?:\s*[:=]|\s+(?:is|shows|says|reads))?\s*NO\b`),
+    rx(
+      String.raw`\bAzureAdPrt\b${gap(25)}\bYES\b${gap(15)}(?:[,;]|\b(?:and|while|but|whereas)\b)${gap(15)}\bNO\b`,
+    ),
+    ...[
+      String.raw`\b(?:lost|lose|loses|never (?:got|had|received|obtained)|failed to (?:get|obtain|acquire|refresh)|cannot (?:get|obtain|acquire)|can['’]t (?:get|obtain|acquire)|(?:does ?n['’]?t|does not|do not|don['’]t) (?:get|receive|obtain|acquire)|no longer (?:has|have|gets?))\b${gap(20)}\b(?:its |their |the |a )?${PRT}\b`,
+      String.raw`\b${PRT}\b${gap(50)}(?:[,;]|\b(?:and|while|but|whereas)\b)${gap(40)}\b(?:(?:does ?n['’]?t|does not|do not|don['’]t)\b(?=\s*(?:[.;,!?\n]|$)|\s+have\b)|(?:has|have|got) none\b|there is none\b)`,
+      String.raw`\b${PRT}\b${gap(30)}\b${NOT_DONE} (?:be |been |get |got )?(?:obtained|issued|acquired|received|refreshed|renewed|available|present|there|found)\b`,
+    ].map((pattern) => rx(pattern, { eventTypes: PRT_TYPES })),
+  ],
+  // A federation server that is in error: a signing certificate that expired, a clock that runs fast, tokens it issued that are
+  // rejected, a node that is down. Whoever tells it: the engineer, or the customer's administrator who looked.
+  'sig.federation-node-error': [
+    ...[
+      String.raw`\b(?:token[- ]signing|signing|federation|ad ?fs|sts|idp|identity provider|saml)\b${gap(25)}\bcertificates?\b${gap(60)}\b(?:has |have |had |is |was |were |got )?(?:expired|invalid|revoked|about to expire|missing)\b`,
+      String.raw`\bexpired\b${gap(30)}\b(?:token[- ]signing|signing|federation|ad ?fs|sts)\b${gap(15)}\bcertificates?\b`,
+      String.raw`\b${FED_NODE}\b${gap(40)}\b(?:clock|time)\b${gap(30)}\b${FED_CLOCK}\b`,
+      String.raw`\bclock\b${gap(12)}\bof\b${gap(8)}\b${FED_NODE}\b${gap(30)}\b${FED_CLOCK}\b`,
+      String.raw`\bfederat\w+\b${gap(60)}\b(?:token|signature|certificate|assertion)\b${gap(50)}\b(?:rejected|invalid|refused|expired)\b`,
+      String.raw`\b(?:tokens?|assertions?|signatures?)\b${gap(40)}\b(?:federation|ad ?fs|sts|identity provider|idp)\b${gap(40)}\b(?:rejected|invalid|refused)\b`,
+      String.raw`\b${FED_NODE}\b${gap(45)}\b(?:down|unreachable|unresponsive|(?:failing|failed)(?!\s?(?:over|attempts?|sign|log|users?|auth|requests?))|returning errors|returns? (?:http )?(?:5\d\d|errors?)|time[sd]? out|overloaded|crash\w*|stopped|offline)\b`,
+    ].map((pattern) =>
+      rx(pattern, {
+        eventTypes: [...FINDING_TYPES, ...CUSTOMER_LOG_TYPES],
+        negativeContent: false,
+      }),
+    ),
+    ...[
+      String.raw`\b(?:token|signature|certificate|assertion)\b${gap(50)}\bnot (?:yet )?valid\b${gap(40)}\b(?:identity provider|idp|federat\w+|ad ?fs|sts)\b`,
+      String.raw`\bfederat\w+\b${gap(60)}\b(?:token|signature|certificate|assertion)\b${gap(50)}\bnot (?:yet )?valid\b`,
+      String.raw`\b${FED_NODE}\b${gap(60)}\bnot (?:responding|answering)\b`,
+    ].map((pattern) =>
+      rx(pattern, {
+        eventTypes: [...FINDING_TYPES, ...CUSTOMER_LOG_TYPES],
+        negativeContent: true,
+      }),
+    ),
+  ],
+  // Microsoft has an incident that matches: "Microsoft has posted an incident for Teams", "the incident explains it", "the
+  // incident stays open". The engineer's word; what a customer was told by someone else is not read.
+  'sig.service-health-incident': [
+    ...[
+      String.raw`\b(?:microsoft|${HEALTH_PAGE})\b${gap(40)}\b(?:(?:has |have )?(?:just )?(?:posted|published|declared|opened|logged|listed|reported)|confirm\w*|acknowledg\w*|shows?|lists?)\b${gap(30)}\b(?:an?|the|this)\b${gap(15)}\b(?:incident|outage|advisory|service issue|degradation|disruption|MO\d{5,7}|TM\d{5,7}|EX\d{5,7})\b`,
+      String.raw`\b(?:the |this |that )?(?:incident|outage|advisory)\b${gap(40)}\b(?:explains?|matches|fits|is (?:still )?(?:active|ongoing|open)|stays open|remains open|started|began|is being (?:investigated|mitigated)|affects?|impacts?)\b`,
+      String.raw`\b(?:an?|the) (?:active |ongoing |open |new )?(?:incident|outage|advisory)\b${gap(30)}\b(?:for|affecting|impacting|concerning)\b${gap(30)}\b(?:teams|sign-?in|entra|authentication|microsoft 365|exchange online)\b`,
+    ].map((pattern) => rx(pattern, { roles: [...ENG_ROLES], eventTypes: FINDING_TYPES })),
+  ],
+  // Microsoft has no incident: "service health is clear", "service health shows nothing", "no incident for Teams", "this is not an
+  // outage". The engineer who looked; a dashboard's colour reported by someone else is not read.
+  'sig.service-health-clear': [
+    rx(
+      String.raw`\b${HEALTH_PAGE}\b${gap(30)}\b(?:is|are|looks?|looked|shows?|showed|says?|reports?)\b${gap(8)}\b(?:clear|green|all green|healthy|normal|operational|quiet)\b`,
+      {
+        roles: [...ENG_ROLES],
+        eventTypes: [...FINDING_TYPES, 'validation_result'],
+        negativeContent: false,
+      },
+    ),
+    ...[
+      String.raw`\b${HEALTH_PAGE}\b${gap(30)}\b(?:is|are|looks?|looked|shows?|showed|says?|reports?|has|have)\b${gap(8)}\b(?:nothing|no (?:\w+ )?(?:incidents?|advisor(?:y|ies)|outages?|issues?|problems?|degradations?|disruptions?))\b`,
+      String.raw`\bno (?:active |open |ongoing |known |relevant )?(?:incidents?|advisor(?:y|ies)|outages?|service issues?|degradations?)\b${gap(40)}\b(?:for|affecting|on|about|in|that|which|with)\b${gap(30)}\b(?:teams|sign-?in|entra|authentication|microsoft|m365|office)\b`,
+      String.raw`\b(?:this|it|that|there)(?: is|['’]s| was) not (?:an? )?(?:microsoft(?:-side)? |service )?(?:outage|incident|service issue)\b`,
+      String.raw`\b${HEALTH_PAGE}\b${gap(30)}\b${NOT_DONE} (?:show|list|have|report|mention|contain)\b${gap(20)}\b(?:an?|any)\b${gap(10)}\b(?:incident|advisory|outage|issue|degradation)\b`,
+    ].map((pattern) =>
+      rx(pattern, {
+        roles: [...ENG_ROLES],
+        eventTypes: [...FINDING_TYPES, 'validation_result'],
+      }),
+    ),
+  ],
+};
 
 for (const signal of signals) {
   const extra = [
