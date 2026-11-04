@@ -1431,6 +1431,9 @@ const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetec
       String.raw`\b(?:rows?|entries|records?|events?|results?)\b${gap(40)}\b(?:show(?:s|ed)?|list(?:s|ed)?|say|says|indicate[sd]?)\b${gap(30)}\b(?:the |a )?(?:conditional access |ca |mfa )?polic(?:y|ies)\b${gap(25)}\b(?:applied|enforced|blocked|triggered|blocking|failed)\b`,
       String.raw`\b(?:results?|rows?|entries|sign-?ins?|attempts?|events?)\b${gap(60)}\b(?:mfa|multi-?factor)\b${gap(25)}\b(?:required|interrupted|not completed|not satisfied|failed|abandoned|challenge)`,
       String.raw`\bconditional ?access ?(?:result|status|outcome)s?\b[^.\n]{0,15}\b(?:failure|failed|blocked|denied|interrupted)\b`,
+      String.raw`\b(?:conditional access|ca)(?: polic(?:y|ies))? ?(?:result|status|outcome)s?\b[^.\n]{0,15}\b(?:failure|failed|blocked|denied|interrupted)\b`,
+      String.raw`\b(?:error|errors|result ?type|result code|code|status|status code)\s?:?\s?(?:50076|50074|50072|50158|53000|53001|53002|53003|53004|530032)\b`,
+      String.raw`\b(?:stopped|blocked|interrupted|denied|rejected|challenged) by (?:the |a )?['"‘“]?[\w ]{0,40}?\b(?:mfa|multi-?factor|conditional access|compliant|require\w*)\b[\w ]{0,30}?['"’”]? ?\bpolic(?:y|ies)\b`,
     ].map((pattern) => rx(pattern, { eventTypes: FINDING_TYPES })),
   ],
   // One name server that does not answer, or answers wrongly: a code (SERVFAIL, NXDOMAIN, a sinkhole) next to an address or a
@@ -1665,6 +1668,16 @@ const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetec
       String.raw`\bno (?:active |open |ongoing |known |relevant )?(?:incidents?|advisor(?:y|ies)|outages?|service issues?|degradations?)\b${gap(40)}\b(?:for|affecting|on|about|in|that|which|with)\b${gap(30)}\b(?:teams|sign-?in|entra|authentication|microsoft|m365|office)\b`,
       String.raw`\b(?:this|it|that|there)(?: is|['’]s| was) not (?:an? )?(?:microsoft(?:-side)? |service )?(?:outage|incident|service issue)\b`,
       String.raw`\b${HEALTH_PAGE}\b${gap(30)}\b${NOT_DONE} (?:show|list|have|report|mention|contain)\b${gap(20)}\b(?:an?|any)\b${gap(10)}\b(?:incident|advisory|outage|issue|degradation)\b`,
+    ].map((pattern) =>
+      rx(pattern, {
+        roles: [...ENG_ROLES],
+        eventTypes: [...FINDING_TYPES, 'validation_result'],
+      }),
+    ),
+    // "shows all services healthy", "no Microsoft-side outage is reported", "no known Microsoft issue": the engineer who looked.
+    ...[
+      String.raw`\b(?:service health|the (?:service )?status page|the message center)\b${gap(30)}\b(?:shows?|showed|lists?|listed|reports?|has)\b${gap(20)}\b(?:all|every) (?:services?|components?|workloads?)\b${gap(10)}\b(?:healthy|operational|available|up|green|normal)\b`,
+      String.raw`\bno [\w -]{0,20}?\b(?:microsoft|m365|service|teams|entra)(?:-side)?\b[\w -]{0,12}?\b(?:incidents?|outages?|issues?|problems?|advisor(?:y|ies)|degradations?)\b`,
     ].map((pattern) =>
       rx(pattern, {
         roles: [...ENG_ROLES],

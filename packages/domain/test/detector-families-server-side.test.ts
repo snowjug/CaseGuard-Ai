@@ -1112,6 +1112,39 @@ const SCOPE_WORDING: readonly Family[] = [
       'The secondary DNS and the primary both returned an empty answer.',
     ],
   },
+  {
+    id: 'service health clear: all healthy, no outage on record, no known issue',
+    signal: 'sig.service-health-clear',
+    role: 'support_engineer',
+    type: 'engineer_email',
+    reads: [
+      'The status page lists every workload as operational for the tenant.',
+      'No Microsoft-side outage is on record for Teams or Entra today.',
+      'I found no service incident that touches your region.',
+      'There is no known Microsoft problem at the moment.',
+    ],
+    doesNotRead: [
+      'Please check whether there is a known Microsoft issue.',
+      'Microsoft has posted an incident for Teams.',
+      'I will look for a Microsoft outage tomorrow.',
+    ],
+  },
+  {
+    id: 'Conditional Access or MFA in the sign-in log: a code with its label, a policy that stopped them',
+    signal: 'sig.mfa-ca-events-in-logs',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      'Each failure carries status code 50072, the user was asked for a second factor.',
+      'ResultType 50076 for every failed attempt: MFA was required.',
+      'All of them were stopped by the "Compliant device only" policy.',
+      'Conditional Access policy result: failure on each row.',
+    ],
+    doesNotRead: [
+      'Please look for error 50074 in the sign-in log.',
+      'If it were Conditional Access we would see status code 53003.',
+    ],
+  },
 ];
 
 describeFamilies('wording families of the server side: scope and what was tried', SCOPE_WORDING);
