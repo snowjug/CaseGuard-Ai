@@ -114,12 +114,20 @@ const FAMILIES: readonly Family[] = [
       'Only Tallinn is affected, as far as we can tell.',
       'On mobile data Teams signs in without delay, so it may be the building network.',
       'Teams works on my phone hotspot but not on the office wifi.',
+      'Riga and Vilnius are fine, it is only Tallinn that struggles.',
+      'Seville has no problem at all, Madrid does.',
+      'Only the Graz office is affected, as far as we can tell.',
+      'From home it works, inside the office it does not.',
+      'Over the VPN Teams signs in without delay.',
     ],
     doesNotRead: [
       'Only one user is affected, I think.',
       'Only admins are affected by the new policy.',
       'The other site is closed for the holiday.',
       'I charged my phone on mobile data day.',
+      'Monday is fine for the follow-up call.',
+      'Outlook works fine for all of us.',
+      'Everything is fine now, thank you.',
     ],
   },
   {
@@ -162,10 +170,13 @@ const FAMILIES: readonly Family[] = [
     reads: [
       'Teams opens, spins, then says it could not find the server.',
       'Teams will not start at all. The app shows that it cannot resolve the host and offers a Retry button.',
+      'Sign-in fails and the host name could not be resolved.',
+      'Teams will not start. The server name could not be found.',
     ],
     doesNotRead: [
       'The printer says it could not find the server.',
       'Please tell me which servers the laptops use.',
+      'The print server name could not be resolved.',
     ],
   },
   {

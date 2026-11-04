@@ -1073,6 +1073,25 @@ const WORDING_FAMILIES_SCOPE: Readonly<Record<string, readonly SignalDetector[]>
       String.raw`\b(?:works?|worked|signs? in|signed in)\b${GAP}{0,30}\b(?:on|over|with|using|via)\s+(?:mobile data|(?:my|his|her|their) (?:phone|hotspot)|a different network|another network|home (?:wi-?fi|network|broadband)|4g|5g|lte|tethering)\b`,
       { roles: [...CUSTOMER_ROLES] },
     ),
+    // Named places that are fine ("Cork and Galway have no problem"): capitalised words, never a product or a day.
+    rx(
+      String.raw`\b(?!(?:Teams|Microsoft|Outlook|Windows|Office|Entra|Azure|Chrome|Edge|Firefox|Android|Apple|Zoom|Slack|Word|Excel|PowerPoint|OneDrive|SharePoint|VPN|Wi-?Fi|LAN|DNS|(?:Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day|The|This|That|These|Those|They|She|Everything|Everyone|Everybody|Nothing|Nobody)\b)[A-Z][\p{L}]{2,24}(?:\s+(?:and|or|&)\s+[A-Z][\p{L}]{2,24}){0,2}\s+(?:is|are|work|works|seem|seems)\s+(?:fine|ok|okay|normal|unaffected|not affected|working)\b`,
+      { roles: [...CUSTOMER_ROLES], flags: 'u' },
+    ),
+    rx(
+      String.raw`\b(?!(?:Teams|Microsoft|Outlook|Windows|Office|Entra|Azure|Chrome|Edge|Firefox|Android|Apple|Zoom|Slack|Word|Excel|PowerPoint|OneDrive|SharePoint|The|This|That|It|We|They|There|Everything|Everyone|Everybody|Nothing|Nobody)\b)[A-Z][\p{L}]{2,24}(?:\s+(?:and|or|&)\s+[A-Z][\p{L}]{2,24}){0,2}\s+(?:has|have) no (?:problem|trouble|issue)s?\b`,
+      { roles: [...CUSTOMER_ROLES], flags: 'u' },
+    ),
+    // "only the Graz office is hit", "just the warehouse fails": a place named as the only one with the failure.
+    rx(
+      String.raw`\b(?:only|just|mainly|mostly)\s+(?:the\s+|our\s+)?[\p{L} ]{0,30}?(?:site|office|branch|building|campus|floor|location|plant|depot|warehouse|store|region|subnet|vlan)s?\b${GAP}{0,60}\b(?:affect\w*|fail\w*|impact\w*|problems?|cannot|can['’]?t|unable)\b`,
+      { roles: [...CUSTOMER_ROLES], flags: 'iu' },
+    ),
+    // From home, over the VPN or outside the office it works: the failure follows the network.
+    rx(
+      String.raw`\b(?:from home|over (?:the )?vpn|on (?:the )?vpn|outside (?:the|our) office|(?:the )?guest wi-?fi)\b${GAP}{0,50}\b(?:works?|worked|signs? in|signed in|is fine|is ok|is okay|no problem|fast)\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
   ],
   // F24: a retry that works, said by the attempt that did: "the second try", "after three attempts", "sometimes... sometimes".
   'sig.intermittent-failures': [
@@ -1104,11 +1123,19 @@ const WORDING_FAMILIES_SCOPE: Readonly<Record<string, readonly SignalDetector[]>
       { roles: [...CUSTOMER_ROLES] },
     ),
   ],
-  // F26: a name that could not be found, in the words of the screen: "could not find the server", in a paragraph about
-  // Teams or signing in.
+  // F26: a name that could not be found, in the words of the screen: "could not find the server", "the host name could not
+  // be resolved", in a paragraph about Teams or signing in.
   'sig.error-name-not-resolved': [
     rx(
       String.raw`${ABOUT_TEAMS}\b(?:says?|shows?|displays?|message|error|gets?|got)\b${GAP}{0,40}\b(?:could ?n['’]?t|could not|cannot|can['’]?t|unable to)\s+(?:find|reach|locate|resolve)\s+(?:the\s+|a\s+|that\s+)?(?:server|name|host(?:name)?|address)\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+    rx(
+      String.raw`${ABOUT_TEAMS}\b(?:could ?n['’]?t|could not|cannot|can['’]?t|unable to|failed to|fails? to)\s+(?:be\s+)?(?:resolved?|found|located|look ?up)\b${GAP}{0,30}\b(?:name|host(?:name)?|server|address|domain)\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+    rx(
+      String.raw`${ABOUT_TEAMS}\b(?:server name|host ?name|domain name|dns name|name of the (?:server|host))\b${GAP}{0,30}\b(?:(?:could ?n['’]?t|could not|cannot|can['’]?t|can not) be (?:resolved|found)|not (?:be )?(?:resolved|found)|does ?n['’]?t exist|does not exist|failed to resolve)`,
       { roles: [...CUSTOMER_ROLES] },
     ),
   ],
