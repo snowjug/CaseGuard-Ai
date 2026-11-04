@@ -88,7 +88,7 @@ const CUE_DEFINITIONS: readonly ModalityCue[] = [
     modality: 'conditional',
     priority: 3,
     pattern: /\bwhether\b(?!\s+or\s+not\b)/i,
-    reach: 10,
+    reach: 6,
     stopsAtComma: true,
     purpose:
       'An embedded question: the clause asks whether something holds, so it says neither that it does nor that it does not.',
@@ -334,11 +334,12 @@ const isHabitual = (text: string, start: number, end: number): boolean =>
   HABITUAL.test(text.slice(Math.max(0, start - 30), Math.min(end, start + 40)));
 
 /**
- * The first word of a clause that asks: the auxiliary of an inverted question or a wh-word, after the small words that
- * lead into one ("and", "so", "also").
+ * The first word of a clause that asks a yes-or-no question: the auxiliary of an inverted question, after the small words
+ * that lead into one ("and", "so", "also"). A wh-question ("Why are all the Warsaw users locked out?") is left out on
+ * purpose: it presupposes what it asks about, and a customer often reports a problem in that form.
  */
 const QUESTION_OPENER =
-  /^(?:(?:and|so|also|then|now|ok|okay|hi|hello|thanks|but|or)[,\s]+)*(?:is|are|was|were|do|does|did|can|could|would|will|shall|should|has|have|had|may|might|what|why|when|where|which|who|whom|whose|how|any|anyone|anybody|(?:is|are|was|were|do|does|did|can|could|would|will|should|has|have|had)n['’]t)\b/i;
+  /^(?:(?:and|so|also|then|now|ok|okay|hi|hello|thanks|but|or)[,\s]+)*(?:is|are|was|were|do|does|did|can|could|would|will|shall|should|has|have|had|may|might|any|anyone|anybody|(?:is|are|was|were|do|does|did|can|could|would|will|should|has|have|had)n['’]t)\b/i;
 /** How far after a span a question mark is looked for. */
 const QUESTION_REACH = 200;
 

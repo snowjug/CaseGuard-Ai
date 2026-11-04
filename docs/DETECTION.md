@@ -64,11 +64,13 @@ line break or a contrast word (`but`, `however`, `although`, …). Abbreviations
 
 **A question** is not on the list. After the cues have decided, a span that lies in a question is `requested` when it
 would otherwise have fired (asserted, negated, attributed or speculative); a request, a condition or a plan already is
-not a statement, so a question adds nothing to it. A question is a clause that opens with an auxiliary or a wh-word
-("is", "does", "could", "what", "any") and ends with a question mark, with no comma between the span and the mark (one
+not a statement, so a question adds nothing to it. A question is a clause that opens with an auxiliary
+("is", "does", "could", "any") and ends with a question mark, with no comma between the span and the mark (one
 before "or" does not count, as in an alternative question). "Are no failed rows recorded for these users?" and "Please
 check whether service health lists nothing active" therefore deny nothing, while "120 users cannot sign in, does anyone
-know why?" still states the 120 users: the question comes after a comma.
+know why?" still states the 120 users: the question comes after a comma. A wh-question ("Why are all the Warsaw users locked
+out?") is not one on purpose: it presupposes what it asks about, and a customer often reports a problem in that form. The
+`whether` cue reaches six words, so that a statement after a dash is not taken for part of the question.
 
 Every cue carries a purpose, sentences it must decide and look-alikes it must **not** decide (`not only`, `no problem`,
 `please note`, `if possible`, a habit such as "if you wait it sometimes works"). A test runs all of them, so the list

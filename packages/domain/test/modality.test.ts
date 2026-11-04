@@ -175,7 +175,7 @@ describe('a question asks about the fact and does not state it', () => {
     'Does Entra hold [a failed row] for them?',
     'Are [no failed rows] recorded for these users?',
     "Isn't [the proxy] failing for everyone?",
-    'And what do the [sign-in logs] show for the Warsaw users?',
+    'And do the [sign-in logs] hold anything for the Warsaw users?',
     'Is it [only one laptop] that fails to sign in?',
   ])('%s', (marked) => {
     expect(assess(marked)).toMatchObject({ modality: 'requested', cueId: 'question' });
@@ -187,8 +187,11 @@ describe('a question asks about the fact and does not state it', () => {
     'No [failed rows] were recorded. Is that normal?',
     'Check https://example.test/a?b=1 for [40 users] who fail.',
     'We asked the Warsaw office, is it [DNS] - or the proxy?',
-  ])('does not take %s for a question', (marked) => {
-    expect(assess(marked).cueId).not.toBe('question');
+    'Why are [all the Warsaw users] locked out of Teams?',
+    'How can [45 users] be blocked at the same time?',
+    'Not sure whether it is only Warsaw or all of them - about [45 users] cannot sign in.',
+  ])('does not take %s for a question or a clause that asks', (marked) => {
+    expect(['question', 'whether']).not.toContain(assess(marked).cueId);
   });
 
   it('leaves a full stop of an abbreviation inside the question', () => {
