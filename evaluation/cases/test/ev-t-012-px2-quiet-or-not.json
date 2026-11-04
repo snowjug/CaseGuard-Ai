@@ -1,0 +1,114 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-012-px2-quiet-or-not",
+  "split": "test",
+  "family": "fam-212",
+  "title": "Leeds office Teams sign-in failing about half the time; two contradictory proxy tests",
+  "scenario": "Two network colleagues report opposite per-node proxy results within minutes of each other; a joint re-run shows one node is dead and the earlier all-clear is withdrawn. Staff also disagree about when the problem began, and nothing settles that.",
+  "categories": ["contradiction", "noisy"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-02-26T09:40:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Teams logins failing for about half of the Leeds office",
+      "text": "Hello. Roughly half of the 60 people in our Leeds office can't sign in to Teams since Wednesday morning. Some never got in all day, others got through after a few tries. Teams shows caa82ee2. Edinburgh is fine. Proxy-wise: TLS inspection on our four proxy nodes (px1 to px4) hasn't been altered in months. This all started on Wednesday, nothing before it.\n\nJoel Prentice, Lyonsgate Surveyors"
+    },
+    {
+      "key": "ev02",
+      "at": 14,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Teams logins failing for about half of the Leeds office",
+      "text": "Hi Joel. Since the traffic goes through four proxy nodes I'd like each node tested separately: from a Leeds PC, reach login.microsoftonline.com through px1, px2, px3 and px4 in turn and note the response time per node. Please also send three people it hit with an approximate UTC time each, and the list of offices that are fine.\n\nLars"
+    },
+    {
+      "key": "ev03",
+      "at": 58,
+      "who": "network",
+      "type": "diagnostic_result",
+      "channel": "email",
+      "title": "per-node timings",
+      "text": "Tom (network). Ran it at 10:10 UTC from the Leeds LAN, curl via each node:\npx1 0.31s\npx2 0.35s\npx3 0.52s\npx4 0.33s\nAll four consistent, no node stands out."
+    },
+    {
+      "key": "ev04",
+      "at": 62,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "chat from the Leeds floor (copied)",
+      "text": "Copy of our floor chat, in case it helps:\n[10:21] Priyanka: mine's dead again\n[10:22] Gus: same, caa82ee2 on screen\n[10:23] Gus: this has been happening to me since last Thursday tbh\n[10:24] Marian: lol Gus you say that about everything\n[10:26] Priyanka: is the kettle on\n[10:27] Mina: I'm going to run Tom's test again from my desk"
+    },
+    {
+      "key": "ev05",
+      "at": 74,
+      "who": "network",
+      "type": "diagnostic_result",
+      "channel": "email",
+      "title": "my run from the floor",
+      "text": "Mina. From LEEDS-FLR-07 at 10:30 UTC, 3 runs each: px1 0.41 / px2 no reply in 30s (3 of 3) / px3 0.39 / px4 0.44. So px2 is dead for the login host. Tom's run must have got lucky somehow."
+    },
+    {
+      "key": "ev06",
+      "at": 96,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Two results that cannot both stand",
+      "text": "Tom, Mina: these two results cannot both be right - all four nodes answering at 10:10 versus px2 silent at 10:30 from the same office. Please run the test together, in the same minute, one of you on the LAN and one from the floor PC, and send me both raw outputs.\n\nLars"
+    },
+    {
+      "key": "ev07",
+      "at": 140,
+      "who": "network",
+      "type": "diagnostic_result",
+      "channel": "email",
+      "title": "joint re-run",
+      "text": "Re-ran together with Mina at 11:35 UTC: px2 gives no reply for both of us, the other three answer. My 10:10 run was wrong, probably an old keep-alive connection that was still open to px2, so it never made a fresh connection. Ignore my all-clear.\n\nTom"
+    },
+    {
+      "key": "ev08",
+      "at": 160,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Workaround and what comes later",
+      "text": "Good, thanks both. Workaround: take px2 out of the PAC file today so Leeds stops being sent to it. Longer term: have the proxy vendor look at px2, and make the pool stop decrypting traffic to the Microsoft 365 hostnames, through your change process. Tell me when px2 is out.\n\nLars"
+    },
+    {
+      "key": "ev09",
+      "at": 230,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Workaround and what comes later",
+      "text": "px2 has been out of the PAC since 13:05 UTC. I just tested and signed in first time, as did Mina and Priyanka. No error screens in Leeds so far.\n\nJoel"
+    },
+    {
+      "key": "ev10",
+      "at": 1480,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "portal",
+      "title": "Next-day check",
+      "text": "Since px2 left the PAC there have been no Leeds contacts, and Tom's per-node test, repeated this morning on px1, px3 and px4, passes. The vendor has the px2 ticket; the inspection change goes to your change board next week. Keeping the case open until then.\n\nLars"
+    },
+    {
+      "key": "ev11",
+      "at": 1500,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Next-day check",
+      "text": "Quiet today. Gus says nothing has failed for him since px2 came out (and yes, he still insists it started last Thursday).\n\nJoel"
+    }
+  ]
+}

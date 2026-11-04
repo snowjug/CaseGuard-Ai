@@ -1,0 +1,75 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-013-vet-practice-admin-jobs",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T11:40:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [],
+      "actions": [],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.proxy-node-inconsistent",
+          "reason": "other",
+          "note": "A proxy address is a mailbox alias, not a network proxy."
+        },
+        {
+          "event": "ev01",
+          "id": "sig.recent-network-change-reported",
+          "reason": "other",
+          "note": "A TXT record for domain ownership is a request, not a deployed change before any failure."
+        },
+        {
+          "event": "ev01",
+          "id": "sig.federation-node-error",
+          "reason": "other",
+          "note": "Federation here is the Teams external-access allow list."
+        },
+        {
+          "event": "ev01",
+          "id": "sig.token-expiry-errors",
+          "reason": "other",
+          "note": "A hardware MFA token with a flat battery; no sign-in log codes."
+        },
+        {
+          "event": "ev02",
+          "id": "sig.proxy-node-inconsistent",
+          "reason": "other",
+          "note": "Proxy address as a mailbox alias."
+        },
+        {
+          "event": "ev02",
+          "id": "sig.federation-node-error",
+          "reason": "other",
+          "note": "Federation as the external-access allow list."
+        },
+        {
+          "event": "ev03",
+          "id": "sig.recent-network-change-reported",
+          "reason": "other",
+          "note": "A planned TXT record for domain verification."
+        },
+        {
+          "event": "ev05",
+          "id": "sig.recent-network-change-reported",
+          "reason": "other",
+          "note": "The TXT record for domain verification is in place; unrelated to any failure."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": [],
+      "rationale": "Nothing in this case is a sign-in failure: it is a list of housekeeping requests that happen to contain words such as proxy, DNS, federation and token in their everyday senses. Nothing should be read as a signal or a cause, and the engineer's answers contain no diagnostic step. The handling is correct and quick.",
+      "uncertainty": "none"
+    }
+  ],
+  "adjudication": null
+}

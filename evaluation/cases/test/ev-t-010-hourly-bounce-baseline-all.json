@@ -1,0 +1,105 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-010-hourly-bounce-baseline-all",
+  "split": "test",
+  "family": "fam-210",
+  "title": "Insurance firm: Teams sends users back to login about once an hour",
+  "scenario": "A cloud-only tenant is signed out every hour after a sign-in frequency edit to a baseline policy. Forum rumour, a proxy guess and a helpdesk cache report are all unsupported; the customer's own exclusion and revocation tests change nothing.",
+  "categories": ["negation"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-09-02T12:10:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Teams throws everybody back to the login screen about once an hour",
+      "text": "Hello, Hanneke Jansen, IT admin at Oakline Insurance. Since yesterday morning Teams sends people back to the sign-in screen roughly once an hour. They type their password, it works, and an hour later it happens again. About 70 of our 90 users have noticed. Somebody on a forum is claiming there is a Microsoft outage, but I can't see anything in our Service health page. We are cloud-only, no AD FS here, so no federation servers to look at. A colleague also thinks our proxy could be eating the tokens, but that's a guess, there's no evidence.\nHanneke"
+    },
+    {
+      "key": "ev02",
+      "at": 22,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Teams throws everybody back to the login screen about once an hour",
+      "text": "Hi Hanneke. Two questions to start: did anyone change Conditional Access or MFA settings (sign-in frequency in particular) in the days before Tuesday morning, and has anything moved on the network side? Please also give me the wording of the prompt people see, three colleagues it happened to with the UTC moment for each, and whether all your sites are hit alike.\n\nSoren"
+    },
+    {
+      "key": "ev03",
+      "at": 75,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Teams throws everybody back to the login screen about once an hour",
+      "text": "The prompt reads: 'Session timed out - log in once more'. People: t.vermeer 08:10 UTC Tue, r.dekker 09:15, f.smit 10:12 - that is the hourly rhythm. All sites alike. Changes: the security team now tells me they set a sign-in frequency of 1 hour on the 'Baseline-All' policy on Monday evening; I only heard today. DNS and proxy untouched. Also Jan from the helpdesk says clearing the Teams cache on t.vermeer's PC fixed it, but I have not checked that myself."
+    },
+    {
+      "key": "ev04",
+      "at": 110,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Entra lookup and audit log",
+      "text": "Entra lookup for t.vermeer / r.dekker / f.smit around 08:10 / 09:15 / 10:12 UTC Tuesday: a failure row for each, result AADSTS70043 (refresh token expired or invalid). Audit log: policy 'Baseline-All' was edited at 20:41 UTC on Monday, its frequency control now reads 1 hour."
+    },
+    {
+      "key": "ev05",
+      "at": 125,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "What the logs show",
+      "text": "Hanneke, the failing sign-ins do reach Entra and are rejected with token-expired results (AADSTS70043). The frequency setting your security team added on Monday evening makes tokens lapse after an hour, which fits the hourly rhythm. Nothing points at the proxy, DNS or federation. Suggest your security lead raises the frequency to something like 12 hours, or exempts Teams, under change control. Until then please do not clear caches or reinstall anything on users' machines; neither will help here. Next word from me tomorrow at 09:00 UTC.\n\nSoren"
+    },
+    {
+      "key": "ev06",
+      "at": 180,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: What the logs show",
+      "text": "Interesting. For the record we already tried two things on five test users last night: excluded them from the MFA policy 'MFA-Staff' and also revoked their sessions. They still got bounced hourly afterwards, so I agree it is not MFA. And please disregard what I passed on about Jan's cache clear: she says it came back an hour later, so that did nothing."
+    },
+    {
+      "key": "ev07",
+      "at": 200,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: What the logs show",
+      "text": "That fits: the expiry comes from the frequency rule in 'Baseline-All', which neither the MFA exclusion nor a session revocation touches. I would leave both of those alone from here on.\n\nSoren"
+    },
+    {
+      "key": "ev08",
+      "at": 1270,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Frequency changed",
+      "text": "Our security lead set the sign-in frequency on Baseline-All to 12 hours at 08:30 UTC this morning. Nobody has been bounced since."
+    },
+    {
+      "key": "ev09",
+      "at": 1500,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "portal",
+      "title": "Log check after the change",
+      "text": "Checked the log for the affected group: no 70043 rows since 08:30 UTC today. I'd call it fixed; keeping the case open until tomorrow in case the evening shift disagrees.\n\nSoren"
+    },
+    {
+      "key": "ev10",
+      "at": 1560,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Log check after the change",
+      "text": "Evening shift reports nothing. Thanks for the quick diagnosis."
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "schema": "caseguard.eval-manifest/1",
   "datasetVersion": "2.0.0",
-  "annotationVersion": 2,
+  "annotationVersion": 3,
   "splits": {
     "dev": [
       "ev-d-001-p1-warsaw-resolver",
@@ -79,7 +79,15 @@
       "ev-t-005-new-image-no-prt",
       "ev-t-006-whole-company-signin-down",
       "ev-t-007-adfs02-ahead-of-time",
-      "ev-t-008-one-nurse-white-window"
+      "ev-t-008-one-nurse-white-window",
+      "ev-t-009-rotterdam-crossed-off-list",
+      "ev-t-010-hourly-bounce-baseline-all",
+      "ev-t-011-labs-policy-nobody-owned",
+      "ev-t-012-px2-quiet-or-not",
+      "ev-t-013-vet-practice-admin-jobs",
+      "ev-t-014-council-mfa-go-live-plan",
+      "ev-t-015-monday-password-overdue",
+      "ev-t-016-vpn-hourly-rekey-drop"
     ]
   },
   "cases": {
@@ -460,6 +468,62 @@
       "derivedFrom": null,
       "eventsSha256": "ed386a600fd9c689cefa169b18ff099b2e71878fbf33aea6b1564f530b9408b9",
       "annotationsSha256": "7d2bbb78d77652c6f21d3aa3c23894ccd9dd66ce9da2b41b28642372836c9773"
+    },
+    "ev-t-009-rotterdam-crossed-off-list": {
+      "split": "test",
+      "family": "fam-209",
+      "derivedFrom": null,
+      "eventsSha256": "aaa25c618d94c1ece63e74fe323fa0d66872e352e03d03c88f6c84da869ed636",
+      "annotationsSha256": "06cf1b25b9cb8d8de6f9b0990085e43f82af938d4f09a0a61a70116f9b4ce24b"
+    },
+    "ev-t-010-hourly-bounce-baseline-all": {
+      "split": "test",
+      "family": "fam-210",
+      "derivedFrom": null,
+      "eventsSha256": "8d55b7460b83fa356ea606326863a8a7c20d640600f426c806204d5212339ccc",
+      "annotationsSha256": "8f85bc232178b793a8429b798690565aabca8b7fd82174476c9f403bb3e6becc"
+    },
+    "ev-t-011-labs-policy-nobody-owned": {
+      "split": "test",
+      "family": "fam-211",
+      "derivedFrom": null,
+      "eventsSha256": "028ff584b2ea9d974df4e0b63437d5c016e2aa99b8897f014902356c3602463f",
+      "annotationsSha256": "149202eaa088c295440c78c553c4b9d71e13de4295b18a5ea1e70b0fb021fdf2"
+    },
+    "ev-t-012-px2-quiet-or-not": {
+      "split": "test",
+      "family": "fam-212",
+      "derivedFrom": null,
+      "eventsSha256": "b8efffbcabe237612b78a34d85072a21c3b91701df7cf6f1bf4e45da6ac113a9",
+      "annotationsSha256": "ed7044223e014cb6650a095fcccbacdcb3fd2df9817ea3727f7d271b8b95f813"
+    },
+    "ev-t-013-vet-practice-admin-jobs": {
+      "split": "test",
+      "family": "fam-213",
+      "derivedFrom": null,
+      "eventsSha256": "9a3aaa27af466dab0265396fdb1a2acd7165d25e0259e5ecd2dac6ba678b96cb",
+      "annotationsSha256": "7156612e21e81b2806e32ec89fcdc4f291883694686eacd610d58be708d4d1b9"
+    },
+    "ev-t-014-council-mfa-go-live-plan": {
+      "split": "test",
+      "family": "fam-214",
+      "derivedFrom": null,
+      "eventsSha256": "2d78435c7825c5341ffc45f408aa856d7c51617e677a3624877eea19ca123ae0",
+      "annotationsSha256": "9fcff7ce49fff14628bbd07fed6395d2aabfdd9b28c4d636f10819bed15495e3"
+    },
+    "ev-t-015-monday-password-overdue": {
+      "split": "test",
+      "family": "fam-215",
+      "derivedFrom": null,
+      "eventsSha256": "e1b849b1615760e7f24f5c38dde894d5102b5d6e3c48b9ae1cd4e24c93f368b7",
+      "annotationsSha256": "78082180f3703d80556a5e9e5b656e84188b9611f668aff6abda1dd702c5dbe8"
+    },
+    "ev-t-016-vpn-hourly-rekey-drop": {
+      "split": "test",
+      "family": "fam-216",
+      "derivedFrom": null,
+      "eventsSha256": "704c17386045f8501138b7704f1ae9bd4684576cb6fc9a3efe0cdaa0f5ba6625",
+      "annotationsSha256": "c2cd9dcea378f71a6056b0f5e03a1b8ba3c3b80938e92db3168d53fca827d2f4"
     },
     "ev-v-001-graz-new-filter": {
       "split": "validation",

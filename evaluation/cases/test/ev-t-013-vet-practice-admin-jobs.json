@@ -1,0 +1,69 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-013-vet-practice-admin-jobs",
+  "split": "test",
+  "family": "fam-213",
+  "title": "Vet practice asks for four small admin jobs; nothing is failing",
+  "scenario": "An office manager lists housekeeping requests that reuse alarming vocabulary in harmless senses: a mailbox alias called a proxy address, a TXT record for domain ownership, an external-access allow list called federation, and a hardware token with a flat battery.",
+  "categories": ["negative-control"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-04-08T13:25:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "A few admin jobs (nothing is broken!)",
+      "text": "Hi, nothing is wrong, I just have a few admin jobs and I am not sure who does what.\n1) The practice manager wants a second address, billing@example.com, to land in the shared mailbox. I think that is called a proxy address or an alias?\n2) We bought a new website name and the registrar says I must put a TXT record in the DNS zone to prove we own it. Which value goes where?\n3) Dr Okafor wants to chat in Teams with people at a partner clinic, and someone told me our federation setting has to allow their domain first.\n4) The hardware token I use for MFA has a flat battery. How do I get another?\nNo rush on any of this.\n\nWilhelmina Cho, Thornbury Veterinary Group"
+    },
+    {
+      "key": "ev02",
+      "at": 22,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: A few admin jobs (nothing is broken!)",
+      "text": "Hello Wilhelmina, good to hear nothing is on fire. Short answers:\n1) In the Microsoft 365 admin center open the shared mailbox and add billing@example.com under its email addresses. That is the 'proxy address' you heard about. Tell me the mailbox name and I can do it for you.\n2) Your registrar shows a record type (TXT), a host (often just @) and a value string. Paste the value exactly as given into your DNS zone, give it a few minutes, then press Verify in the admin center.\n3) In the Teams admin center, under external access, add the partner's domain to the allowed list. That list is the 'federation' setting.\n4) Hardware tokens are handed out by whoever runs your MFA registration; the request form is linked below.\nSay which of these you would like me to carry out.\n\nBram"
+    },
+    {
+      "key": "ev03",
+      "at": 51,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: A few admin jobs (nothing is broken!)",
+      "text": "Thanks Bram, very clear. Please do number 1 for me, the mailbox is 'Front Desk' (frontdesk@example.com). I will do the TXT record myself this afternoon. The partner clinic's domain is pinewood-clinic.example.com. As for the token, a new one would be lovely - my manager says the old one is about three years old and can go in the bin anyway.\n\nWilhelmina"
+    },
+    {
+      "key": "ev04",
+      "at": 88,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Jobs done",
+      "text": "Added billing@example.com to the 'Front Desk' shared mailbox (done 14:12 UTC). Added pinewood-clinic.example.com to the Teams external access allow list. Token request form sent to the customer."
+    },
+    {
+      "key": "ev05",
+      "at": 140,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Jobs done",
+      "text": "All three look good - I tested a chat with Dr Okafor's contact at the partner clinic and it went through. The TXT record is in as well, and the registrar has accepted it. I will fill in the token form tomorrow. Thank you!"
+    },
+    {
+      "key": "ev06",
+      "at": 150,
+      "who": "system",
+      "type": "status_change",
+      "channel": "tool",
+      "title": "Case resolved",
+      "text": "Status changed from Open to Resolved: customer confirmed that jobs 1 to 3 are done; job 4 waits for the customer's form."
+    }
+  ]
+}

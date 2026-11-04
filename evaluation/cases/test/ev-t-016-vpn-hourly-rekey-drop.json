@@ -1,0 +1,87 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-016-vpn-hourly-rekey-drop",
+  "split": "test",
+  "family": "fam-216",
+  "title": "Remote staff dropped from the VPN every hour since a firewall upgrade",
+  "scenario": "A different workload: IPsec VPN tunnels fail to rekey after a firewall firmware upgrade narrowed the accepted cipher proposals. No Teams sign-in is involved, so the engine must refuse.",
+  "categories": ["unsupported"],
+  "workload": "vpn-remote-access",
+  "openedAt": "2026-03-03T14:30:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "VPN drops every hour since the firewall upgrade",
+      "text": "Hello, Ravi Menon from Fernhill Logistics. Our remote staff are being kicked off the VPN on an hourly cycle and must reconnect manually. It began after we upgraded the firmware on our edge firewall pair on Saturday night. Clients use the built-in Windows IKEv2 profile; the gateway is the active/standby firewall pair. Reconnecting works straight away, until the next hour."
+    },
+    {
+      "key": "ev02",
+      "at": 25,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: VPN drops every hour since the firewall upgrade",
+      "text": "Hi Ravi, thanks. Please send an excerpt of the firewall's VPN log around one disconnect (a couple of minutes either side), the IPsec phase 1 and phase 2 lifetimes and proposal lists configured on the gateway, and the output of Get-VpnConnectionIPsecConfiguration for one client profile.\n\nAnselm"
+    },
+    {
+      "key": "ev03",
+      "at": 70,
+      "who": "customer",
+      "type": "log_sample",
+      "channel": "email",
+      "title": "gateway log excerpt",
+      "text": "Mar 3 12:00:03 fw1 ikemgr[2211]: IKE_SA remote 10.250.4.17 child SA rekey requested\nMar 3 12:00:03 fw1 ikemgr[2211]: CHILD_SA rekey failed: NO_PROPOSAL_CHOSEN\nMar 3 12:00:04 fw1 ikemgr[2211]: IKE_SA 10.250.4.17 deleted\nSame pattern for each client that gets cut off, about 3600 s after it connects. Lifetimes: phase 1 28800 s, phase 2 3600 s; proposals after the upgrade: AES256-GCM only. Client output attached: transform AES-CBC-256 / SHA256."
+    },
+    {
+      "key": "ev04",
+      "at": 110,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Reading the logs",
+      "text": "Rekey fails with NO_PROPOSAL_CHOSEN at the first child SA lifetime. Gateway proposal list is GCM only since the upgrade; the Windows client's default for the rekey offers CBC with SHA256. So the first SA works, the rekey cannot negotiate, the gateway drops the tunnel."
+    },
+    {
+      "key": "ev05",
+      "at": 125,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Cause and a test",
+      "text": "Ravi, the hourly cut-off is a rekey that cannot negotiate: after the upgrade the gateway only accepts AES-GCM for the child SA, while the Windows client rekeys with CBC. Two options: allow the CBC proposal again on the gateway, or switch the client profile to GCM (Set-VpnConnectionIPsecConfiguration with GCMAES256 for both cipher and authentication transform). I would try the client-side change on one laptop first and see whether it survives three rekeys.\n\nAnselm"
+    },
+    {
+      "key": "ev06",
+      "at": 260,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Cause and a test",
+      "text": "Changed my own laptop's profile to GCM at 09:00 and it has stayed connected through three rekeys, over three hours."
+    },
+    {
+      "key": "ev07",
+      "at": 280,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Roll it out",
+      "text": "Good. Roll the same profile setting out to the rest through your management tool; I would leave the gateway proposal list as it is. Let me know once that has happened.\n\nAnselm"
+    },
+    {
+      "key": "ev08",
+      "at": 1500,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Roll it out",
+      "text": "Rolled out yesterday to all remote clients, no drops reported since. Thank you."
+    }
+  ]
+}

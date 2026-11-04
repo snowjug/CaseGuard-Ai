@@ -1,0 +1,114 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-009-rotterdam-crossed-off-list",
+  "split": "test",
+  "family": "fam-209",
+  "title": "Rotterdam depot desktop Teams will not sign in; customer has already ruled things out",
+  "scenario": "An admin opens with a list of things he has already excluded. Log lookups agree with him, and a resolver test is first reported clean, then corrected: from a depot PC one DHCP resolver gives no answer.",
+  "categories": ["negation"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-08-19T07:40:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Rotterdam depot Teams - already crossed off the usual suspects",
+      "text": "Hi, Pieter here (IT, Brightwater Logistics). Nine of us at the Rotterdam depot cannot get Teams desktop to sign in since Monday morning. To save you asking, what I have already crossed off:\n- not intermittent: it fails on every attempt on those PCs\n- not the lookup-failure kind of error (caa82ee7); our window says ERR_TIMED_OUT\n- Conditional Access: audit log shows zero edits since February, nothing changed there\n- Microsoft service health is green, nothing listed for Teams or Entra\n- our two proxy nodes both answer when I test them by hand\nDave in security reckons excluding us from the MFA policy might fix it, but nobody has tried that and honestly I doubt MFA has anything to do with this.\nPieter"
+    },
+    {
+      "key": "ev02",
+      "at": 13,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Rotterdam depot Teams - already crossed off the usual suspects",
+      "text": "Hi Pieter, that list saves us an hour, thank you. Still needed from you: three of the nine by name, each with a UTC time you remember; confirmation of which other sites are working normally; and whether anything - deliberate or accidental - touched DNS, DHCP, the proxies or the firewall in the days before Monday.\n\nHassan"
+    },
+    {
+      "key": "ev03",
+      "at": 47,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Rotterdam depot Teams - already crossed off the usual suspects",
+      "text": "Names: Sanne Visser (Mon 06:55 UTC), Joris Bakker (Mon 07:10), Ilse Mulder (Tue 06:48). All nine work at the depot. Antwerp and Gent have not reported a thing. As for changes: no DNS, proxy or firewall work that I know of, I would have seen the change tickets."
+    },
+    {
+      "key": "ev04",
+      "at": 96,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Entra queries",
+      "text": "Entra, interactive and non-interactive, +/-5 min around Sanne / Joris / Ilse: no rows for any of them, so nothing matching was recorded. Also searched the depot accounts since Sunday for 50076, 50074 and CA failure results: none. Token-side codes (700082, 50173, 50132, 70043): none either. The CA audit query did return three policy edits (6 Jan, 14 Jan, 9 Feb) but zero rows inside Mon-Tue, so those are background, unrelated."
+    },
+    {
+      "key": "ev05",
+      "at": 110,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "What I found, and the next test",
+      "text": "Pieter, results: nothing for the nine shows up on the Entra side (no failure rows, no MFA/CA results, no token errors), and the CA audit has no edit that lines up with Monday. So the requests probably die on the way, before Entra. For that reason I would not exclude anyone from the MFA policy and I would not revoke sessions: nothing in the evidence points at either. Next test is name resolution. Kasper, please query login.microsoftonline.com and the Microsoft CDN name on each resolver the depot DHCP scope lists, from a depot PC, ten tries each, and paste the answers. If the resolvers come out clean, my next stop would be dsregcmd on a depot PC; if that shows AzureAdPrt YES, device state is off the table too. I will write again at 11:00 UTC.\n\nHassan"
+    },
+    {
+      "key": "ev06",
+      "at": 190,
+      "who": "network",
+      "type": "diagnostic_result",
+      "channel": "email",
+      "title": "resolver check",
+      "text": "Kasper, depot network. Queried login.microsoftonline.com and the CDN name on 10.30.1.2, .3 and .4, ten times each: all three answer every time, 9-15 ms. Looks fine to me, so not DNS I think."
+    },
+    {
+      "key": "ev07",
+      "at": 233,
+      "who": "network",
+      "type": "diagnostic_result",
+      "channel": "email",
+      "title": "CORRECTION - resolver check",
+      "text": "Correction to my last mail, sorry: I ran that from my desk in the head-office VLAN, not from a depot PC, so the all-clear is wrong. From DEP-014 (10.30.1.77) it is: .2 and .4 answer fine, .3 gives no answer at all for the login name or the CDN name, ten out of ten. Please ignore the earlier all-clear.\n\nKasper"
+    },
+    {
+      "key": "ev08",
+      "at": 250,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Workaround for the depot",
+      "text": "Thanks for catching that, Kasper. So .3 is the one that fails for the depot's PCs while .2 and .4 answer. Workaround: drop 10.30.1.3 from the depot DHCP scope and refresh leases (or reboot the nine PCs). Repairing or replacing that resolver is yours to schedule; tell me the date. I will watch for reports until 17:00 UTC.\n\nHassan"
+    },
+    {
+      "key": "ev09",
+      "at": 330,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Workaround for the depot",
+      "text": "Kasper removed .3 from the depot scope at 13:40 UTC and we bounced the nine PCs. Sanne, Joris and Ilse are all signed in, and the other six too. First time, every time so far."
+    },
+    {
+      "key": "ev10",
+      "at": 1500,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "portal",
+      "title": "Next-day look",
+      "text": "Nobody at the depot has contacted us since yesterday afternoon, and I repeated the resolver test from DEP-014: .2 and .4 fine again, .3 still silent as expected. I am keeping the case open until you have dealt with .3.\n\nHassan"
+    },
+    {
+      "key": "ev11",
+      "at": 1560,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Next-day look",
+      "text": "Depot was quiet today, all nine fine since the .3 change. Kasper has the appliance on his list for next week."
+    }
+  ]
+}

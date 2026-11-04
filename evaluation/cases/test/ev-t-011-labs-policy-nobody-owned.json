@@ -1,0 +1,114 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-011-labs-policy-nobody-owned",
+  "split": "test",
+  "family": "fam-211",
+  "title": "QC lab Teams sign-in loop; IT lead and security lead tell different stories",
+  "scenario": "Two customer contacts disagree about whether Conditional Access was touched, a customer admin's own log check contradicts the engineer's, and an exclusion that fixes the labs is silently overwritten the next night.",
+  "categories": ["contradiction"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-05-19T08:30:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Teams sign-in loop in the QC labs",
+      "text": "Hi support. About 25 people in the QC labs have had a Teams sign-in loop since Monday. Nobody here has touched Conditional Access for months, so I doubt it is policy. Most of them get an MFA prompt and then land back on the start screen; the lab PCs are shared. The sign-in logs are Marta's department and I rarely look at them.\n\nIvo, IT lead, Sundial Pharma"
+    },
+    {
+      "key": "ev02",
+      "at": 16,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Teams sign-in loop in the QC labs",
+      "text": "Hello Ivo, to get going I need: the sentence on the screen during the loop, three lab users and roughly when each one hit it (UTC), and the list of places that work normally. Because the MFA prompt appears, please also ask Marta whether any identity policy, MFA setting or network rule was altered during the last few days, and send me her answer.\n\nLeila"
+    },
+    {
+      "key": "ev03",
+      "at": 52,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Teams sign-in loop in the QC labs",
+      "text": "Samples: l.horvat Mon 07:05 UTC, g.silva Mon 07:30, a.kim Mon 08:12. Only the labs (building C) are affected; head office is fine. Marta has not replied yet."
+    },
+    {
+      "key": "ev04",
+      "at": 88,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Entra and audit lookup",
+      "text": "Entra, 07:05 / 07:30 / 08:12 UTC Monday for the three samples: a failure row for each, AADSTS50076, policy 'Teams-Compliant' listed as failed. Audit log: 'Teams-Compliant' last edited Thu 15:02 UTC by marta.k."
+    },
+    {
+      "key": "ev05",
+      "at": 121,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Teams sign-in loop in the QC labs",
+      "text": "Marta (security) here, Ivo forwarded this to me. For the record: on Thursday afternoon I edited the policy 'Teams-Compliant' so that it demands a compliant device instead of plain MFA. It is a policy change, I just did not tell Ivo. The lab PCs are not enrolled in Intune yet, which is probably why."
+    },
+    {
+      "key": "ev06",
+      "at": 150,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Teams sign-in loop in the QC labs",
+      "text": "I looked in Entra myself for l.horvat, g.silva and a.kim at those times and there is nothing, no failures at all. So it cannot be a policy issue; the logs would show it."
+    },
+    {
+      "key": "ev07",
+      "at": 170,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Different clocks, probably",
+      "text": "Ivo, my lookup found AADSTS50076 rows with 'Teams-Compliant' named at those minutes, so I suspect we are looking at different clocks: the portal filters in local time by default (UTC+2 for you) and my times were UTC. Re-run it with the UTC setting and you should see the same rows. That also fits what Marta describes: lab PCs that are not compliant are stopped by her Thursday edit. Temporary measure while Intune enrolment catches up: Marta excludes the lab group from 'Teams-Compliant'. I will check back with you at 14:00 UTC.\n\nLeila"
+    },
+    {
+      "key": "ev08",
+      "at": 310,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Exclusion in place",
+      "text": "Excluded the lab group from 'Teams-Compliant' at 12:10 UTC. The lab PCs sign in normally now, 25 of 25 tested.\n\nMarta"
+    },
+    {
+      "key": "ev09",
+      "at": 1500,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Labs looping again",
+      "text": "Morning. Bad news: since 07:50 UTC today the lab PCs are looping again. Marta says a colleague re-applied the standard policy template last night, which overwrote the exclusion.\n\nIvo"
+    },
+    {
+      "key": "ev10",
+      "at": 1530,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Labs looping again",
+      "text": "Checked: AADSTS50076 rows with 'Teams-Compliant' named are back for the lab PCs from 07:50 UTC, which matches your timing. Please have Marta re-apply the lab-group exclusion and take that group out of the template job's scope. I will look at the logs hourly until 17:00 UTC.\n\nLeila"
+    },
+    {
+      "key": "ev11",
+      "at": 1700,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Labs looping again",
+      "text": "Exclusion re-applied at 10:05 UTC and the template job's scope corrected. Labs are working again. The permanent answer is enrolling the lab PCs in Intune, planned for the 28th.\n\nMarta"
+    }
+  ]
+}
