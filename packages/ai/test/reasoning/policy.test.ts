@@ -58,7 +58,7 @@ function criticOf(
     };
   });
   const result = PROPOSAL_SCHEMAS.critic_result.parse(criticResult());
-  return { result: result as KeptCritic['result'], evidence: [], critiques: kept };
+  return { result: result, evidence: [], critiques: kept };
 }
 
 const REFS: ConclusionRef[] = [

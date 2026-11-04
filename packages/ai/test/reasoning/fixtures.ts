@@ -269,7 +269,7 @@ export function parsed(
   type: ReasonerProposal['type'],
   patch: Record<string, unknown> = {},
 ): ReasonerProposal {
-  return PROPOSAL_SCHEMAS[type].parse(proposal(type, patch)) as ReasonerProposal;
+  return PROPOSAL_SCHEMAS[type].parse(proposal(type, patch));
 }
 
 export const VALID_CRITIC_RESULT = {

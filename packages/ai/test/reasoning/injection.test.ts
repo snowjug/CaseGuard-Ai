@@ -154,7 +154,9 @@ describe('the renderer fences and escapes a payload, wherever it is placed', () 
       expect(rendered.blocks.map((b) => b.name)).toEqual(baseline.blocks.map((b) => b.name));
       for (const block of rendered.blocks) {
         expect(block.nonce).toBe(rendered.nonce);
-        expect(() => JSON.parse(block.body)).not.toThrow();
+        expect(() => {
+          JSON.parse(block.body);
+        }).not.toThrow();
         expect(block.body).not.toMatch(/[<>]/);
       }
       expect(rendered.user.split(rendered.nonce).length - 1).toBe(2 * rendered.blocks.length);
@@ -224,7 +226,9 @@ describe('the renderer fences and escapes a payload, wherever it is placed', () 
         );
         const focus = rendered.blocks.find((b) => b.name === 'focus');
         expect(focus).toBeDefined();
-        expect(() => JSON.parse(focus?.body ?? '')).not.toThrow();
+        expect(() => {
+          JSON.parse(focus?.body ?? '');
+        }).not.toThrow();
         for (const block of rendered.blocks) expect(block.body).not.toMatch(/[<>]/);
         expect(rendered.user).toContain(payload.text.slice(0, 20));
       });

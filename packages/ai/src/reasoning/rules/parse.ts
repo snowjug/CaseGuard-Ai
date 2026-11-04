@@ -13,7 +13,7 @@ export interface ParsedProposal {
 export function parseProposal(type: FindingType, raw: unknown): ParsedProposal {
   const result = PROPOSAL_SCHEMAS[type].safeParse(raw);
   return result.success
-    ? { parsed: result.data as AnyProposal, issues: [] }
+    ? { parsed: result.data, issues: [] }
     : { parsed: null, issues: result.error.issues };
 }
 

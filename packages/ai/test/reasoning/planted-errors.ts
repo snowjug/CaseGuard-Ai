@@ -61,7 +61,7 @@ export interface Mutation {
 
 const element = (reply: Json, where: string): Json => {
   const match = /^(\w+)\[(\d+)\]$/.exec(where);
-  if (match) return ((reply[match[1] as string] as Json[])[Number(match[2])] ?? {}) as Json;
+  if (match) return (reply[match[1] as string] as Json[])[Number(match[2])] ?? {};
   return reply[where] as Json;
 };
 
@@ -1148,7 +1148,7 @@ const critic = (spec: Omit<Spec, 'agent' | 'where'> & { index: number }): Mutati
   });
 
 const critique = (reply: Json, index: number): Json =>
-  (((reply.result as Json).critiques as Json[])[index] ?? {}) as Json;
+  ((reply.result as Json).critiques as Json[])[index] ?? {};
 
 const CRITIC: Mutation[] = [
   {

@@ -277,7 +277,7 @@ describe('latency: timeout, retries, concurrency', () => {
           agent,
           { ...(entry as object), delayMs: 1 },
         ]),
-      ) as Script;
+      );
 
     it('lets no more calls into the provider than the limit, and queues the rest', async () => {
       const { state, sleep } = track();

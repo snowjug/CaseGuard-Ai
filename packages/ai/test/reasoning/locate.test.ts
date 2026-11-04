@@ -101,7 +101,7 @@ describe('locating a citation', () => {
       eventId: 'e1',
       excerpt: 'the page never loads.',
       ...({ start: 3, end: 9 } as object),
-    } as { eventId: string; excerpt: string });
+    });
     expect(located?.start).toBe(event().storedBody.indexOf('the page never loads.'));
   });
 

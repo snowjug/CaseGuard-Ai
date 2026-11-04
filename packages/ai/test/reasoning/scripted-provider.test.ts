@@ -202,7 +202,9 @@ describe('scripted test provider', () => {
       expect(response.output).toBeUndefined();
       expect(response.parseError).not.toBeNull();
       expect(response.outputText).not.toBeNull();
-      expect(() => JSON.parse(response.outputText ?? '')).toThrow();
+      expect(() => {
+        JSON.parse(response.outputText ?? '');
+      }).toThrow();
     });
 
     it('a reply that is cut off, with finish reason length', async () => {

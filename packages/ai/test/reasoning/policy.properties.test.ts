@@ -171,7 +171,7 @@ const proposalArb = (index: number): fc.Arbitrary<KeptProposal> =>
 const proposalsArb: fc.Arbitrary<KeptProposal[]> = fc
   .integer({ min: 0, max: 7 })
   .chain((n) => fc.tuple(...Array.from({ length: n }, (_, i) => proposalArb(i))))
-  .map((list) => list as KeptProposal[]);
+  .map((list) => list);
 
 function criticFor(
   proposals: readonly KeptProposal[],
@@ -203,7 +203,7 @@ function criticFor(
     };
   });
   const critic: KeptCritic = {
-    result: PROPOSAL_SCHEMAS.critic_result.parse(criticResult()) as KeptCritic['result'],
+    result: PROPOSAL_SCHEMAS.critic_result.parse(criticResult()),
     evidence: [],
     critiques,
   };
