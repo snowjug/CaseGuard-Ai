@@ -1095,6 +1095,23 @@ const SCOPE_WORDING: readonly Family[] = [
     reads: ['The browser tells her the server address could not be found.'],
     doesNotRead: ['The server address will be sent to you by the network team.'],
   },
+  {
+    id: 'name servers: every one answers, said another way',
+    signal: 'sig.resolvers-consistent',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      'DNS resolution is healthy on the three resolvers we probed.',
+      'Resolvers 10.7.0.1, 10.7.0.2 and 10.7.0.3 respond identically for the sign-in hosts.',
+      'All name servers answered every lookup during the test.',
+      'The primary and the secondary DNS both return the right address.',
+    ],
+    doesNotRead: [
+      'Please check that all resolvers answer.',
+      'DNS resolution is broken on the secondary server.',
+      'The secondary DNS and the primary both returned an empty answer.',
+    ],
+  },
 ];
 
 describeFamilies('wording families of the server side: scope and what was tried', SCOPE_WORDING);

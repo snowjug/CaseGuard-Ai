@@ -1460,12 +1460,17 @@ const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetec
   'sig.resolvers-consistent': [
     ...[
       String.raw`\b(?:all|every|each|both)\b(?! (?:the )?other)${gap(14)}\b${DNS_NOUN}\b${gap(40)}\b${ANSWERS}\b${gap(50)}\b${ALL_FINE}\b(?!${gap(40)}\bexcept\b)`,
-      String.raw`\b(?:all|every|each|both|the (?:two|three|four|five))\b(?! (?:the )?other)${gap(20)}\b(?:${DNS_NOUN}|ns ?\d)\b${gap(60)}\b${ANSWERS}\b${gap(40)}\b(?:the )?(?:same|identical|equal\w*|consistent\w*|correct\w*|fine|normally|every time|success\w*|within|(?:in )?under)\b(?!${gap(40)}\bexcept\b)`,
+      String.raw`\b(?:all|every|each|both|the (?:two|three|four|five))\b(?! (?:the )?other)${gap(20)}\b(?:${DNS_NOUN}|ns ?\d)\b${gap(60)}\b${ANSWERS}\b${gap(40)}\b(?:the )?(?:same|identical|consistent\w*|correct\w*|fine|normally|every (?:time|query|lookup|request)|within|(?:in )?under)\b(?!${gap(40)}\bexcept\b)`,
       String.raw`\b${DNS_NOUN}\b[^\n]{0,140}?[.!?] (?:all|both) (?:three|two|four|five|of them)\b${gap(10)}\b(?:answer\w*|respond\w*|repl(?:y|ies|ied)|worked|resolved)\b${gap(30)}\b(?:every time|normally|fine|correct\w*|within|in under|each time)`,
       String.raw`\b${DNS_NOUN}\b${gap(100)}[.;!?] (?:all|both|each|they all|every one)(?: (?:three|two|four|five|of them))?\b${gap(10)}\b(?:answer\w*|respond\w*|repl(?:y|ies|ied)|return\w*|worked|resolved?|resolves)\b${gap(30)}\b(?:every time|normally|fine|correct\w*|within|in under|each time|the same)\b`,
-      String.raw`\b${IPV4}\b${gap(15)}\band\b${gap(5)}\b${IPV4}\b${gap(40)}\b${ANSWERS}\b${gap(30)}\b(?:identical|the same|correct\w*|fine|normally|equal\w*|consistent\w*)\b`,
+      String.raw`\b${IPV4}\b${gap(15)}\band\b${gap(5)}\b${IPV4}\b${gap(40)}\b${ANSWERS}\b${gap(30)}\b(?:identical(?:ly)?|the same|correct\w*|fine|normally|equal\w*|consistent\w*)\b`,
+      String.raw`\b(?:${DNS_NOUN}|(?:primary|secondary|first|second|backup) dns)\b${gap(15)}\bboth\b${gap(10)}\b${ANSWERS}\b${gap(30)}\b(?:the )?(?:right|correct\w*|same|identical(?:ly)?|fine|normally)\b`,
       String.raw`\b(?:dns|resol\w+|name resolution)\b${gap(60)}\b(?:both|all|each|every)\b${gap(8)}\bservers?\b${gap(15)}\b${ANSWERS}\b`,
     ].map((pattern) => rx(pattern, AS_TESTED)),
+    rx(
+      String.raw`\b(?:dns|name) resolution\b${gap(8)}\b(?:is|are|was|were|looks?|looked|works?|worked)\b${gap(12)}\b(?:fine|healthy|ok|okay|normal|good|clean|in order|working)\b`,
+      { roles: [...ENG_ROLES], eventTypes: NETWORK_TEST_TYPES, negativeContent: false },
+    ),
     rx(
       String.raw`\b(?:dns|name resolution|the resolvers?)\b${gap(8)}\b(?:is|are|was|were|looks?|looked|seems?|seemed|works?|worked|checks? out)\b${gap(12)}\b(?:fine|healthy|ok|okay|normal|good|clean|in order|working)\b`,
       { roles: [...ENG_ROLES], eventTypes: NETWORK_TEST_TYPES, negativeContent: false },
