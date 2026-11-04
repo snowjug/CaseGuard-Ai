@@ -24,7 +24,7 @@ Part of the architecture set: [ARCHITECTURE.md](ARCHITECTURE.md), [DOMAIN_ENGINE
 Nothing in this repository has ever spoken to a model endpoint. Every number reported by an Azure-configured run would
 be unmeasured until a deployment is tested.
 
-## 2. The ten agents
+## 2. The twelve agents
 
 The catalogue is `AGENT_CATALOG` in `packages/ai/src/agents/catalog.ts`. An agent is a task contract (input,
 prompt, output schema, validators), not a deployed service.
@@ -41,6 +41,15 @@ prompt, output schema, validators), not a deployed service.
 | Communication Coach (`communication_coach`)             | post-hoc       | generation         | model or deterministic | events, evidence, flagged claims, pack knowledge         | none                                                |
 | Token Governor (`token_governor`)                       | post-hoc       | deterministic      | **code only**          | request metadata                                         | none                                                |
 | Safety and Policy Validator (`safety_policy_validator`) | post-hoc       | deterministic      | **code only**          | a candidate output and its validation context            | none                                                |
+| Case Reasoner (`case_reasoner`)                         | pre-resolution | reasoning          | model or deterministic | events, pack hypotheses, actions, requirements, signals  | none                                                |
+| Case Critic (`case_critic`)                             | pre-resolution | reasoning          | model or deterministic | events, pack hypotheses, the conclusions under review    | none                                                |
+
+- **The Case Reasoner and the Case Critic** are the two agents of the optional, evidence-grounded model-assisted review
+  (`runModelAssistedReview`). The reasoner reads the redacted record and never the engine's conclusions; every proposal it
+  makes quotes the record and is checked by deterministic grounding rules before anyone sees it; the critic may only
+  critique numbered conclusions it was given and cannot approve, accept, reject or add one. Without a real model provider
+  the review is off and these agents run no model. Nothing here has been run against a real model
+  ([packages/ai/README.md](../packages/ai/README.md#model-assisted-review-optional-evidence-grounded)).
 
 - **Pre-resolution** agents never see the final resolution or any event after their boundary. **Post-hoc** agents
   judge the finished case and may see the resolution; their prompts say anything that relies on it must be labelled
