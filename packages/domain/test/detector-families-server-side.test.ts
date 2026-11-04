@@ -852,6 +852,117 @@ describeFamilies(
   DEVICE_AND_SERVICE,
 );
 
+const WIDER: readonly Family[] = [
+  {
+    id: 'no failed row, counted: "0 failures", "returned 0 records"',
+    signal: 'sig.no-server-side-failure-records',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      'Both sign-in log tables show 0 failures for the three accounts in that window.',
+      'The query against SigninLogs returned 0 records for those UPNs.',
+    ],
+    doesNotRead: [
+      'Please tell me whether SigninLogs returns 0 records for those UPNs.',
+      'If both sign-in log tables show 0 failures we can close the identity side.',
+    ],
+  },
+  {
+    id: 'failed rows that are there, said another way: a count, "I can see each of the failures", "show up as failures", one row per attempt',
+    signal: 'sig.server-side-failure-records-present',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      'SigninLogs holds 7 failed rows for the affected UPNs, all with result code 53003.',
+      'I can see each of the failures in Entra, one row per attempt.',
+      'We see the attempts on our side; they show up as failures with error 530032.',
+      'Found 12 failed sign-ins for that user between 14:00 and 14:30 UTC.',
+    ],
+    doesNotRead: [
+      'Please confirm that you can see each of the failures in Entra.',
+      'SigninLogs holds 0 failed rows for the affected UPNs.',
+      'If I find 12 failed sign-ins for that user I will send them to you.',
+    ],
+  },
+  {
+    id: 'one name server fails, called another way: "the secondary DNS", "ns2", "resolver B", an address that fails for a host or for a share of the tries',
+    signal: 'sig.resolver-inconsistent',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      "nslookup against the secondary DNS gives 'server failed' for the sign-in hostnames; the primary resolves them.",
+      'Resolver B drops about a third of the queries for the Microsoft sign-in names.',
+      'ns2 returns an empty answer for login.microsoftonline.com while ns1 returns the right address.',
+      'The DNS server at 10.40.0.9 is filtering the Microsoft hostnames and returns 0.0.0.0.',
+      '10.7.0.5 failed for login.microsoftonline.com in 4 of 10 tries.',
+    ],
+    doesNotRead: [
+      'Please test the secondary DNS for the sign-in hostnames.',
+      'If ns2 drops queries we will take it out of the DHCP scope.',
+      'Both resolvers returned the right address for login.microsoftonline.com.',
+    ],
+  },
+  {
+    id: 'every name server answers, said another way: "the same addresses", "no difference between the resolvers", "works on every DNS server"',
+    signal: 'sig.resolvers-consistent',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      'Both DNS servers resolve login.microsoftonline.com to the same addresses.',
+      'I tested all three resolvers for the sign-in hostnames and every one answered in under 40 ms.',
+      'nslookup against 10.0.0.2 and 10.0.0.3 returns identical, correct answers.',
+      'There is no difference between the resolvers; each returns the correct IPs.',
+      'Resolution of the sign-in hosts works on every DNS server we tried.',
+      'The two forwarders return the same result for teams.microsoft.com every time.',
+    ],
+    doesNotRead: [
+      'Please check that all resolvers answer.',
+      'One resolver fails for login.microsoftonline.com.',
+    ],
+  },
+  {
+    id: 'one proxy node fails, called another way: "PRX-B", "one of the four proxy nodes", "only the Oslo proxy", an address, "one bad node"',
+    signal: 'sig.proxy-node-inconsistent',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      'One of the four proxy nodes, PRX-B, hangs on connections to login.microsoftonline.com.',
+      'Only the Oslo proxy drops the traffic to Teams; the other proxy servers are fine.',
+      'The proxy at 10.1.9.14 fails to forward requests; 10.1.9.12 and .13 are okay.',
+      'One proxy out of three is dropping the connections to the Microsoft login endpoints.',
+      'Our proxy farm has one bad node that times out on TLS handshakes.',
+    ],
+    doesNotRead: ['Please test each proxy node.', 'All proxies answer normally.'],
+  },
+  {
+    id: 'every proxy node answers, said another way: "none of them timed out", "returned 200", "behaving the same", "no bad node"',
+    signal: 'sig.proxy-nodes-consistent',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      'We tested each proxy server and none of them timed out.',
+      'Every proxy returned 200 for login.microsoftonline.com.',
+      'The proxies are behaving the same; there is no bad node.',
+      'Requests through proxy-01, proxy-02 and proxy-03 all succeeded without errors.',
+      'All proxy nodes pass the connectivity test to the sign-in endpoint.',
+    ],
+    doesNotRead: ['Please confirm that all proxy nodes respond.', 'One proxy node times out.'],
+  },
+  {
+    id: 'a federation node in error, said another way: an HTTP 5xx, the time skew named first',
+    signal: 'sig.federation-node-error',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      'One AD FS node is returning HTTP 503 for the sign-in requests.',
+      'Time skew of 7 minutes on the STS node.',
+    ],
+    doesNotRead: ['Please measure the time skew on the STS node.'],
+  },
+];
+
+describeFamilies('wording families of the server side: the same facts, said another way', WIDER);
+
 describe('the pairs of the device token and the service health', () => {
   it('reads a denial of an incident as the clear side, and says which signal it denied', () => {
     const found = observationsOf(
