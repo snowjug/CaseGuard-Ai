@@ -764,5 +764,9 @@
       "annotationsSha256": "57104e2bc4197d11ec789b5c5441acc8eb24caac9cd9149ee8b2962c6ee1e23b"
     }
   },
-  "locked": null
+  "locked": {
+    "at": "2026-11-04T09:55:55Z",
+    "commit": "5040e33215edd776bb94b8f8842d5ba78732f4cc",
+    "testSetSha256": "d22745ac4efbe6ca9ac84c8376a1f372a0bbe7081d63e6f28f9b405ce2d47d44"
+  }
 }
