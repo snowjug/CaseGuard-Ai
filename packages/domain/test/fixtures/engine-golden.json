@@ -1,6 +1,6 @@
 {
-  "about": "What the two synthetic samples produce under ENGINE_VERSION 2026.4.0 (knowledge pack 1.1.0). Each digest is the hash of one part of the analysis with source locations (pointer, field, start, end) and evidence links removed (see withoutLinkage in ../engine-golden.ts). A change that only adds source linkage leaves every digest as it is; a digest that moves means a score, id, ranking or text moved. Regenerate only for an intended change of the engine's output, and say so in the commit. 2026.4.0 is such a change (detection reads whether a sentence states a fact, reads chat shorthand, and knows more wordings): Case One reads the same 26 signals with one excerpt a few words longer; Case Two reads two more (the customer's 'we have not changed Conditional Access' and the engineer's note that one proxy node timed out). Both keep their score, band, forks and leading hypothesis; the pack version in the method notes changed, and some intermediate confidence bounds and per-action values of Case Two moved by at most 0.04 with its two extra observations.",
-  "engineVersion": "2026.4.0",
+  "about": "What the two synthetic samples produce under ENGINE_VERSION 2026.5.0 (knowledge pack 1.2.0). Each digest is the hash of one part of the analysis with source locations (pointer, field, start, end) and evidence links removed (see withoutLinkage in ../engine-golden.ts). A change that only adds source linkage leaves every digest as it is; a digest that moves means a score, id, ranking or text moved. Regenerate only for an intended change of the engine's output, and say so in the commit. 2026.4.0 is such a change (detection reads whether a sentence states a fact, reads chat shorthand, and knows more wordings): Case One reads the same 26 signals with one excerpt a few words longer; Case Two reads two more (the customer's 'we have not changed Conditional Access' and the engineer's note that one proxy node timed out). Both keep their score, band, forks and leading hypothesis; the pack version in the method notes changed, and some intermediate confidence bounds and per-action values of Case Two moved by at most 0.04 with its two extra observations. 2026.5.0 moved no digest of a signal, claim, score, band, fork, hypothesis, warning or scenario of either sample: it reads more ways of saying a thing on text the samples do not contain. Only the quality, metrics and coaching digests moved, because they carry the pack version (1.1.0 to 1.2.0) in their method notes.",
+  "engineVersion": "2026.5.0",
   "cases": {
     "one": {
       "reference": "CG-SYN-1001",
@@ -33,10 +33,10 @@
         "twin": "ef42edd77d511a8d852bd1c67ded42e55772719dee4be61f8db5929573fa444b",
         "scenarios": "f497eae0a1c0f593f704f29b1697b7749a427589e8e767c4946191c06f4201cc",
         "scenarioQuality": "3a8ab12e94d3076e19cf8b022e71987798d5770d47323eefa4c266e9a5619de3",
-        "quality": "e9c260c2238175d97973b15cc118c3086515cbf40e26841ccbc0dcd6e4ea07c2",
-        "metrics": "b7f062654719d017a8cb08f6fd14807c2a5556dc4164a63bb1a3a92af21bb330",
+        "quality": "d431ac8b50cb3377df839c37501338ae5db81df0bfde558646fccef635149f9c",
+        "metrics": "a4c773b27af8cb117768f6aa0668139b05935e8d60bd437b132855a2c53198e0",
         "warnings": "f2cb9af23b72e3f2aa103d233e0539e765bbe55c928582d5aa1b70de609fcea6",
-        "coaching": "afa5a45ae467cd4dbf5c8fbd7614d074039e9bea0901ac6febba20195d41455e"
+        "coaching": "c322b2ebe3152071dd3dca9d3a409f1c265ac83bec1663d370f03af27a6b0695"
       }
     },
     "two": {
@@ -70,10 +70,10 @@
         "twin": "c6d768cdfe6aa97b86f49e258738a4aea07d980ef18eecf450e741e7b8966525",
         "scenarios": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "scenarioQuality": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "quality": "6d5d09fc465716f51a55640183a215bc06e9a3d50d15cc5d91cc7204a1245317",
-        "metrics": "6bcf71ee8072ee69daaeb81f23a83004f9f07c36d7dec8d51ce17fd201986de9",
+        "quality": "149e7a7114d426ce03ecc7ca46e2d0d2ff4cfc3428be3e2630c6423ee03d382d",
+        "metrics": "18902f8252f37902ffb84a32919c04232a6b5b1565ad5263b0a57f84e54af4b6",
         "warnings": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "coaching": "c0ae5c4ced5734253cd62d7289975e9872533cf3823e196c97bb88e850b9d529"
+        "coaching": "eadaac1e50c9d46fd09d352b8f9b8b97e39fe7c2e827e17c4370d1d080cc216a"
       }
     }
   }

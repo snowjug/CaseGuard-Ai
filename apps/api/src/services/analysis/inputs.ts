@@ -49,8 +49,16 @@ import type { RequestContext } from '../../http/request-context';
  * signals; no score, band, fork or simulated figure moves. Stored runs are recomputed once. Each counterfactual
  * path also says how far to trust it (what its figures rest on, whether it could have been followed, what limits
  * it, what to check, which skill would have applied); no figure of a path moved.
+ * 2026.5.0: detection reads many more ways of saying the same thing: wording families for the scope signals (how many
+ * are affected and where, how the failure shows itself, what the people at the keyboard tried) and for the server-side
+ * ones (what the logs, the name servers, the proxy nodes, the device token, the access policy and service health show).
+ * A yes-or-no question and a "whether" clause state nothing, the title of a reply ("Re: ...") is not read again as the
+ * replier's own words, and a few more first-person guess verbs are guesses. A conflict's subject is the label of its pair
+ * or attribute (its id is unchanged). On the two shipped samples every digest of a score, band, fork, hypothesis, warning
+ * and scenario is byte-identical to 2026.4.0: the change is in what is read on text the samples do not contain
+ * (docs/DETECTION.md, docs/EVALUATION.md section 10). Stored runs are recomputed once.
  */
-export const ENGINE_VERSION = '2026.4.0';
+export const ENGINE_VERSION = '2026.5.0';
 
 /** Everything an analysis reads. Loaded once per run and never mutated. */
 export interface AnalysisInputs {

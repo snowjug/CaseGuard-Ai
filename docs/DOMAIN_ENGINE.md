@@ -638,7 +638,7 @@ evaluation cases, with at least two for each answer, built on the real samples a
   alone. `packages/domain/test/determinism-across-ids.test.ts` runs both samples under four sets of generated ids and
   compares every figure after replacing ids by what they stand for (so a different order of the same things fails too);
   `apps/api/test/determinism-across-ids.int.test.ts` does the same through two fresh databases.
-- **Engine version.** `ENGINE_VERSION` (`apps/api/src/services/analysis/inputs.ts`, currently `2026.4.0`) is part of the
+- **Engine version.** `ENGINE_VERSION` (`apps/api/src/services/analysis/inputs.ts`, currently `2026.5.0`) is part of the
   analysis input hash, so a change of meaning re-analyses stored cases instead of reusing them. `2026.2.0`: a view's belief is
   one number (the last step of its own timeline), scenario summaries are written from the decision instant and the simulated
   path alone, and the "Retrospectively produced little information" note needs a complete case with a recorded resolution
@@ -660,7 +660,12 @@ evaluation cases, with at least two for each answer, built on the real samples a
   or simulated figure moves (`packages/domain/test/engine-golden.ts` and `fixtures/engine-golden.json`
   pin the digests of both samples, with only the source linkage and the citation lists left out of the comparison, and
   were regenerated for this version). Stored artefacts are replaced at the next analysis; until
-  then a stored citation has no field and is `not_checkable`. After a version
+  then a stored citation has no field and is `not_checkable`. `2026.5.0` (knowledge pack `1.2.0`): detection reads many more
+  ways of saying the same thing (wording families for the scope signals and for the server-side ones), a yes-or-no
+  question or a "whether" clause states nothing, the title of a reply is not read again as the replier's words, and a
+  conflict's subject is the label of its pair or attribute ([DETECTION.md](DETECTION.md)); on the two samples **no
+  digest of a signal, claim, score, band, fork, hypothesis, warning or scenario moved**, and only the quality, metrics
+  and coaching digests were regenerated because they carry the pack version. After a version
   change a reviewer's decision on a counterfactual scenario survives only if the regenerated simulation is identical;
   otherwise it is reset and the reset is audited. Because the seed no longer covers the engine version, the skill library or
   the provider, a change of the library or the provider, or a release that changes no number, re-runs the analysis (new

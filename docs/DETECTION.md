@@ -1,8 +1,8 @@
 # Detection methodology
 
 How `packages/domain` turns the words of a support case into **observations** (a signal found in an event), and what it
-does with a sentence that mentions a signal without stating it. This page describes engine **2026.4.0** with the
-knowledge pack `kp.teams-authentication` **1.1.0**. It is the reference for anyone changing a detector.
+does with a sentence that mentions a signal without stating it. This page describes engine **2026.5.0** with the
+knowledge pack `kp.teams-authentication` **1.2.0**. It is the reference for anyone changing a detector.
 
 Related: [DOMAIN_ENGINE.md](DOMAIN_ENGINE.md) (what happens once an observation exists), [EVALUATION.md](EVALUATION.md)
 (how well detection works, and how that is measured), [MISS_TAXONOMY.md](MISS_TAXONOMY.md) (why the first evaluation

@@ -2693,7 +2693,7 @@ const requirements: KnowledgeRequirement[] = [
 
 export const TEAMS_AUTH_PACK: KnowledgePack = {
   id: 'kp.teams-authentication',
-  version: '1.1.0',
+  version: '1.2.0',
   workload: 'teams-authentication',
   title: 'Microsoft Teams authentication failures (illustrative knowledge pack)',
   description:
