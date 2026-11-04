@@ -3,8 +3,10 @@
 How CaseGuard AI was evaluated, with the numbers that were actually produced for this document, what they prove and what they
 cannot. Every figure comes from a command that was run on one developer machine (given in section 9). Nothing here is a claim
 about real-world accuracy: the data are **two synthetic cases written together with the engine** and, since the second
-evaluation wave, **a small independent set of 16 synthetic cases** (section 7); there is **no second human annotator** and no real
-customer data, and every score is an **estimate** from an authored knowledge pack.
+evaluation wave, **three independent synthetic sets: a tuning set, a validation set and a locked test split** (sections 7 and 10);
+there is **no human annotator** (every label is an AI draft) and no real customer data, and every score is an **estimate** from an
+authored knowledge pack. The first evaluation of text the pack was not written for is section 7 (Wave 1); the Wave 2 sets, the
+protocol, the verdict criteria and the results are section 10.
 
 Related: [DOMAIN_ENGINE.md](DOMAIN_ENGINE.md), [AI_ORCHESTRATION.md](AI_ORCHESTRATION.md), [RESPONSIBLE_AI.md](RESPONSIBLE_AI.md),
 [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md).
@@ -384,6 +386,11 @@ The two shipped cases were written together with the knowledge pack, so they sho
 reads other people's wording correctly. This section is the first measurement on text the pack was not written for. It is small
 and has one annotator: read it as a warning light, not as an accuracy figure.
 
+> **Historical (Wave 1).** The figures in this section are those of the engine before the Wave 2 work (13 of 66 labelled signals
+> read: recall 20 %, precision 76 %). Its 16 cases are now part of the `dev` split of section 10, which holds the Wave 2 sets, the
+> protocol and the results; the four negation and typing tests that this section describes as expected failures now pass as
+> ordinary regression tests (`wave1-findings.test.ts`).
+
 **The set** (`packages/domain/test/evaluation/`: 16 synthetic cases, 83 authored events, 66 labelled signal occurrences):
 
 | Group      | Cases | What it checks                                                                                                                                                              |
@@ -486,7 +493,7 @@ weight or prior was touched.
 
 - **Two shipped synthetic cases, written alongside the engine.** They show consistency. The independent set of section 7 is a
   first step beyond them, no more.
-- **The independent set is small and has one annotator.** 16 cases, 83 events, 66 labelled occurrences, 9 stories with a cause,
+- **The independent set of section 7 (Wave 1) is small and has one annotator;** the Wave 2 sets and their limits are in section 10.5. 16 cases, 83 events, 66 labelled occurrences, 9 stories with a cause,
   2 with an expected missed moment; no confidence intervals and no second annotator, so no agreement figure. The annotator also
   wrote the cases, and both were produced with the help of the AI model that helped build the product, so author and labels can
   share blind spots.
@@ -604,3 +611,82 @@ split that was not used to choose anything.
 
 These are thresholds for a decision-support tool whose findings an engineer reads, not for an autonomous one. They were chosen
 from what a misleading or a missing finding costs a reviewer, not from a number the engine already reached.
+
+### 10.3 Results on `dev` and `validation`
+
+Engine 2026.5.0, knowledge pack 1.2.0. Every label is an AI draft by one annotator. Intervals, case lists and the full tables are
+produced by `eval:dev` and `eval:validation`; those two commands are the source of every figure here. "Reported and labelled /
+reported, not labelled / labelled, not reported" is true positives, false positives and misses.
+
+| Measure                                                                    | Wave 1, 16 cases (historical)     | `dev`: before the Wave 2 wording families → now | `validation`: before → now    |
+| -------------------------------------------------------------------------- | --------------------------------- | ----------------------------------------------- | ----------------------------- |
+| Signals: true / false positives / misses                                   | 13 / 4 / 53                       | 144 / 11 / 169 → **259 / 4 / 54**               | 33 / 5 / 96 → **61 / 6 / 68** |
+| Signal precision                                                           | 76 %                              | 93 % → 98 %                                     | 87 % → 91 %                   |
+| Signal recall                                                              | 20 %                              | 46 % → 83 %                                     | 26 % → **47 %**               |
+| Silent where the fact is denied, guessed, planned, attributed or asked for | every false positive was a denial | 99 % (77 of 78)                                 | 93 % (37 of 40)               |
+| Negative controls with nothing reported and no decision point              | -                                 | 6 of 6                                          | **2 of 4**                    |
+| Contradictions: labelled conflicts found; class right among the found      | -                                 | 1 of 19; 1 of 1                                 | 2 of 9; **0 of 2**            |
+| Decision points: precision; recall                                         | -                                 | 21 % (6 of 28); 64 % (7 of 11)                  | **0 of 10**; 0 of 3           |
+| Engineer actions: precision; recall                                        | -                                 | 94 %; **19 %** (32 of 166)                      | 70 %; **6 %** (7 of 111)      |
+| The leading hypothesis is a labelled cause                                 | -                                 | 73 % (24 of 33), Brier 0.051                    | 62 % (8 of 13)                |
+| Citations verified against the stored text; mismatches                     | -                                 | 91 % (n = 650); 0                               | 88 % (n = 179); 0             |
+| Reordered copies with an identical analysis                                | -                                 | 3 of 3                                          | -                             |
+
+What the table says, and what it does not:
+
+- **Detection recall nearly doubled on text the detectors were not written from, and is still below half.** Validation recall went
+  from 26 % to 47 %, with precision up from 87 % to 91 %. On `dev`, which the detectors were tuned on, recall is 83 %: the 36 points
+  between the two are what tuning on a set buys, not what an unseen case gets. Intervals are wide (validation has 129 labelled
+  occurrences in 18 cases, and occurrences cluster in cases).
+- **What validation still misses (68 occurrences).** 14 (21 %) are the fix-confirmation signals, which only structured event data
+  can show: reading "the fix worked" from prose, or from the leading hypothesis, would count the same evidence twice, so the engine
+  does not. 1 has no detector that accepts the event's type or author role. 53 (78 %) are wording a detector accepts and whose
+  pattern did not match. Over the occurrences a text detector could report, recall is 54 % (n = 114).
+- **A gain on the author's own probes is not a gain on unseen text.** The author of the last round of families for the site and
+  the cache signals measured them on sentences it wrote itself (the site signal: 5 of 17 before, 15 of 17 after); on validation that
+  signal still reads 2 of its 11 occurrences, the same as before the round. Only the held-out sets tell.
+- **Negation is handled; the rest of "not stated" is only partly.** A sentence that denies, guesses, plans, asks for, reports from
+  someone else or leaves open a fact is read through a small list of cues (DETECTION.md section 3). The engine stays silent on 99 %
+  and 93 % of the facts the labels say are absent. Wave 1's failure, a denial read as a finding, no longer occurs in `dev`: its four
+  remaining false positives are a restatement, an explanation of a policy, and two readings of "the logs are clean / hold nothing"
+  that the annotator did not label.
+- **The negative controls are the clearest sign of over-reading on unseen text.** All six on `dev` are silent, because the
+  patterns were tuned against them; two of the four on `validation` report something.
+- **Contradictions are barely found.** The engine finds a conflict only between two statements of a declared signal pair or of a
+  counted attribute, and it pairs adjacent statements. The annotators' pairs follow no such rule: 6 of the 19 labelled `dev`
+  conflicts are about something the pack does not model, and for most of the rest the engine pairs other events than the
+  annotator did. 1 of 19 on `dev`, 2 of 9 on `validation` (neither of the two with the right class).
+- **Decision points are not reliable.** 22 of the 28 the engine reports on `dev` match no label (13 are "low-value action"), and
+  none of the 10 on `validation` does. The product's review page now says that they are questions to discuss, not findings.
+- **Engineer actions are mostly not read.** The engine reads an engineer's step from `engineer_action`, `engineer_email` and
+  `escalation` events or from an explicit action key. 72 of the 134 `dev` actions it misses are stated in `diagnostic_result`,
+  `validation_result` and other result or output events, which it does not read as actions; within the event types it does read,
+  recall is 34 %. A step that an engineer took and reported in such an event can therefore still be suggested as a next step,
+  unless the signals it produced were read (KNOWN_LIMITATIONS.md PL-17).
+
+### 10.4 How the sets were used (so that the figures can be read for what they are)
+
+- `dev` was read case by case. Detectors, wording families, modality cues and the regression floors
+  (`evaluation/runs/floors.json`, now recall 0.80, precision 0.96) were set from it. Its figures are optimistic.
+- `validation` was run about seven times (six outputs were saved), always as aggregates (by signal, by category, by dimension; no case was read).
+  Each look decided whether a family transferred: it kept, narrowed or removed it. The first scope-count family added 15 false
+  positives and no true positive on validation and was narrowed to stated failures. This is model selection on the set, so its
+  figures are mildly optimistic too. The exact number of the early re-runs was not recorded.
+- The cases, the evaluation tooling and the wording families were written by AI assistants working apart. The case authors never
+  opened the pack or the detectors; the family authors never read a validation or a test case (only aggregates of `validation`).
+  The independence check caught six detector-test sentences that shared a six-word run with held-out cases (they were reworded)
+  and a pack pattern that shared one with a `dev` case. The author of the test split saw the file names of the `dev` and
+  `validation` cases, not their content.
+
+### 10.5 What this evaluation cannot show
+
+- **The labels are AI drafts by one annotator** and the cases were written with the help of the same family of model that helped
+  build the engine, so annotator and author can share blind spots. No human has judged a label; there is no second annotator, so
+  no agreement figure for `validation` and `test`.
+- **Synthetic text, one workload.** Nothing says how the engine reads real customer cases, and the families are tied to Teams
+  sign-in wording in English.
+- **Small sets.** 18 validation and 30 test cases; per-signal rows rest on a handful of occurrences (`too_few` under 20).
+- **No real model was run.** The model-assisted review is optional and off; its grounding and critic checks were exercised with
+  a scripted provider, which is labelled as a simulation (134 of 134 planted mechanical errors were caught by deterministic checks;
+  that says nothing about a model).
+- **Estimates stay estimates.** Confidence, quality, avoidable effort and simulated time come from authored priors.
