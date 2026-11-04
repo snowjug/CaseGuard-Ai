@@ -525,6 +525,129 @@ const NETWORK: readonly Family[] = [
 
 describeFamilies('wording families of the server side: name servers and proxy nodes', NETWORK);
 
+const CHANGES: readonly Family[] = [
+  {
+    id: 'a network change told by the customer: what was moved, replaced, upgraded or enabled, and when',
+    signal: 'sig.recent-network-change-reported',
+    role: 'customer_network_admin',
+    type: 'customer_email',
+    reads: [
+      'We upgraded the firewall firmware on Friday night.',
+      'The proxy vendor pushed an update on Tuesday morning.',
+      'Our ISP changed the public IP range of the Leeds site last weekend.',
+      'We migrated the proxies to a new cluster two days ago.',
+      'A new web filtering category was enabled on the gateway yesterday evening.',
+      'Someone replaced the DNS forwarders on Sunday.',
+      'On Thursday we switched to a different VPN provider.',
+      'The PAC file was changed on Monday and clients picked it up overnight.',
+      'Node 2 got a renewed TLS inspection certificate last Tuesday.',
+      'Last week our security team turned on a new filtering rule for the DNS resolvers.',
+    ],
+    doesNotRead: [
+      'Resolver 10.4.0.5 was removed from the DHCP scopes at 12:40 UTC and clients are renewing leases.',
+      'The PAC file was updated at 11:35 UTC and proxy-3 is out of rotation.',
+      'We will upgrade the firewall firmware on Friday night.',
+      'Nothing has changed on the proxies in the last week.',
+      'We did not touch the DNS servers this week.',
+      'I think someone touched the proxy at some point, but I do not know when.',
+      'The firewall change is planned for next Tuesday.',
+      'The network team changed the meeting room schedule yesterday.',
+      'We deployed the DNS exception for the Microsoft endpoints and added the resolver back to DHCP.',
+    ],
+  },
+  {
+    id: 'a network change that the customer passes on, and one an engineer asks about',
+    signal: 'sig.recent-network-change-reported',
+    role: 'customer_end_user',
+    type: 'customer_email',
+    reads: ['The IT team said they moved the DNS to a new rack on Monday.'],
+    doesNotRead: ['Please ask the network team whether they upgraded the firewall last night.'],
+  },
+  {
+    id: 'a change to the access policy told by the customer: a policy that requires MFA rolled out, the sign-in frequency set',
+    signal: 'sig.recent-ca-change-reported',
+    role: 'customer_admin',
+    type: 'customer_email',
+    reads: [
+      'Yesterday afternoon our identity team rolled out a policy that blocks sign-ins from outside the country.',
+      'On Wednesday I lowered the sign-in frequency to two hours.',
+      'Last week we enabled a policy that requires MFA for every cloud app.',
+      'Two days ago somebody changed the session lifetime for Teams.',
+    ],
+    doesNotRead: [
+      'We will roll out a policy that requires MFA next month.',
+      'Our compliance officer changed the retention policy yesterday.',
+      'Could it be that the policy that requires MFA was rolled out on Monday?',
+      'The password policy was changed yesterday.',
+    ],
+  },
+  {
+    id: 'a change to the access policy read by the engineer in the audit log or the recap',
+    signal: 'sig.recent-ca-change-reported',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      'The audit log shows the policy Mobile access updated on Tuesday at 09:15 UTC.',
+      'A new Conditional Access policy was assigned to the whole sales group instead of the pilot group.',
+    ],
+    doesNotRead: [
+      'Please check the audit log for policy changes from yesterday.',
+      'The audit log shows no policy changes.',
+    ],
+  },
+  {
+    id: 'the access policy left alone: not changed, not touched, unchanged, only old events',
+    signal: 'sig.ca-config-unchanged',
+    role: 'customer_admin',
+    type: 'customer_email',
+    reads: [
+      'Conditional Access has not been touched since January.',
+      'Our CA policies were not modified by anyone this quarter.',
+      'Nobody changed the access rules before the problems started.',
+      'The session policy remains unchanged.',
+      'The sign-in frequency is still the same as before.',
+      'The only policy events in the audit log are dated in February, so nothing recent changed.',
+    ],
+    doesNotRead: [
+      'Conditional Access was changed yesterday.',
+      'The marketing team has not been told about the conditional access change.',
+      'Please check whether the access policies were modified.',
+      'The printer policy is unchanged.',
+    ],
+  },
+  {
+    id: 'leaving users out of the policy changed nothing',
+    signal: 'sig.ca-exclusion-no-effect',
+    role: 'customer_admin',
+    type: 'customer_email',
+    reads: [
+      'We excluded the five affected users from the MFA policy and they are still blocked.',
+      'The security team left out the whole sales group. People kept getting the same error afterwards.',
+      'I exempted two accounts from the policy and it made no difference.',
+      'Excluded the pilot group from the rule at 10:15 UTC: still blocked, same message.',
+    ],
+    doesNotRead: [
+      'We excluded the five affected users from the MFA policy and they can sign in now.',
+      'Should we exclude the five users from the MFA policy, or would they still be blocked?',
+      'We will exclude the pilot group tomorrow.',
+      'If we excluded the group, the failures might continue.',
+      'We excluded the Oslo proxy from TLS inspection and it is still timing out.',
+    ],
+  },
+  {
+    id: 'an exclusion that is in place, and the users are still blocked: the engineer reads the rows',
+    signal: 'sig.ca-exclusion-no-effect',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      'The exclusion is on the group Contractors, but the users are in the group Vendors, so their rows still show the policy applied.',
+    ],
+    doesNotRead: ['Please add the exclusion for the users.'],
+  },
+];
+
+describeFamilies('wording families of the server side: what changed in the policy', CHANGES);
+
 describe('the pairs of the name servers and the proxy nodes', () => {
   it('reads a denial of a failure as the other side, and says which signal it denied', () => {
     const found = observationsOf(

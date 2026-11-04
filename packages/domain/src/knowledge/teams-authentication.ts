@@ -1072,6 +1072,18 @@ const NODE_FAILS = String.raw`(?:times? out|timed out|timing out|time-?outs?|fai
 /** "All answered normally": the way a test that finds nothing wrong is worded. */
 const ALL_FINE = String.raw`(?:normally|fine|(?:the )?(?:correct|right)\w*|every time|okay?|properly|as expected|within|under|identical|\d+ of \d+|(?:ten|five|three|four|two|twenty) of \w+)`;
 const ANSWERS = String.raw`(?:answer\w*|respond\w*|repl(?:y|ies|ied)|return\w*|resolve[sd]?|work(?:s|ed)?|succeeded|complet\w+)`;
+/** When something changed, as a customer says it: a relative time, a day, "last Thursday", "on Monday night". Not a time of day. */
+const WHEN_ANY = String.raw`(?:yesterday|tonight|today|this (?:morning|week)|last (?:night|week|weekend|\w{3,9}day|wed|mon|sat|sun)|on (?:\w{3,9}day|wed|mon|sat|sun)|(?:\d+|two|three|few) (?:days?|weeks?) ago|recently)`;
+/** The parts of a network, in the words a customer uses for them: a change to one of them is a network change. */
+const NET_PART = String.raw`(?:dns|resolvers?|dhcp|proxy|proxies|pac file|firewall|gateway|web ?filter\w*|vpn|wan|egress|isp|inspection|rack)`;
+/** What was done to them. A removal, a rollback and a restore are not in it: they are what the fix did, not what broke it. */
+const NET_DID = String.raw`(?:moved|migrated|switched|changed|replaced|upgraded|updated|added|enabled|deployed|pushed|applied|rolled out|turned on|went live)`;
+/** What the access policy is made of, beyond the rule nouns of `ACCESS_RULE`. */
+const POLICY_THAT = String.raw`polic(?:y|ies) (?:that|which) (?:requires?|blocks?|enforces?|forces?|mandates?|restricts?)`;
+const CA_THING = String.raw`(?:${ACCESS_RULE}|sign-?in frequency|session (?:limit|lifetime|timeout)|token lifetime)`;
+const MONTH = String.raw`(?:january|february|march|april|may|june|july|august|september|october|november|december)`;
+/** What a customer says when excluding users from a policy changed nothing: "still blocked", "the same error", "no change". */
+const NO_EFFECT = String.raw`(?:still (?:blocked|fail\w*|prompted|asked|gets?|getting|seeing|the same|broken|happening)|same (?:error|message|block\w*|result|failure\w*|thing|behaviou?r|pattern|problem|issue|prompt)|(?:failures?|errors?|blocks?|prompts?) (?:continue|persist|remain)\w*)`;
 
 /**
  * Wording families for the signals about the server side: what the logs and the infrastructure show (name servers, proxy
@@ -1249,6 +1261,54 @@ const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetec
       String.raw`\b(?:no|zero) (?:timeouts?|time-?outs?|failures?|errors?|drops?)\b${gap(30)}\b(?:through|on|from|at|via|across)\b${gap(15)}\b(?:any|all|every|each|the|a)\b${gap(8)}\b(?:proxy|proxies|nodes?)\b`,
       String.raw`\b(?:all|every|each|both)\b(?! (?:the )?other)${gap(14)}\b(?:proxy|proxies|proxy (?:nodes?|servers?))\b${gap(30)}\b${ANSWERS}\b${gap(30)}\bwithout (?:a |any )?(?:timeouts?|time-?outs?|errors?|failures?|drops?)\b`,
     ].map((pattern) => rx(pattern, AS_TESTED_DENIAL)),
+  ],
+  // A change to the customer's network, told by the customer in its own words: what was moved, replaced, upgraded, enabled or
+  // renewed, and when ("last Thursday", "on Monday night"). A time of day is not a when: it is what a fix is dated with.
+  'sig.recent-network-change-reported': [
+    ...[
+      String.raw`\b${NET_PART}\b${gap(50)}\b${NET_DID}\b${gap(40)}\b${WHEN_ANY}\b`,
+      String.raw`\b${NET_DID}\b${gap(40)}\b${NET_PART}\b${gap(50)}\b${WHEN_ANY}\b`,
+      String.raw`\b${WHEN_ANY}\b${gap(60)}\b${NET_DID}\b${gap(40)}\b${NET_PART}\b`,
+      String.raw`\b(?:got|received|has|have|had|installed|pushed|renewed|replaced|updated)\b${gap(25)}\b(?:inspection|tls|ssl|proxy|gateway|firewall) certificate\b${gap(30)}\b${WHEN_ANY}\b`,
+    ].map((pattern) => rx(pattern, { roles: [...CUSTOMER_ROLES] })),
+  ],
+  // A change to the access policy, told by the customer (a policy that requires MFA rolled out, the sign-in frequency set) or read
+  // by the engineer in the audit log or the recap of the case.
+  'sig.recent-ca-change-reported': [
+    ...[
+      String.raw`\b${WHEN_ANY}\b${gap(60)}\b(?:rolled out|deployed|enabled|introduced|created|turned on|put in place|activated|assigned)\b${gap(30)}\b(?:a |an |the |new )${POLICY_THAT}\b`,
+      String.raw`\b(?:rolled out|deployed|enabled|introduced|created|turned on|put in place|activated|assigned)\b${gap(30)}\b(?:a |an |the |new )${POLICY_THAT}\b${gap(60)}\b${WHEN_ANY}\b`,
+      String.raw`\b${WHEN_ANY}\b${gap(60)}\b(?:set|changed|updated|reduced|lowered|raised|extended|shortened|increased|configured)\b${gap(40)}\b(?:sign-?in frequency|session (?:limit|lifetime|timeout)|token lifetime)\b`,
+      String.raw`\b(?:set|changed|updated|reduced|lowered|raised|extended|shortened|increased|configured)\b${gap(40)}\b(?:sign-?in frequency|session (?:limit|lifetime|timeout)|token lifetime)\b${gap(60)}\b${WHEN_ANY}\b`,
+    ].map((pattern) => rx(pattern, { roles: [...CUSTOMER_ROLES] })),
+    ...[
+      String.raw`\baudit\b${gap(60)}\bpolic(?:y|ies)\b${gap(50)}\b(?:updated|changed|modified|created|edited|added)\b${gap(20)}\b(?:on|last|yesterday|today|this)\b`,
+      String.raw`\bnew\b${gap(20)}\b(?:conditional access|ca)\b${gap(8)}\bpolic(?:y|ies)\b${gap(15)}\b(?:was|were|got|has been|had been)\b${gap(4)}\b(?:assigned|created|added|configured|deployed|enabled|applied|introduced|rolled out)`,
+    ].map((pattern) => rx(pattern, { roles: [...ENG_ROLES], eventTypes: FINDING_TYPES })),
+  ],
+  // The access policy left alone: "has not been changed", "nobody touched it", "unchanged", and the audit that finds only old
+  // events.
+  'sig.ca-config-unchanged': [
+    String.raw`\b${CA_THING}\b${gap(30)}\b(?:(?:has|have|had|was|were)(?: ?n['’]?t| not)|never)\b(?: been)? (?:changed|touched|modified|updated|edited|altered|adjusted)\b`,
+    String.raw`\b(?:nobody|no one|none of us)\b${gap(20)}\b(?:changed|touched|edited|modified|updated|altered)\b${gap(40)}\b${CA_THING}\b`,
+    String.raw`\b${CA_THING}\b${gap(30)}\b(?:remains?|remained|stays?|stayed|is|are|was|were)\b${gap(10)}\b(?:the same|unchanged|untouched|as (?:it|they) (?:was|were)|as before)\b`,
+    String.raw`\b(?:the )?(?:only|last|latest|most recent|newest)\b${gap(25)}\b(?:polic(?:y|ies)|ca|conditional access|configuration|access rule)\b${gap(25)}\b(?:changes?|edits?|events?|modifications?|updates?)\b${gap(60)}\b(?:dated|from|in|on|was|were|are|is)\b${gap(20)}\b(?:${MONTH}|\d+ (?:weeks?|months?) ago|last (?:month|year|quarter))\b`,
+  ].map((pattern) => rx(pattern)),
+  // Leaving users out of the policy changed nothing, said by the customer, in the sentence or the one after: "excluded the three
+  // users. They got the same error", "excluded the group, people still blocked".
+  'sig.ca-exclusion-no-effect': [
+    rx(
+      String.raw`\b(?:excluded|excluding|exempted|left out|took out|bypassed)\b[^\n]{0,100}?\b(?:users?|accounts?|groups?|people|staff|members|them|everyone|admins?)\b[^\n]{0,160}?\b${NO_EFFECT}\b`,
+      { roles: [...CUSTOMER_ROLES], negativeContent: false },
+    ),
+    rx(
+      String.raw`\b(?:excluded|excluding|exempted|left out|took out|bypassed)\b[^\n]{0,100}?\b(?:users?|accounts?|groups?|people|staff|members|them|everyone|admins?)\b[^\n]{0,160}?\b(?:no (?:change|difference|effect|improvement)|nothing (?:changed|happened)|did ?n['’]?t (?:help|change|fix|work)|made no difference|unchanged)\b`,
+      { roles: [...CUSTOMER_ROLES], negativeContent: true },
+    ),
+    rx(
+      String.raw`\bexclusions?\b[^\n]{0,140}?\b(?:still (?:blocked|applied|show\w*|fail\w*|prompt\w*)|same (?:error|message|block\w*)|no (?:change|effect))\b`,
+      { roles: [...ENG_ROLES], eventTypes: FINDING_TYPES },
+    ),
   ],
 };
 
