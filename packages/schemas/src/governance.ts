@@ -110,6 +110,9 @@ export const DEFAULT_MODEL_CONFIG: ModelConfig = {
       maxInputTokens: 4_000,
       maxOutputTokens: 500,
     },
+    // The reasoner quotes event text, so it needs the untrimmed events; the critic reads the same events plus the conclusions.
+    case_reasoner: { ...DEFAULT_AGENT_BUDGET, maxInputTokens: 16_000, maxOutputTokens: 4_000 },
+    case_critic: { ...DEFAULT_AGENT_BUDGET, maxInputTokens: 16_000, maxOutputTokens: 3_000 },
   },
   costLimits: { perRequestUsd: null, perCaseUsd: null, perDayUsd: null },
   unitPrices: { inputPer1kUsd: null, outputPer1kUsd: null, cachedInputPer1kUsd: null },

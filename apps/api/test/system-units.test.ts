@@ -89,6 +89,21 @@ describe('[FR-TK-03] provider status from configuration (pure)', () => {
     expect(JSON.stringify(status)).not.toContain(AZURE_KEY);
   });
 
+  it('describes the scripted test provider as a simulated test double, never as a model', () => {
+    const status = describeProvider(config({ AI_PROVIDER: 'scripted' }).ai, NOW);
+    expect(ProviderStatusSchema.parse(status)).toEqual(status);
+    expect(status).toMatchObject({
+      kind: 'scripted',
+      configured: true,
+      healthy: true,
+      simulated: true,
+      model: 'scripted-test-model',
+    });
+    expect(status.detail).toMatch(/script/i);
+    expect(status.detail).toMatch(/local or test/);
+    expect(status.validationNote).toMatch(/no real model was called/i);
+  });
+
   it('names managed identity when that is the configured authentication', () => {
     const managed = config({
       ...AZURE_ENV,
@@ -295,6 +310,14 @@ describe('[NFR-OBS-01] integration notices (pure)', () => {
     expect(notices).toContain('deterministic evidence engine');
     expect(notices).toContain('lexical');
     expect(notices).toContain('development sign-in');
+  });
+
+  it('says that a scripted provider is a test double and names no cloud model', () => {
+    const notices = integrationNotices(config({ AI_PROVIDER: 'scripted' }))
+      .join('\n')
+      .toLowerCase();
+    expect(notices).toContain('replays a stated script');
+    expect(notices).not.toContain('azure openai');
   });
 
   it('describes every configured external integration as validated against mocks only', () => {

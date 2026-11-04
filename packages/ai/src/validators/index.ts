@@ -7,6 +7,7 @@ import { checkGroundedness } from './grounding';
 import { checkOutputInjection } from './injection';
 import { checkPolicy } from './policy';
 import { checkTemporal } from './temporal';
+import { validateProposalOutput } from '../reasoning/validate';
 import {
   DEFAULT_VALIDATION_LIMITS,
   NON_REPAIRABLE_KINDS,
@@ -99,6 +100,10 @@ export function validateAgentOutput<A extends AgentName>(
   vctx: ValidationContext | null,
   limits: ValidationLimits = DEFAULT_VALIDATION_LIMITS,
 ): ValidationReport<AgentOutputs[A]> {
+  // The reasoning agents' replies are judged proposal by proposal, not as a whole (see `validateProposalOutput`).
+  if ((agent === 'case_reasoner' || agent === 'case_critic') && vctx !== null) {
+    return validateProposalOutput(agent, raw, vctx) as unknown as ValidationReport<AgentOutputs[A]>;
+  }
   if (raw === undefined) {
     return report<AgentOutputs[A]>(null, [
       {
@@ -133,7 +138,6 @@ export function validateAgentOutput<A extends AgentName>(
       },
     ]);
   }
-
   const parsed = OUTPUT_SCHEMAS[agent].safeParse(raw);
   if (!parsed.success) return report<AgentOutputs[A]>(null, schemaIssues(parsed.error));
   if (vctx === null) return report(parsed.data, []);

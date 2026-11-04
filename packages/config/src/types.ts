@@ -95,6 +95,8 @@ export interface AiLimits {
 
 export type AiProviderConfig =
   | { readonly provider: 'deterministic' }
+  /** Test double (packages/ai `ScriptedProvider`). Accepted only when APP_ENV is local or test. */
+  | { readonly provider: 'scripted' }
   | {
       readonly provider: 'azure-openai';
       readonly endpoint: string;

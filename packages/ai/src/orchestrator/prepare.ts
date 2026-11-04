@@ -1,4 +1,5 @@
 import type { AgentBudget } from '@caseguard/schemas';
+import { AGENT_CATALOG } from '../agents/catalog';
 import type { AgentTask } from '../agents/tasks';
 import type { CacheInput, CacheScope } from '../cache/semantic-cache';
 import { buildContext, type ContextDeps } from '../context/build';
@@ -93,11 +94,13 @@ export function prepareTask(
         .map((m) => m.content)
         .join('\n'),
     );
+  const { maxTrimLevel } = AGENT_CATALOG[task.agent];
   const fit = fitContextToBudget({
     buildAt: (level) => buildContext(task, level, contextDeps),
     measure,
     maxInputTokens:
       options.applyBudget && !isStatic(task) ? limits.maxInputTokens : Number.MAX_SAFE_INTEGER,
+    ...(maxTrimLevel === undefined ? {} : { maxLevel: maxTrimLevel }),
   });
   const nonce = deriveNonce(requestId, prompt.templateHash);
   const messages = renderMessages(prompt, fit.built.context, { nonce });

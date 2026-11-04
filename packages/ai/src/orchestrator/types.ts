@@ -13,6 +13,7 @@ import type { ProviderErrorCode } from '../errors';
 import type { GovernorLimits, TokenGovernor } from '../governor/token-governor';
 import type { HandlerOverrides } from '../providers/deterministic/provider';
 import type { PromptRegistry } from '../prompts/registry';
+import type { ProposalReport } from '../reasoning/types';
 import type { BreakerSnapshot } from '../resilience/circuit-breaker';
 import type { BulkheadStats } from '../resilience/bulkhead';
 import type { OutputIssue, ValidationLimits } from '../validators/types';
@@ -38,6 +39,14 @@ export interface AgentRunRequest<A extends AgentName> {
   retainContent?: boolean;
   /** Skip the model and use deterministic code for this task. */
   forceDeterministic?: boolean;
+  /**
+   * A ceiling on the tokens of a larger unit of work this task belongs to (a model-assisted review): `used` is what
+   * the unit has already spent. A call that could take the unit past `ceiling` is refused before it is made
+   * (`budget_exceeded`, code `run_tokens`) and the task falls back to deterministic code.
+   */
+  runTokenBudget?: { ceiling: number; used: number };
+  /** Fewer validator-feedback repair attempts than the orchestrator's default allows. Never more. */
+  maxRepairAttempts?: number;
 }
 
 /** Why a model proposal was not used. Contains our own wording only, never raw model text. */
@@ -66,6 +75,13 @@ export interface AgentRunResult<A extends AgentName> {
   inputFlags: InputFlags;
   /** Honest, user-safe notes (fallback, compression, simulated labelling). */
   notices: string[];
+  /**
+   * What happened to each proposal of a reasoning agent's reply, and the located quotations of the survivors. Null for
+   * every other agent and whenever the result is not a validated reply (deterministic code, a fallback).
+   */
+  proposals: ProposalReport | null;
+  /** Provider calls made for this task, repairs included (a call's own transport retries are not counted). */
+  providerCalls: number;
   /** Present only when `retainContent` was requested. */
   content?: { messages: ModelMessage[]; rawOutput: string | null };
 }

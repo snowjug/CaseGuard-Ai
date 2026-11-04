@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import {
   AgentNameSchema,
+  CASE_CRITIC_SCHEMA_ID,
+  CASE_REASONER_SCHEMA_ID,
+  CaseCriticOutputSchema,
+  CaseReasonerOutputSchema,
   CounterfactualStrategySchema,
   EvidenceCategorySchema,
   ForkCategorySchema,
@@ -9,6 +13,8 @@ import {
   LevelSchema,
   QualityDimensionKeySchema,
   type AgentName,
+  type CaseCriticOutput,
+  type CaseReasonerOutput,
 } from '@caseguard/schemas';
 
 /**
@@ -281,6 +287,15 @@ export const SafetyVerdictSchema = z.strictObject({
 });
 export type SafetyVerdict = z.infer<typeof SafetyVerdictSchema>;
 
+// ---------------------------------------------------------------- reasoning agents (optional model assistance)
+
+/**
+ * The two agents of the optional model-assisted review. Their schemas live in `@caseguard/schemas` (`ai-findings.ts`)
+ * because the stored finding and the screens share them; they are registered here like every other agent's output.
+ */
+export { CaseCriticOutputSchema, CaseReasonerOutputSchema };
+export type { CaseCriticOutput, CaseReasonerOutput };
+
 // ---------------------------------------------------------------- registry
 
 export interface AgentOutputs {
@@ -294,6 +309,8 @@ export interface AgentOutputs {
   communication_coach: CoachingNotes;
   token_governor: TokenGovernorDecision;
   safety_policy_validator: SafetyVerdict;
+  case_reasoner: CaseReasonerOutput;
+  case_critic: CaseCriticOutput;
 }
 
 export type AgentOutputOf<A extends AgentName> = AgentOutputs[A];
@@ -309,6 +326,8 @@ export const OUTPUT_SCHEMAS: { [A in AgentName]: z.ZodType<AgentOutputs[A]> } = 
   communication_coach: CoachingNotesSchema,
   token_governor: TokenGovernorDecisionSchema,
   safety_policy_validator: SafetyVerdictSchema,
+  case_reasoner: CaseReasonerOutputSchema,
+  case_critic: CaseCriticOutputSchema,
 };
 
 export const OUTPUT_SCHEMA_IDS: Record<AgentName, string> = {
@@ -322,4 +341,6 @@ export const OUTPUT_SCHEMA_IDS: Record<AgentName, string> = {
   communication_coach: 'caseguard.coaching-notes.v1',
   token_governor: 'caseguard.token-governor-decision.v1',
   safety_policy_validator: 'caseguard.safety-verdict.v1',
+  case_reasoner: CASE_REASONER_SCHEMA_ID,
+  case_critic: CASE_CRITIC_SCHEMA_ID,
 };

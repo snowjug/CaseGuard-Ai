@@ -1,13 +1,37 @@
 import { rankActions, strategyProfile } from '@caseguard/domain';
 import type { AgentTask } from '../agents/tasks';
-import { clip } from '../util/text';
+import type { ReviewConclusion } from '../reasoning/types';
+import type { Redactor } from '../types';
+import { clip, collapseWhitespace } from '../util/text';
 import { hypothesisStandingAsOf, likelihoodLevel } from './derive';
 import type { ScopedAnalysis } from './scope';
 import type { EventStamp } from './types';
 
 export interface FocusDeps {
   maxAnalysisDepth: number;
+  /** Applied to every text of a conclusion under review before it is shown (they quote and paraphrase the record). */
+  redact: Redactor;
 }
+
+/** The most conclusions the critic is given to review. The rest are not shown to it; they are still findings. */
+export const MAX_CONCLUSIONS_UNDER_REVIEW = 30;
+
+const conclusionFocus = (c: ReviewConclusion, redact: Redactor) => {
+  const text = (value: string, max: number): string => clip(collapseWhitespace(redact(value)), max);
+  return {
+    id: c.id,
+    source: c.source,
+    kind: c.kind,
+    text: text(c.text, 300),
+    reasoning: c.reasoning === null ? null : text(c.reasoning, 300),
+    confidenceBasis: c.confidenceBasis,
+    confidence: c.confidence,
+    eventIds: c.eventIds.slice(0, 8),
+    evidence: c.evidence
+      .slice(0, 3)
+      .map((e) => ({ eventId: e.eventId, excerpt: text(e.excerpt, 200) })),
+  };
+};
 
 export interface FocusResult {
   focus: Record<string, unknown>;
@@ -191,6 +215,17 @@ export function buildFocus(task: AgentTask, scoped: ScopedAnalysis, deps: FocusD
     case 'timeline_analyzer':
     case 'evidence_classifier':
     case 'hypothesis_generator':
+    case 'case_reasoner':
       return { focus: {}, anchors, actionIds };
+    case 'case_critic':
+      return {
+        focus: {
+          conclusions: task.input.conclusions
+            .slice(0, MAX_CONCLUSIONS_UNDER_REVIEW)
+            .map((c) => conclusionFocus(c, deps.redact)),
+        },
+        anchors,
+        actionIds,
+      };
   }
 }

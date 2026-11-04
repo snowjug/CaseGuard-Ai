@@ -55,13 +55,24 @@ function buildLimits(ctx: BuildContext): AiLimits {
 
 /**
  * AI provider settings. The default is the deterministic knowledge-pack provider, which needs no
- * network. Azure OpenAI uses managed identity; an API key is for local experiments only.
+ * network. Azure OpenAI uses managed identity; an API key is for local experiments only. `scripted` is a test
+ * double that replays a script (packages/ai): it is refused unless APP_ENV is local or test, so it can never serve a
+ * deployed environment.
  */
 export function buildAi(ctx: BuildContext): AiConfig {
   const { raw } = ctx;
   const limits = buildLimits(ctx);
   const provider = raw.AI_PROVIDER ?? 'deterministic';
   if (provider === 'deterministic') return { provider, limits };
+  if (provider === 'scripted') {
+    if (!ctx.localLike) {
+      ctx.fail(
+        'AI_PROVIDER',
+        "'scripted' is a test-only provider and is allowed only when APP_ENV is local or test; use 'deterministic' or 'azure-openai'",
+      );
+    }
+    return { provider, limits };
+  }
 
   const endpoint = raw.AZURE_OPENAI_ENDPOINT;
   if (endpoint === undefined) {

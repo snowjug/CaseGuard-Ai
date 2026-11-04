@@ -1,5 +1,5 @@
 import type { AgentName } from '@caseguard/schemas';
-import type { TemporalMode } from '../context/types';
+import type { TemporalMode, TrimLevel } from '../context/types';
 
 export type AgentDifficulty = 'deterministic' | 'classification' | 'reasoning' | 'generation';
 export type KnowledgeSection = 'hypotheses' | 'actions' | 'requirements' | 'signals';
@@ -17,12 +17,28 @@ export interface AgentMeta {
     evidence: boolean;
     claims: 'none' | 'plain' | 'flagged';
     knowledge: readonly KnowledgeSection[];
+    /**
+     * Give each knowledge item its description (a vocabulary the model can read), and an action only its id, label and
+     * description. Default false: the catalogue entries carry their ranking attributes instead.
+     */
+    vocabulary?: boolean;
+    /**
+     * Label each event with the engineering action the deterministic engine recognised in it. Default true. The agents
+     * that must not see the engine's findings (the reasoner, whose agreement with the engine has to be independent)
+     * turn it off.
+     */
+    recognisedActions?: boolean;
   };
   /**
    * Items of this output array are anchored to a moment in the case: everything they cite must
    * have been known then (strictly before the anchor event, or up to the claim's own event).
    */
   itemAnchor: { arrayKey: string; source: 'claim' | 'event'; inclusive: boolean } | null;
+  /**
+   * The most compressed context this agent accepts. An agent that quotes event text cannot work from headers, so for
+   * it a context that does not fit at this level is refused (`input_too_large`) rather than degraded. Default: any.
+   */
+  maxTrimLevel?: TrimLevel;
 }
 
 export const AGENT_CATALOG: Readonly<Record<AgentName, AgentMeta>> = {
@@ -131,5 +147,40 @@ export const AGENT_CATALOG: Readonly<Record<AgentName, AgentMeta>> = {
     execution: 'deterministic_only',
     sections: { evidence: false, claims: 'none', knowledge: [] },
     itemAnchor: null,
+  },
+  // The two agents of the optional model-assisted review. They see the redacted events and a vocabulary, never the
+  // engine's findings (the critic sees a list of conclusions under review, which the task supplies), and they work from
+  // untrimmed or lightly trimmed text because they quote it.
+  case_reasoner: {
+    name: 'case_reasoner',
+    label: 'Case Reasoner',
+    temporalMode: 'pre_resolution',
+    difficulty: 'reasoning',
+    execution: 'model_or_deterministic',
+    sections: {
+      evidence: false,
+      claims: 'none',
+      knowledge: ['hypotheses', 'actions', 'requirements', 'signals'],
+      vocabulary: true,
+      recognisedActions: false,
+    },
+    itemAnchor: null,
+    maxTrimLevel: 1,
+  },
+  case_critic: {
+    name: 'case_critic',
+    label: 'Case Critic',
+    temporalMode: 'pre_resolution',
+    difficulty: 'reasoning',
+    execution: 'model_or_deterministic',
+    sections: {
+      evidence: false,
+      claims: 'none',
+      knowledge: ['hypotheses'],
+      vocabulary: true,
+      recognisedActions: false,
+    },
+    itemAnchor: null,
+    maxTrimLevel: 1,
   },
 };

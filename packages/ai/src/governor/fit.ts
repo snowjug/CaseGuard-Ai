@@ -18,6 +18,8 @@ export interface FitOptions {
   /** Estimated prompt tokens for a built context, including the fixed instructions. */
   measure: (built: BuiltContext) => number;
   maxInputTokens: number;
+  /** The most compressed level the caller accepts. A context that needs more than this does not fit. */
+  maxLevel?: TrimLevel;
 }
 
 /**
@@ -32,7 +34,8 @@ export function fitContextToBudget(options: FitOptions): FitResult {
   if (tokensBefore <= options.maxInputTokens) {
     return { built: first, level: 0, tokensBefore, tokensAfter: tokensBefore, fits: true };
   }
-  for (let level = 1; level <= MAX_TRIM_LEVEL; level++) {
+  const deepest = options.maxLevel ?? MAX_TRIM_LEVEL;
+  for (let level = 1; level <= deepest; level++) {
     const trimLevel = level as TrimLevel;
     const built = options.buildAt(trimLevel);
     const tokens = options.measure(built);

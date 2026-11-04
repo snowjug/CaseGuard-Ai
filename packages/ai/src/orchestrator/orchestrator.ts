@@ -362,6 +362,8 @@ export class AiOrchestrator {
       rejection: cause?.rejection ?? null,
       inputFlags: this.flagsOf(prepared),
       notices,
+      proposals: null,
+      providerCalls: cause?.calls.length ?? 0,
       ...(run.request.retainContent === true
         ? { content: { messages: sent.messages, rawOutput: cause?.rawOutput ?? null } }
         : {}),
@@ -411,7 +413,7 @@ export class AiOrchestrator {
           error: null,
           resultSource: 'cache',
           fallbackReason: null,
-          simulatedResult: outcome.meta.provider === 'deterministic',
+          simulatedResult: outcome.meta.provider !== 'azure-openai',
           cacheHit: true,
           cacheSavedTokens: outcome.meta.usage.totalTokens,
           earlyStopped: false,
@@ -423,6 +425,8 @@ export class AiOrchestrator {
           rejection: null,
           inputFlags: this.flagsOf(outcome.prepared),
           notices: ['Served from the tenant-scoped semantic cache.'],
+          proposals: outcome.report.proposals ?? null,
+          providerCalls: 0,
         };
       }
       case 'model': {
@@ -456,6 +460,8 @@ export class AiOrchestrator {
           rejection: null,
           inputFlags: this.flagsOf(outcome.prepared),
           notices,
+          proposals: outcome.report.proposals ?? null,
+          providerCalls: outcome.calls.length,
           ...(run.request.retainContent === true
             ? { content: { messages: outcome.prepared.messages, rawOutput: outcome.rawOutput } }
             : {}),

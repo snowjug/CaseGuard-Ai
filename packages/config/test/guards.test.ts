@@ -325,3 +325,51 @@ describe('provider requirements', () => {
     );
   });
 });
+
+describe('the scripted test provider is for local and test runtimes only', () => {
+  it.each(['local', 'test'])('is accepted when APP_ENV is %s, and needs nothing else', (appEnv) => {
+    const result = validateConfig({ APP_ENV: appEnv, AI_PROVIDER: 'scripted' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.config.ai.provider).toBe('scripted');
+    expect(result.config.ai.limits).toBeDefined();
+  });
+
+  it('is accepted with no APP_ENV at all, which is a local run', () => {
+    const result = validateConfig({ AI_PROVIDER: 'scripted' });
+    expect(result.ok && result.config.ai.provider).toBe('scripted');
+  });
+
+  it.each(['development', 'staging', 'production'])(
+    'is refused when APP_ENV is %s, and the refusal names AI_PROVIDER',
+    (appEnv) => {
+      const found = issuesFor({ ...PRODUCTION_ENV, APP_ENV: appEnv, AI_PROVIDER: 'scripted' });
+      expect(found.map((i) => i.variable)).toEqual(['AI_PROVIDER']);
+      expect(found[0]?.message).toMatch(/test-only provider/);
+      expect(found[0]?.message).toMatch(/local or test/);
+    },
+  );
+
+  it('is refused in a deployed environment whatever else is set, demo mode included', () => {
+    const found = issuesFor({
+      ...PRODUCTION_ENV,
+      AI_PROVIDER: 'scripted',
+      DEMO_MODE: 'true',
+      DEMO_AUTO_SEED: 'true',
+    });
+    expect(found.map((i) => i.variable)).toContain('AI_PROVIDER');
+  });
+
+  it('does not change the deterministic default, or what the deployed environments accept', () => {
+    const local = validateConfig({ APP_ENV: 'local' });
+    expect(local.ok && local.config.ai.provider).toBe('deterministic');
+    expect(issuesFor(PRODUCTION_ENV)).toEqual([]);
+    expect(issuesFor({ ...PRODUCTION_ENV, AI_PROVIDER: 'deterministic' })).toEqual([]);
+  });
+
+  it('still refuses a value that is not a provider', () => {
+    expect(
+      issuesFor({ APP_ENV: 'local', AI_PROVIDER: 'scripted-model' }).map((i) => i.variable),
+    ).toEqual(['AI_PROVIDER']);
+  });
+});

@@ -1,4 +1,9 @@
-import { AZURE_VALIDATION_NOTE, DeterministicProvider } from '@caseguard/ai';
+import {
+  AZURE_VALIDATION_NOTE,
+  DeterministicProvider,
+  SCRIPTED_MODEL,
+  SCRIPTED_VALIDATION_NOTE,
+} from '@caseguard/ai';
 import type { AiConfig } from '@caseguard/config';
 import type { ProviderStatus } from '@caseguard/schemas';
 
@@ -33,6 +38,9 @@ function limitsOf(ai: AiConfig): ProviderStatus['limits'] {
 export function configurationFacts(ai: AiConfig): string {
   if (ai.provider === 'deterministic') {
     return 'Runs in-process: no network call and no language model.';
+  }
+  if (ai.provider === 'scripted') {
+    return 'Test double that replays a script: no network call and no language model. Allowed only when APP_ENV is local or test.';
   }
   const authentication =
     ai.auth === 'managed-identity'
@@ -69,6 +77,21 @@ export function describeProvider(ai: AiConfig, now: Date): ProviderStatus {
         `In-process deterministic knowledge-pack engine. Results are simulated or estimated and labelled as such. ${configurationFacts(ai)}`,
       ),
       validationNote: descriptor.validationNote,
+      limits: limitsOf(ai),
+    };
+  }
+  if (ai.provider === 'scripted') {
+    return {
+      kind: 'scripted',
+      configured: true,
+      healthy: true,
+      model: SCRIPTED_MODEL,
+      simulated: true,
+      checkedAt,
+      detail: clip(
+        `Scripted test provider. Every reply comes from a script, so nothing it returns says anything about a real model. ${configurationFacts(ai)}`,
+      ),
+      validationNote: SCRIPTED_VALIDATION_NOTE,
       limits: limitsOf(ai),
     };
   }
