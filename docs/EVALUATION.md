@@ -543,3 +543,64 @@ Set-Location ..\..
 The calibration numbers in section 3 and the full evaluation report in section 5 were produced by throw-away scripts that import
 `@caseguard/domain` / `@caseguard/ai` and the test helpers; `evalReportToMarkdown` and `evalReportToJson` in `@caseguard/ai` render
 the harness report. The scripts were kept outside the repository.
+
+## 10. Wave 2: the evaluation sets, the protocol, the verdict criteria and the result
+
+Section 7 is the first, small, historical measurement (Wave 1). Wave 2 replaced it with three separate sets, a written protocol
+and a locked split. This section says what they are, **what verdict each possible result would earn (written before the locked
+split was run, and not changed afterwards)**, and then what was measured.
+
+### 10.1 The sets and the protocol
+
+| Split           | Cases                                         | Events | Labelled signal occurrences | Absences with a reason | Use                                                                                           |
+| --------------- | --------------------------------------------- | -----: | --------------------------: | ---------------------: | --------------------------------------------------------------------------------------------- |
+| `dev`           | 43 independent cases, plus 3 reordered copies |    419 |                         313 |                     78 | The tuning set: detectors may be changed after reading its per-case output. Optimistic.       |
+| `validation`    | 18                                            |    208 |                         129 |                     40 | Aggregates only; used to choose between detector variants. Mildly optimistic too (10.4).      |
+| `test` (locked) | 30                                            |      - |                         267 |                    122 | Run once per release with `eval:locked`; its numbers must never be used to change a detector. |
+
+The `dev` split holds the 16 Wave 1 cases (13 independent and 3 reordered copies) migrated to the Wave 2 format and 30 added
+in Wave 2. Every label is an **AI draft by one annotator** (`copilot-wave1`, `copilot-wave2-a`); no human has judged one, so
+the figures measure agreement with an AI assistant. The corpus is synthetic text.
+
+- **Independence.** The authors of the cases never opened the knowledge pack or the detectors. A checker (`eval:check`) rejects
+  any six-word run that a case shares with the two shipped samples, the vocabulary, the string literals of the pack, the
+  unit-test fixtures of the detectors or a case of another split. A dev case may be quoted by a detector test (dev is what the
+  detectors are tuned on); a validation or test case may not.
+- **Reach.** Nothing under `packages/*` or `apps/*` source, and no detector test, may import or read a validation or a test
+  case; only the evaluation tooling and the guard do.
+- **Who sees what.** Per-case output is for `dev` only. `validation` prints aggregates. The test split can be run only through
+  `eval:locked`, which refuses to run with uncommitted changes under the test cases or their annotations, refuses a split that
+  differs from the one locked in `evaluation/manifest.json`, and appends a hash-chained record to
+  `evaluation/runs/locked-runs.json`. The test author saw the file names of the dev and validation cases (not their content).
+- **Measures** (`packages/domain/test/evaluation/`): per-signal precision and recall with Wilson intervals (marked `too_few`
+  under 20 observations), negation (silence where the label says the fact is absent, with its reason), contradictions
+  (labelled conflicts found, class and subject right, precision), negative controls (nothing reported and no decision point),
+  decision points (precision, recall, earliest missed moment), the leading hypothesis and its calibration, citations verified
+  against the stored text, and the order of events.
+
+### 10.2 Verdict criteria (fixed before the locked run)
+
+The verdict is one of three, and the default is the first. Each criterion is applied to the **locked test split**, the only
+split that was not used to choose anything.
+
+**ANALYTICAL QUALITY NOT READY** unless every criterion of the next level holds.
+
+**READY FOR CONTROLLED INTERNAL EVALUATION**: the team may use the output on non-customer cases to judge it. All of:
+
+1. signal precision at least 0.85 and recall at least 0.60 (what is reported is mostly right, and a reader is not shown half of a story);
+2. the engine is silent on at least 95 % of the facts the labels say are absent, so that a denial is not read as a finding;
+3. every negative control of the split: no signal reported and no decision point;
+4. no citation that mismatches its stored text, and at least 85 % of the citations verified against it;
+5. decision points: precision at least 0.50, because a wrong "missed moment" is the output most likely to mislead a reviewer;
+6. nothing that protects the data regressed: secret scan, row-level security, redaction and audit-chain tests all green.
+
+**READY FOR CONTROLLED PILOT PREPARATION**: everything above, and also:
+
+7. signal precision at least 0.90 and recall at least 0.75;
+8. contradictions: at least half of at least 20 labelled conflicts found, with the right class in at least 70 % of the found pairs;
+9. the labels of the locked split reviewed by at least one independent human annotator, with an agreement figure (Cohen's kappa
+   on signals of at least 0.6) reported;
+10. a real-model evaluation, if the model-assisted path is to be enabled (it has never been run: no credentials).
+
+These are thresholds for a decision-support tool whose findings an engineer reads, not for an autonomous one. They were chosen
+from what a misleading or a missing finding costs a reviewer, not from a number the engine already reached.

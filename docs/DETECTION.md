@@ -47,19 +47,28 @@ whether it stops at a comma. The scope of a cue ends at the end of the clause: a
 line break or a contrast word (`but`, `however`, `although`, …). Abbreviations (`e.g.`, `etc.`) and labels such as
 `Correction:` do not end it.
 
-| Cue                   | Modality      |     Reach (words) | Example of what it decides                        |
-| --------------------- | ------------- | ----------------: | ------------------------------------------------- |
-| `cannot-rule-out`     | speculative   |                 6 | "We cannot rule out a DNS fault yet."             |
-| `not-sure`            | speculative   |                 4 | "I am not sure whether the proxy is involved."    |
-| `condition`           | conditional   | 12, comma-bounded | "If the logs had been checked, …"                 |
-| `counterfactual`      | conditional   |                10 | "The engineer would have checked the logs first." |
-| `negation-verb`       | negated       |  5, comma-bounded | "The engineer did not check the logs."            |
-| `negation-quantifier` | negated       |                 4 | "No log review was performed." "Nothing active."  |
-| `guess`               | speculative   |                 8 | "It might be a DNS issue." "I suspect the proxy." |
-| `request`             | requested     |                 8 | "Please send a HAR capture."                      |
-| `intention`           | future intent |                 8 | "I will check the logs tomorrow."                 |
-| `reported-by-someone` | attributed    |                10 | "The customer said the logs were checked."        |
-| `correction`          | corrected     |                12 | "Correction: the proxy was changed on Tuesday."   |
+| Cue                   | Modality      |     Reach (words) | Example of what it decides                         |
+| --------------------- | ------------- | ----------------: | -------------------------------------------------- |
+| `cannot-rule-out`     | speculative   |                 6 | "We cannot rule out a DNS fault yet."              |
+| `not-sure`            | speculative   |                 4 | "I am not sure whether the proxy is involved."     |
+| `condition`           | conditional   | 12, comma-bounded | "If the logs had been checked, …"                  |
+| `whether`             | conditional   | 10, comma-bounded | "Please check whether the logs hold a failed row." |
+| `counterfactual`      | conditional   |                10 | "The engineer would have checked the logs first."  |
+| `negation-verb`       | negated       |  5, comma-bounded | "The engineer did not check the logs."             |
+| `negation-quantifier` | negated       |                 4 | "No log review was performed." "Nothing active."   |
+| `guess`               | speculative   |                 8 | "It might be a DNS issue." "I suspect the proxy."  |
+| `request`             | requested     |                 8 | "Please send a HAR capture."                       |
+| `intention`           | future intent |                 8 | "I will check the logs tomorrow."                  |
+| `reported-by-someone` | attributed    |                10 | "The customer said the logs were checked."         |
+| `correction`          | corrected     |                12 | "Correction: the proxy was changed on Tuesday."    |
+
+**A question** is not on the list. After the cues have decided, a span that lies in a question is `requested` when it
+would otherwise have fired (asserted, negated, attributed or speculative); a request, a condition or a plan already is
+not a statement, so a question adds nothing to it. A question is a clause that opens with an auxiliary or a wh-word
+("is", "does", "could", "what", "any") and ends with a question mark, with no comma between the span and the mark (one
+before "or" does not count, as in an alternative question). "Are no failed rows recorded for these users?" and "Please
+check whether service health lists nothing active" therefore deny nothing, while "120 users cannot sign in, does anyone
+know why?" still states the 120 users: the question comes after a comma.
 
 Every cue carries a purpose, sentences it must decide and look-alikes it must **not** decide (`not only`, `no problem`,
 `please note`, `if possible`, a habit such as "if you wait it sometimes works"). A test runs all of them, so the list
@@ -80,11 +89,16 @@ signal. An engineer's planned or denied step is not a step taken. A request to t
 negation inside its own match must not count against it. A detector is `negativeContent` when it says so, or, when it
 does not say, when its own pattern contains a negation word; cues _before_ the match still apply.
 
-## 4. Quoted history
+## 4. Quoted history and the title of a reply
 
 Only `customer_email`, `engineer_email` and `escalation_response` events can quote. Masking never changes a length, so
 offsets in the masked text are offsets in the stored text. A quotation without a marker (pasted without `>`) is read as
 the writer's own words; this is a known limit.
+
+The title of a reply (one that opens with `Re:`, `Fwd:`, `AW:`, `SV:`, `Odp:` or `Re[2]:`) repeats the subject of the first
+message of the thread, and the first event already holds those words. It is blanked in the same way, for events of every
+type, so that a detector does not count the subject again at every reply and put it to the replier. A reply whose own body
+says the same thing is still read from the body.
 
 ## 5. Chat normalisation
 
