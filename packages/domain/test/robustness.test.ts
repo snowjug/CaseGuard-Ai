@@ -134,9 +134,9 @@ describe('[NFR-SEC-05] detectors cannot be used for denial of service (ReDoS)', 
    * constant-time and not a backtracking risk, so that one reason is not counted here.
    */
   const WORD_BOUNDARY_WRAPPER = 'it uses a look-around assertion';
-  // Two patterns have more than four unbounded `\s+` runs. Each run sits between literal words and is followed by a
-  // bounded gap, so there is nothing to backtrack into; they take 0.2 ms on every input above.
-  const REVIEWED_RUNS = ['sig.no-server-side-failure-records', 'sig.resolver-inconsistent'];
+  // One pattern has more than four unbounded `\s+` runs. Each run sits between literal words and is followed by a
+  // bounded gap, so there is nothing to backtrack into; it takes 0.2 ms on every input above.
+  const REVIEWED_RUNS = ['sig.resolver-inconsistent'];
 
   it('no pattern has nested repetition, a back-reference or an unreviewed run of unbounded repetitions', () => {
     const risky = regexes

@@ -997,3 +997,45 @@ describe('the pairs of the device token and the service health', () => {
     ).not.toContain('sig.prt-healthy');
   });
 });
+
+const PRECISION: readonly Family[] = [
+  {
+    id: 'no failed row: a time range called the failure window is not a failure, and "nothing is known yet" is not an empty log',
+    signal: 'sig.no-server-side-failure-records',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      'I went through the sign-in logs for those users. There is nothing at all for the failing attempts.',
+      'Zero rows for the failing attempts between 09:00 and 09:30.',
+    ],
+    doesNotRead: [
+      'The audit query came back with zero rows inside the failure window.',
+      'We got 0 rows in the incident period for the failure window you gave.',
+      'A bad token or a Conditional Access block would show in the sign-in logs, so I will check those first. Nothing is certain yet.',
+      'The sign-in logs will tell us more. For now nothing is decided.',
+    ],
+  },
+  {
+    id: 'several people: a count of people is read when they are affected, not when they are the object of an administrator or have only replied',
+    signal: 'sig.multiple-users-affected',
+    role: 'customer_admin',
+    type: 'customer_email',
+    reads: [
+      'More than 40 users in the Leeds office cannot sign in to Teams since nine.',
+      'Several people on the second floor get the same error.',
+      'We asked around and 25 colleagues have the same problem.',
+      'The policy blocked 50 users this morning.',
+    ],
+    doesNotRead: [
+      'I disabled the accounts of 60 users last night and asked them to sign in again.',
+      'Our helpdesk forced a password change for 300 users on Friday.',
+      '35 people have replied that the error is gone.',
+      'Twenty minutes ago I checked the list: 40 people from the Oslo team are in that group. They are not affected.',
+    ],
+  },
+];
+
+describeFamilies(
+  'wording families of the server side: precision of two older detectors',
+  PRECISION,
+);
