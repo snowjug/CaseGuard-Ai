@@ -1,0 +1,87 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-007-adfs02-ahead-of-time",
+  "split": "test",
+  "family": "fam-207",
+  "title": "One in three federated sign-ins to Teams fails at random",
+  "scenario": "In a federated tenant about a third of attempts fail and the same user succeeds on the next click; one of three AD FS servers has a clock several minutes ahead, and resynchronising it ends the failures.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-07-14T14:05:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_call",
+      "channel": "phone",
+      "title": "Call: one in three sign-ins failing",
+      "text": "Call 14:05 UTC (16:05 local, CEST). Sofia Albrecht, IT lead at Marlow & Finch, reports that since about lunchtime (11:00 UTC) roughly one in three Teams sign-ins fails. It is random: the same person fails and then gets through on the very next click. About 35 people have complained so far. Their domain is federated with AD FS, three servers behind a load balancer. She has not looked at the AD FS servers yet."
+    },
+    {
+      "key": "ev02",
+      "at": 16,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Where I'd look first",
+      "text": "Hi Sofia, since sign-in goes through your own AD FS farm and only some attempts fail, please check each of the three nodes for certificate and time problems: expiry dates on the token-signing and service-communications certificates, w32tm /query /status on every node, and the AD FS admin event log since 11:00 UTC. I'd also like the exact error wording, three users who were hit with a UTC timestamp for each, and a note on whether any office fares worse than the others.\n\nMateo"
+    },
+    {
+      "key": "ev03",
+      "at": 88,
+      "who": "network",
+      "type": "log_sample",
+      "channel": "email",
+      "title": "AD FS node check",
+      "text": "Jonas (sysadmin at Marlow & Finch). Per node:\n\nadfs01  w32tm offset +0.012s | certs valid until 2027-01-14 | admin log clean\nadfs02  w32tm offset +487.3s, last successful sync 6 days ago | admin log: EventID 364 x212 since 11:04, 'security token time bounds invalid'\nadfs03  w32tm offset +0.020s | certs valid until 2027-01-14 | admin log clean\n\nadfs02 is the VM that was moved to another host last Thursday. Users who failed: j.keller@example.com 12:31 UTC, m.vogt@example.com 12:44, a.rossi@example.com 12:52. No difference between offices."
+    },
+    {
+      "key": "ev04",
+      "at": 118,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Sign-in log check",
+      "text": "Sign-in logs for j.keller / m.vogt / a.rossi at 12:31 / 12:44 / 12:52 UTC: failure rows for all three, each citing the federated token's invalid time bounds. The successful retries right after were issued through other nodes. Fits adfs02 being about eight minutes ahead."
+    },
+    {
+      "key": "ev05",
+      "at": 130,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Cause and what to do",
+      "text": "Sofia - the cause looks clear: adfs02's clock is about eight minutes ahead, so tokens it issues are rejected downstream, and roughly a third of attempts land on it. Fix: resynchronise its time (and look at the hypervisor time-sync setting for that VM), and leave it out of rotation on the load balancer until its clock is right. I'll check back with you at 16:30 UTC.\n\nMateo"
+    },
+    {
+      "key": "ev06",
+      "at": 215,
+      "who": "network",
+      "type": "diagnostic_result",
+      "channel": "email",
+      "title": "adfs02 resynced",
+      "text": "adfs02 was pulled out of the pool at 15:52 UTC, resynced against the PDC, offset now +0.03s, and hypervisor time sync is switched off for that VM. Back in the pool at 16:20. Five of us have signed in to Teams ten times each since: no failures."
+    },
+    {
+      "key": "ev07",
+      "at": 1500,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "portal",
+      "title": "Next-day check",
+      "text": "Morning Sofia. The hourly count of federated failures in the sign-in logs has been flat at zero from 16:00 UTC yesterday onwards, and is still zero this morning. I also had Jonas re-run the clock check on all three nodes today: all within 50 ms. The case stays open until Friday as agreed.\n\nMateo"
+    },
+    {
+      "key": "ev08",
+      "at": 1520,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Next-day check",
+      "text": "Agreed, thanks. No complaints since yesterday afternoon."
+    }
+  ]
+}

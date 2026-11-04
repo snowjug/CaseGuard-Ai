@@ -1,0 +1,114 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-004-after-the-session-reset",
+  "split": "test",
+  "family": "fam-204",
+  "title": "Half of school staff cannot get back into Teams after a bulk session revocation",
+  "scenario": "After an administrator revoked all sessions following a phishing scare, many staff loop on sign-in; the logs show revoked-grant results, clearing the client cache fixes most devices, and a reinstall fixes the last two.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-10-20T08:20:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Teachers locked out of Teams after our security reset",
+      "text": "Hi, we had a phishing scare on Sunday so I revoked all sessions for the 120 teaching and admin staff late that evening, as the guidance says. Since this morning about half of them cannot get back into Teams: it shows 'your session has expired, sign in again', they type their details, it takes them round the same screen again, and some get in after three or four tries. Other Office apps seem OK for most. Lessons start at 9 and I have a queue at my door.\n\nGwen Haddad, Pinecrest Academy"
+    },
+    {
+      "key": "ev02",
+      "at": 12,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Teachers locked out of Teams after our security reset",
+      "text": "Hello Gwen, understood, let's get your queue down. Please send: the exact text on the failing screen (a screenshot is fine), three staff members it happened to, each with an approximate UTC time, and whether some building or device group suffers more than the others. Also: besides the Sunday revocation, has anything changed in MFA/Conditional Access, DNS or the proxy in the last two days?\n\nRafael"
+    },
+    {
+      "key": "ev03",
+      "at": 31,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Teachers locked out of Teams after our security reset",
+      "text": "Screenshot attached, it's the 'session has expired' page. Users: m.bell@example.com 08:02 UTC, h.ansah@example.com 08:09, j.tiwari@example.com 08:14 (UK is on BST until Sunday, so a clock in school reads an hour more). It hits everyone I've asked, in all three buildings, equally. No other changes: the Conditional Access set-up hasn't been edited since last term, and nobody touched the network."
+    },
+    {
+      "key": "ev04",
+      "at": 70,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Entra lookup",
+      "text": "m.bell, h.ansah and j.tiwari at 08:02 / 08:09 / 08:14 UTC: failure rows exist for all three. Result 50173 (grant expired or revoked, fresh authentication needed) for m.bell and j.tiwari, 50132 (session revoked) for h.ansah. Fits the Sunday revocation: the Teams client keeps presenting stale tokens."
+    },
+    {
+      "key": "ev05",
+      "at": 95,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "What the logs say, and one test",
+      "text": "Gwen - the failing attempts do reach Entra and they carry grant-expired and session-revoked results (AADSTS50173 and 50132), which matches the revocation you did on Sunday. Please don't revoke again. The stale sign-in state sits on each device, so on one affected laptop (Mr Bell's, say) please quit Teams completely, clear the Teams cache folder, start it again and sign in once. Tell me how that goes; I'll update you at 10:30 UTC.\n\nRafael"
+    },
+    {
+      "key": "ev06",
+      "at": 140,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: What the logs say, and one test",
+      "text": "Done on Mr Bell's laptop and on Hana Ansah's as well: cache cleared, one sign-in and both are straight in, and they've stayed in for the last 40 minutes. Shall I do the same on all of them?"
+    },
+    {
+      "key": "ev07",
+      "at": 160,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Roll it out",
+      "text": "Yes please, roll it out to the rest of the affected laptops. If you have a management tool, push a script that closes Teams, removes the cache folder and relaunches it; otherwise staff can do it by hand following the steps in the attachment.\n\nRafael"
+    },
+    {
+      "key": "ev08",
+      "at": 275,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Roll-out numbers",
+      "text": "Script ran on 62 laptops by 11:30 UTC. 60 are fine now. Two (Mr Tiwari's and the library one) still loop after the clear, same screen as before."
+    },
+    {
+      "key": "ev09",
+      "at": 300,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "The two stragglers",
+      "text": "Thanks. For those two, please reinstall Teams (uninstall, reboot, install the current client) and sign in. If either one still fails after that, send me a dsregcmd /status dump from that machine; I'd rather not ask for that unless it is needed.\n\nRafael"
+    },
+    {
+      "key": "ev10",
+      "at": 420,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: The two stragglers",
+      "text": "Reinstalling fixed both of them - Mr Tiwari signed in first time and so did the library PC. That's all 120 staff back in. Thank you."
+    },
+    {
+      "key": "ev11",
+      "at": 1500,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "portal",
+      "title": "Next-day check and closure",
+      "text": "Morning Gwen - no new contacts since yesterday afternoon, and the sign-in log has no more 50173 or 50132 rows for your staff after 12:00 UTC yesterday. I'm closing the case; please don't revoke all sessions again without telling us first, because it brings this back.\n\nRafael"
+    }
+  ]
+}

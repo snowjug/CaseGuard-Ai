@@ -1,7 +1,7 @@
 {
   "schema": "caseguard.eval-manifest/1",
   "datasetVersion": "2.0.0",
-  "annotationVersion": 1,
+  "annotationVersion": 2,
   "splits": {
     "dev": [
       "ev-d-001-p1-warsaw-resolver",
@@ -71,7 +71,16 @@
       "ev-v-017-partner-mail-bounces",
       "ev-v-018-two-dsregcmd-outputs"
     ],
-    "test": []
+    "test": [
+      "ev-t-001-harbourside-second-nameserver",
+      "ev-t-002-gw3-hangs-on-login",
+      "ev-t-003-dock-terminals-mfa-loop",
+      "ev-t-004-after-the-session-reset",
+      "ev-t-005-new-image-no-prt",
+      "ev-t-006-whole-company-signin-down",
+      "ev-t-007-adfs02-ahead-of-time",
+      "ev-t-008-one-nurse-white-window"
+    ]
   },
   "cases": {
     "ev-d-001-p1-warsaw-resolver": {
@@ -395,6 +404,62 @@
       "derivedFrom": null,
       "eventsSha256": "2cd4c6efc3bfade75145492a94320bc54cf85ed27af4af2ea296201feca15ff2",
       "annotationsSha256": "f2f76c5b19a5f474b66c3a5d5d46e7bbcef5eb5ff760c9dd2ba050a014d0a719"
+    },
+    "ev-t-001-harbourside-second-nameserver": {
+      "split": "test",
+      "family": "fam-201",
+      "derivedFrom": null,
+      "eventsSha256": "cd208fdf232462af6d4c57dd78fe87d151b2e031453f9e376fb0d6bcd4221784",
+      "annotationsSha256": "5bc1a2babfbe12c2120ed631243cbd86e2a70f4cffdf45449544116753f84e45"
+    },
+    "ev-t-002-gw3-hangs-on-login": {
+      "split": "test",
+      "family": "fam-202",
+      "derivedFrom": null,
+      "eventsSha256": "0ed9428282094e9139c2b375b07d1c8a9115201082178046e014555a50cf2e4e",
+      "annotationsSha256": "2d9cc93279c2fad5455af993417d3c9ff8b6ddf6b48dce5e6d745bab96aff308"
+    },
+    "ev-t-003-dock-terminals-mfa-loop": {
+      "split": "test",
+      "family": "fam-203",
+      "derivedFrom": null,
+      "eventsSha256": "b5283cddb11b802693ffb7345352556e21b3b96c2d357319ca3ffb3ebf7784cb",
+      "annotationsSha256": "339f5b1505e742eb5d9528230c40d8588df01d3b17bc7913142cd9b407b017a1"
+    },
+    "ev-t-004-after-the-session-reset": {
+      "split": "test",
+      "family": "fam-204",
+      "derivedFrom": null,
+      "eventsSha256": "df268b24e54bd117f92e1d05d44b4458e7f4dc7ec672ef6084cb5c0c0fd7429a",
+      "annotationsSha256": "534bb1a97f4afa9ff36ee0c69f5b5931d51944de76be17540fcd1275385ed7f1"
+    },
+    "ev-t-005-new-image-no-prt": {
+      "split": "test",
+      "family": "fam-205",
+      "derivedFrom": null,
+      "eventsSha256": "a1d0045d63e808570d7f7b72d09d3daa63ae2062241317ac29008b329524c453",
+      "annotationsSha256": "8643282969ea2b9f5c825ff87e3c6340c43d93b2768aa8e02946e1f42fed57b1"
+    },
+    "ev-t-006-whole-company-signin-down": {
+      "split": "test",
+      "family": "fam-206",
+      "derivedFrom": null,
+      "eventsSha256": "bb4b0c59c3ee900433b48c3518c7ac42ce8469bf426398f09358f2c0d22073c1",
+      "annotationsSha256": "320da50b1b7abb31aea39cffc037033c82e141512393eaf27093be4bfdc971c8"
+    },
+    "ev-t-007-adfs02-ahead-of-time": {
+      "split": "test",
+      "family": "fam-207",
+      "derivedFrom": null,
+      "eventsSha256": "6696348deacc44bc108e6ef0a26b554c10cb40ffb9ed80c11b9cbb4831108be4",
+      "annotationsSha256": "54b7857aa94a24c08443b99eb4bf3036680a2390cf0ed0be051092bc22da93da"
+    },
+    "ev-t-008-one-nurse-white-window": {
+      "split": "test",
+      "family": "fam-208",
+      "derivedFrom": null,
+      "eventsSha256": "ed386a600fd9c689cefa169b18ff099b2e71878fbf33aea6b1564f530b9408b9",
+      "annotationsSha256": "7d2bbb78d77652c6f21d3aa3c23894ccd9dd66ce9da2b41b28642372836c9773"
     },
     "ev-v-001-graz-new-filter": {
       "split": "validation",

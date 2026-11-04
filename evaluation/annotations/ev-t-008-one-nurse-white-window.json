@@ -1,0 +1,66 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-008-one-nurse-white-window",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T10:30:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.error-timeout" },
+        { "event": "ev01", "id": "sig.single-user-scope" },
+        { "event": "ev05", "id": "sig.cache-clear-resolved" },
+        { "event": "ev07", "id": "sig.cache-clear-resolved" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-har-capture" },
+        { "event": "ev04", "id": "act.clear-teams-cache" },
+        { "event": "ev06", "id": "act.communicate-status" }
+      ],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.web-client-also-fails",
+          "reason": "negated",
+          "note": "Teams in Edge works."
+        },
+        {
+          "event": "ev03",
+          "id": "act.clear-teams-cache",
+          "reason": "requested",
+          "note": "The user only asks whether she should delete the folder."
+        },
+        {
+          "event": "ev04",
+          "id": "act.request-har-capture",
+          "reason": "corrected",
+          "note": "The engineer withdraws the capture request."
+        },
+        {
+          "event": "ev06",
+          "id": "act.reinstall-teams",
+          "reason": "conditional",
+          "note": "A reinstall is only considered if the problem returns."
+        }
+      ],
+      "forks": [
+        {
+          "event": "ev02",
+          "category": "disproportionate_customer_effort",
+          "note": "A single non-technical user is asked for a decrypting capture and a HAR comparison before any scoping or a simple cache step."
+        }
+      ],
+      "earliestMissed": "ev02",
+      "counterfactualDirection": "better",
+      "conflicts": [],
+      "qualityBand": "needs_attention",
+      "causes": ["hyp.client-cache"],
+      "rationale": "One user, one laptop, with the web client working (ev01) points at the local client. The first reply (ev02) asks for packet captures from a non-technical user, which she cannot produce (ev03); the cache step that finally works (ev04, ev05) was available from the start. The engineer corrects course quickly and closes properly, but ev02 cost the customer three hours and some distress.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

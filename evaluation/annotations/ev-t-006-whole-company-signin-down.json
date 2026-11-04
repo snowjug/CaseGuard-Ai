@@ -1,0 +1,63 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-006-whole-company-signin-down",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T10:10:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev03", "id": "sig.service-health-incident" },
+        { "event": "ev04", "id": "sig.service-health-incident" },
+        { "event": "ev05", "id": "sig.resolvers-consistent" },
+        { "event": "ev05", "id": "sig.proxy-nodes-consistent" },
+        { "event": "ev06", "id": "sig.error-timeout" }
+      ],
+      "actions": [
+        { "event": "ev03", "id": "act.check-service-health" },
+        { "event": "ev04", "id": "act.communicate-status" },
+        { "event": "ev07", "id": "act.check-service-health" },
+        { "event": "ev07", "id": "act.communicate-status" }
+      ],
+      "absent": [
+        {
+          "event": "ev04",
+          "id": "act.check-service-health",
+          "reason": "future_intent",
+          "note": "The repeated checks every 30 minutes are promised, not yet done."
+        },
+        {
+          "event": "ev05",
+          "id": "sig.resolver-inconsistent",
+          "reason": "negated",
+          "note": "All three resolvers answer correctly."
+        },
+        {
+          "event": "ev05",
+          "id": "sig.proxy-node-inconsistent",
+          "reason": "negated",
+          "note": "Both proxy nodes answer normally."
+        },
+        {
+          "event": "ev06",
+          "id": "sig.single-user-scope",
+          "reason": "speculative",
+          "note": "The user only wonders whether it is just them."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.service-incident"],
+      "rationale": "Everybody is affected at once (ev01) and the engineer checks service health straight away (ev03), finding an active incident that matches in symptom and start time. The customer's own resolver and proxy checks (ev05) are clean, which agrees. The engineer says plainly that nothing needs changing, promises updates (ev04) and reports the restoration (ev07). After restoration the incident is no longer active, so ev07 carries no incident signal.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

@@ -1,0 +1,78 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-001-harbourside-second-nameserver",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T09:20:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.site-correlated" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        {
+          "event": "ev01",
+          "id": "sig.error-name-not-resolved",
+          "uncertainty": "low",
+          "note": "Plain-language description of the cannot-find-the-server page; no code or message id is quoted."
+        },
+        { "event": "ev03", "id": "sig.error-name-not-resolved" },
+        { "event": "ev03", "id": "sig.site-correlated" },
+        { "event": "ev03", "id": "sig.recent-network-change-reported" },
+        { "event": "ev03", "id": "sig.ca-config-unchanged" },
+        { "event": "ev04", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev05", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev06", "id": "sig.resolver-inconsistent" },
+        { "event": "ev06", "id": "sig.recent-network-change-reported" },
+        { "event": "ev07", "id": "sig.resolver-inconsistent" },
+        { "event": "ev08", "id": "sig.dns-fix-resolved" },
+        { "event": "ev09", "id": "sig.dns-fix-resolved" },
+        { "event": "ev10", "id": "sig.dns-fix-resolved" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.dns-resolver-comparison" },
+        { "event": "ev05", "id": "act.communicate-status" },
+        { "event": "ev07", "id": "act.remove-resolver-from-service" },
+        { "event": "ev07", "id": "act.restore-dns-policy" },
+        { "event": "ev07", "id": "act.communicate-status" },
+        { "event": "ev09", "id": "act.validate-fix" },
+        { "event": "ev09", "id": "act.communicate-status" }
+      ],
+      "absent": [
+        {
+          "event": "ev03",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "negated",
+          "note": "Customer says the MFA and Conditional Access settings were left alone since the autumn."
+        },
+        {
+          "event": "ev04",
+          "id": "sig.server-side-failure-records-present",
+          "reason": "negated",
+          "note": "No failure rows at the sampled times."
+        },
+        {
+          "event": "ev04",
+          "id": "act.request-har-capture",
+          "reason": "negated",
+          "note": "The engineer says explicitly that no HAR traces are being requested."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.dns-resolution"],
+      "rationale": "Scoping comes first (ev02), the log lookup (ev04) shows the attempts never reached Entra, and a per-resolver test (ev05, ev06) isolates one resolver that fails for the sign-in names. The engineer separates the workaround (pull the resolver) from the permanent rule correction (ev07), and checks before and after (ev09). The recent filtering rollout (ev03, ev06) and the single failing resolver (ev06) support the cause. Handling is efficient: nothing costly is asked of end users.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

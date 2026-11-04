@@ -1,0 +1,78 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-008-one-nurse-white-window",
+  "split": "test",
+  "family": "fam-208",
+  "title": "Teams desktop closes with an error on one clinic laptop; browser works",
+  "scenario": "A single clinic user cannot start the Teams desktop client while colleagues and the browser version are fine. The first engineer reply demands traces from a non-technical user; a later simple cache deletion fixes the laptop.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-04-27T09:12:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Teams refuses to open on my work laptop",
+      "text": "Good afternoon, my name is Beatriz Alves, dental nurse at the Kestrel Dental Group clinic in Porto. Since Monday my Teams on my work laptop will not start - a white window, then a message with caa82ee2 and then it closes by itself. Nobody else here has this, I asked Rui and Joana. I can open Teams in Edge and it works OK there. Please help me, I need Teams for the patient reminders."
+    },
+    {
+      "key": "ev02",
+      "at": 40,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Teams will not start on my laptop",
+      "text": "Dear Beatriz, to analyse the issue properly I need a full network capture. Please install Fiddler Classic, enable HTTPS decryption, reproduce the failing start-up while capturing, save the session as a SAZ file, and also export a HAR file from the Edge developer tools for the sign-in that works, for comparison. Please send both files, and the Teams log bundle zipped (Ctrl+Alt+Shift+1 inside the app).\n\nKind regards, Dominic"
+    },
+    {
+      "key": "ev03",
+      "at": 175,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Teams will not start on my laptop",
+      "text": "Dear Dominic, I tried but Fiddler asks for an administrator password and I do not have one, I am very sorry. Rui says maybe I should just delete the Teams folder and start again? Should I?"
+    },
+    {
+      "key": "ev04",
+      "at": 255,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "A much simpler step",
+      "text": "No need to apologise, forget the capture. Let's try something much simpler. Close Teams completely (right-click the icon in the tray, Quit), then empty out the Teams cache folder (%appdata%\\Microsoft\\Teams for the classic client, or %localappdata%\\Packages\\MSTeams_8wekyb3d8bbwe\\LocalCache for the new one) and start Teams again.\n\nDominic"
+    },
+    {
+      "key": "ev05",
+      "at": 300,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: A much simpler step",
+      "text": "I deleted the folder as you wrote. Teams opened, asked for my password once and I am in. All my chats are there. It has been two hours and it is still working."
+    },
+    {
+      "key": "ev06",
+      "at": 320,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: A much simpler step",
+      "text": "Excellent. If it should come back we would look at a reinstall next, otherwise nothing more is needed. I will leave the case open until Friday and write to you then.\n\nDominic"
+    },
+    {
+      "key": "ev07",
+      "at": 4400,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: A much simpler step",
+      "text": "Teams has worked every day since I deleted the folder. Thank you for your patience, and sorry about the Fiddler."
+    }
+  ]
+}

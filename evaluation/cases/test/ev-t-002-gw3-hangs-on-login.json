@@ -1,0 +1,114 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-002-gw3-hangs-on-login",
+  "split": "test",
+  "family": "fam-202",
+  "title": "London office: Teams sign-in hangs, Glasgow fine, new web gateways",
+  "scenario": "After TLS inspection was widened on a pool of four web gateways, about half the London office cannot sign in; one gateway never answers for the Microsoft sign-in hosts, and taking it out of the pool ends the failures. The engineer asks for end-user HAR traces that were not needed.",
+  "categories": ["noisy"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-11T06:50:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "teams login broken london",
+      "text": "hi. teams is failing for like half the ppl in the london office since this morning?? sign in just hangs for ages and then pops up caa82ee2. my laptop too. glasgow lot say theyre ok. sometimes if u retry it goes thru but mostly not. we switched on TLS inspection on the new gateway pool wed night but i doubt thats it cos some ppl were fine yday after that. also the coffee machine is broken lol. pls advise asap thx - Ruben (Quillon Legal)"
+    },
+    {
+      "key": "ev02",
+      "at": 2,
+      "who": "system",
+      "type": "system_event",
+      "channel": "tool",
+      "title": "Auto acknowledgement",
+      "text": "Case registered. Priority P2 (business hours). First response target: 60 minutes. A support engineer will be assigned shortly."
+    },
+    {
+      "key": "ev03",
+      "at": 14,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: teams login broken london",
+      "text": "Hi Ruben - a few quick things please:\n- exact error text/screenshot from a failing machine\n- 3 users who hit it, with roughly when (UTC pls)\n- which sites/subnets fail and which are fine\n- what exactly changed on Wed night, and who owns the gateways\nIf you've got a network person, loop them in. Ines"
+    },
+    {
+      "key": "ev04",
+      "at": 43,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: teams login broken london",
+      "text": "ok. users who failed (BST on the laptops so UTC is an hour earlier than shown): Ruben Ashby 08:12, Mei Ling Chong 08:20, Oskar Brandt 08:31. London = 10.60.0.0/16, all of it hit at times; Glasgow = 10.61.0.0/16, no complaints at all. gateways are gw1-gw4, owned by Dariusz in our network team, he's cc'd. the thing that changed is TLS inspection for outbound web via the pool, from Wed 22:00."
+    },
+    {
+      "key": "ev05",
+      "at": 79,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Log lookup",
+      "text": "Checked Ruben, Mei Ling, Oskar at 07:12 / 07:20 / 07:31 UTC (customer sent BST, converted) in SigninLogs + non-interactive. Nothing for any of them, no failures logged at those minutes => attempts are not reaching Entra."
+    },
+    {
+      "key": "ev06",
+      "at": 97,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Next: test each gateway",
+      "text": "Dariusz - from a London LAN client please hit login.microsoftonline.com through each of gw1..gw4 in turn (curl with the proxy set, or the PAC route if that's easier), note timings per gateway, and send me the output. Ruben - while that runs, can two of the affected users capture a Fiddler or browser HAR file of a failing sign-in and send it over? Ines"
+    },
+    {
+      "key": "ev07",
+      "at": 152,
+      "who": "network",
+      "type": "log_sample",
+      "channel": "email",
+      "title": "gateway timings",
+      "text": "Dariusz here. 5 runs each from 10.60.4.21:\n\ncurl -s -o /dev/null -w \"%{time_total}\" -x http://gw1.q.example.com:8080 https://login.microsoftonline.com/\ngw1 0.41 0.39 0.44 0.40 0.42\ngw2 0.38 0.40 0.37 0.41 0.39\ngw3 no reply in 30 s x5 (killed it each time)\ngw4 0.44 0.43 0.47 0.45 0.44\n\nso its gw3 only."
+    },
+    {
+      "key": "ev08",
+      "at": 176,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "gw3 - workaround and permanent fix",
+      "text": "Thanks Dariusz, clear result. Workaround now: pull gw3 out of the PAC file / load balancer so London stops being sent to it. Permanent fix: stop decrypting traffic to the Microsoft 365 endpoints on the pool (use Microsoft's published endpoint list), through your change process (the gateway vendor can look at gw3 itself separately). Ruben - forget the HAR request, we don't need it any more. Tell me once gw3 is out of rotation. Ines"
+    },
+    {
+      "key": "ev09",
+      "at": 241,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: gw3 - workaround and permanent fix",
+      "text": "gw3 is out of the PAC as of 10:05 BST. just tested on my laptop, signed in first go, and Mei Ling and the others at my end are in as well. no more error screens so far."
+    },
+    {
+      "key": "ev10",
+      "at": 1500,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "email",
+      "title": "Next-day check",
+      "text": "Morning Ruben. No new London tickets since gw3 left the pool yesterday, and my scripted sign-in test from the London LAN passes through the pool as it stands. The vendor ticket for gw3 is open (no ETA). The inspection exemption goes to your change board on Tuesday; keeping this case open until it is in. Ines"
+    },
+    {
+      "key": "ev11",
+      "at": 1530,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Next-day check",
+      "text": "all good here, no sign in failures today that I've seen or heard about since gw3 came out. ok to close after the exemption goes in."
+    }
+  ]
+}
