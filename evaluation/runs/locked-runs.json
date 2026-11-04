@@ -1,0 +1,20 @@
+{
+  "schema": "caseguard.eval-locked-runs/1",
+  "runs": [
+    {
+      "ranAt": "2026-11-04T12:13:11Z",
+      "gitCommit": "cf2a92e2b7a0354f22a833cbacf15f67492c91b8",
+      "engineVersion": "2026.5.0 (@caseguard/domain@0.1.0)",
+      "packId": "kp.teams-authentication",
+      "packVersion": "1.2.0",
+      "packSha256": "b49341b870c35f72ab0e92fd4fdf7e52f2b7bae861a580e3639122f0bfcb1300",
+      "caseSetSha256": "9f032eb9634cc496709722b902d5a52d3bc93a5a5da4809fb205a862ff024d61",
+      "testSetSha256": "d22745ac4efbe6ca9ac84c8376a1f372a0bbe7081d63e6f28f9b405ce2d47d44",
+      "resultsSha256": "62976a8fb57568c92d8d1aade5369b030a86d40e3a38b3151e2af328a0276dc9",
+      "detail": false,
+      "index": 1,
+      "previous": null,
+      "hash": "557e539e4285a365c0dc44adb9516fc93e7de3a235687439574ba2b2521d3ac2"
+    }
+  ]
+}
