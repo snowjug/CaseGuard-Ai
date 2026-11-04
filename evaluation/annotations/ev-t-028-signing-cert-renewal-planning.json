@@ -1,0 +1,45 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-028-signing-cert-renewal-planning",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T14:40:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [],
+      "actions": [{ "event": "ev04", "id": "act.check-federation-health" }],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.federation-node-error",
+          "reason": "other",
+          "note": "A certificate that will expire in 60 days is a plan, not an error."
+        },
+        {
+          "event": "ev02",
+          "id": "sig.federation-node-error",
+          "reason": "conditional",
+          "note": "Certificate errors and clock drift are only described as what would happen if a node missed the rollover."
+        },
+        {
+          "event": "ev02",
+          "id": "act.check-federation-health",
+          "reason": "future_intent",
+          "note": "A checklist is promised, not yet sent."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": [],
+      "rationale": "No failure exists: this is advance planning for a certificate rollover and a clock-source change. Certificate and clock-skew words appear as an upcoming expiry and as conditionals, so they are not signals. The only action in the vocabulary is the node-check checklist the engineer sends in ev04, a request to review certificates, clocks and logs on each node.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

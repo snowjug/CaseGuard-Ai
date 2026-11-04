@@ -1,0 +1,39 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-016-vpn-hourly-rekey-drop",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T12:10:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [],
+      "actions": [],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.recent-network-change-reported",
+          "reason": "other",
+          "note": "A firewall firmware upgrade before a VPN problem; the workload is not Teams sign-in."
+        },
+        {
+          "event": "ev01",
+          "id": "sig.intermittent-failures",
+          "reason": "other",
+          "note": "A VPN reconnect works every time; not a Teams sign-in retry."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": [],
+      "rationale": "This is an IPsec VPN rekey problem, a different workload from Teams authentication. The engine has no knowledge pack for it and must refuse. The vocabulary of this domain does not apply, so no signal, action or cause is labelled; the firewall upgrade and the reconnect words are look-alike text. Handling of the case itself is efficient.",
+      "uncertainty": "none"
+    }
+  ],
+  "adjudication": null
+}

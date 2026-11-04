@@ -1,0 +1,87 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-014-council-mfa-go-live-plan",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T11:50:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [],
+      "actions": [{ "event": "ev04", "id": "act.review-ca-policy-config" }],
+      "absent": [
+        {
+          "event": "ev03",
+          "id": "sig.ca-exclusion-no-effect",
+          "reason": "other",
+          "note": "Break-glass accounts are excluded from the draft policy by design, not as a test."
+        },
+        {
+          "event": "ev04",
+          "id": "act.exclude-users-from-mfa-ca",
+          "reason": "other",
+          "note": "The break-glass exclusion in the draft is a design choice, not a test exclusion."
+        },
+        {
+          "event": "ev01",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "future_intent",
+          "note": "The policy will be created next week."
+        },
+        {
+          "event": "ev01",
+          "id": "sig.ca-exclusion-no-effect",
+          "reason": "conditional",
+          "note": "An exclusion is only considered if something goes wrong at go-live."
+        },
+        {
+          "event": "ev01",
+          "id": "sig.revoke-sessions-no-effect",
+          "reason": "conditional",
+          "note": "Revoking sessions is only considered if something goes wrong at go-live."
+        },
+        {
+          "event": "ev02",
+          "id": "sig.token-expiry-errors",
+          "reason": "conditional",
+          "note": "The 70043 codes are what one would see if a session passes the limit; none exist yet."
+        },
+        {
+          "event": "ev02",
+          "id": "act.revoke-user-sessions",
+          "reason": "conditional",
+          "note": "Only if there is a security reason."
+        },
+        {
+          "event": "ev02",
+          "id": "act.exclude-users-from-mfa-ca",
+          "reason": "conditional",
+          "note": "Advice about a pilot-first exclusion, not something arranged."
+        },
+        {
+          "event": "ev02",
+          "id": "act.review-ca-policy-config",
+          "reason": "future_intent",
+          "note": "The engineer will read the draft when it arrives."
+        },
+        {
+          "event": "ev03",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "future_intent",
+          "note": "The pilot, and so the policy, starts next Monday."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": [],
+      "rationale": "This is a planning conversation with no failure: every signal-like word (policy change, exclusion, revocation, token codes) appears as a plan, a condition or advice. The only real action is the engineer's review of the draft policy settings in ev04. The advice is sound and appropriately careful about revocation and exclusions.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

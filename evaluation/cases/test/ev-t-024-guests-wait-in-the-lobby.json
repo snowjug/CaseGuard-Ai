@@ -1,0 +1,60 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-024-guests-wait-in-the-lobby",
+  "split": "test",
+  "family": "fam-224",
+  "title": "External trainers wait in the Teams lobby after a meeting policy tweak",
+  "scenario": "A training company tightened its Teams meeting policy and now partner trainers wait in the lobby. Policy and change words appear in a harmless sense; there is no sign-in failure and nothing to diagnose.",
+  "categories": ["negative-control"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-08-05T15:10:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "External trainers wait in the lobby since our policy change",
+      "text": "Hi. Last week I changed our Teams meeting policy to tighten things up, and since then the external trainers we invite wait in the lobby until somebody lets them in. Inside the company everyone joins as before. We want the partner trainers to go straight in again, but not anonymous people who just have the link. Which setting is it?\n\nOlu Adeyemi, Hartwell Training"
+    },
+    {
+      "key": "ev02",
+      "at": 25,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: External trainers wait in the lobby since our policy change",
+      "text": "Hi Olu, it's the lobby bypass setting in the meeting policy: Teams admin center > Meetings > Meeting policies > the policy your trainers use > 'Who can bypass the lobby'. 'People in my org' keeps everybody from outside waiting. 'People in my org, trusted orgs and guests' lets partner trainers skip the lobby while anonymous joiners still wait.\n\nGerhard"
+    },
+    {
+      "key": "ev03",
+      "at": 48,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: External trainers wait in the lobby since our policy change",
+      "text": "Found it. I changed 'Who can bypass the lobby' on the Trainers policy from 'People in my org' to 'People in my org, trusted orgs and guests' about ten minutes ago. I'll test tomorrow with a partner trainer.\n\nOlu"
+    },
+    {
+      "key": "ev04",
+      "at": 1440,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: External trainers wait in the lobby since our policy change",
+      "text": "Tested with a partner trainer this morning: she joined straight in, no lobby, and a person with just the link still waited. Thanks!\n\nOlu"
+    },
+    {
+      "key": "ev05",
+      "at": 1445,
+      "who": "system",
+      "type": "status_change",
+      "channel": "tool",
+      "title": "Case resolved",
+      "text": "Status changed from Open to Resolved."
+    }
+  ]
+}

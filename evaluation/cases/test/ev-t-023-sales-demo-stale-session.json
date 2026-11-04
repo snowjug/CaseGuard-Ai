@@ -1,0 +1,87 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-023-sales-demo-stale-session",
+  "split": "test",
+  "family": "fam-223",
+  "title": "Salesperson locked out of Teams desktop after a weekend password change",
+  "scenario": "A panicked single user whose desktop client keeps presenting a session from before her password change; the engineer's terse replies, a phone call transcript and a log lookup lead to a session revocation that ends it.",
+  "categories": ["noisy"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-07-21T06:50:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "URGENT teams wont let me in",
+      "text": "urgent!!! teams wont let me in since i changed my pw on sunday. it keeps saying you need to sign in again over and over. outlook and the rest work fine on my phone. im the only one who changed pw this weekend and no one else on the team has this problem. client demo at 10!!!\n\nTamar Eze, Sales"
+    },
+    {
+      "key": "ev02",
+      "at": 15,
+      "who": "customer",
+      "type": "customer_call",
+      "channel": "phone",
+      "title": "Call transcript",
+      "text": "Call 07:05 UTC from Tamar Eze (sales). Repeats her email. She says the Teams website in Edge signs her in without trouble but the desktop app will not, and she has restarted the laptop twice. Her colleagues are fine."
+    },
+    {
+      "key": "ev03",
+      "at": 22,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: URGENT teams wont let me in",
+      "text": "Tamar - looking at the logs now. Please don't reinstall anything. What's your sign-in address, and roughly when (UTC) did the last attempts fail?\n\nIbrahim"
+    },
+    {
+      "key": "ev04",
+      "at": 27,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: URGENT teams wont let me in",
+      "text": "tamar.eze@example.com. fails at about 06:58, again 07:03 and 07:10 UTC before I rang"
+    },
+    {
+      "key": "ev05",
+      "at": 40,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Entra check",
+      "text": "tamar.eze, 06:58 / 07:03 / 07:10 UTC: failure rows, AADSTS50173 twice (grant expired after the password change) and AADSTS50133 once (session expired). The desktop client is still presenting a token from before the Sunday change."
+    },
+    {
+      "key": "ev06",
+      "at": 46,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Found it",
+      "text": "Tamar, found it: the desktop app is holding a session from before your password change and Entra rejects it (50173). Fix: I'm revoking your sessions now, which signs you out everywhere once; then quit Teams fully and sign in again. Should take two minutes.\n\nIbrahim"
+    },
+    {
+      "key": "ev07",
+      "at": 58,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Found it",
+      "text": "ok did it!! signed in first time and im in the meeting room now. thank u thank u thank u"
+    },
+    {
+      "key": "ev08",
+      "at": 200,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "email",
+      "title": "Closing",
+      "text": "No failure rows for tamar.eze after 07:30 UTC. Closing the case.\n\nIbrahim"
+    }
+  ]
+}

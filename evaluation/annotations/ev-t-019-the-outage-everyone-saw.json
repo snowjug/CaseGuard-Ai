@@ -1,0 +1,75 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-019-the-outage-everyone-saw",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T12:40:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.error-timeout" },
+        { "event": "ev03", "id": "sig.service-health-clear" },
+        { "event": "ev04", "id": "sig.service-health-clear" },
+        { "event": "ev05", "id": "sig.site-correlated" },
+        { "event": "ev06", "id": "sig.service-health-incident" },
+        { "event": "ev07", "id": "sig.service-health-incident" }
+      ],
+      "actions": [
+        { "event": "ev03", "id": "act.check-service-health" },
+        { "event": "ev04", "id": "act.communicate-status" },
+        { "event": "ev04", "id": "act.request-minimal-scoping" },
+        { "event": "ev04", "id": "act.request-recent-changes" },
+        { "event": "ev06", "id": "act.check-service-health" },
+        { "event": "ev07", "id": "act.communicate-status" },
+        { "event": "ev09", "id": "act.check-service-health" },
+        { "event": "ev09", "id": "act.communicate-status" }
+      ],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.service-health-incident",
+          "reason": "attributed",
+          "note": "The customer relays social media and a tech site; no incident has been seen in the tenant's health view."
+        },
+        {
+          "event": "ev04",
+          "id": "act.check-service-health",
+          "reason": "future_intent",
+          "note": "The second look at 09:30 UTC is promised, not yet done."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [
+        {
+          "class": "source_disagreement",
+          "events": ["ev01", "ev03"],
+          "subject": "sig.service-health-incident",
+          "note": "The customer says Microsoft is down; the engineer's first look at Service health finds nothing active."
+        },
+        {
+          "class": "temporal_update",
+          "events": ["ev03", "ev06"],
+          "subject": "sig.service-health-clear",
+          "note": "Service health was clear at 08:40 UTC and lists an active incident at 10:10 UTC."
+        },
+        {
+          "class": "direct_contradiction",
+          "events": ["ev01", "ev05"],
+          "subject": "scope-of-offices",
+          "note": "All three offices are said to be locked out; the Cork contact says Cork has had no problem all morning."
+        }
+      ],
+      "qualityBand": "strong",
+      "causes": ["hyp.service-incident"],
+      "rationale": "The engineer does not take the customer's outage claim as fact: the first health check (ev03) is clear, the reply (ev04) says so and asks for scoping. When a second look finds an active incident (ev06) the engineer says plainly that the earlier statement was right then and no longer is (ev07). The Cork contact contradicts the claim that all offices are down (ev05 against ev01) and the incident then fits only part of the picture. The final check after resolution (ev09) is a status check, not an active-incident statement.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

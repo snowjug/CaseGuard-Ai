@@ -1,0 +1,69 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-014-council-mfa-go-live-plan",
+  "split": "test",
+  "family": "fam-214",
+  "title": "Council IT asks how Teams will behave once MFA enforcement is switched on",
+  "scenario": "A planning conversation ahead of an MFA go-live: nothing has happened yet, so revocation, exclusions, sign-in frequency and token codes appear only as plans, conditions and advice. The engineer does review the draft policy at the end.",
+  "categories": ["negative-control"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-30T10:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Planning MFA enforcement - questions before we start",
+      "text": "Hello, Frieda Lindholm, Harbourview Council IT. Nothing is broken, I am preparing. We plan to enforce MFA for all 400 staff on the 21st through a Conditional Access policy that I will create next week. Two questions. First, if we set the sign-in frequency to 8 hours, will Teams ask people to sign in again every 8 hours? Second, if something goes wrong at go-live, would it be acceptable to revoke sessions or to exclude a pilot group quickly, or is that a bad idea? Thanks in advance."
+    },
+    {
+      "key": "ev02",
+      "at": 35,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Planning MFA enforcement - questions before we start",
+      "text": "Hi Frieda, good that you ask before go-live.\nFirst: yes. With a sign-in frequency of 8 hours people must authenticate again at least every 8 hours, and Teams will prompt them at that point. That is the setting working as designed. If a session is past the limit you would see token-expiry codes such as 70043 in the sign-in logs, which is normal for that setting and not a fault.\nSecond: both are quick to do, but I would only revoke sessions if there is a security reason, since it forces everybody to sign in again. An exclusion is best tried on the pilot group first and removed afterwards.\nSend me the draft policy when you have it and I will read through it.\n\nZainab"
+    },
+    {
+      "key": "ev03",
+      "at": 70,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Planning MFA enforcement - questions before we start",
+      "text": "Very helpful. The pilot group will be 25 people and the rest follow a week later. Attached is the draft policy: all users, all cloud apps, require MFA, sign-in frequency 8 hours, break-glass accounts excluded. Pilot starts next Monday."
+    },
+    {
+      "key": "ev04",
+      "at": 120,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Draft policy review",
+      "text": "Read it through. Assignments and the break-glass exclusion look right. One suggestion: leave the sign-in frequency out for the pilot and add it in a second step, so you can tell which setting causes which prompt. Nothing else to change.\n\nZainab"
+    },
+    {
+      "key": "ev05",
+      "at": 180,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Draft policy review",
+      "text": "Good idea, I will drop the frequency for the pilot. Thank you for the quick review."
+    },
+    {
+      "key": "ev06",
+      "at": 1500,
+      "who": "system",
+      "type": "status_change",
+      "channel": "tool",
+      "title": "Case closed",
+      "text": "Status changed from Resolved to Closed. Reason: advice given, no further contact."
+    }
+  ]
+}

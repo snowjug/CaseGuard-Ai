@@ -1,0 +1,87 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-003-dock-terminals-mfa-loop",
+  "split": "test",
+  "family": "fam-203",
+  "title": "Shared dock terminals loop on Teams sign-in after new MFA-for-everything policy",
+  "scenario": "A new policy requiring MFA for every app stops shared warehouse terminals whose users cannot approve prompts; the sign-in logs show the policy as the blocker, and widening the grant to hybrid-joined devices ends the loop.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-03-18T09:05:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Teams keeps bouncing people back to sign-in since our MFA rollout",
+      "text": "Hello support,\n\nOn Monday afternoon our security lead pushed out a fresh Conditional Access rule that demands MFA for every cloud app, for all users, with a fresh prompt at each sign-in and no exceptions. Since yesterday morning the staff on the shared terminals in the dock office are asked for MFA and Teams drops them back on the sign-in page in a loop. Phones aren't allowed on the dock floor, so nobody there can approve a prompt anyway. About 40 of our 130 users have complained so far.\n\nImre Solheim, Nordhaven Shipping"
+    },
+    {
+      "key": "ev02",
+      "at": 17,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Teams keeps bouncing people back to sign-in since our MFA rollout",
+      "text": "Hi Imre, thanks for the detail. Three things so I can look at the logs: (1) what the screen actually says when the loop kicks in; (2) three people it happened to, plus a UTC time for each; (3) which devices or locations are hit and which are untouched. You mention one new policy - was anything else changed this week on the network, DNS, proxy or firewall side?\n\nNoor"
+    },
+    {
+      "key": "ev03",
+      "at": 55,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Teams keeps bouncing people back to sign-in since our MFA rollout",
+      "text": "Text on screen: 'More information required', then the Authenticator prompt, over and over. Failing: o.nilsen@example.com 06:58 UTC, d.petrov@example.com 07:05, k.asante@example.com 07:19 (we're on CET, UTC+1, so a local clock shows an hour more). Shared terminals fail; staff on their own managed laptops get a prompt on their phone and carry on. There were no network changes at all this month."
+    },
+    {
+      "key": "ev04",
+      "at": 92,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Log lookup and audit log",
+      "text": "Interactive sign-in logs for o.nilsen / d.petrov / k.asante at 06:58 / 07:05 / 07:19 UTC: each has a failure row at that minute, error AADSTS50076, Conditional Access status 'failure', policy 'Require MFA - all apps (v2)' applied. Audit log: that policy was created Mon 14:12 UTC. So the attempts do reach Entra and the new policy is what stops them."
+    },
+    {
+      "key": "ev05",
+      "at": 120,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Findings so far",
+      "text": "Imre - findings so far. The three failing attempts do reach Entra, and each one is stopped by the new 'Require MFA - all apps (v2)' policy (AADSTS50076). The terminals cannot satisfy the MFA requirement because nobody there can approve a prompt. Suggested change for your security lead, under your change control: let the dock terminals satisfy the policy by being compliant or hybrid-joined devices, rather than by MFA. Expect a note from me around 15:00 UTC to hear how it went.\n\nNoor"
+    },
+    {
+      "key": "ev06",
+      "at": 215,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Findings so far",
+      "text": "Our security lead edited the policy at 11:40 UTC to accept hybrid-joined devices as an alternative to MFA. The dock terminals are working now: Olav Nilsen and Dmitri Petrov are both in Teams as I write. We still need to do the same for the second warehouse's terminals."
+    },
+    {
+      "key": "ev07",
+      "at": 1500,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Next-day check",
+      "text": "Hi Imre, I repeated the earlier log query for the window 12:00-15:00 UTC yesterday and again for this morning: the terminal accounts show no failing rows any more, zero rows for them. Please confirm tomorrow morning that the shared terminals stay signed in through a full shift. I'll write again on Friday at 10:00 UTC either way.\n\nNoor"
+    },
+    {
+      "key": "ev08",
+      "at": 1560,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Next-day check",
+      "text": "Confirmed: the shared terminals have kept their Teams session through today's shift. Please close the case."
+    }
+  ]
+}

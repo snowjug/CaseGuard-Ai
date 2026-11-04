@@ -1,0 +1,85 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-021-excluded-and-still-failing",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T13:00:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        {
+          "event": "ev01",
+          "id": "sig.error-name-not-resolved",
+          "uncertainty": "low",
+          "note": "Plain-language description of the cannot-find-the-host page, no code quoted."
+        },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev01", "id": "sig.recent-ca-change-reported" },
+        { "event": "ev03", "id": "sig.ca-exclusion-no-effect" },
+        { "event": "ev03", "id": "sig.intermittent-failures" },
+        {
+          "event": "ev05",
+          "id": "sig.error-name-not-resolved",
+          "uncertainty": "low",
+          "note": "The browser's own wording for a name that cannot be resolved, not the code itself."
+        },
+        { "event": "ev05", "id": "sig.site-correlated" },
+        { "event": "ev06", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev07", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev08", "id": "sig.resolver-inconsistent" },
+        { "event": "ev08", "id": "sig.recent-network-change-reported" },
+        { "event": "ev10", "id": "sig.dns-fix-resolved" },
+        { "event": "ev11", "id": "sig.dns-fix-resolved" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.exclude-users-from-mfa-ca" },
+        { "event": "ev04", "id": "act.request-minimal-scoping" },
+        { "event": "ev06", "id": "act.signin-log-correlation" },
+        { "event": "ev07", "id": "act.dns-resolver-comparison" },
+        { "event": "ev07", "id": "act.communicate-status" },
+        { "event": "ev09", "id": "act.remove-resolver-from-service" },
+        { "event": "ev09", "id": "act.restore-dns-policy" },
+        { "event": "ev11", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        {
+          "event": "ev06",
+          "id": "sig.ca-exclusion-no-effect",
+          "reason": "other",
+          "note": "A judgement about why the test could not matter, not a new report of its outcome."
+        },
+        {
+          "event": "ev06",
+          "id": "sig.mfa-ca-events-in-logs",
+          "reason": "negated",
+          "note": "No MFA or CA failure results for the three users since Friday."
+        },
+        {
+          "event": "ev07",
+          "id": "act.exclude-users-from-mfa-ca",
+          "reason": "corrected",
+          "note": "The engineer takes back the earlier exclusion request and asks for it to be undone."
+        }
+      ],
+      "forks": [
+        {
+          "event": "ev02",
+          "category": "alternative_action_available",
+          "note": "The customer's own assumption that the new MFA rules were the cause was acted on, and users were excluded from the policy, before the cheap log lookup that later showed the attempts never reached Entra."
+        }
+      ],
+      "earliestMissed": "ev02",
+      "counterfactualDirection": "better",
+      "conflicts": [],
+      "qualityBand": "adequate",
+      "causes": ["hyp.dns-resolution"],
+      "rationale": "The customer blames the MFA rollout from the previous Friday (ev01) and the first move (ev02) follows that guess by asking for users to be excluded from the policy, which changes nothing (ev03). A log lookup, available at once and without customer effort, finds no rows and no MFA/CA results (ev06); the engineer owns the mistake. The page wording and the site pattern (ev05) point at name resolution, and the per-resolver answers (ev08) show the new filtering resolver giving nothing. The fix and its check follow (ev09 to ev11). The quoted line in ev04 repeats the customer's earlier result and is not a new statement.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

@@ -1,0 +1,150 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-010-hourly-bounce-baseline-all",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T11:10:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.service-health-clear" },
+        { "event": "ev03", "id": "sig.recent-ca-change-reported" },
+        { "event": "ev04", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev04", "id": "sig.token-expiry-errors" },
+        { "event": "ev04", "id": "sig.recent-ca-change-reported" },
+        { "event": "ev05", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev05", "id": "sig.token-expiry-errors" },
+        { "event": "ev05", "id": "sig.recent-ca-change-reported" },
+        { "event": "ev06", "id": "sig.ca-exclusion-no-effect" },
+        { "event": "ev06", "id": "sig.revoke-sessions-no-effect" },
+        { "event": "ev06", "id": "sig.cache-clear-no-effect" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev04", "id": "act.review-ca-policy-config" },
+        { "event": "ev05", "id": "act.communicate-status" },
+        { "event": "ev09", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        {
+          "event": "ev05",
+          "id": "sig.proxy-node-inconsistent",
+          "reason": "negated",
+          "note": "Nothing points at the proxy."
+        },
+        {
+          "event": "ev05",
+          "id": "sig.resolver-inconsistent",
+          "reason": "negated",
+          "note": "Nothing points at DNS."
+        },
+        {
+          "event": "ev05",
+          "id": "sig.federation-node-error",
+          "reason": "negated",
+          "note": "Nothing points at federation."
+        },
+        {
+          "event": "ev01",
+          "id": "sig.service-health-incident",
+          "reason": "attributed",
+          "note": "A forum poster claims an outage; the customer does not endorse it."
+        },
+        {
+          "event": "ev01",
+          "id": "sig.federation-node-error",
+          "reason": "negated",
+          "note": "Cloud-only tenant, no AD FS to look at."
+        },
+        {
+          "event": "ev01",
+          "id": "sig.proxy-node-inconsistent",
+          "reason": "speculative",
+          "note": "A colleague's guess about the proxy; no test."
+        },
+        {
+          "event": "ev03",
+          "id": "sig.site-correlated",
+          "reason": "negated",
+          "note": "All sites alike."
+        },
+        {
+          "event": "ev03",
+          "id": "sig.recent-network-change-reported",
+          "reason": "negated",
+          "note": "DNS and proxy untouched."
+        },
+        {
+          "event": "ev03",
+          "id": "sig.cache-clear-resolved",
+          "reason": "attributed",
+          "note": "A helpdesk colleague's claim, explicitly not checked by the customer."
+        },
+        {
+          "event": "ev05",
+          "id": "act.clear-teams-cache",
+          "reason": "negated",
+          "note": "The engineer asks the customer not to clear caches."
+        },
+        {
+          "event": "ev05",
+          "id": "act.reinstall-teams",
+          "reason": "negated",
+          "note": "The engineer asks the customer not to reinstall."
+        },
+        {
+          "event": "ev06",
+          "id": "sig.cache-clear-resolved",
+          "reason": "corrected",
+          "note": "The relayed cache-clear success is withdrawn: the problem returned an hour later."
+        },
+        {
+          "event": "ev07",
+          "id": "act.exclude-users-from-mfa-ca",
+          "reason": "negated",
+          "note": "The engineer advises leaving the MFA exclusion alone."
+        },
+        {
+          "event": "ev07",
+          "id": "act.revoke-user-sessions",
+          "reason": "negated",
+          "note": "The engineer advises leaving revocation alone."
+        },
+        {
+          "event": "ev08",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "other",
+          "note": "The 12-hour setting is the remedy, applied after onset."
+        },
+        {
+          "event": "ev09",
+          "id": "sig.token-expiry-errors",
+          "reason": "negated",
+          "note": "No 70043 rows after the change."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [
+        {
+          "class": "corrected_information",
+          "events": ["ev03", "ev06"],
+          "subject": "sig.cache-clear-resolved",
+          "note": "A relayed claim that clearing the cache fixed the PC is withdrawn: it came back an hour later."
+        }
+      ],
+      "qualityBand": "strong",
+      "causes": ["hyp.token-session", "hyp.conditional-access"],
+      "rationale": "Many claims in the customer's mails are not statements of fact: a forum outage rumour (ev01), a proxy guess (ev01) and a helpdesk cache report (ev03) are all hearsay or guesses and carry no signal. The engineer's lookup (ev04) finds token-expired rows and a sign-in frequency edit on the evening before onset, and the customer's own exclusion and revocation tests (ev06) changed nothing. The cache report is later withdrawn (ev06). The 12-hour setting in ev08 is a remedy after onset, not an onset change. Two causes fit: the token lifetime and the Conditional Access setting that sets it.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

@@ -1,0 +1,96 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-006-whole-company-signin-down",
+  "split": "test",
+  "family": "fam-206",
+  "title": "All three offices locked out of Teams sign-in from mid-morning",
+  "scenario": "Everyone at a food producer loses Teams sign-in at once; the customer's own resolver and proxy checks come back clean, service health shows an active Microsoft incident, and the failures stop when it is restored.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-05-06T10:31:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "TEAMS SIGN-IN DOWN EVERYWHERE",
+      "text": "Teams sign-in is dead for the whole company since about 10:20. 200+ people, all three offices, nobody can get in. Our CEO is standing next to me. Is this something on our side?? Please call back if you need to.\n\nOla Brandvold, Tallgrass Foods"
+    },
+    {
+      "key": "ev02",
+      "at": 1,
+      "who": "system",
+      "type": "system_event",
+      "channel": "tool",
+      "title": "Priority raised",
+      "text": "Priority raised from P3 to P1 automatically: affected-user estimate above 100 (keyword match). Duty manager notified."
+    },
+    {
+      "key": "ev03",
+      "at": 9,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Service health check",
+      "text": "10:40 UTC: opened Microsoft 365 service health. Active incident TM502817, 'Teams sign-ins failing or slow for customers in Europe', start 10:12 UTC, status investigating. Message center has nothing else relevant. This matches the customer's symptoms and timing."
+    },
+    {
+      "key": "ev04",
+      "at": 12,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "There is a Microsoft incident",
+      "text": "Hi Ola, there is an active Microsoft incident (TM502817) for Teams sign-in in Europe that began at 10:12 UTC, which fits what you're seeing. There's nothing you need to change on your side. I'll check the incident every 30 minutes and email you with each change; you'll hear from me by 12:30 UTC at the latest.\n\nPriya"
+    },
+    {
+      "key": "ev05",
+      "at": 22,
+      "who": "network",
+      "type": "diagnostic_result",
+      "channel": "email",
+      "title": "Our own checks",
+      "text": "Ola asked me to rule out our side. I queried login.microsoftonline.com and the CDN name on each of our three resolvers (10.20.0.2, .3, .4) with Resolve-DnsName: every answer correct, about 20 ms. I also pushed the same requests through both proxy nodes and both answer normally. Looks like it's not our DNS or proxy.\n\nKarl (network)"
+    },
+    {
+      "key": "ev06",
+      "at": 31,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "is it just me?",
+      "text": "is it just me or is everyone down?? the sign-in window shows ERR_CONNECTION_TIMED_OUT every time i press sign in. i have tried 6 times. i have a client call at 11:30 pls help"
+    },
+    {
+      "key": "ev07",
+      "at": 98,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Incident update: service restored",
+      "text": "Hi Ola, I looked at the incident page again just now: Microsoft has posted TM502817 as service restored at 11:58 UTC (cause given: a faulty configuration change in the regional sign-in front door). Please ask a handful of people across the three offices to sign in and tell me if anyone still fails. I'll keep the case open until tomorrow 09:00 UTC.\n\nPriya"
+    },
+    {
+      "key": "ev08",
+      "at": 125,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Incident update: service restored",
+      "text": "All three offices are back in. About 200 people have been signing in since noon with no trouble. Thanks for the quick answer."
+    },
+    {
+      "key": "ev09",
+      "at": 1500,
+      "who": "system",
+      "type": "status_change",
+      "channel": "tool",
+      "title": "Case closed",
+      "text": "Status changed from Waiting on customer to Closed. Reason: no further contact for 24 hours."
+    }
+  ]
+}

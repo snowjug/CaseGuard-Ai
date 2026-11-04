@@ -1,0 +1,157 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-009-rotterdam-crossed-off-list",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T11:00:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.error-timeout" },
+        { "event": "ev01", "id": "sig.ca-config-unchanged" },
+        { "event": "ev01", "id": "sig.service-health-clear" },
+        { "event": "ev01", "id": "sig.proxy-nodes-consistent" },
+        { "event": "ev03", "id": "sig.site-correlated" },
+        { "event": "ev04", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev04", "id": "sig.policy-events-outside-failure-window" },
+        { "event": "ev05", "id": "sig.no-server-side-failure-records" },
+        {
+          "event": "ev05",
+          "id": "sig.policy-events-outside-failure-window",
+          "uncertainty": "low",
+          "note": "Restated as no audit edit that lines up with Monday, without the zero-rows wording."
+        },
+        { "event": "ev06", "id": "sig.resolvers-consistent" },
+        { "event": "ev07", "id": "sig.resolver-inconsistent" },
+        { "event": "ev08", "id": "sig.resolver-inconsistent" },
+        { "event": "ev09", "id": "sig.dns-fix-resolved" },
+        { "event": "ev10", "id": "sig.dns-fix-resolved" },
+        { "event": "ev10", "id": "sig.resolver-inconsistent" },
+        { "event": "ev11", "id": "sig.dns-fix-resolved" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev04", "id": "act.review-ca-policy-config" },
+        { "event": "ev05", "id": "act.dns-resolver-comparison" },
+        { "event": "ev05", "id": "act.communicate-status" },
+        { "event": "ev08", "id": "act.remove-resolver-from-service" },
+        { "event": "ev08", "id": "act.communicate-status" },
+        { "event": "ev10", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.intermittent-failures",
+          "reason": "negated",
+          "note": "Customer says it is not intermittent: every attempt fails."
+        },
+        {
+          "event": "ev01",
+          "id": "sig.error-name-not-resolved",
+          "reason": "negated",
+          "note": "The tag caa82ee7 is named only to say it is not the error shown."
+        },
+        {
+          "event": "ev01",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "negated",
+          "note": "Zero audit edits since February."
+        },
+        {
+          "event": "ev01",
+          "id": "sig.ca-exclusion-no-effect",
+          "reason": "speculative",
+          "note": "A colleague's guess that excluding users might help; nobody has tried it."
+        },
+        {
+          "event": "ev03",
+          "id": "sig.recent-network-change-reported",
+          "reason": "negated",
+          "note": "No DNS, proxy or firewall work known."
+        },
+        {
+          "event": "ev04",
+          "id": "sig.mfa-ca-events-in-logs",
+          "reason": "negated",
+          "note": "No 50076, 50074 or CA failure results found."
+        },
+        {
+          "event": "ev04",
+          "id": "sig.token-expiry-errors",
+          "reason": "negated",
+          "note": "None of the listed token codes found."
+        },
+        {
+          "event": "ev05",
+          "id": "sig.mfa-ca-events-in-logs",
+          "reason": "negated",
+          "note": "No MFA/CA results."
+        },
+        {
+          "event": "ev05",
+          "id": "sig.token-expiry-errors",
+          "reason": "negated",
+          "note": "No token errors."
+        },
+        {
+          "event": "ev05",
+          "id": "act.exclude-users-from-mfa-ca",
+          "reason": "negated",
+          "note": "The engineer says he would not exclude anyone."
+        },
+        {
+          "event": "ev05",
+          "id": "act.revoke-user-sessions",
+          "reason": "negated",
+          "note": "The engineer says he would not revoke sessions."
+        },
+        {
+          "event": "ev05",
+          "id": "act.device-registration-check",
+          "reason": "conditional",
+          "note": "dsregcmd only if the resolvers come out clean."
+        },
+        {
+          "event": "ev05",
+          "id": "sig.prt-healthy",
+          "reason": "conditional",
+          "note": "Only a what-if: if dsregcmd shows AzureAdPrt YES."
+        },
+        {
+          "event": "ev06",
+          "id": "sig.resolver-inconsistent",
+          "reason": "negated",
+          "note": "The network admin concludes it is not DNS."
+        },
+        {
+          "event": "ev07",
+          "id": "sig.resolvers-consistent",
+          "reason": "corrected",
+          "note": "The earlier all-clear is withdrawn: it was run from the wrong VLAN."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [
+        {
+          "class": "corrected_information",
+          "events": ["ev06", "ev07"],
+          "subject": "sig.resolvers-consistent",
+          "note": "The network admin withdraws his own all-clear and reports one resolver failing from a depot PC."
+        }
+      ],
+      "qualityBand": "strong",
+      "causes": ["hyp.dns-resolution"],
+      "rationale": "The customer's opening list (ev01) is mostly denials, and the engineer checks them against the logs instead of repeating them: no failure rows, no MFA/CA or token codes, no policy edit in the window (ev04, ev05). That sends the next test to name resolution from a depot PC (ev05). The first resolver result (ev06) is withdrawn by its author (ev07): the test was run from the wrong network, and from a depot PC one resolver gives no answer. The workaround is applied and checked the next day (ev08 to ev11). Engineer's plans not to exclude users or revoke sessions, and the dsregcmd step that is conditional, are not actions.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

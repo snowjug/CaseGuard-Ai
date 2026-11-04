@@ -1,0 +1,48 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-007-adfs02-ahead-of-time",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T10:20:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev03", "id": "sig.federation-node-error" },
+        { "event": "ev04", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev04", "id": "sig.federation-node-error" },
+        { "event": "ev04", "id": "sig.intermittent-failures" },
+        { "event": "ev05", "id": "sig.federation-node-error" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.check-federation-health" },
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.communicate-status" },
+        { "event": "ev07", "id": "act.validate-fix" },
+        { "event": "ev07", "id": "act.check-federation-health" }
+      ],
+      "absent": [
+        {
+          "event": "ev03",
+          "id": "sig.site-correlated",
+          "reason": "negated",
+          "note": "No difference between offices."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.federation"],
+      "rationale": "A random one-in-three failure pattern on a federated domain (ev01) sends the engineer to the federation nodes first (ev02). The node check (ev03) shows one server far out of time with token time-bound errors, and the sign-in log lookup (ev04) matches the three sampled users to failure rows citing the same fault. The fix is applied and checked by hour and by a clock check on all three nodes (ev06, ev07).",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

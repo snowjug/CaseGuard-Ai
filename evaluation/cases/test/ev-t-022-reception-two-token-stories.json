@@ -1,0 +1,114 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-022-reception-two-token-stories",
+  "split": "test",
+  "family": "fam-222",
+  "title": "Dental clinic front desk keeps being asked to sign in; admin and user disagree on device state",
+  "scenario": "An admin reports healthy device registration and a working browser; a receptionist's pasted output and a colleague's browser test say otherwise. The admin later admits his first check ran in his own session; whether the browser really works is never settled.",
+  "categories": ["contradiction"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-04-14T09:30:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Front-desk laptops keep re-asking for Teams sign-in",
+      "text": "Hi. The front-desk laptops at Penhallow Dental (14 of them) ask for a Teams sign-in every few minutes. I've checked the usual suspects: dsregcmd on the affected laptops I looked at shows AzureAdPrt YES, and the browser version of Teams works fine on all of them, so I don't think it's the devices. Could it be Microsoft's side?\n\nAlun Prys"
+    },
+    {
+      "key": "ev02",
+      "at": 15,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Front-desk laptops keep re-asking for Teams sign-in",
+      "text": "Hi Alun, let's go through it one fact at a time. Please send what the laptops actually say, the names of three people who were hit with when it happened (UTC), and a yes or no on whether other sites are fine. I'd also like the raw dsregcmd /status output from two of the laptops, not a summary; the SSO State block is the part I want.\n\nBruna"
+    },
+    {
+      "key": "ev03",
+      "at": 48,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Front-desk laptops keep re-asking for Teams sign-in",
+      "text": "Wording: 'Couldn't sign you in, please try again'. People: dana.fox 09:05 UTC, imran.syed 09:21, hettie.wyn 09:40. It's all at this one clinic, our Truro clinic has no trouble. I'll paste dsregcmd when I get a moment - the receptionists are shouting at me.\n\nAlun"
+    },
+    {
+      "key": "ev04",
+      "at": 71,
+      "who": "enduser",
+      "type": "diagnostic_result",
+      "channel": "email",
+      "title": "dsregcmd from my laptop",
+      "text": "Alun said to send you this from my laptop (PEN-FD-03):\n| AzureAdJoined : YES\n| EnterpriseJoined : NO\n| DomainJoined : NO\n| Device Name : PEN-FD-03\n| AzureAdPrt : NO\n| AzureAdPrtAuthority :\n| WamDefaultSet : ERROR\n\nDana Fox"
+    },
+    {
+      "key": "ev05",
+      "at": 83,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "web version too",
+      "text": "i tried the web version in edge like alun said and it fails too. same message. so its not just the app\n\nImran"
+    },
+    {
+      "key": "ev06",
+      "at": 105,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Two things that don't fit",
+      "text": "Alun, two things don't fit together. You reported AzureAdPrt YES and a working browser; Dana's output shows AzureAdPrt NO on PEN-FD-03 and Imran says the browser fails as well. Please run dsregcmd /status in the user's own session (not an elevated prompt signed in as you) on PEN-FD-03 and one other front-desk laptop, and tell me what the AzureAdPrt line says.\n\nBruna"
+    },
+    {
+      "key": "ev07",
+      "at": 150,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Two things that don't fit",
+      "text": "Ran it again in Dana's own session this time: AzureAdPrt : NO on PEN-FD-03 and NO on PEN-FD-07. My first checks were run in my admin session on those PCs, which showed my own token, so ignore the YES I reported. I haven't looked at the browser question yet.\n\nAlun"
+    },
+    {
+      "key": "ev08",
+      "at": 168,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Next step: device registration",
+      "text": "Right, that clears it up. The front-desk laptops hold no PRT, so silent sign-in can't work; it's a device registration problem. I'm passing it to our identity team to look at the device objects and registration logs for PEN-FD-03 and -07, and I'll come back to you at 15:00 UTC with what they say.\n\nBruna"
+    },
+    {
+      "key": "ev09",
+      "at": 175,
+      "who": "engineer",
+      "type": "escalation",
+      "channel": "internal",
+      "title": "Escalation to identity backend",
+      "text": "Escalation: Penhallow Dental, 14 front-desk laptops prompt repeatedly. dsregcmd in user context on two: AzureAdJoined YES, AzureAdPrt NO. The customer's first report of PRT YES came from the admin's own session and has been withdrawn. Truro clinic unaffected. Ask: registration and PRT acquisition trace for the two device objects."
+    },
+    {
+      "key": "ev10",
+      "at": 300,
+      "who": "engineer",
+      "type": "escalation_response",
+      "channel": "internal",
+      "title": "Identity team response",
+      "text": "Identity: the 14 device objects were left in a pending state after the clinic's Intune connector was re-linked last week; re-registration triggered from our side. Token acquisition should work after the next sign-in."
+    },
+    {
+      "key": "ev11",
+      "at": 1500,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Two things that don't fit",
+      "text": "Re-registration seems to have worked: dsregcmd in the user session now shows AzureAdPrt : YES on PEN-FD-03 and PEN-FD-07, and Teams stays signed in on all 14 laptops. The browser works as well, I checked on three.\n\nAlun"
+    }
+  ]
+}

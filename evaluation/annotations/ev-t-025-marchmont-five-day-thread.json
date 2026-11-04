@@ -1,0 +1,135 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-025-marchmont-five-day-thread",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T14:00:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.site-correlated" },
+        { "event": "ev01", "id": "sig.error-name-not-resolved" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev01", "id": "sig.recent-ca-change-reported" },
+        { "event": "ev04", "id": "sig.error-name-not-resolved" },
+        { "event": "ev04", "id": "sig.site-correlated" },
+        { "event": "ev05", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev05", "id": "sig.recent-ca-change-reported" },
+        { "event": "ev06", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev08", "id": "sig.ca-exclusion-no-effect" },
+        { "event": "ev08", "id": "sig.cache-clear-no-effect" },
+        { "event": "ev08", "id": "sig.error-name-not-resolved" },
+        { "event": "ev11", "id": "sig.multiple-users-affected" },
+        { "event": "ev12", "id": "sig.error-name-not-resolved" },
+        { "event": "ev17", "id": "sig.resolver-inconsistent" },
+        { "event": "ev17", "id": "sig.recent-network-change-reported" },
+        {
+          "event": "ev17",
+          "id": "sig.error-name-not-resolved",
+          "uncertainty": "low",
+          "note": "NXDOMAIN appears in a pasted resolver test, not in a client window."
+        },
+        { "event": "ev18", "id": "sig.resolver-inconsistent" },
+        { "event": "ev20", "id": "sig.dns-fix-resolved" },
+        { "event": "ev22", "id": "sig.dns-fix-resolved" },
+        { "event": "ev23", "id": "sig.resolver-inconsistent" },
+        { "event": "ev23", "id": "sig.dns-fix-resolved" },
+        { "event": "ev26", "id": "sig.resolvers-consistent" },
+        { "event": "ev26", "id": "sig.dns-fix-resolved" },
+        { "event": "ev27", "id": "sig.resolvers-consistent" },
+        { "event": "ev27", "id": "sig.dns-fix-resolved" },
+        { "event": "ev28", "id": "sig.recent-network-change-reported" },
+        {
+          "event": "ev28",
+          "id": "sig.resolver-inconsistent",
+          "uncertainty": "low",
+          "note": "A summary of the cause, not of a test: one resolver mishandled the names while the other two answered."
+        }
+      ],
+      "actions": [
+        { "event": "ev03", "id": "act.request-minimal-scoping" },
+        { "event": "ev03", "id": "act.request-recent-changes" },
+        { "event": "ev05", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.review-ca-policy-config" },
+        { "event": "ev07", "id": "act.exclude-users-from-mfa-ca" },
+        { "event": "ev07", "id": "act.clear-teams-cache" },
+        { "event": "ev10", "id": "act.request-har-capture" },
+        { "event": "ev14", "id": "act.dns-resolver-comparison" },
+        { "event": "ev14", "id": "act.communicate-status" },
+        { "event": "ev18", "id": "act.remove-resolver-from-service" },
+        { "event": "ev18", "id": "act.restore-dns-policy" },
+        { "event": "ev18", "id": "act.communicate-status" },
+        { "event": "ev23", "id": "act.validate-fix" },
+        {
+          "event": "ev25",
+          "id": "act.validate-fix",
+          "uncertainty": "low",
+          "note": "The engineer arranges the discriminating test for after the permanent fix."
+        },
+        { "event": "ev27", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        {
+          "event": "ev28",
+          "id": "act.exclude-users-from-mfa-ca",
+          "reason": "corrected",
+          "note": "The recap calls the earlier exclusion request a wrong turn and says it has been reverted."
+        },
+        {
+          "event": "ev04",
+          "id": "sig.recent-network-change-reported",
+          "reason": "negated",
+          "note": "Nobody has told the writer of any network change; she adds that the branch network team may not say."
+        },
+        {
+          "event": "ev06",
+          "id": "act.exclude-users-from-mfa-ca",
+          "reason": "future_intent",
+          "note": "The exclusion is intended, requested in the next event."
+        },
+        {
+          "event": "ev06",
+          "id": "act.dns-resolver-comparison",
+          "reason": "future_intent",
+          "note": "Name resolution is explicitly put off."
+        },
+        {
+          "event": "ev14",
+          "id": "act.request-har-capture",
+          "reason": "corrected",
+          "note": "The engineer withdraws the trace request."
+        },
+        {
+          "event": "ev14",
+          "id": "act.exclude-users-from-mfa-ca",
+          "reason": "corrected",
+          "note": "The engineer asks for the exclusions to be put back."
+        }
+      ],
+      "forks": [
+        {
+          "event": "ev07",
+          "category": "contradiction_ignored",
+          "note": "The lookup in ev05 and the engineer's own note in ev06 say the attempts never reached Entra; an exclusion test of the new policy was still asked for, and name resolution, the cheaper discriminating check, was put off."
+        },
+        {
+          "event": "ev10",
+          "category": "disproportionate_customer_effort",
+          "note": "Packet captures from end users were asked for while the per-resolver test, which needs a network admin only, had not been tried."
+        }
+      ],
+      "earliestMissed": "ev07",
+      "counterfactualDirection": "better",
+      "conflicts": [],
+      "qualityBand": "needs_attention",
+      "causes": ["hyp.dns-resolution"],
+      "rationale": "The log lookup in ev05 already showed no rows, and ev06 says so, but the recorded change (a new Conditional Access baseline) drew the next two steps: exclusions (ev07, no effect in ev08) and packet captures from end users (ev10). A user's remark about a lookup failure (ev12, quoted in ev14) turns the work to name resolution; the per-resolver test (ev17) finds the new filtering resolver failing for the Microsoft names, the workaround and the permanent fix are kept apart (ev18, ev28) and checked (ev23, ev27). The quoted line in ev14 is not a new statement. Handling recovers well but lost about a day and a half.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

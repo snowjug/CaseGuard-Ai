@@ -1,0 +1,90 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-012-px2-quiet-or-not",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T11:30:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.error-timeout" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev01", "id": "sig.site-correlated" },
+        { "event": "ev03", "id": "sig.proxy-nodes-consistent" },
+        { "event": "ev04", "id": "sig.error-timeout" },
+        { "event": "ev05", "id": "sig.proxy-node-inconsistent" },
+        { "event": "ev07", "id": "sig.proxy-node-inconsistent" },
+        { "event": "ev09", "id": "sig.proxy-fix-resolved" },
+        { "event": "ev10", "id": "sig.proxy-fix-resolved" },
+        { "event": "ev11", "id": "sig.proxy-fix-resolved" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.proxy-node-comparison" },
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev06", "id": "act.proxy-node-comparison" },
+        { "event": "ev08", "id": "act.remove-proxy-node-from-rotation" },
+        { "event": "ev08", "id": "act.bypass-proxy-inspection" },
+        { "event": "ev10", "id": "act.validate-fix" },
+        { "event": "ev10", "id": "act.communicate-status" }
+      ],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.recent-network-change-reported",
+          "reason": "negated",
+          "note": "TLS inspection on the proxies has not been altered in months."
+        },
+        {
+          "event": "ev06",
+          "id": "sig.proxy-nodes-consistent",
+          "reason": "attributed",
+          "note": "The engineer reports Tom's all-clear as one of two conflicting results, without endorsing it."
+        },
+        {
+          "event": "ev06",
+          "id": "sig.proxy-node-inconsistent",
+          "reason": "attributed",
+          "note": "The engineer reports Mina's result as one of two conflicting results, without endorsing it."
+        },
+        {
+          "event": "ev07",
+          "id": "sig.proxy-nodes-consistent",
+          "reason": "corrected",
+          "note": "Tom withdraws his earlier all-clear."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [
+        {
+          "class": "unresolved_conflict",
+          "events": ["ev01", "ev04"],
+          "subject": "onset-day",
+          "note": "The office contact says it started on Wednesday with nothing before; a user says it has happened to him since last Thursday. Nothing in the record settles it."
+        },
+        {
+          "class": "direct_contradiction",
+          "events": ["ev03", "ev05"],
+          "subject": "sig.proxy-nodes-consistent",
+          "note": "Two per-node tests from the same office twenty minutes apart: all four nodes answer versus one node silent."
+        },
+        {
+          "class": "corrected_information",
+          "events": ["ev03", "ev07"],
+          "subject": "sig.proxy-nodes-consistent",
+          "note": "Tom withdraws his all-clear after the joint re-run."
+        }
+      ],
+      "qualityBand": "strong",
+      "causes": ["hyp.proxy-egress"],
+      "rationale": "The per-node test is asked for at once (ev02). Two customer-side colleagues then report opposite results (ev03, ev05); the engineer names the conflict and asks for a simultaneous re-run (ev06), which settles it and leads the first tester to withdraw his result (ev07). The onset-day disagreement between the contact and a user (ev01, ev04) is never settled and stays as an unresolved conflict. The engineer's restatement of both results in ev06 is a report of what others said, not an assertion. Workaround and permanent fix are kept apart (ev08) and checked the next day (ev10).",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

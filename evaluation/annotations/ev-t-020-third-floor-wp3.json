@@ -1,0 +1,108 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-020-third-floor-wp3",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T12:50:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.error-timeout" },
+        { "event": "ev03", "id": "sig.site-correlated" },
+        {
+          "event": "ev03",
+          "id": "sig.recent-network-change-reported",
+          "uncertainty": "low",
+          "note": "Vague: somebody did something to the web filter last Thursday; no detail on what."
+        },
+        { "event": "ev05", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev05", "id": "sig.policy-events-outside-failure-window" },
+        { "event": "ev06", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev07", "id": "sig.proxy-node-inconsistent" },
+        { "event": "ev07", "id": "sig.resolvers-consistent" },
+        { "event": "ev09", "id": "sig.proxy-fix-resolved" },
+        { "event": "ev10", "id": "sig.proxy-fix-resolved" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev05", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.review-ca-policy-config" },
+        { "event": "ev06", "id": "act.proxy-node-comparison" },
+        { "event": "ev06", "id": "act.dns-resolver-comparison" },
+        { "event": "ev06", "id": "act.communicate-status" },
+        { "event": "ev08", "id": "act.remove-proxy-node-from-rotation" },
+        { "event": "ev08", "id": "act.bypass-proxy-inspection" },
+        { "event": "ev10", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.multiple-users-affected",
+          "reason": "negated",
+          "note": "Not widespread as far as the writer knows."
+        },
+        {
+          "event": "ev01",
+          "id": "sig.proxy-node-inconsistent",
+          "reason": "speculative",
+          "note": "Somebody mentioned the proxy; no test, no evidence."
+        },
+        {
+          "event": "ev02",
+          "id": "act.proxy-node-comparison",
+          "reason": "future_intent",
+          "note": "Proxy testing is postponed until the facts are in."
+        },
+        {
+          "event": "ev04",
+          "id": "sig.no-server-side-failure-records",
+          "reason": "conditional",
+          "note": "Only what the engineer would conclude if the lookup finds no rows."
+        },
+        {
+          "event": "ev04",
+          "id": "act.signin-log-correlation",
+          "reason": "future_intent",
+          "note": "The lookup is planned, not yet run."
+        },
+        {
+          "event": "ev04",
+          "id": "act.proxy-node-comparison",
+          "reason": "conditional",
+          "note": "Only if the lookup shows no rows."
+        },
+        {
+          "event": "ev04",
+          "id": "act.remove-proxy-node-from-rotation",
+          "reason": "conditional",
+          "note": "Only after the node test."
+        },
+        {
+          "event": "ev04",
+          "id": "sig.proxy-fix-resolved",
+          "reason": "speculative",
+          "note": "Pulling a node might end the problem; nothing has been done."
+        },
+        {
+          "event": "ev07",
+          "id": "sig.resolver-inconsistent",
+          "reason": "negated",
+          "note": "DNS is fine: both resolvers answer every time."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.proxy-egress"],
+      "rationale": "The customer hedges (ev01) and the engineer lays out a conditional plan (ev04) before running anything, so those two events are mostly guesses and conditions. The lookup that follows (ev05) finds no rows and no policy edits in the window, which sends the node and resolver tests to the network admin (ev06); ev07 isolates the third proxy node and clears DNS. The workaround and the permanent change are kept apart (ev08) and the next-day check follows (ev10).",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

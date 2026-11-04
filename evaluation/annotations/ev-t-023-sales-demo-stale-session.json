@@ -1,0 +1,56 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-023-sales-demo-stale-session",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T13:20:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.single-user-scope" },
+        { "event": "ev02", "id": "sig.single-user-scope" },
+        { "event": "ev05", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev05", "id": "sig.token-expiry-errors" },
+        { "event": "ev06", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev06", "id": "sig.token-expiry-errors" }
+      ],
+      "actions": [
+        {
+          "event": "ev03",
+          "id": "act.request-minimal-scoping",
+          "uncertainty": "low",
+          "note": "Only the sign-in address and the UTC time of the last attempts are asked for."
+        },
+        { "event": "ev05", "id": "act.signin-log-correlation" },
+        { "event": "ev06", "id": "act.revoke-user-sessions" },
+        { "event": "ev08", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        {
+          "event": "ev02",
+          "id": "sig.web-client-also-fails",
+          "reason": "negated",
+          "note": "The website in Edge signs her in without trouble."
+        },
+        {
+          "event": "ev03",
+          "id": "act.reinstall-teams",
+          "reason": "negated",
+          "note": "The engineer asks the user not to reinstall anything."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.token-session"],
+      "rationale": "One user, a password change just before onset, and a working browser (ev01, ev02) point at a stale client session. The engineer stops a reinstall (ev03), checks the sign-in records for the three times given (ev05), finds grant-expired and session-expired results, and revokes the user's sessions with a clear instruction (ev06). The fix is checked afterwards (ev08). The user's panic and typing are noise, not content.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

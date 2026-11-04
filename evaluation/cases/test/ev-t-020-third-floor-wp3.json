@@ -1,0 +1,105 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-020-third-floor-wp3",
+  "split": "test",
+  "family": "fam-220",
+  "title": "Two architects on the third floor cannot sign in to Teams desktop",
+  "scenario": "Two users on one floor fail while twenty on another are fine. The customer's hedges and the engineer's plan are full of guesses and conditionals; the log lookup then shows the requests never reach Entra, and a per-node test finds one dead proxy node.",
+  "categories": ["negation"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-11-02T10:25:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Two of us cannot sign in to Teams (studio, 3rd floor)",
+      "text": "Hi. Two of us in the London studio (me and Dev) can't sign in to Teams desktop since this morning. It's not widespread as far as I know - everyone else seems fine, so it may well be just our PCs. The sign-in window ends with ERR_TIMED_OUT. Somebody mentioned the proxy but I really wouldn't know.\n\nBeatrix Calder, Calder & Moss Architects"
+    },
+    {
+      "key": "ev02",
+      "at": 18,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Two of us cannot sign in to Teams (studio, 3rd floor)",
+      "text": "Hi Beatrix. Before anyone tests proxies I'd like the facts: the UTC minute of a failure for each of you two, whether other floors are fine, and whether anything on the network side (proxy, web filter, DNS, firewall) was changed in recent days.\n\nMateus"
+    },
+    {
+      "key": "ev03",
+      "at": 52,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Two of us cannot sign in to Teams (studio, 3rd floor)",
+      "text": "Times: me 09:58 UTC, Dev 10:03. We're both on the 3rd floor VLAN (10.70.3.x); the 2nd floor (10.70.2.x), about 20 people, is fine. Nothing changed that I know of, but Gareth did something to 'the web filter' last Thursday."
+    },
+    {
+      "key": "ev04",
+      "at": 70,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Plan, nothing run yet",
+      "text": "Thanks. Plan, nothing run yet: (1) look in Entra for your two attempts. If there are no rows for those minutes, I'd conclude the requests never reach Entra and the 3rd floor path becomes the suspect. (2) In that case Gareth would try login.microsoftonline.com via every proxy node, from a 3rd-floor PC, and compare the results. Pulling a node out of rotation might then end the problem, but only after that test, not before.\n\nMateus"
+    },
+    {
+      "key": "ev05",
+      "at": 160,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Entra lookup and CA audit",
+      "text": "Entra lookup for Beatrix 09:58 UTC and Dev 10:03 UTC (+/- 5 min): no rows at all for either. Conditional Access audit: three edits last quarter, none in the window; zero rows between 08:00 and 11:00 UTC today."
+    },
+    {
+      "key": "ev06",
+      "at": 172,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "It is on the path, not in Entra",
+      "text": "Beatrix, Gareth: the two attempts never show up in Entra, so the trouble sits on the path from the 3rd floor to Microsoft. Gareth, please test login.microsoftonline.com through each proxy node from a 3rd-floor PC and compare them, and query your resolvers for it while you're at it. I'll be back here at 15:00 UTC.\n\nMateus"
+    },
+    {
+      "key": "ev07",
+      "at": 215,
+      "who": "network",
+      "type": "diagnostic_result",
+      "channel": "email",
+      "title": "node and resolver test",
+      "text": "Gareth. From 10.70.3.41: wp1 0.4 s, wp2 0.4 s, wp3 no reply in 30 s (3 of 3). Resolvers 10.70.0.2 and 10.70.0.3 both answer login and the CDN name every time. So wp3 is the bad node and DNS is fine."
+    },
+    {
+      "key": "ev08",
+      "at": 240,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Workaround and permanent change",
+      "text": "Thanks Gareth. Workaround: take wp3 out of the PAC file. Permanent: have the pool's TLS decryption exempt the Microsoft 365 hostnames, through your change control, and ask the vendor to look at wp3.\n\nMateus"
+    },
+    {
+      "key": "ev09",
+      "at": 275,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Workaround and permanent change",
+      "text": "wp3 has been out of the PAC since 14:35 UTC. Dev and I both signed in first time just now. Thanks!"
+    },
+    {
+      "key": "ev10",
+      "at": 1500,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "portal",
+      "title": "Next-day check",
+      "text": "No further failures reported from the studio since 14:35 UTC, and a per-node test from a 3rd-floor PC through wp1 and wp2 passes. The vendor ticket for wp3 is with Gareth. Closing after your change board has the exemption.\n\nMateus"
+    }
+  ]
+}

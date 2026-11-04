@@ -1,0 +1,113 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-022-reception-two-token-stories",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T13:10:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.prt-healthy" },
+        { "event": "ev03", "id": "sig.site-correlated" },
+        { "event": "ev04", "id": "sig.prt-missing" },
+        { "event": "ev05", "id": "sig.web-client-also-fails" },
+        { "event": "ev06", "id": "sig.prt-missing" },
+        { "event": "ev07", "id": "sig.prt-missing" },
+        { "event": "ev08", "id": "sig.prt-missing" },
+        { "event": "ev09", "id": "sig.prt-missing" },
+        { "event": "ev09", "id": "sig.site-correlated" },
+        { "event": "ev11", "id": "sig.prt-healthy" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.device-registration-check" },
+        { "event": "ev06", "id": "act.device-registration-check" },
+        { "event": "ev08", "id": "act.escalate-to-identity-team" },
+        { "event": "ev08", "id": "act.communicate-status" },
+        { "event": "ev09", "id": "act.escalate-to-identity-team" }
+      ],
+      "absent": [
+        {
+          "event": "ev03",
+          "id": "act.device-registration-check",
+          "reason": "future_intent",
+          "note": "The admin only says he will paste dsregcmd output later."
+        },
+        {
+          "event": "ev07",
+          "id": "sig.web-client-also-fails",
+          "reason": "other",
+          "note": "The admin says he has not looked at the browser yet; no statement either way."
+        },
+        {
+          "event": "ev01",
+          "id": "sig.web-client-also-fails",
+          "reason": "negated",
+          "note": "The admin says the browser works fine for all of them."
+        },
+        {
+          "event": "ev06",
+          "id": "sig.prt-healthy",
+          "reason": "attributed",
+          "note": "The engineer repeats the admin's earlier report as one of two conflicting accounts."
+        },
+        {
+          "event": "ev06",
+          "id": "sig.web-client-also-fails",
+          "reason": "attributed",
+          "note": "The engineer repeats what the user says about the browser."
+        },
+        {
+          "event": "ev07",
+          "id": "sig.prt-healthy",
+          "reason": "corrected",
+          "note": "The admin withdraws his first report: it was run in his own session."
+        },
+        {
+          "event": "ev09",
+          "id": "sig.prt-healthy",
+          "reason": "corrected",
+          "note": "The escalation notes that the first YES report has been withdrawn."
+        },
+        {
+          "event": "ev11",
+          "id": "sig.web-client-also-fails",
+          "reason": "negated",
+          "note": "After the fix the browser works too."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [
+        {
+          "class": "source_disagreement",
+          "events": ["ev01", "ev04"],
+          "subject": "sig.prt-healthy",
+          "note": "The admin reports a healthy token on the laptops he looked at; the receptionist's pasted output for her laptop shows none."
+        },
+        {
+          "class": "unresolved_conflict",
+          "events": ["ev01", "ev05"],
+          "subject": "sig.web-client-also-fails",
+          "note": "The admin says the browser works for all; a user says it fails. The admin later says he has not looked at the browser, so nothing settles it before the fix."
+        },
+        {
+          "class": "corrected_information",
+          "events": ["ev01", "ev07"],
+          "subject": "sig.prt-healthy",
+          "note": "The admin withdraws his first report: it came from his own admin session."
+        }
+      ],
+      "qualityBand": "strong",
+      "causes": ["hyp.device-state"],
+      "rationale": "The engineer asks for raw output instead of summaries (ev02) and, when the sources disagree (ev04, ev05 against ev01), names the mismatch and asks for the check to be repeated in the user's own session (ev06). The admin's withdrawal (ev07) settles the registration question and the case is escalated with the evidence (ev08, ev09). The browser disagreement is never settled before the fix, so it stays an unresolved conflict. The final state (ev11) shows a healthy token after re-registration.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

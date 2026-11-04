@@ -1,0 +1,73 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-005-new-image-no-prt",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T10:00:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev03", "id": "sig.cache-clear-no-effect" },
+        { "event": "ev03", "id": "sig.site-correlated" },
+        { "event": "ev05", "id": "sig.prt-missing" },
+        { "event": "ev05", "id": "sig.prt-healthy" },
+        { "event": "ev06", "id": "sig.prt-missing" },
+        { "event": "ev06", "id": "sig.prt-healthy" },
+        { "event": "ev07", "id": "sig.prt-missing" },
+        { "event": "ev07", "id": "sig.prt-healthy" },
+        {
+          "event": "ev07",
+          "id": "sig.multiple-users-affected",
+          "uncertainty": "low",
+          "note": "The escalation restates that 18 new laptops loop on sign-in."
+        },
+        { "event": "ev07", "id": "sig.cache-clear-no-effect" },
+        { "event": "ev09", "id": "sig.prt-missing" },
+        { "event": "ev10", "id": "sig.prt-healthy" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.reinstall-teams" },
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev04", "id": "act.device-registration-check" },
+        { "event": "ev06", "id": "act.escalate-to-identity-team" },
+        { "event": "ev06", "id": "act.communicate-status" },
+        { "event": "ev07", "id": "act.escalate-to-identity-team" },
+        { "event": "ev09", "id": "act.communicate-status" },
+        { "event": "ev09", "id": "act.device-registration-check" }
+      ],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.web-client-also-fails",
+          "reason": "negated",
+          "note": "Teams in a browser works normally on the new laptops."
+        },
+        {
+          "event": "ev07",
+          "id": "sig.web-client-also-fails",
+          "reason": "negated",
+          "note": "Browser sign-in works."
+        }
+      ],
+      "forks": [
+        {
+          "event": "ev02",
+          "category": "low_value_action",
+          "note": "Only the new images fail, the same people are fine on old laptops and the browser works: that pointed at device state. A Teams reinstall was asked for first and cost a day."
+        }
+      ],
+      "earliestMissed": "ev02",
+      "counterfactualDirection": "better",
+      "conflicts": [],
+      "qualityBand": "adequate",
+      "causes": ["hyp.device-state"],
+      "rationale": "The call note (ev01) already shows a device-specific pattern: new machines only, browser fine. The reinstall requested in ev02 changes nothing (ev03), and the registration output (ev05) shows no refresh token on the new devices and one on the old device. The escalation (ev07) carries the evidence, and the identity team finds an unfinished registration (ev08, ev09); one re-joined laptop then reports a healthy token (ev10). Handling is sound after ev04; the first step was the weak point.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

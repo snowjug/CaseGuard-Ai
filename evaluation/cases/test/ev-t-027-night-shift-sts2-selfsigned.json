@@ -1,0 +1,87 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-027-night-shift-sts2-selfsigned",
+  "split": "test",
+  "family": "fam-227",
+  "title": "Night-shift staff refused at about one sign-in in three, app and browser alike",
+  "scenario": "After a Sunday maintenance window one of two on-site federation servers presents a self-signed certificate; a third of attempts, those the balancer sends to it, are refused. Staff succeed a minute later. The fix is a proper certificate and a time out of the balancer.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-09T05:40:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_call",
+      "channel": "phone",
+      "title": "Call: night shift cannot sign in, about a third of attempts",
+      "text": "Call 05:40 UTC. Ceri Llewellyn, service desk at Brynmawr Health Partnership, reports that roughly a third of sign-in attempts by night-shift staff are refused, in the Teams app and also in a browser. The same person can be refused and then accepted a minute later. About 45 staff so far. They sign in through two on-site STS servers behind a balancer, and a maintenance window on Sunday evening touched the certificates on those servers."
+    },
+    {
+      "key": "ev02",
+      "at": 18,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: call about night-shift sign-ins",
+      "text": "Hello Ceri, since your sign-in goes through your own STS pair and only some attempts fail, please inspect each of the two servers: the certificates they present (issuer, thumbprint, dates), the clocks, and the federation service event log since Sunday evening. Please also send three staff members it affected with a UTC minute each, the wording on screen, and which wards or buildings are untouched.\n\nArvid"
+    },
+    {
+      "key": "ev03",
+      "at": 40,
+      "who": "network",
+      "type": "log_sample",
+      "channel": "email",
+      "title": "STS report",
+      "text": "Dewi (infrastructure). Report:\nsts1  service certificate CN=sts.brynmawr.example.com, issuer Brynmawr Issuing CA, valid to 2027-04-01 | clock +0.02 s | event log quiet\nsts2  service certificate CN=sts.brynmawr.example.com, issuer = sts2 (self-signed), valid from 2026-06-07 | clock +0.03 s | event log: 'The remote certificate is invalid according to the validation procedure' x380 since Sunday 22:00\nStaff hit: g.price 03:12 UTC, n.hughes 03:40, r.davies 04:55. No ward is better or worse, it is whoever lands on sts2."
+    },
+    {
+      "key": "ev04",
+      "at": 50,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Entra check",
+      "text": "Entra, 03:12 / 03:40 / 04:55 UTC +/- 5 min for g.price, n.hughes, r.davies: failure rows for all three (a federated sign-in that failed); a success a minute later for each, consistent with landing on sts1 the second time."
+    },
+    {
+      "key": "ev05",
+      "at": 60,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Cause and fix",
+      "text": "Ceri, Dewi - cause: sts2 got a self-signed certificate during Sunday's maintenance, so every sign-in that the balancer sends to it is refused while those on sts1 go through. Fix: install the proper certificate (same chain as sts1) on sts2, and keep sts2 out of the balancer until that is done. I will check back with you at 08:00 UTC.\n\nArvid"
+    },
+    {
+      "key": "ev06",
+      "at": 195,
+      "who": "network",
+      "type": "diagnostic_result",
+      "channel": "email",
+      "title": "sts2 repaired",
+      "text": "sts2 out of the balancer 06:50 UTC. Proper certificate imported 07:20, back in at 07:35. Twenty test sign-ins from staff phones and PCs since: all fine.\n\nDewi"
+    },
+    {
+      "key": "ev07",
+      "at": 1500,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "portal",
+      "title": "Next-day check",
+      "text": "Re-ran the certificate and clock check on both servers: same issuer chain and thumbprint, offsets under 50 ms. Entra shows no federated failures since 07:35 UTC. Closing once the day shift has logged in without trouble.\n\nArvid"
+    },
+    {
+      "key": "ev08",
+      "at": 1520,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Next-day check",
+      "text": "Day shift all in, thank you.\n\nCeri"
+    }
+  ]
+}

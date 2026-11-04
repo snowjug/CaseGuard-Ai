@@ -1,0 +1,97 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-004-after-the-session-reset",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T09:50:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev03", "id": "sig.multiple-users-affected" },
+        { "event": "ev03", "id": "sig.ca-config-unchanged" },
+        { "event": "ev04", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev04", "id": "sig.token-expiry-errors" },
+        { "event": "ev05", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev05", "id": "sig.token-expiry-errors" },
+        { "event": "ev06", "id": "sig.cache-clear-resolved" },
+        { "event": "ev08", "id": "sig.cache-clear-resolved" },
+        { "event": "ev08", "id": "sig.cache-clear-no-effect" },
+        { "event": "ev10", "id": "sig.cache-clear-resolved" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.clear-teams-cache" },
+        { "event": "ev05", "id": "act.communicate-status" },
+        { "event": "ev07", "id": "act.clear-teams-cache" },
+        { "event": "ev09", "id": "act.reinstall-teams" },
+        { "event": "ev11", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.revoke-sessions-no-effect",
+          "reason": "other",
+          "note": "The revocation is the trigger the customer describes; nothing says failures carried on unchanged after it as a remedy."
+        },
+        {
+          "event": "ev03",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "negated",
+          "note": "Conditional Access not edited since last term."
+        },
+        {
+          "event": "ev03",
+          "id": "sig.recent-network-change-reported",
+          "reason": "negated",
+          "note": "Nobody touched the network."
+        },
+        {
+          "event": "ev03",
+          "id": "sig.site-correlated",
+          "reason": "negated",
+          "note": "All three buildings equally affected."
+        },
+        {
+          "event": "ev05",
+          "id": "act.revoke-user-sessions",
+          "reason": "negated",
+          "note": "The engineer asks the customer not to revoke again."
+        },
+        {
+          "event": "ev09",
+          "id": "act.device-registration-check",
+          "reason": "conditional",
+          "note": "dsregcmd output is only wanted if the reinstall does not work."
+        },
+        {
+          "event": "ev11",
+          "id": "sig.token-expiry-errors",
+          "reason": "negated",
+          "note": "The engineer reports no more 50173 or 50132 rows after the fix."
+        },
+        {
+          "event": "ev11",
+          "id": "act.revoke-user-sessions",
+          "reason": "negated",
+          "note": "The engineer asks the customer not to revoke all sessions again without warning."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.token-session", "hyp.client-cache"],
+      "rationale": "The failures start after a bulk revocation (ev01) and the log lookup (ev04) finds grant-expired and session-revoked results for the sampled users, so the token story fits. The remedy is device-side: clearing the cache fixes the tested laptops (ev06), most of the roll-out (ev08) and a reinstall fixes the last two (ev10). The engineer scopes first, asks only for a one-laptop test before a roll-out, and tells the customer not to repeat the revocation. Two causes are accepted because the tokens were revoked server-side but only the stale client state kept the users out.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

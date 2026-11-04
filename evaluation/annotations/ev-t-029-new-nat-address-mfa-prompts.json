@@ -1,0 +1,83 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-029-new-nat-address-mfa-prompts",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T14:50:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.site-correlated" },
+        { "event": "ev01", "id": "sig.recent-network-change-reported" },
+        { "event": "ev03", "id": "sig.ca-config-unchanged" },
+        { "event": "ev04", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev04", "id": "sig.mfa-ca-events-in-logs" },
+        { "event": "ev05", "id": "sig.policy-events-outside-failure-window" },
+        {
+          "event": "ev05",
+          "id": "sig.recent-network-change-reported",
+          "uncertainty": "low",
+          "note": "Implied by the option to move the NAT back to the old address."
+        }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev04", "id": "act.review-ca-policy-config" },
+        { "event": "ev05", "id": "act.communicate-status" },
+        { "event": "ev07", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        {
+          "event": "ev06",
+          "id": "sig.recent-network-change-reported",
+          "reason": "other",
+          "note": "A remark about process for future NAT changes; the change itself was reported in ev01."
+        },
+        {
+          "event": "ev03",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "negated",
+          "note": "Nobody has edited the policy since spring."
+        },
+        {
+          "event": "ev04",
+          "id": "sig.policy-events-outside-failure-window",
+          "reason": "future_intent",
+          "note": "The engineer still has to confirm that none of the two audit edits falls inside the window."
+        },
+        {
+          "event": "ev05",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "negated",
+          "note": "Nobody edited the policy this week."
+        },
+        {
+          "event": "ev06",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "other",
+          "note": "Adding the address to the named location is the remedy, made after onset."
+        },
+        {
+          "event": "ev07",
+          "id": "sig.mfa-ca-events-in-logs",
+          "reason": "negated",
+          "note": "No more 50074 rows for the Hartlepool users after the fix."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.conditional-access"],
+      "rationale": "One branch prompted and the rest not (ev01), plus a firewall NAT change the customer volunteers, makes the engineer ask whether any policy depends on addresses (ev02); one does (ev03). The log lookup (ev04) shows 50074 rows with that policy applied and a client address outside the named location, so the policy was not edited but its effect changed with the network. The audit check starts as an intention (ev04) and is completed in ev05. The remedy edit (ev06) is made after onset.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

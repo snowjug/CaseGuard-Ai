@@ -1,0 +1,62 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-002-gw3-hangs-on-login",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T09:30:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.error-timeout" },
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.site-correlated" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev01", "id": "sig.recent-network-change-reported" },
+        { "event": "ev04", "id": "sig.site-correlated" },
+        { "event": "ev04", "id": "sig.recent-network-change-reported" },
+        { "event": "ev05", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev07", "id": "sig.proxy-node-inconsistent" },
+        { "event": "ev09", "id": "sig.proxy-fix-resolved" },
+        { "event": "ev10", "id": "sig.proxy-fix-resolved" },
+        { "event": "ev11", "id": "sig.proxy-fix-resolved" }
+      ],
+      "actions": [
+        { "event": "ev03", "id": "act.request-minimal-scoping" },
+        { "event": "ev03", "id": "act.request-recent-changes" },
+        { "event": "ev05", "id": "act.signin-log-correlation" },
+        { "event": "ev06", "id": "act.proxy-node-comparison" },
+        { "event": "ev06", "id": "act.request-har-capture" },
+        { "event": "ev08", "id": "act.remove-proxy-node-from-rotation" },
+        { "event": "ev08", "id": "act.bypass-proxy-inspection" },
+        { "event": "ev10", "id": "act.validate-fix" },
+        { "event": "ev10", "id": "act.communicate-status" }
+      ],
+      "absent": [
+        {
+          "event": "ev08",
+          "id": "act.request-har-capture",
+          "reason": "corrected",
+          "note": "The engineer withdraws the earlier HAR request: it is no longer needed."
+        }
+      ],
+      "forks": [
+        {
+          "event": "ev06",
+          "category": "disproportionate_customer_effort",
+          "note": "HAR captures from two end users were requested alongside the cheaper per-gateway test; the log lookup had already pointed to the network path."
+        }
+      ],
+      "earliestMissed": "ev06",
+      "counterfactualDirection": "better",
+      "conflicts": [],
+      "qualityBand": "adequate",
+      "causes": ["hyp.proxy-egress"],
+      "rationale": "The log lookup in ev05 shows the attempts never reached Entra, and ev07 isolates gw3 as the only gateway without an answer. The pool's TLS inspection was widened the night before onset (ev01, ev04). Handling is mostly good (scoping, per-gateway test, workaround and permanent fix kept apart, next-day check), but ev06 asks end users for packet captures without need and the engineer retracts that in ev08. The customer's own doubt about the change being the cause in ev01 is an opinion, not a signal.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

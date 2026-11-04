@@ -1,0 +1,78 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-017-supplier-mail-stuck-queue",
+  "split": "test",
+  "family": "fam-217",
+  "title": "Outbound mail to one supplier queues for hours, then bounces",
+  "scenario": "A different workload: mail to one external domain is delayed because the supplier's new DNS provider left a broken delegation. Name-lookup and timeout words appear, but no Teams sign-in is involved, so the engine must refuse.",
+  "categories": ["unsupported"],
+  "workload": "exchange-mail-flow",
+  "openedAt": "2026-05-27T09:15:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Mails to one supplier sit in the queue, then bounce",
+      "text": "Hello, Sunniva Haugen, Eikeland Finans. Since Tuesday afternoon every email to our freight supplier (domain nordlast.example.com) stays in the outbound queue for hours and then bounces with 4.4.7, delivery expired. Mail to all other recipients goes out fine. The supplier insists nothing arrives on their side. Our connector for their domain uses forced TLS and a smart host. Nothing else has been touched on our mail setup."
+    },
+    {
+      "key": "ev02",
+      "at": 20,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Mails to one supplier sit in the queue, then bounce",
+      "text": "Hi Sunniva, to see where the messages are stuck, please send a message trace for one affected mail (sender, recipient and send time), the connector settings for the supplier's domain, and whether the supplier changed their MX records or TLS certificate recently.\n\nLucas"
+    },
+    {
+      "key": "ev03",
+      "at": 55,
+      "who": "customer",
+      "type": "log_sample",
+      "channel": "portal",
+      "title": "message trace excerpt",
+      "text": "Message trace: Status Pending. Detail: '451 4.4.0 DNS query failed. The MX lookup for nordlast.example.com timed out.' Connector: send connector 'Supplier-TLS', smart host mail.nordlast.example.com, TLS required. Their IT told us they moved their DNS to a new provider last Monday."
+    },
+    {
+      "key": "ev04",
+      "at": 90,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "MX lookups",
+      "text": "Looked up the MX record for nordlast.example.com against three public resolvers: two return the MX host, one returns SERVFAIL. At the new DNS provider the zone has a lame delegation for one of its name servers since Monday, so lookups that land on that server fail. The fault is on the supplier's side."
+    },
+    {
+      "key": "ev05",
+      "at": 105,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Cause is on the supplier's DNS",
+      "text": "Sunniva, the cause is on the supplier's DNS: a broken delegation at their new provider makes some MX lookups fail, so our service cannot work out where to deliver. They need to correct the delegation. Until they do, you can add a temporary send connector that delivers to their smart host by IP address for that one domain.\n\nLucas"
+    },
+    {
+      "key": "ev06",
+      "at": 330,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Cause is on the supplier's DNS",
+      "text": "The supplier's DNS provider fixed the delegation at 14:05 UTC. Our queue drained within minutes and every delayed mail went out. Thanks."
+    },
+    {
+      "key": "ev07",
+      "at": 360,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "portal",
+      "title": "Check after the fix",
+      "text": "Repeated the MX lookup against the same three resolvers: all return the MX host now. Closing the case.\n\nLucas"
+    }
+  ]
+}

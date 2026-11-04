@@ -1,0 +1,39 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-024-guests-wait-in-the-lobby",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T13:30:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [],
+      "actions": [],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "other",
+          "note": "A change to the Teams meeting policy, not to a Conditional Access or MFA policy."
+        },
+        {
+          "event": "ev03",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "other",
+          "note": "The same Teams meeting policy change, made in the course of the fix."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": [],
+      "rationale": "A meeting-lobby question: nothing fails to sign in and nothing needs diagnosing. A policy change appears twice, but it is a Teams meeting policy and not Conditional Access or MFA, so it is look-alike text. The engineer names the exact setting and the customer fixes it.",
+      "uncertainty": "none"
+    }
+  ],
+  "adjudication": null
+}

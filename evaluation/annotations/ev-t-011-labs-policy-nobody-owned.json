@@ -1,0 +1,106 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-011-labs-policy-nobody-owned",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T11:20:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.ca-config-unchanged" },
+        { "event": "ev03", "id": "sig.site-correlated" },
+        { "event": "ev04", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev04", "id": "sig.mfa-ca-events-in-logs" },
+        { "event": "ev04", "id": "sig.recent-ca-change-reported" },
+        { "event": "ev05", "id": "sig.recent-ca-change-reported" },
+        { "event": "ev06", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev07", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev07", "id": "sig.mfa-ca-events-in-logs" },
+        { "event": "ev07", "id": "sig.recent-ca-change-reported" },
+        {
+          "event": "ev09",
+          "id": "sig.recent-ca-change-reported",
+          "uncertainty": "low",
+          "note": "A policy re-application the night before the recurrence, not before the original onset."
+        },
+        { "event": "ev10", "id": "sig.mfa-ca-events-in-logs" },
+        { "event": "ev10", "id": "sig.server-side-failure-records-present" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev04", "id": "act.review-ca-policy-config" },
+        { "event": "ev07", "id": "act.exclude-users-from-mfa-ca" },
+        { "event": "ev07", "id": "act.communicate-status" },
+        { "event": "ev10", "id": "act.signin-log-correlation" },
+        { "event": "ev10", "id": "act.exclude-users-from-mfa-ca" },
+        { "event": "ev10", "id": "act.communicate-status" }
+      ],
+      "absent": [
+        {
+          "event": "ev09",
+          "id": "sig.ca-exclusion-no-effect",
+          "reason": "other",
+          "note": "The exclusion had worked and was overwritten by a template job; it did not fail to help."
+        },
+        {
+          "event": "ev01",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "negated",
+          "note": "Nobody has touched Conditional Access for months, as the IT lead sees it."
+        },
+        {
+          "event": "ev08",
+          "id": "sig.ca-exclusion-no-effect",
+          "reason": "negated",
+          "note": "The exclusion worked: the lab PCs sign in normally."
+        },
+        {
+          "event": "ev08",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "other",
+          "note": "The exclusion is the remedy, made after onset."
+        },
+        {
+          "event": "ev11",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "other",
+          "note": "Re-applying the exclusion and correcting the job scope is the remedy, not an onset change."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [
+        {
+          "class": "source_disagreement",
+          "events": ["ev01", "ev05"],
+          "subject": "sig.ca-config-unchanged",
+          "note": "The IT lead says Conditional Access was not touched; the security lead says she edited the policy on Thursday."
+        },
+        {
+          "class": "direct_contradiction",
+          "events": ["ev04", "ev06"],
+          "subject": "sig.server-side-failure-records-present",
+          "note": "The engineer found failure rows for the three samples; the customer's admin says he found none for the same users and times."
+        },
+        {
+          "class": "temporal_update",
+          "events": ["ev08", "ev09"],
+          "subject": "lab-pc-sign-in-state",
+          "note": "The lab PCs signed in normally after the exclusion, then looped again the next morning."
+        }
+      ],
+      "qualityBand": "strong",
+      "causes": ["hyp.conditional-access"],
+      "rationale": "The IT lead's belief that policy is untouched (ev01) is contradicted by the security lead's own edit (ev05), which the engineer had already found in the audit log (ev04). The customer's later claim of an empty log (ev06) contradicts the engineer's finding (ev04); ev07 explains it plausibly as a time-zone difference but nothing in the record proves it. The exclusion fixes the labs (ev08) and is then overwritten (ev09), so the state changes twice. The engineer stays calm through the disagreements and checks the logs again before asking for the exclusion to be restored (ev10).",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

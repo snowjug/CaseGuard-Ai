@@ -1,0 +1,105 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-001-harbourside-second-nameserver",
+  "split": "test",
+  "family": "fam-201",
+  "title": "Bakery-cafe staff stuck on the Teams sign-in page at three shops",
+  "scenario": "Staff at three of fourteen shops cannot sign in to Teams while the others can; a newly added filtering resolver in the DHCP scopes will not answer for the Microsoft login hostnames, and dropping it from the scopes ends the failures.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-02-09T07:48:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Teams won't let the shop staff in",
+      "text": "Good morning,\n\nI look after IT for Crumb & Kettle (fourteen bakery-cafes). From a little after half past seven this morning a big chunk of our shop and kitchen staff cannot get into Teams. The screen sits on the little spinning dots, then flips to a page saying it can't find the server's address, with a Try again button. If they press it two or three times some of them do get through, and then they're fine until the next time they have to log in. I've had calls from roughly two dozen people across three of the shops (Quayside, Millgate and Harbourside). Head office and Northgate haven't rung me at all. It's the Monday rush and the tills run off the same laptops, so a quick look would be much appreciated.\n\nMarguerite Dubois, IT coordinator"
+    },
+    {
+      "key": "ev02",
+      "at": 19,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Teams won't let the shop staff in",
+      "text": "Hi Marguerite,\n\nThanks, that's a clear picture. To narrow it down I need four things:\n1. A screenshot or the exact wording of that error page.\n2. Three people who hit it, and for each one roughly when it happened, in UTC (your tills are probably on UTC+0 in winter, but please say).\n3. Which sites are failing, and which you are sure are fine.\n4. Anything at all that was altered during the past forty-eight hours around the network, DNS, proxy, firewall or identity/MFA, however unrelated it looks.\n\nCallum, Teams support"
+    },
+    {
+      "key": "ev03",
+      "at": 58,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Teams won't let the shop staff in",
+      "text": "Screenshot attached - under the big heading it says DNS_PROBE_FINISHED_NXDOMAIN. Three who failed: Ana Mendes (a.mendes@example.com) at 07:41, Peter Okafor (p.okafor@example.com) at 07:52, Hilde Lindqvist (h.lindqvist@example.com) at 08:03, all UK time, so the same as UTC until the clocks go forward. Down: Quayside, Millgate, Harbourside. Fine: head office, Northgate and, as far as anyone's told me, the other nine. Changes: our contractor Meridian rolled out a cloud DNS filtering service to the shops last Friday evening and it slipped my mind to say so, sorry. Nothing else I know of. The MFA and Conditional Access settings haven't been touched since the autumn."
+    },
+    {
+      "key": "ev04",
+      "at": 96,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Entra lookup for the three samples",
+      "text": "Searched Entra for Ana, Peter and Hilde around 07:41 / 07:52 / 08:03 UTC (+/- 5 min), interactive and non-interactive tables both: nothing at all for any of them. Not a single failure row exists around those minutes, which means these attempts die before they get to Entra. Name resolution on the shop networks is the first thing to test. Not asking anyone for HAR traces, no need for that yet."
+    },
+    {
+      "key": "ev05",
+      "at": 122,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Update - not an Entra problem, name resolution next",
+      "text": "Marguerite, Tomasz - the three failing attempts do not show up in Entra's logs at all, so whatever is going wrong happens before the request reaches the sign-in service. Tomasz, from a Harbourside machine could you query login.microsoftonline.com, plus the Microsoft CDN name that the sign-in page pulls in, on every one of the three resolvers your DHCP scopes list (10.40.0.2, .3 and .4)? Resolve-DnsName is fine, ten repeats each, and paste me the raw answers. I'll pick this up again at 11:00 UTC and write to you then, whatever has come back."
+    },
+    {
+      "key": "ev06",
+      "at": 205,
+      "who": "network",
+      "type": "diagnostic_result",
+      "channel": "email",
+      "title": "Resolver test from Harbourside",
+      "text": "Tomasz (Meridian). Ten repeats each from a Harbourside laptop:\n\n10.40.0.2  login.microsoftonline.com  10/10 answered, 11-16 ms\n10.40.0.4  login.microsoftonline.com  10/10 answered, 12-19 ms\n10.40.0.3  login.microsoftonline.com  0/10 answered - SERVFAIL every time; the CDN name the same\n\nexample.com resolves fine against all three. .3 is the filtering resolver we added on Friday, the other two are the customer's own domain controllers."
+    },
+    {
+      "key": "ev07",
+      "at": 233,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Workaround and the proper fix",
+      "text": "Thanks Tomasz, that matches what I suspected: .3 never gives an answer for Microsoft's login hostnames, whereas .2 and .4 always do. Two steps, kept apart on purpose.\nWorkaround, today: take 10.40.0.3 out of the DHCP scopes at the three shops and renew leases on the affected machines (a reboot does it).\nPermanent fix: Meridian amends the filtering policy so that the hostnames on Microsoft's published endpoint list are never blocked, via your normal change control. Please raise it with them today.\nTell me when the workaround is live; I'll watch for new reports until 15:00 UTC."
+    },
+    {
+      "key": "ev08",
+      "at": 305,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Workaround and the proper fix",
+      "text": "Tomasz took .3 out of the three shop scopes at 12:10 and we rebooted the till laptops. I've just rung each shop lead: seventeen people have signed in since, every one first time, and nobody has seen the error page again. Fingers crossed it holds."
+    },
+    {
+      "key": "ev09",
+      "at": 1500,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Before/after check",
+      "text": "Morning Marguerite. Before/after on my side: until midday yesterday the three shops kept contacting us about the sign-in page; from 12:10 UTC yesterday to now, nothing. I re-ran the resolver test from Harbourside this morning: .2 and .4 still answer everything. Meridian has the rule correction booked for Thursday's window. Can you confirm your three shop leads see no failures today? I'll keep the case open until Thursday's change is done."
+    },
+    {
+      "key": "ev10",
+      "at": 1560,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Before/after check",
+      "text": "None of the three shops has had the error page today, nor since the lunchtime change yesterday. Happy to leave it open until Thursday. Thanks both."
+    }
+  ]
+}

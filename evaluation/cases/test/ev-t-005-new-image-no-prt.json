@@ -1,0 +1,105 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-005-new-image-no-prt",
+  "split": "test",
+  "family": "fam-205",
+  "title": "Eighteen newly imaged laptops keep asking for sign-in in Teams",
+  "scenario": "Only new laptops of one site loop on the Teams sign-in prompt while the same people are fine on old machines and in a browser; a Teams reinstall changes nothing, and the registration output shows no primary refresh token on the new devices.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-03-24T10:20:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_call",
+      "channel": "phone",
+      "title": "Call: eighteen new laptops keep re-asking for sign-in",
+      "text": "Call logged 10:20 UTC. Ewan Sutherland, IT at Velora Retail, says eighteen of the new laptops imaged last week for head office finance and HR will not stay signed in to Teams: the app asks them to sign in, they do it, and a minute later it asks again. The same people are fine on their old laptops. He says Teams in a browser on the new laptops works normally. No error code read out; he will find one."
+    },
+    {
+      "key": "ev02",
+      "at": 17,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: call about the new laptops",
+      "text": "Hi Ewan, thanks for ringing. Let's start with the cheap things. On two of the affected laptops please uninstall Teams, put the current client back, sign in, and let me know whether anything changes. Please also send: the exact error wording from one failing laptop, three people who were hit, each with a rough UTC time, and which sites have new laptops versus old ones (so we can see whether it's the image or the location).\n\nHamza"
+    },
+    {
+      "key": "ev03",
+      "at": 1700,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: call about the new laptops",
+      "text": "Reinstalled Teams on Eilidh Carr's and Karim Rahman's new laptops yesterday afternoon: no difference, same prompt-again loop. The window just says 'Couldn't log you in, try once more'. Failures: e.carr@example.com 09:12 UTC, k.rahman@example.com 09:40, a.nowak@example.com 10:05. Affected: head office, which is the only site with the new laptops. Unaffected: the depot and the shops, who still use the old ones."
+    },
+    {
+      "key": "ev04",
+      "at": 1730,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Device registration output please",
+      "text": "Thanks Ewan. Since it's only the new images, I want to look at device registration. Please run dsregcmd /status in a command prompt on three affected laptops and on one of the old laptops, and paste back the SSO State block from each; the AzureAdPrt line matters most.\n\nHamza"
+    },
+    {
+      "key": "ev05",
+      "at": 1850,
+      "who": "customer",
+      "type": "diagnostic_result",
+      "channel": "portal",
+      "title": "dsregcmd output",
+      "text": "Output below. The new laptops (VEL-LT-0412, 0455, 0466) are all the same, so I'm pasting one:\n\n+------------------------------------------+\n| Device State\n| AzureAdJoined : YES\n| DomainJoined : NO\n| Device Name : VEL-LT-0412\n+------------------------------------------+\n| SSO State\n| AzureAdPrt : NO\n| WamDefaultSet : ERROR\n\nOld laptop VEL-LT-0107 (same user as 0412): AzureAdPrt : YES"
+    },
+    {
+      "key": "ev06",
+      "at": 1900,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "That's the answer, passing it on",
+      "text": "Thank you, that's what I needed. The three new laptops are joined but hold no primary refresh token (AzureAdPrt NO), while the old one has one. Without a PRT silent single sign-on can't happen, which is why Teams keeps asking. I'm passing the output to our identity team to look at the registration of those three device objects, and I'll update you tomorrow morning.\n\nHamza"
+    },
+    {
+      "key": "ev07",
+      "at": 1915,
+      "who": "engineer",
+      "type": "escalation",
+      "channel": "internal",
+      "title": "Escalation to identity backend",
+      "text": "Escalating: customer Velora Retail, 18 new head-office laptops loop on Teams sign-in, old laptops of the same users fine. Evidence: dsregcmd on VEL-LT-0412/0455/0466 shows AzureAdJoined YES but AzureAdPrt NO; old laptop VEL-LT-0107 AzureAdPrt YES. Teams reinstall on two of the new machines changed nothing. Browser sign-in works. Ask: registration trace for the three device objects and the reason PRT acquisition fails."
+    },
+    {
+      "key": "ev08",
+      "at": 2100,
+      "who": "engineer",
+      "type": "escalation_response",
+      "channel": "internal",
+      "title": "Identity team response",
+      "text": "Identity team: the three device objects exist but their join state is 'pending'; the registration task from the image never completed. Re-running the join (dsregcmd /leave, then the join task from the new-image runbook) should fix it. Over to you to guide the customer."
+    },
+    {
+      "key": "ev09",
+      "at": 2140,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Update from the identity team",
+      "text": "Ewan, our identity colleagues came back: the registration of the new image was left in a pending state and never finished, which explains the missing PRT. Please re-run the join on one affected laptop first (dsregcmd /leave, then the join task from the image runbook, reboot, sign in) and run dsregcmd /status again to confirm the AzureAdPrt line. I'll check in tomorrow at 09:00 UTC; if that laptop is healthy we do the other seventeen the same way.\n\nHamza"
+    },
+    {
+      "key": "ev10",
+      "at": 3000,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Update from the identity team",
+      "text": "Re-joined Eilidh's laptop this morning. dsregcmd now shows AzureAdPrt : YES, she's signed in and Teams has stayed signed in for two hours. We'll do the other seventeen this week."
+    }
+  ]
+}

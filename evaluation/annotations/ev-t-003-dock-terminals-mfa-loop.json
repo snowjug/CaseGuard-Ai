@@ -1,0 +1,61 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-003-dock-terminals-mfa-loop",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T09:40:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.recent-ca-change-reported" },
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev04", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev04", "id": "sig.mfa-ca-events-in-logs" },
+        { "event": "ev04", "id": "sig.recent-ca-change-reported" },
+        { "event": "ev05", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev05", "id": "sig.mfa-ca-events-in-logs" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev04", "id": "act.review-ca-policy-config" },
+        { "event": "ev05", "id": "act.communicate-status" },
+        { "event": "ev07", "id": "act.validate-fix" },
+        { "event": "ev07", "id": "act.communicate-status" }
+      ],
+      "absent": [
+        {
+          "event": "ev03",
+          "id": "sig.recent-network-change-reported",
+          "reason": "negated",
+          "note": "No network changes at all this month."
+        },
+        {
+          "event": "ev06",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "other",
+          "note": "The edit at 11:40 UTC is the remedy, made after onset; it is not the change that preceded the failures."
+        },
+        {
+          "event": "ev07",
+          "id": "sig.policy-events-outside-failure-window",
+          "reason": "other",
+          "note": "Zero rows are reported for a window after the fix, not inside the failure window."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.conditional-access"],
+      "rationale": "The customer names a new policy created the day before onset (ev01) and the audit log confirms its creation time (ev04). The log lookup in ev04 finds a failure row with AADSTS50076 and the policy named at each sampled minute, so the attempts did reach Entra and the policy blocked them (ev05 restates this). The remedy edit in ev06 is after onset, so it is not a change-before-onset signal. Handling is efficient and ends with a before/after check (ev07).",
+      "uncertainty": "none"
+    }
+  ],
+  "adjudication": null
+}
