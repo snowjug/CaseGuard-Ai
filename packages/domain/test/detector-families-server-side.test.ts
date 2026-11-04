@@ -672,3 +672,217 @@ describe('the pairs of the name servers and the proxy nodes', () => {
     ).toContain('sig.resolver-inconsistent');
   });
 });
+
+const DEVICE_AND_SERVICE: readonly Family[] = [
+  {
+    id: 'the device has its token: AzureAdPrt YES, or a valid token in words, or one device with and one without',
+    signal: 'sig.prt-healthy',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      'dsregcmd /status on the repaired laptop: AzureAdPrt : YES, and Teams signs in.',
+      'AzureAdPrt YES for both pilot users.',
+      'The old laptop has a valid PRT; the new one does not.',
+      'The primary refresh token is available on all five machines.',
+      'PRT status looks fine on the device.',
+      'The device is hybrid joined and has PRT.',
+      'Good news: the primary refresh token is there and was issued at 08:12.',
+      "Elena's laptop has no primary refresh token, Carmen's older one does.",
+    ],
+    doesNotRead: [
+      'The device has no primary refresh token.',
+      'AzureAdPrt : NO on this laptop.',
+      'Please check whether the laptop has a valid PRT.',
+      'If the PRT is healthy, we can rule out the device.',
+      'The device has a PRT but it is expired.',
+      'The PRT is not present on this laptop.',
+      'We cannot confirm that the laptop has a PRT without the dsregcmd output.',
+    ],
+  },
+  {
+    id: 'the device has lost its token: AzureAdPrt NO, no token in words, one device without',
+    signal: 'sig.prt-missing',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      'The laptop has lost its primary refresh token.',
+      'dsregcmd shows AzureAdPrt is NO on the sick laptop.',
+      'These devices never got a PRT after the re-image.',
+      'AzureAdPrt NO on three of the four laptops.',
+      "Carmen's laptop has a PRT, Elena's doesn't.",
+      "The PRT can't be refreshed by the broker.",
+      'The primary refresh token could not be obtained.',
+      "The laptop doesn't get a primary refresh token anymore.",
+    ],
+    doesNotRead: [
+      'The device has a primary refresh token.',
+      'AzureAdPrt : YES on this laptop.',
+      'Please check whether the laptop lost its PRT.',
+      'If the PRT is missing we re-register the device.',
+      'I suspect the laptop lost its primary refresh token.',
+      "The laptop has a PRT, but it doesn't help with the Teams error.",
+      "If the PRT can't be obtained we will rejoin the device.",
+      'Please check that the primary refresh token can be obtained.',
+    ],
+  },
+  {
+    id: 'the token state pasted by the customer: AzureAdPrt NO',
+    signal: 'sig.prt-missing',
+    role: 'customer_end_user',
+    type: 'customer_email',
+    reads: ['I ran dsregcmd /status as asked and it prints AzureAdPrt : NO.'],
+    doesNotRead: ['I will run dsregcmd /status tomorrow and send AzureAdPrt : NO or YES.'],
+  },
+  {
+    id: 'a federation server in error: a certificate that expired, a clock that is off, tokens refused, a node that is down',
+    signal: 'sig.federation-node-error',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      'The token-signing certificate on ADFSPROD01 expired yesterday at 23:59 UTC.',
+      'ADFS02 has a signing certificate that expired last night.',
+      'The clock of ADFS02 runs 4 minutes slow, so its tokens are rejected.',
+      'The AD FS server clock is five minutes ahead of the domain controller.',
+      'Tokens issued by the federation farm are rejected as not yet valid.',
+      'Several ADFS nodes return HTTP 500.',
+      'The AD FS service on node 2 stopped responding.',
+      'Event 364 on the federation server: the token signing certificate is no longer valid.',
+      'ADFS clock skew of about two minutes on one node.',
+    ],
+    doesNotRead: [
+      'Please check the token-signing certificate on the AD FS farm.',
+      'If the federation server clock is off, tokens would be rejected.',
+      'I suspect the ADFS node is down.',
+      "The customer's ADFS is probably not involved.",
+      'The TLS inspection certificate on the proxy expired last week.',
+      'The renewal of the token-signing certificate is planned for Friday, before it expires.',
+    ],
+  },
+  {
+    id: 'a federation server in error, as the engineer asks or says it in a mail',
+    signal: 'sig.federation-node-error',
+    role: 'support_engineer',
+    type: 'engineer_email',
+    reads: ['We found the AD FS node ADFS03 down since 08:05, so a third of the sign-ins fail.'],
+    doesNotRead: [
+      'Since you use AD FS, could you look at the certificates, the system time and the AD FS event log around the failed attempts?',
+      'ADFS failed over to the second node without any user impact.',
+    ],
+  },
+  {
+    id: 'a federation server in error, told by the customer administrator who looked',
+    signal: 'sig.federation-node-error',
+    role: 'customer_admin',
+    type: 'customer_email',
+    reads: ['Our AD FS node in the DMZ is down since this morning.'],
+    doesNotRead: ['The AD FS team is in a meeting until noon.'],
+  },
+  {
+    id: 'Microsoft has an incident that matches: posted, confirmed, listed, open',
+    signal: 'sig.service-health-incident',
+    role: 'support_engineer',
+    type: 'engineer_email',
+    reads: [
+      'Service health at 10:40 UTC: Microsoft has posted an incident for Teams and sign-in in Europe.',
+      'Microsoft confirms the outage affecting Teams sign-in and says mitigation is under way.',
+      'The incident explains the timeouts, there is nothing to change on your side.',
+      'The Microsoft status page lists an active advisory for Entra sign-in.',
+      'The incident stays open while Microsoft rolls out the fix.',
+      'There is an incident for Teams and authentication in the West Europe region.',
+    ],
+    doesNotRead: [
+      'Please check whether Microsoft has posted an incident for Teams.',
+      'If the incident explains the failures we will tell you.',
+      'Maybe it is a Microsoft outage affecting sign-in.',
+      'I will check service health for an incident later.',
+      'Service health shows no incident for Teams.',
+    ],
+  },
+  {
+    id: 'an incident that the customer heard about from someone else',
+    signal: 'sig.service-health-incident',
+    role: 'customer_end_user',
+    type: 'customer_email',
+    reads: [],
+    doesNotRead: ['The office manager says the status page showed an incident for Teams.'],
+  },
+  {
+    id: 'Microsoft has no incident: service health clear, nothing active, not an outage',
+    signal: 'sig.service-health-clear',
+    role: 'support_engineer',
+    type: 'engineer_email',
+    reads: [
+      'Service health is clear for Teams and Entra ID.',
+      'Looked at the message center and service health: nothing active for sign-in.',
+      'The Microsoft status page shows no incident for Teams, so this is not an outage.',
+      'No active incident for Teams or Entra sign-in right now.',
+      'Service health does not show any incident or advisory.',
+      'This is not a Microsoft outage; the status page is green.',
+    ],
+    doesNotRead: [
+      'Please check that service health is clear.',
+      'If service health is clear we look at the proxy.',
+      'Microsoft has posted an incident for Teams.',
+      'I do not think this is a Microsoft outage.',
+      'The status page is red for Teams in Europe.',
+    ],
+  },
+  {
+    id: 'a closing note that lists the theories that were rejected',
+    signal: 'sig.service-health-clear',
+    role: 'support_engineer',
+    type: 'resolution_note',
+    reads: [],
+    doesNotRead: [
+      'None of the theories held: not an expired token, not a service incident, not a device fault.',
+    ],
+  },
+  {
+    id: 'a dashboard colour that the customer heard about',
+    signal: 'sig.service-health-clear',
+    role: 'customer_end_user',
+    type: 'customer_email',
+    reads: [],
+    doesNotRead: ['Our helpdesk says the Microsoft status page is green.'],
+  },
+];
+
+describeFamilies(
+  'wording families of the server side: devices, federation and service health',
+  DEVICE_AND_SERVICE,
+);
+
+describe('the pairs of the device token and the service health', () => {
+  it('reads a denial of an incident as the clear side, and says which signal it denied', () => {
+    const found = observationsOf(
+      eventOf(
+        'support_engineer',
+        'engineer_email',
+        'Microsoft has not posted an incident for Teams.',
+      ),
+    );
+    const clear = found.find((o) => o.signalId === 'sig.service-health-clear');
+    expect(clear?.negationOf).toBe('sig.service-health-incident');
+    expect(found.map((o) => o.signalId)).not.toContain('sig.service-health-incident');
+  });
+
+  it('reads a token that is there and one that is not, from the one sentence', () => {
+    const found = signalsOf(
+      eventOf(
+        'support_engineer',
+        'diagnostic_result',
+        "Carmen's laptop has a PRT, Elena's doesn't.",
+      ),
+    );
+    expect(found).toContain('sig.prt-healthy');
+    expect(found).toContain('sig.prt-missing');
+  });
+
+  it('leaves the recap of a case note to the older detectors', () => {
+    expect(
+      signalsOf(
+        eventOf('support_engineer', 'case_note', 'The PRT is present on all three devices.'),
+      ),
+    ).not.toContain('sig.prt-healthy');
+  });
+});

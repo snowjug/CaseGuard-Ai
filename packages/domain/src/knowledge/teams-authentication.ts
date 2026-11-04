@@ -1084,6 +1084,18 @@ const CA_THING = String.raw`(?:${ACCESS_RULE}|sign-?in frequency|session (?:limi
 const MONTH = String.raw`(?:january|february|march|april|may|june|july|august|september|october|november|december)`;
 /** What a customer says when excluding users from a policy changed nothing: "still blocked", "the same error", "no change". */
 const NO_EFFECT = String.raw`(?:still (?:blocked|fail\w*|prompted|asked|gets?|getting|seeing|the same|broken|happening)|same (?:error|message|block\w*|result|failure\w*|thing|behaviou?r|pattern|problem|issue|prompt)|(?:failures?|errors?|blocks?|prompts?) (?:continue|persist|remain)\w*)`;
+const PRT = String.raw`(?:primary refresh token|prt)`;
+/** Where a device's token is told in words. The case note, which sums the case up, is left to the older detectors. */
+const PRT_TYPES: typeof LOG_RESULT_TYPES = [
+  ...FINDING_TYPES,
+  'validation_result',
+  ...CUSTOMER_LOG_TYPES,
+];
+/** A federation server or node, as it is named: AD FS (ADFS03), the STS, the federation farm, the web application proxy. */
+const FED_NODE = String.raw`(?:ad ?fs\w{0,10}|sts|federation (?:server|farm|node|service|proxy)|web application proxy)`;
+/** Where Microsoft says whether it has an incident. */
+const HEALTH_PAGE = String.raw`(?:service health|the (?:service )?status page|the message center|microsoft(?:['’]s)? status)`;
+const FED_CLOCK = String.raw`(?:fast|slow|ahead|behind|drift\w*|skew\w*|out of sync|wrong|off by)`;
 
 /**
  * Wording families for the signals about the server side: what the logs and the infrastructure show (name servers, proxy
@@ -1308,6 +1320,96 @@ const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetec
     rx(
       String.raw`\bexclusions?\b[^\n]{0,140}?\b(?:still (?:blocked|applied|show\w*|fail\w*|prompt\w*)|same (?:error|message|block\w*)|no (?:change|effect))\b`,
       { roles: [...ENG_ROLES], eventTypes: FINDING_TYPES },
+    ),
+  ],
+  // The primary refresh token of a device that is there: "AzureAdPrt YES", "AzureAdPrt is NO on yours and YES on hers", "has a
+  // valid PRT", "shows a fresh primary refresh token".
+  'sig.prt-healthy': [
+    rx(String.raw`\bAzureAdPrt\b(?:\s*[:=]|\s+(?:is|shows|says|reads))?\s*YES\b`),
+    ...[
+      String.raw`\bAzureAdPrt\b${gap(25)}\bNO\b${gap(15)}(?:[,;]|\b(?:and|while|but|whereas)\b)${gap(15)}\bYES\b`,
+      String.raw`\bAzureAdPrt\b${gap(25)}\bYES\b${gap(15)}(?:[,;]|\b(?:and|while|but|whereas)\b)${gap(15)}\bNO\b`,
+    ].map((pattern) => rx(pattern)),
+    ...[
+      String.raw`\b(?:has|have|had|shows?|showed|with|got|gets?) (?:an? |the )?(?:valid |fresh |healthy |current |new |working )?${PRT}\b(?!${gap(25)}\b(?:expired|stale|invalid|revoked|corrupt\w*)\b)`,
+      String.raw`\b${PRT}\b${gap(20)}\b(?:present|healthy|valid|fresh|issued|ok|okay|fine|good|up to date)\b(?!${gap(25)}\b(?:expired|stale|invalid|revoked)\b)`,
+      String.raw`\b${PRT}\b${gap(20)}\b(?:is|are|was|were|be|been|got|gets?) (?:\w+ )?(?:there|available|obtained|acquired|received|in place|intact|working|refreshed)\b`,
+    ].map((pattern) => rx(pattern, { eventTypes: PRT_TYPES, negativeContent: false })),
+    rx(
+      String.raw`\b(?:no|without) (?:\w+ )?${PRT}\b${gap(50)}(?:[,;]|\b(?:and|while|but|whereas)\b)${gap(40)}\b(?:(?:does|do)\b(?=\s*(?:[.;,!?\n]|$)|\s+have\b)|(?:has|have|got) one\b|there (?:is|are)\b)`,
+      { eventTypes: PRT_TYPES, negativeContent: true },
+    ),
+  ],
+  // The primary refresh token of a device that is gone: "AzureAdPrt is NO", "has lost its PRT", "never got a primary refresh token".
+  'sig.prt-missing': [
+    rx(String.raw`\bAzureAdPrt\b(?:\s*[:=]|\s+(?:is|shows|says|reads))?\s*NO\b`),
+    rx(
+      String.raw`\bAzureAdPrt\b${gap(25)}\bYES\b${gap(15)}(?:[,;]|\b(?:and|while|but|whereas)\b)${gap(15)}\bNO\b`,
+    ),
+    ...[
+      String.raw`\b(?:lost|lose|loses|never (?:got|had|received|obtained)|failed to (?:get|obtain|acquire|refresh)|cannot (?:get|obtain|acquire)|can['’]t (?:get|obtain|acquire)|(?:does ?n['’]?t|does not|do not|don['’]t) (?:get|receive|obtain|acquire)|no longer (?:has|have|gets?))\b${gap(20)}\b(?:its |their |the |a )?${PRT}\b`,
+      String.raw`\b${PRT}\b${gap(50)}(?:[,;]|\b(?:and|while|but|whereas)\b)${gap(40)}\b(?:(?:does ?n['’]?t|does not|do not|don['’]t)\b(?=\s*(?:[.;,!?\n]|$)|\s+have\b)|(?:has|have|got) none\b|there is none\b)`,
+      String.raw`\b${PRT}\b${gap(30)}\b${NOT_DONE} (?:be |been |get |got )?(?:obtained|issued|acquired|received|refreshed|renewed|available|present|there|found)\b`,
+    ].map((pattern) => rx(pattern, { eventTypes: PRT_TYPES })),
+  ],
+  // A federation server that is in error: a signing certificate that expired, a clock that runs fast, tokens it issued that are
+  // rejected, a node that is down. Whoever tells it: the engineer, or the customer's administrator who looked.
+  'sig.federation-node-error': [
+    ...[
+      String.raw`\b(?:token[- ]signing|signing|federation|ad ?fs|sts|idp|identity provider|saml)\b${gap(25)}\bcertificates?\b${gap(60)}\b(?:has |have |had |is |was |were |got )?(?:expired|invalid|revoked|about to expire|missing)\b`,
+      String.raw`\bexpired\b${gap(30)}\b(?:token[- ]signing|signing|federation|ad ?fs|sts)\b${gap(15)}\bcertificates?\b`,
+      String.raw`\b${FED_NODE}\b${gap(40)}\b(?:clock|time)\b${gap(30)}\b${FED_CLOCK}\b`,
+      String.raw`\bclock\b${gap(12)}\bof\b${gap(8)}\b${FED_NODE}\b${gap(30)}\b${FED_CLOCK}\b`,
+      String.raw`\bfederat\w+\b${gap(60)}\b(?:token|signature|certificate|assertion)\b${gap(50)}\b(?:rejected|invalid|refused|expired)\b`,
+      String.raw`\b(?:tokens?|assertions?|signatures?)\b${gap(40)}\b(?:federation|ad ?fs|sts|identity provider|idp)\b${gap(40)}\b(?:rejected|invalid|refused)\b`,
+      String.raw`\b${FED_NODE}\b${gap(45)}\b(?:down|unreachable|unresponsive|(?:failing|failed)(?!\s?(?:over|attempts?|sign|log|users?|auth|requests?))|returning errors|returns? (?:http )?(?:5\d\d|errors?)|time[sd]? out|overloaded|crash\w*|stopped|offline)\b`,
+    ].map((pattern) =>
+      rx(pattern, {
+        eventTypes: [...FINDING_TYPES, ...CUSTOMER_LOG_TYPES],
+        negativeContent: false,
+      }),
+    ),
+    ...[
+      String.raw`\b(?:token|signature|certificate|assertion)\b${gap(50)}\bnot (?:yet )?valid\b${gap(40)}\b(?:identity provider|idp|federat\w+|ad ?fs|sts)\b`,
+      String.raw`\bfederat\w+\b${gap(60)}\b(?:token|signature|certificate|assertion)\b${gap(50)}\bnot (?:yet )?valid\b`,
+      String.raw`\b${FED_NODE}\b${gap(60)}\bnot (?:responding|answering)\b`,
+    ].map((pattern) =>
+      rx(pattern, {
+        eventTypes: [...FINDING_TYPES, ...CUSTOMER_LOG_TYPES],
+        negativeContent: true,
+      }),
+    ),
+  ],
+  // Microsoft has an incident that matches: "Microsoft has posted an incident for Teams", "the incident explains it", "the
+  // incident stays open". The engineer's word; what a customer was told by someone else is not read.
+  'sig.service-health-incident': [
+    ...[
+      String.raw`\b(?:microsoft|${HEALTH_PAGE})\b${gap(40)}\b(?:(?:has |have )?(?:just )?(?:posted|published|declared|opened|logged|listed|reported)|confirm\w*|acknowledg\w*|shows?|lists?)\b${gap(30)}\b(?:an?|the|this)\b${gap(15)}\b(?:incident|outage|advisory|service issue|degradation|disruption|MO\d{5,7}|TM\d{5,7}|EX\d{5,7})\b`,
+      String.raw`\b(?:the |this |that )?(?:incident|outage|advisory)\b${gap(40)}\b(?:explains?|matches|fits|is (?:still )?(?:active|ongoing|open)|stays open|remains open|started|began|is being (?:investigated|mitigated)|affects?|impacts?)\b`,
+      String.raw`\b(?:an?|the) (?:active |ongoing |open |new )?(?:incident|outage|advisory)\b${gap(30)}\b(?:for|affecting|impacting|concerning)\b${gap(30)}\b(?:teams|sign-?in|entra|authentication|microsoft 365|exchange online)\b`,
+    ].map((pattern) => rx(pattern, { roles: [...ENG_ROLES], eventTypes: FINDING_TYPES })),
+  ],
+  // Microsoft has no incident: "service health is clear", "service health shows nothing", "no incident for Teams", "this is not an
+  // outage". The engineer who looked; a dashboard's colour reported by someone else is not read.
+  'sig.service-health-clear': [
+    rx(
+      String.raw`\b${HEALTH_PAGE}\b${gap(30)}\b(?:is|are|looks?|looked|shows?|showed|says?|reports?)\b${gap(8)}\b(?:clear|green|all green|healthy|normal|operational|quiet)\b`,
+      {
+        roles: [...ENG_ROLES],
+        eventTypes: [...FINDING_TYPES, 'validation_result'],
+        negativeContent: false,
+      },
+    ),
+    ...[
+      String.raw`\b${HEALTH_PAGE}\b${gap(30)}\b(?:is|are|looks?|looked|shows?|showed|says?|reports?|has|have)\b${gap(8)}\b(?:nothing|no (?:\w+ )?(?:incidents?|advisor(?:y|ies)|outages?|issues?|problems?|degradations?|disruptions?))\b`,
+      String.raw`\bno (?:active |open |ongoing |known |relevant )?(?:incidents?|advisor(?:y|ies)|outages?|service issues?|degradations?)\b${gap(40)}\b(?:for|affecting|on|about|in|that|which|with)\b${gap(30)}\b(?:teams|sign-?in|entra|authentication|microsoft|m365|office)\b`,
+      String.raw`\b(?:this|it|that|there)(?: is|['’]s| was) not (?:an? )?(?:microsoft(?:-side)? |service )?(?:outage|incident|service issue)\b`,
+      String.raw`\b${HEALTH_PAGE}\b${gap(30)}\b${NOT_DONE} (?:show|list|have|report|mention|contain)\b${gap(20)}\b(?:an?|any)\b${gap(10)}\b(?:incident|advisory|outage|issue|degradation)\b`,
+    ].map((pattern) =>
+      rx(pattern, {
+        roles: [...ENG_ROLES],
+        eventTypes: [...FINDING_TYPES, 'validation_result'],
+      }),
     ),
   ],
 };
