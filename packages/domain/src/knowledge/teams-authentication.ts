@@ -985,9 +985,22 @@ const WORDING_FAMILIES: Readonly<Record<string, readonly SignalDetector[]>> = {
     ),
   ],
 };
+
+/**
+ * Wording families for the signals about the server side: what the logs and the infrastructure show (name servers, proxy
+ * nodes, federation, device tokens, service health) and what changed in the access policy. Kept apart from the map above
+ * so that two authors can add families at the same time; read both when looking for what detects a signal. The same
+ * rules hold: a family is a way of saying a thing, never a list of the sentences that failed; every family has
+ * look-alike sentences it must not read in `test/detector-families.test.ts`; gaps are bounded.
+ */
+const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetector[]>> = {};
+
 for (const signal of signals) {
-  const extra = WORDING_FAMILIES[signal.id];
-  if (extra) signal.detectors.push(...extra);
+  const extra = [
+    ...(WORDING_FAMILIES[signal.id] ?? []),
+    ...(WORDING_FAMILIES_SERVER_SIDE[signal.id] ?? []),
+  ];
+  if (extra.length > 0) signal.detectors.push(...extra);
 }
 
 const KQL_CORRELATE = [
