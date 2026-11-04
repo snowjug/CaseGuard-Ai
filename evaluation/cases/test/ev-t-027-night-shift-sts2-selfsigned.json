@@ -36,7 +36,7 @@
       "type": "log_sample",
       "channel": "email",
       "title": "STS report",
-      "text": "Dewi (infrastructure). Report:\nsts1  service certificate CN=sts.brynmawr-example.com, issuer Brynmawr Issuing CA, valid to 2027-04-01 | clock +0.02 s | event log quiet\nsts2  service certificate CN=sts.brynmawr-example.com, issuer = sts2 (self-signed), valid from 2026-06-07 | clock +0.03 s | event log: 'The remote certificate is invalid according to the validation procedure' x380 since Sunday 22:00\nStaff hit: g.price 03:12 UTC, n.hughes 03:40, r.davies 04:55. No ward is better or worse, it is whoever lands on sts2."
+      "text": "Dewi (infrastructure). Report:\nsts1  service certificate CN=sts.brynmawr.example.com, issuer Brynmawr Issuing CA, valid to 2027-04-01 | clock +0.02 s | event log quiet\nsts2  service certificate CN=sts.brynmawr.example.com, issuer = sts2 (self-signed), valid from 2026-06-07 | clock +0.03 s | event log: 'The remote certificate is invalid according to the validation procedure' x380 since Sunday 22:00\nStaff hit: g.price 03:12 UTC, n.hughes 03:40, r.davies 04:55. No ward is better or worse, it is whoever lands on sts2."
     },
     {
       "key": "ev04",

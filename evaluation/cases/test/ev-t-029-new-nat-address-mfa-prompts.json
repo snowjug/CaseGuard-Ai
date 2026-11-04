@@ -27,7 +27,7 @@
       "type": "engineer_email",
       "channel": "portal",
       "title": "Re: Hartlepool asked for MFA at every Teams sign-in since Monday",
-      "text": "Hi Colin. Thank you, that helps. Please send three affected people with a rough UTC time each, the wording shown at the prompt, and tell me whether any Conditional Access policy of yours depends on locations or IP addresses (for instance 'MFA unless on the office network').\n\nYusuf"
+      "text": "Hi Colin. Thank you, that helps. Could you give me a few names of people who were prompted (three is plenty) with roughly when, in UTC, plus the exact wording at the prompt? And tell me whether any Conditional Access policy of yours depends on locations or IP addresses (for instance 'MFA unless on the office network').\n\nYusuf"
     },
     {
       "key": "ev03",
@@ -45,7 +45,7 @@
       "type": "engineer_action",
       "channel": "internal",
       "title": "Entra and audit lookup",
-      "text": "Entra, 07:31 / 07:48 / 08:05 UTC +/- 5 min for the three: a failure row for each, AADSTS50074 (strong authentication required), policy 'MFA away from office' applied, client address the second public one. That address is not in the named location 'Offices'. The audit query for policy edits returned two edits, both in the spring; I still have to confirm that none falls inside the failure window."
+      "text": "Entra, 07:31 / 07:48 / 08:05 UTC +/- 5 min for the three: failures logged for all three, AADSTS50074 (strong authentication required), policy 'MFA away from office' applied, client address the second public one. That address is not in the named location 'Offices'. The audit query for policy edits returned two edits, both in the spring; I still have to confirm that none falls inside the failure window."
     },
     {
       "key": "ev05",

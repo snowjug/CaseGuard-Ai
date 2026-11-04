@@ -45,7 +45,7 @@
       "type": "engineer_action",
       "channel": "internal",
       "title": "Entra lookup and audit log",
-      "text": "Entra lookup for t.vermeer / r.dekker / f.smit around 08:10 / 09:15 / 10:12 UTC Tuesday: a failure row for each, result AADSTS70043 (refresh token expired or invalid). Audit log: policy 'Baseline-All' was edited at 20:41 UTC on Monday, its frequency control now reads 1 hour."
+      "text": "Entra lookup for t.vermeer / r.dekker / f.smit around 08:10 / 09:15 / 10:12 UTC Tuesday: a failure row apiece, result AADSTS70043 (refresh token expired or invalid). Audit log: policy 'Baseline-All' was edited at 20:41 UTC on Monday, its frequency control now reads 1 hour."
     },
     {
       "key": "ev05",

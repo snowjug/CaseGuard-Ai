@@ -27,7 +27,7 @@
       "type": "engineer_email",
       "channel": "portal",
       "title": "Re: Teams logins failing for about half of the Leeds office",
-      "text": "Hi Joel. Since the traffic goes through four proxy nodes I'd like each node tested separately: from a Leeds PC, reach login.microsoftonline.com through px1, px2, px3 and px4 in turn and note the response time per node. Please also send three people it hit with an approximate UTC time each, and the list of offices that are fine.\n\nLars"
+      "text": "Hi Joel. Since the traffic goes through four proxy nodes I'd like each node tested separately: from a Leeds PC, reach login.microsoftonline.com through px1, px2, px3 and px4 in turn and note the response time per node. I also need a few names of people who were hit, with approximate UTC times, and a list of the offices that are fine.\n\nLars"
     },
     {
       "key": "ev03",

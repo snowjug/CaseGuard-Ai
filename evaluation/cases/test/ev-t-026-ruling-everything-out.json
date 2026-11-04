@@ -36,7 +36,7 @@
       "type": "engineer_email",
       "channel": "portal",
       "title": "Re: Teams sign-in fails roughly one time in three, all offices",
-      "text": "Hello Pia. Before guessing, three things: (a) three people it hit, with an approximate UTC minute each, and what the failing screen says; (b) whether any site fares better or worse than the others; (c) anything at all that changed on identity, network, DNS, proxy or firewall in the last week, including things you consider unrelated.\n\nElif"
+      "text": "Hello Pia. Before guessing, three things: (a) what the failing screen says, plus names and rough UTC minutes for three of the people who hit it; (b) whether any site fares better or worse than the others; (c) anything at all that changed on identity, network, DNS, proxy or firewall in the last week, including things you consider unrelated.\n\nElif"
     },
     {
       "key": "ev04",
@@ -117,7 +117,7 @@
       "type": "diagnostic_result",
       "channel": "portal",
       "title": "dsregcmd, two PCs",
-      "text": "dsregcmd, two PCs (LON-114 and MAD-052), both people fail intermittently:\nDomainJoined : YES\nDomain Name : tavistock-example.local\nAzureAdJoined : YES\nDeviceAuthStatus : SUCCESS\nAzureAdPrt : YES\n(identical on both)\n\nPia"
+      "text": "dsregcmd, two PCs (LON-114 and MAD-052), both people fail intermittently:\nDomainJoined : YES\nDomain Name : tavistock.example.com\nAzureAdJoined : YES\nDeviceAuthStatus : SUCCESS\nAzureAdPrt : YES\n(identical on both)\n\nPia"
     },
     {
       "key": "ev13",

@@ -18,7 +18,7 @@
       "type": "customer_email",
       "channel": "portal",
       "title": "Mails to one supplier sit in the queue, then bounce",
-      "text": "Hello, Sunniva Haugen, Eikeland Finans. Since Tuesday afternoon every email to our freight supplier (domain nordlast-example.com) stays in the outbound queue for hours and then bounces with 4.4.7, delivery expired. Mail to all other recipients goes out fine. The supplier insists nothing arrives on their side. Our connector for their domain uses forced TLS and a smart host. Nothing else has been touched on our mail setup."
+      "text": "Hello, Sunniva Haugen, Eikeland Finans. Since Tuesday afternoon every email to our freight supplier (domain nordlast.example.com) stays in the outbound queue for hours and then bounces with 4.4.7, delivery expired. Mail to all other recipients goes out fine. The supplier insists nothing arrives on their side. Our connector for their domain uses forced TLS and a smart host. Nothing else has been touched on our mail setup."
     },
     {
       "key": "ev02",
@@ -36,7 +36,7 @@
       "type": "log_sample",
       "channel": "portal",
       "title": "message trace excerpt",
-      "text": "Message trace: Status Pending. Detail: '451 4.4.0 DNS query failed. The MX lookup for nordlast-example.com timed out.' Connector: send connector 'Supplier-TLS', smart host mail.nordlast-example.com, TLS required. Their IT told us they moved their DNS to a new provider last Monday."
+      "text": "Message trace: Status Pending. Detail: '451 4.4.0 DNS query failed. The MX lookup for nordlast.example.com timed out.' Connector: send connector 'Supplier-TLS', smart host mail.nordlast.example.com, TLS required. Their IT told us they moved their DNS to a new provider last Monday."
     },
     {
       "key": "ev04",
@@ -45,7 +45,7 @@
       "type": "engineer_action",
       "channel": "internal",
       "title": "MX lookups",
-      "text": "Looked up the MX record for nordlast-example.com against three public resolvers: two return the MX host, one returns SERVFAIL. At the new DNS provider the zone has a lame delegation for one of its name servers since Monday, so lookups that land on that server fail. The fault is on the supplier's side."
+      "text": "Looked up the MX record for nordlast.example.com against three public resolvers: two return the MX host, one returns SERVFAIL. At the new DNS provider the zone has a lame delegation for one of its name servers since Monday, so lookups that land on that server fail. The fault is on the supplier's side."
     },
     {
       "key": "ev05",

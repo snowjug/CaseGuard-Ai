@@ -27,7 +27,7 @@
       "type": "engineer_email",
       "channel": "portal",
       "title": "Re: Front-desk laptops keep re-asking for Teams sign-in",
-      "text": "Hi Alun, let's go through it one fact at a time. Please send the exact wording on the laptops, three people it hit with a UTC time for each, and whether other sites are fine. I'd also like the raw dsregcmd /status output from two of the laptops, not a summary; the SSO State block is the part I want.\n\nBruna"
+      "text": "Hi Alun, let's go through it one fact at a time. Please send what the laptops actually say, the names of three people who were hit with when it happened (UTC), and a yes or no on whether other sites are fine. I'd also like the raw dsregcmd /status output from two of the laptops, not a summary; the SSO State block is the part I want.\n\nBruna"
     },
     {
       "key": "ev03",

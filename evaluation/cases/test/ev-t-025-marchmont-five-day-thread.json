@@ -36,7 +36,7 @@
       "type": "engineer_email",
       "channel": "portal",
       "title": "Re: Leith and Dalkeith cannot get into Teams",
-      "text": "Hi Fiona, thanks, that is a good start. Could you send: three people it happened to with a rough UTC time each, the exact text the failing ones see, and a list of what is fine versus broken (branches, floors, networks)? Also whatever else changed since Wednesday on the network, DNS, proxy or firewall side, however minor.\n\nHamish"
+      "text": "Hi Fiona, thanks, that is a good start. Could you send: the text the failing ones actually see; names and approximate UTC times for any three affected people; and which branches, floors or networks are fine and which are broken? Also whatever else changed since Wednesday on the network, DNS, proxy or firewall side, however minor.\n\nHamish"
     },
     {
       "key": "ev04",

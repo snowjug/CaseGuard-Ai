@@ -45,7 +45,7 @@
       "type": "engineer_email",
       "channel": "portal",
       "title": "Re: TEAMS DOWN - microsoft outage?",
-      "text": "Hi Cathal, I have just been through the Service health board and the Message center posts for Teams and Entra: nothing is listed as active (08:40 UTC), so I can't confirm an outage yet. To get to the bottom of it I need three people it hit, with a rough UTC time for each, the offices that fail and any that work, and anything changed recently on your DNS, proxy or MFA settings. I'll look at Service health again at 09:30 UTC.\n\nOdalys"
+      "text": "Hi Cathal, I have just been through the Service health board and the Message center posts for Teams and Entra: nothing is listed as active (08:40 UTC), so I can't confirm an outage yet. To get to the bottom of it I need the names of three people who were hit and roughly when (UTC), which offices fail and which work, and anything changed recently on your DNS, proxy or MFA settings. I'll look at Service health again at 09:30 UTC.\n\nOdalys"
     },
     {
       "key": "ev05",

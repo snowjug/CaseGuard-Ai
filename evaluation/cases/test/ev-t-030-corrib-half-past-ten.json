@@ -27,7 +27,7 @@
       "type": "engineer_email",
       "channel": "portal",
       "title": "Re: Teams login gives up after a minute, from half past ten",
-      "text": "Hi Aoife. Please send three people it hit with an approximate UTC time each, the wording or code on the failing screen, and which depots are better or worse. Also anything changed on DNS, proxy, firewall or MFA in the last two days, deliberate or not.\n\nNikolai"
+      "text": "Hi Aoife. Who was hit, and roughly when in UTC? Three names will do. I also need the wording or code on the failing screen and which depots fare better or worse. Also anything changed on DNS, proxy, firewall or MFA in the last two days, deliberate or not.\n\nNikolai"
     },
     {
       "key": "ev03",
