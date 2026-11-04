@@ -987,13 +987,160 @@ const WORDING_FAMILIES: Readonly<Record<string, readonly SignalDetector[]>> = {
 };
 
 /**
+ * Pieces of the server-side families below. As above, each one is bounded and nests no repetition.
+ */
+/** Like `GAP`, and a full stop in front of a word character stays inside the sentence (a host name such as login.microsoftonline.com). */
+const HOST_GAP = String.raw`(?:[^.\n]|\.(?=\w))`;
+/** A verb that is denied, with or without the apostrophe: "did not", "doesn't", "never". */
+const NOT_DONE = String.raw`(?:(?:do|does|did|is|are|was|were|has|have|had|ca|could)n['’]?t|(?:do|does|did|is|are|was|were|has|have|had|can|could) not|cannot|never)`;
+/** Where an identity service keeps the record of a sign-in, in the words engineers use for it. */
+const SIGNIN_LOG = String.raw`(?:sign[- ]?in ?logs?|entra(?: id)?|azure ad|the logs?)`;
+/** One line of such a log, in the singular or the plural. */
+const LOG_ROW = String.raw`(?:records?|rows?|entr(?:y|ies)|events?|traces?|hits?|lines?)`;
+/** "no", "zero" and "not a single": what is said to be missing. */
+const NO_ANY = String.raw`(?:no|zero|0|not (?:a single|one))`;
+/**
+ * The modality cues know "no" and "none", not a count of nothing, so a statement of what is there must not start right after
+ * "zero" or "0" (and the words that follow its verb are checked where that matters).
+ */
+const NOT_ZERO = String.raw`(?<!\b(?:zero|nil|0 \w{2,8})[^.\n]{0,40})`;
+/** A bounded gap of at most `max` characters inside one sentence, as short as it can be. */
+const gap = (max: number): string => String.raw`${HOST_GAP}{0,${max}}?`;
+/** The same, and it stays inside one clause: no comma, colon or semicolon either. */
+const clauseGap = (max: number): string => String.raw`(?:[^.,;:\n]|\.(?=\w)){0,${max}}?`;
+/**
+ * What an engineer writes after looking at something. A case note is left out on purpose: plans, hypotheses and findings meet
+ * there, and the detectors written before these families already read it.
+ */
+const FINDING_TYPES: typeof LOG_RESULT_TYPES = [
+  'query_output',
+  'diagnostic_result',
+  'escalation_response',
+  'engineer_action',
+  'engineer_email',
+  'resolution_note',
+  'log_sample',
+];
+/** The customer's administrators, who can open the sign-in logs of their own tenant. */
+const CUSTOMER_LOG_ROLES = ['customer_admin', 'customer_network_admin'] as const;
+const CUSTOMER_LOG_TYPES: typeof LOG_RESULT_TYPES = ['customer_email', 'customer_call'];
+/**
+ * A statement of what is there, read by the engineer's words: a denial inside it ("no failed rows") counts against it, even
+ * when the pattern holds a word such as "zero" that its own look-around needs.
+ */
+const AS_FOUND: Parameters<typeof rx>[1] = { eventTypes: FINDING_TYPES, negativeContent: false };
+/** The same statement with the log named before it or after it, in the one sentence: a phrase that needs a log to be about one. */
+const withLog = (statement: string, before = 80, after = 60): string[] => [
+  String.raw`\b${SIGNIN_LOG}\b${gap(before)}${statement}`,
+  String.raw`${statement}${gap(after)}\b${SIGNIN_LOG}\b`,
+];
+
+/**
  * Wording families for the signals about the server side: what the logs and the infrastructure show (name servers, proxy
  * nodes, federation, device tokens, service health) and what changed in the access policy. Kept apart from the map above
  * so that two authors can add families at the same time; read both when looking for what detects a signal. The same
  * rules hold: a family is a way of saying a thing, never a list of the sentences that failed; every family has
- * look-alike sentences it must not read in `test/detector-families.test.ts`; gaps are bounded.
+ * look-alike sentences it must not read in `test/detector-families-server-side.test.ts`; gaps are bounded.
  */
-const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetector[]>> = {};
+const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetector[]>> = {
+  // A failed row that is not there, said in the many ways engineers say it: the row noun in the singular or the plural, the
+  // log as the subject ("held nothing", "are clean"), the attempt as the subject ("do not appear"), or the service never reached.
+  'sig.no-server-side-failure-records': [
+    ...[
+      String.raw`\b${NO_ANY}\b[\w -]{0,20}?\b(?:fail(?:ed|ures?|ing)|errors?|blocked|rejected)\b[\w -]{0,16}?\b${LOG_ROW}\b`,
+      String.raw`\b${NO_ANY}\b[\w -]{0,12}?\b(?:sign-?in|log-?in|logon|authentication)\b[\w -]{0,12}?\b${LOG_ROW}\b`,
+      String.raw`\b${NO_ANY}\b[\w -]{0,12}?\b(?:matching|corresponding|relevant)\b[\w -]{0,12}?\b${LOG_ROW}\b${gap(80)}\b(?:fail\w*|attempts?|sign-?ins?|users?|${SIGNIN_LOG})\b`,
+      String.raw`\b${NO_ANY} (?:[\w-]+ )?${LOG_ROW}\b${gap(40)}\b(?:for|of|from|at|around|during|matching)\b${gap(40)}\b(?:attempts?|failures?|users?|sign-?ins?|them|those|these)\b`,
+      String.raw`\b(?:could ?n['’]?t|could not|did ?n['’]?t|did not|cannot|can['’]t|unable to) (?:find|see|locate) (?:any|an?|one)\b[\w -]{0,30}?\b${LOG_ROW}\b${gap(60)}\b(?:fail\w*|attempts?|users?|${SIGNIN_LOG})\b`,
+      String.raw`\b(?:nothing|no (?:[\w-]+ )?(?:failures?|errors?|failed (?:sign-?ins?|attempts?|logins?)))\b (?:is |was |were |are |has been |have been |had been )?(?:logged|recorded|captured|registered|written|stored)\b`,
+      String.raw`\b(?:never|(?:did|does|do)n['’]?t|(?:did|does|do) not|fail(?:s|ed|ing)? before|stops? before|stopped before)\b${gap(15)}\b(?:even )?(?:reach(?:es|ed|ing)?|get(?:s|ting)? (?:as far as|to|there)|got (?:as far as|to|there)|make it to|made it to|arriv(?:e|es|ed|ing) (?:at|in))\b${gap(30)}\b(?:entra|azure ad|the identity (?:provider|service|platform)|the (?:sign-?in |authentication |auth )?service|microsoft(?: 365| entra)?|the tenant)\b`,
+    ].map((pattern) => rx(pattern, { eventTypes: FINDING_TYPES })),
+    // With the log named in the sentence: an engineer's, and the customer administrator's who looked into it as well.
+    ...[
+      String.raw`\b${SIGNIN_LOG}\b${clauseGap(30)}\b(?:held|holds?|had|has|have|contain(?:s|ed)?|show(?:s|ed)?|list(?:s|ed)?|return(?:s|ed)?|gave|gives?|came back|comes back|turned up|are|is|were|was|look(?:s|ed)?)\b${clauseGap(12)}\b(?:nothing|none|(?:no|zero) (?:[\w-]+ )?(?:${LOG_ROW}|failures?|errors?|results?|matches)|empty|blank|clean|quiet)\b`,
+      String.raw`\b${SIGNIN_LOG}\b${gap(60)}: ?(?:nothing|none|nil|(?:no|zero) (?:[\w-]+ )?(?:${LOG_ROW}|failures?|errors?|hits|results?|matches))\b`,
+      String.raw`\b(?:nothing|nil|none|(?:no|zero) (?:[\w-]+ )?(?:${LOG_ROW}|failures?|errors?|hits|results?|matches|sign|evidence|mention))\b${gap(45)}\b(?:in|on|from|within|inside)\b${gap(14)}\b${SIGNIN_LOG}\b(?!${HOST_GAP}{0,60}\bsince (?:the|your|our|this) (?:change|fix|removal|update|workaround)\b)`,
+      String.raw`\b(?:attempts?|sign-?ins?|failures?|requests?|them|these|those|they)\b${gap(40)}\b${NOT_DONE} (?:even )?(?:appear|show(?: up)?|be (?:found|seen|listed|logged|recorded)|exist|registered|visible|listed|recorded|logged|found|present|there)\b${gap(40)}\b${SIGNIN_LOG}\b`,
+      String.raw`\bnone of (?:them|these|those|the [\w ]{0,20}?(?:attempts|failures|users|sign-?ins))\b${gap(40)}\b(?:appear|show(?:s)?(?: up)?|are|were|is|was|exist|found|listed|logged|recorded|visible|present)\b${gap(30)}\b${SIGNIN_LOG}\b`,
+      String.raw`\b${SIGNIN_LOG}\b${clauseGap(20)}\b${NOT_DONE} (?:log|record|show|list|contain|have|hold|see)\b${clauseGap(20)}\b(?:anything|any (?:[\w-]+ )?${LOG_ROW}|a single (?:row|record|entry|event))`,
+      String.raw`\b${SIGNIN_LOG}\b${gap(40)}\b(?:found|find|saw|see|got|get|returned|there (?:is|are|was|were))\b${gap(6)}\b(?:nothing|no (?:[\w-]+ )?(?:${LOG_ROW}|failures?|errors?|results?|matches))`,
+      String.raw`\b${SIGNIN_LOG}\b${clauseGap(10)}\bnever (?:saw|received|got|logged|recorded|heard)\b`,
+      ...withLog(
+        String.raw`\b(?:no|zero|not (?:a single|one)) (?:failed|failing|blocked|unsuccessful) (?:sign-?ins?|attempts?|logins?)\b(?!${gap(60)}\bsince (?:the|your|our|this) (?:change|fix|removal|update|workaround)\b)`,
+        60,
+        50,
+      ),
+    ].flatMap((pattern) => [
+      rx(pattern, { eventTypes: FINDING_TYPES }),
+      rx(pattern, { roles: [...CUSTOMER_LOG_ROLES], eventTypes: CUSTOMER_LOG_TYPES }),
+    ]),
+  ],
+  // A failed row that is there: at each of the times given, one for each user, "matching" the attempts, or listed by the log.
+  'sig.server-side-failure-records-present': [
+    ...[
+      String.raw`${NOT_ZERO}\b(?:fail(?:ed|ures?|ing)|blocked|rejected|interrupted|denied)\b${gap(25)}\b(?:rows?|records?|entr(?:y|ies)|events?)\b${gap(40)}\b(?:at|for|around|within|on|in)\b${gap(12)}\b(?:each|every|all|those|these|the|that|their|your) (?:of )?(?:the )?(?=[\w -]{0,20}\b(?:times?|moments?|timestamps?)\b)`,
+      String.raw`${NOT_ZERO}\b(?:each|every|all|both)\b${gap(30)}\b(?:has|have|had|show(?:s|ed)?|with)\b${gap(10)}\b(?:an? |one |at least one |several |multiple |the )?(?!(?:zero|nil|0)\b)(?:[\w-]+ )?(?:fail(?:ed|ures?|ing)|blocked|rejected|interrupted)\b${gap(30)}\b(?:rows?|records?|entr(?:y|ies)|events?)\b`,
+      String.raw`${NOT_ZERO}\b(?:found|find|see|saw|there (?:is|are|was|were)|have|has|had|returned|show(?:s|ed)?)\b${gap(12)}\b(?:matching|corresponding)\b[\w -]{0,24}?${LOG_ROW}\b`,
+      String.raw`${NOT_ZERO}\b(?:matching|corresponding) (?:[\w-]+ )?${LOG_ROW}\b${gap(20)}\b(?:were|are|was|is) (?:found|present|there|returned|logged)\b`,
+      String.raw`${NOT_ZERO}\bthere (?:is|are|was|were)\b${gap(10)}\b(?:an? |one |several |multiple |\d+ )?(?!(?:zero|nil|0)\b)(?:[\w-]+ )?(?:fail(?:ed|ures?)|blocked|rejected)\b${gap(16)}\b(?:rows?|records?|entr(?:y|ies)|events?)\b`,
+      String.raw`${NOT_ZERO}\b(?:fail(?:ed|ure)|blocked|rejected)\b[\w -]{0,16}?\b(?:rows?|records?|entr(?:y|ies)|events?)\b${gap(12)}\b(?:exists?|is present|are present|was found|were found|is there|are there|appears?|shows? up|is logged|are logged|is recorded|are recorded)\b`,
+    ].map((pattern) => rx(pattern, AS_FOUND)),
+    // What a failed attempt or sign-in is only when the sentence says that the log holds it.
+    ...[
+      ...withLog(
+        String.raw`${NOT_ZERO}\b(?:fail(?:ed|ures?|ing)|blocked|rejected|interrupted|denied)\b${gap(25)}\b(?:attempts?|sign-?ins?|requests?)\b${gap(40)}\b(?:at|for|around|within|on|in)\b${gap(12)}\b(?:each|every|all|those|these|the|that|their|your) (?:of )?(?:the )?(?=[\w -]{0,20}\b(?:times?|moments?|timestamps?)\b)`,
+      ),
+      ...withLog(
+        String.raw`${NOT_ZERO}\b(?:each|every|all|both)\b${gap(30)}\b(?:has|have|had|show(?:s|ed)?|with)\b${gap(10)}\b(?:an? |one |at least one |several |multiple |the )?(?!(?:zero|nil|0)\b)(?:[\w-]+ )?(?:fail(?:ed|ures?|ing)|blocked|rejected|interrupted)\b${gap(30)}\b(?:attempts?|sign-?ins?)\b`,
+        100,
+        40,
+      ),
+      ...withLog(
+        String.raw`${NOT_ZERO}\b(?:every|each|all|both)\b${gap(35)}\b(?:attempts?|failures?|sign-?ins?|rows?)\b${gap(20)}\b(?:is|are|was|were)\b${gap(6)}\b(?:there|logged|recorded|listed|visible|present|found)\b`,
+        100,
+        20,
+      ),
+    ].map((pattern) => rx(pattern, AS_FOUND)),
+    rx(
+      String.raw`\b${SIGNIN_LOG}\b${gap(30)}\b(?:hold|holds|held|have|has|had|contain(?:s|ed)?|show(?:s|ed)?|list(?:s|ed)?|record(?:s|ed)?|log(?:s|ged)?|include[sd]?|display(?:s|ed)?|confirm(?:s|ed)?|returned|returns?)\b(?!\s+(?:zero|nil|0)\b)${gap(20)}\b(?:fail(?:ed|ures?|ing)|blocked|rejected|interrupted|errors?)\b`,
+      AS_FOUND,
+    ),
+  ],
+  // An audit of policy changes that finds nothing in the failure window: none of its rows inside it, or only old ones, which
+  // are background.
+  'sig.policy-events-outside-failure-window': [
+    String.raw`\b(?:audit|polic(?:y|ies)|conditional access|configuration|change log)\b${gap(120)}\b(?:zero|no|0|none)\b${gap(40)}\b(?:in|inside|within|during)\b${gap(20)}\b(?:failure|incident|outage|problem|failing|affected|reported)\b[\w -]{0,12}?\b(?:window|period|time ?frame|time range|interval)\b`,
+    String.raw`\b(?:audit|polic(?:y|ies)|conditional access|configuration)\b${gap(100)}\boutside (?:of )?(?:the )?[\w ]{0,20}?\b(?:window|period|time ?frame|time range)\b`,
+    String.raw`\b(?:only|closest|nearest|last|latest|most recent)\b${gap(30)}\b(?:polic(?:y|ies)|audit|configuration)\b${gap(60)}\b(?:dated|from|in|on)\b${gap(25)}\b(?:january|february|march|april|may|june|july|august|september|october|november|december|\d+ (?:weeks?|months?) ago)\b${gap(80)}\b(?:unrelated|background|nothing to do with|not related|irrelevant)\b`,
+  ].map((pattern) => rx(pattern, { eventTypes: FINDING_TYPES })),
+  // A session or token that ran out, in the words of the log and of the client: a code, "the refresh token has expired", "session
+  // expired", and how an engineer explains it ("a password change ends the existing sessions").
+  'sig.token-expiry-errors': [
+    rx(String.raw`\bAADSTS(?:70008|70043|70044|700082|700084|50173|50132|50133)\b`),
+    rx(
+      String.raw`\b(?:sessions?|tokens?|refresh tokens?|access tokens?|grants?)\b (?:has |had |have |is |are |was |were |got |gets )?(?:been )?expired\b`,
+    ),
+    rx(String.raw`\bexpired (?:refresh |access |sign-?in )?(?:tokens?(?!-)|sessions?|grants?)\b`),
+    // The mechanism, as an engineer explains it: "a password change ends the existing sessions", "ends every session".
+    rx(
+      String.raw`\b(?:ends|invalidates|expires|revokes|terminates|kills)\b${gap(10)}\b(?:every|all|each|the existing|existing|their) (?:[\w-]+ )?(?:sessions?|(?:refresh )?tokens?)\b`,
+    ),
+  ],
+  // Conditional Access or MFA that stopped a sign-in, as the log shows it: a code, "the policy is blocking them", "the rows show
+  // the policy applied", "the result interrupted because multi-factor is required".
+  'sig.mfa-ca-events-in-logs': [
+    rx(
+      String.raw`\bAADSTS(?:50076|50074|50072|50079|50097|50131|50158|53000|53001|53002|53003|53004|530003|530032)\b`,
+      { eventTypes: FINDING_TYPES },
+    ),
+    ...[
+      String.raw`\b(?:conditional access|ca)\b${gap(20)}\b(?:polic(?:y|ies)|rule)\b${gap(50)}\b(?:(?:is|are|was|were|has been|have been) (?:blocking|denying|rejecting|interrupting)|(?:blocked|denied|rejected|interrupted) (?:them|those|these|all|every|each|their|the))\b`,
+      String.raw`\b(?:rows?|entries|records?|events?|results?)\b${gap(40)}\b(?:show(?:s|ed)?|list(?:s|ed)?|say|says|indicate[sd]?)\b${gap(30)}\b(?:the |a )?(?:conditional access |ca |mfa )?polic(?:y|ies)\b${gap(25)}\b(?:applied|enforced|blocked|triggered|blocking|failed)\b`,
+      String.raw`\b(?:results?|rows?|entries|sign-?ins?|attempts?|events?)\b${gap(60)}\b(?:mfa|multi-?factor)\b${gap(25)}\b(?:required|interrupted|not completed|not satisfied|failed|abandoned|challenge)`,
+      String.raw`\bconditional ?access ?(?:result|status|outcome)s?\b[^.\n]{0,15}\b(?:failure|failed|blocked|denied|interrupted)\b`,
+    ].map((pattern) => rx(pattern, { eventTypes: FINDING_TYPES })),
+  ],
+};
 
 for (const signal of signals) {
   const extra = [
