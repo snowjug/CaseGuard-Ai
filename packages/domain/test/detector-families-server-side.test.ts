@@ -94,7 +94,7 @@ const FAMILIES: readonly Family[] = [
       'Sign-in logs for the group are clean for that window.',
       'The logs show nothing for any of the accounts.',
       'Entra did not log anything for those users around the failure times.',
-      'I looked in the sign-in logs and found nothing for these people.',
+      'The sign-in log for those accounts turned up nothing at all in that hour.',
       'Entra never saw these sign-ins.',
       'Sign-in logs for the affected group: nothing at all.',
     ],
@@ -486,7 +486,7 @@ const NETWORK: readonly Family[] = [
     role: 'customer_network_admin',
     type: 'customer_email',
     reads: [
-      'proxy node 3 times out for the Microsoft sign-in hosts.',
+      'Anything routed via proxy node 3 hangs when it heads for the Microsoft login endpoints.',
       'Tested all the proxies from Oslo: osl-prx2 times out one in three times.',
     ],
     doesNotRead: ['We have two proxies in Oslo and I am sure that both are healthy.'],
@@ -687,11 +687,11 @@ const DEVICE_AND_SERVICE: readonly Family[] = [
       'PRT status looks fine on the device.',
       'The device is hybrid joined and has PRT.',
       'Good news: the primary refresh token is there and was issued at 08:12.',
-      "Elena's laptop has no primary refresh token, Carmen's older one does.",
+      'The new tablet shows no PRT, but the one it replaced does.',
     ],
     doesNotRead: [
-      'The device has no primary refresh token.',
-      'AzureAdPrt : NO on this laptop.',
+      'Neither workstation in the pilot group received a primary refresh token.',
+      'dsregcmd output for the repaired desktop: AzureAdPrt = NO.',
       'Please check whether the laptop has a valid PRT.',
       'If the PRT is healthy, we can rule out the device.',
       'The device has a PRT but it is expired.',
@@ -709,7 +709,7 @@ const DEVICE_AND_SERVICE: readonly Family[] = [
       'dsregcmd shows AzureAdPrt is NO on the sick laptop.',
       'These devices never got a PRT after the re-image.',
       'AzureAdPrt NO on three of the four laptops.',
-      "Carmen's laptop has a PRT, Elena's doesn't.",
+      "The spare tablet got a PRT; the one on the shelf doesn't.",
       "The PRT can't be refreshed by the broker.",
       'The primary refresh token could not be obtained.',
       "The laptop doesn't get a primary refresh token anymore.",
@@ -812,7 +812,7 @@ const DEVICE_AND_SERVICE: readonly Family[] = [
     role: 'support_engineer',
     type: 'engineer_email',
     reads: [
-      'Service health is clear for Teams and Entra ID.',
+      'The service health page is all green for our tenant right now.',
       'Looked at the message center and service health: nothing active for sign-in.',
       'The Microsoft status page shows no incident for Teams, so this is not an outage.',
       'No active incident for Teams or Entra sign-in right now.',
@@ -871,7 +871,7 @@ describe('the pairs of the device token and the service health', () => {
       eventOf(
         'support_engineer',
         'diagnostic_result',
-        "Carmen's laptop has a PRT, Elena's doesn't.",
+        "The spare tablet got a PRT; the one on the shelf doesn't.",
       ),
     );
     expect(found).toContain('sig.prt-healthy');

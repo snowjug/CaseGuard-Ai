@@ -1214,7 +1214,7 @@ const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetec
     ].map((pattern) => rx(pattern, AS_TESTED_NOW)),
     ...[
       String.raw`${NOT_A_REPLY_TITLE}\b${DNS_NOUN}\b${gap(70)}\b(?:fail(?:s|ed|ing)?\b(?!\s?over)|times? out|timed out|timing out|(?:is|was|are|were) (?:silent|unresponsive|down|unreachable)|drops? (?:the )?quer\w+|refus(?:es|ed|ing) (?:the )?quer\w+|(?:returns?|gives?|answers? with) (?:an? |the )?(?:wrong|bogus|invalid|empty|null|blank)\b)`,
-      String.raw`${NOT_A_REPLY_TITLE}${DNS_REF}${gap(40)}\b(?:fail(?:s|ed|ing)?\b(?!\s?over)|unresponsive)\b${gap(30)}\b(?:to resolve|(?:the )?(?:microsoft|sign-?in|cdn)\b[\w -]{0,12}\b(?:host ?names?|names))`,
+      String.raw`${NOT_A_REPLY_TITLE}${DNS_REF}${gap(40)}\b(?:fail(?:s|ed|ing)?\b(?!\s?over)|unresponsive)\b${gap(30)}\b(?:(?:the )?(?:microsoft|sign-?in|cdn)\b[\w -]{0,12}\b(?:host ?names?|names)|to resolve)`,
     ].map((pattern) => rx(pattern, AS_TESTED)),
     ...[
       String.raw`${NOT_A_REPLY_TITLE}\b${DNS_NOUN}\b${gap(70)}\b(?:(?:did|does|do)(?:n['’]t| not) (?:answer|respond|reply|resolve)|not (?:answering|responding|replying)|(?:could ?n['’]?t|could not|cannot|can['’]t|unable to) resolve|stays? silent|no answers?)`,
