@@ -1260,16 +1260,16 @@ const DNS_REF = String.raw`(?:\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|\B\.\d{1,3}
 /** A proxy node by its name (gbg-prx2, proxy-04, swg3), by its number ("proxy node 3"), by its letter or by its place in the list. */
 const PROXY_NODE = String.raw`(?:\b[a-z0-9-]{0,16}(?:prx|proxy|pxy|swg|wsg)[a-z0-9-]{0,10}\d\b|\bproxy (?:node |server )?#?\d{1,2}\b|\bproxy[- ][a-h]\b|\b(?:first|second|third|fourth|fifth|last) proxy\b)`;
 /** A node that does not answer, in the affirmative: what a timeout or a drop is called. */
-const NODE_FAILS = String.raw`(?:times? out|timed out|timing out|time-?outs?|fail(?:s|ed|ing)?\b(?!\s?over)|drops?|dropped|hung|hangs?|stall(?:s|ed)?|unresponsive|returns? (?:a )?(?:gateway time-?out|50[234]))`;
+const NODE_FAILS = String.raw`(?:times? out|timed out|timing out|time-?outs?|fail(?:s|ed|ing)?\b(?!\s?over)|drop(?:s|ped|ping)?|hung|hangs?|stall(?:s|ed)?|unresponsive|returns? (?:a )?(?:gateway time-?out|50[234]))`;
 /** "All answered normally": the way a test that finds nothing wrong is worded. */
 const ALL_FINE = String.raw`(?:normally|fine|(?:the )?(?:correct|right)\w*|every time|okay?|properly|as expected|within|under|identical|\d+ of \d+|(?:ten|five|three|four|two|twenty) of \w+)`;
 const ANSWERS = String.raw`(?:answer\w*|respond\w*|repl(?:y|ies|ied)|return\w*|resolve[sd]?|work(?:s|ed)?|succeeded|complet\w+)`;
 /** When something changed, as a customer says it: a relative time, a day, "last Thursday", "on Monday night". Not a time of day. */
-const WHEN_ANY = String.raw`(?:yesterday|tonight|today|this (?:morning|week)|last (?:night|week|weekend|\w{3,9}day|wed|mon|sat|sun)|on (?:\w{3,9}day|wed|mon|sat|sun)|(?:\d+|two|three|few) (?:days?|weeks?) ago|recently)`;
+const WHEN_ANY = String.raw`(?:yesterday|tonight|today|this (?:morning|week|month)|last (?:night|week(?:end)?|month|\w{3,9}day)|on \w{3,9}day|(?:\d+|an?|one|two|three|few) (?:days?|weeks?) ago|recently)`;
 /** The parts of a network, in the words a customer uses for them: a change to one of them is a network change. */
 const NET_PART = String.raw`(?:dns|resolvers?|dhcp|proxy|proxies|pac file|firewall|gateway|web ?filter\w*|vpn|wan|egress|isp|inspection|rack)`;
 /** What was done to them. A removal, a rollback and a restore are not in it: they are what the fix did, not what broke it. */
-const NET_DID = String.raw`(?:moved|migrated|switched|changed|replaced|upgraded|updated|added|enabled|deployed|pushed|applied|rolled out|turned on|went live)`;
+const NET_DID = String.raw`(?:(?:mov|migrat|switch|chang|replac|upgrad|updat|enabl|deploy|push|appli)ed|added|rolled out|turned on|went live)`;
 /** What the access policy is made of, beyond the rule nouns of `ACCESS_RULE`. */
 const POLICY_THAT = String.raw`polic(?:y|ies) (?:that|which) (?:requires?|blocks?|enforces?|forces?|mandates?|restricts?)`;
 const CA_THING = String.raw`(?:${ACCESS_RULE}|sign-?in frequency|session (?:limit|lifetime|timeout)|token lifetime)`;
@@ -1288,6 +1288,11 @@ const FED_NODE = String.raw`(?:ad ?fs\w{0,10}|sts|federation (?:server|farm|node
 /** Where Microsoft says whether it has an incident. */
 const HEALTH_PAGE = String.raw`(?:service health|the (?:service )?status page|the message center|microsoft(?:['’]s)? status)`;
 const FED_CLOCK = String.raw`(?:fast|slow|ahead|behind|drift\w*|skew\w*|out of sync|wrong|off by)`;
+const IPV4 = String.raw`\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}`;
+/** A name server by what it is called: the plain nouns, "the secondary DNS", "ns2". */
+const DNS_NOUN_WIDE = String.raw`(?:${DNS_NOUN}|(?:primary|secondary|second|first|backup|internal|upstream|other) dns|ns ?\d)`;
+/** More ways of pointing at a proxy node: "PRX-B", "the proxy at 10.1.9.14". */
+const PROXY_NODE_MORE = String.raw`(?:\b(?:prx|pxy|swg|wsg|proxy)-[a-h]\b|\bproxy (?:at |on |server |node )?${IPV4}\b)`;
 
 /**
  * Wording families for the signals about the server side: what the logs and the infrastructure show (name servers, proxy
@@ -1317,10 +1322,15 @@ const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetec
       String.raw`\b(?:attempts?|sign-?ins?|failures?|requests?|them|these|those|they)\b${gap(40)}\b${NOT_DONE} (?:even )?(?:appear|show(?: up)?|be (?:found|seen|listed|logged|recorded)|exist|registered|visible|listed|recorded|logged|found|present|there)\b${gap(40)}\b${SIGNIN_LOG}\b`,
       String.raw`\bnone of (?:them|these|those|the [\w ]{0,20}?(?:attempts|failures|users|sign-?ins))\b${gap(40)}\b(?:appear|show(?:s)?(?: up)?|are|were|is|was|exist|found|listed|logged|recorded|visible|present)\b${gap(30)}\b${SIGNIN_LOG}\b`,
       String.raw`\b${SIGNIN_LOG}\b${clauseGap(20)}\b${NOT_DONE} (?:log|record|show|list|contain|have|hold|see)\b${clauseGap(20)}\b(?:anything|any (?:[\w-]+ )?${LOG_ROW}|a single (?:row|record|entry|event))`,
-      String.raw`\b${SIGNIN_LOG}\b${gap(40)}\b(?:found|find|saw|see|got|get|returned|there (?:is|are|was|were))\b${gap(6)}\b(?:nothing|no (?:[\w-]+ )?(?:${LOG_ROW}|failures?|errors?|results?|matches))`,
+      String.raw`\b${SIGNIN_LOG}\b${gap(40)}\b(?:found|find|saw|see|got|get|returned|there (?:is|are|was|were))\b${gap(6)}\b(?:nothing|(?:no|zero|0) (?:[\w-]+ )?(?:${LOG_ROW}|failures?|errors?|results?|matches))`,
       String.raw`\b${SIGNIN_LOG}\b${clauseGap(10)}\bnever (?:saw|received|got|logged|recorded|heard)\b`,
       ...withLog(
         String.raw`\b(?:no|zero|not (?:a single|one)) (?:failed|failing|blocked|unsuccessful) (?:sign-?ins?|attempts?|logins?)\b(?!${gap(60)}\bsince (?:the|your|our|this) (?:change|fix|removal|update|workaround)\b)`,
+        60,
+        50,
+      ),
+      ...withLog(
+        String.raw`\b(?:0|zero) (?:[\w-]+ )?(?:failures?|failed (?:sign-?ins?|attempts?|logins?)|errors?)\b(?!${gap(60)}\bsince (?:the|your|our|this) (?:change|fix|removal|update|workaround)\b)`,
         60,
         50,
       ),
@@ -1359,6 +1369,18 @@ const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetec
       String.raw`\b${SIGNIN_LOG}\b${gap(30)}\b(?:hold|holds|held|have|has|had|contain(?:s|ed)?|show(?:s|ed)?|list(?:s|ed)?|record(?:s|ed)?|log(?:s|ged)?|include[sd]?|display(?:s|ed)?|confirm(?:s|ed)?|returned|returns?)\b(?!\s+(?:zero|nil|0)\b)${gap(20)}\b(?:fail(?:ed|ures?|ing)|blocked|rejected|interrupted|errors?)\b`,
       AS_FOUND,
     ),
+    // A count of failed rows, or the engineer's finding them: "7 failed rows for the UPNs", "I can see each of the failures in Entra".
+    ...[
+      ...withLog(
+        String.raw`(?<!\b(?:of|the|these|those|all|only) )\b(?:[1-9]\d{0,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|several|multiple|many) (?:[\w-]+ )?(?:fail(?:ed|ures?|ing)|blocked|rejected|interrupted)(?: sign-?ins?| attempts?| logins?| rows?| records?| entries| events?)?\b`,
+        60,
+        50,
+      ),
+      String.raw`${NOT_ZERO}\b(?:found|see|saw|counted|spotted|list(?:s|ed)?|show(?:s|ed)?|there (?:are|were))\b${gap(6)}\b(?:[1-9]\d{0,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|several|multiple|many) (?:[\w-]+ )?failed (?:sign-?ins?|attempts?|logins?|rows?|records?|entries|events?)\b`,
+      String.raw`\b(?:I|we) (?:can |could )?(?:see|saw|found|find|spotted|located)\b${gap(20)}\b(?:each|every|all|both|the)\b${gap(20)}\b(?:failures?|failed (?:attempts?|sign-?ins?|logins?)|attempts?)\b${gap(40)}\b(?:in|on|from)\b${gap(10)}\b${SIGNIN_LOG}\b`,
+      String.raw`\b(?:attempts?|sign-?ins?|failures?|them|these|those|they)\b${gap(40)}\b(?:show(?:s)? up|appear(?:s|ed)?|(?:are|were) (?:listed|logged|recorded|visible))\b${gap(6)}\b(?:as|with|in)\b${gap(10)}\b(?:fail\w*|errors?|blocked|interrupted)\b`,
+      String.raw`\bone (?:row|record|entry|event) per (?:attempt|failure|sign-?in|user)\b`,
+    ].map((pattern) => rx(pattern, AS_FOUND)),
   ],
   // An audit of policy changes that finds nothing in the failure window: none of its rows inside it, or only old ones, which
   // are background.
@@ -1400,16 +1422,19 @@ const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetec
   'sig.resolver-inconsistent': [
     // A code and an address: as a test is run, not as the recap of a closed case explains it.
     ...[
-      String.raw`${NOT_A_REPLY_TITLE}${DNS_REF}${gap(70)}\b(?:servfail|nxdomain|non-?existent domain|sinkhole\w*)\b`,
-      String.raw`${NOT_A_REPLY_TITLE}\b(?:servfail|nxdomain|non-?existent domain|sinkhole\w*)\b${gap(60)}${DNS_REF}`,
-      String.raw`${NOT_A_REPLY_TITLE}\b(?:dns (?:filter\w*|security)(?: service)?|${DNS_NOUN})\b${gap(60)}\b(?:blocks?|blocked|blocking|sinkholes?|sinkholed)\b${gap(40)}\b(?:login\.microsoftonline\.com|cdn|aadcdn|microsoft|sign-?in)`,
+      String.raw`${NOT_A_REPLY_TITLE}(?:${DNS_REF}|\b${DNS_NOUN_WIDE}\b)${gap(70)}\b(?:servfail|nxdomain|non-?existent domain|sinkhole\w*|server failed|query refused)\b`,
+      String.raw`${NOT_A_REPLY_TITLE}\b(?:servfail|nxdomain|non-?existent domain|sinkhole\w*|server failed|query refused)\b${gap(60)}(?:${DNS_REF}|\b${DNS_NOUN_WIDE}\b)`,
+      String.raw`${NOT_A_REPLY_TITLE}\b(?:dns (?:filter\w*|security)(?: service)?|${DNS_NOUN_WIDE})\b${gap(60)}\b(?:blocks?|blocked|blocking|filter(?:s|ed|ing)|sinkholes?|sinkholed)\b${gap(40)}\b(?:login\.microsoftonline\.com|cdn|aadcdn|microsoft|sign-?in)`,
     ].map((pattern) => rx(pattern, AS_TESTED_NOW)),
     ...[
-      String.raw`${NOT_A_REPLY_TITLE}\b${DNS_NOUN}\b${gap(70)}\b(?:fail(?:s|ed|ing)?\b(?!\s?over)|times? out|timed out|timing out|(?:is|was|are|were) (?:silent|unresponsive|down|unreachable)|drops? (?:the )?quer\w+|refus(?:es|ed|ing) (?:the )?quer\w+|(?:returns?|gives?|answers? with) (?:an? |the )?(?:wrong|bogus|invalid|empty|null|blank)\b)`,
-      String.raw`${NOT_A_REPLY_TITLE}${DNS_REF}${gap(40)}\b(?:fail(?:s|ed|ing)?\b(?!\s?over)|unresponsive)\b${gap(30)}\b(?:to resolve|(?:the )?(?:microsoft|sign-?in|cdn)\b[\w -]{0,12}\b(?:host ?names?|names))`,
+      String.raw`${NOT_A_REPLY_TITLE}\b${DNS_NOUN_WIDE}\b${gap(70)}\b(?:fail(?:s|ed|ing)?\b(?!\s?over)|times? out|timed out|timing out|(?:is|was|are|were) (?:silent|unresponsive|down|unreachable)|drop(?:s|ped|ping)?\b${gap(25)}\bquer\w+|refus(?:es|ed|ing)\b${gap(8)}\bquer\w+)`,
+      String.raw`\b${DNS_NOUN_WIDE}\b${NOT_A_REPLY_TITLE}${gap(70)}\b(?:returns?|gives?|answers? with|replies with|resolves? to)\b${gap(8)}\b(?:(?:wrong|bogus|invalid|empty|null|blank|different)\b|0\.0\.0\.0|127\.0\.0\.1|servfail|nxdomain|refused|server failed)`,
+      String.raw`${NOT_A_REPLY_TITLE}${DNS_REF}${gap(40)}\b(?:fail(?:s|ed|ing)?\b(?!\s?over)|unresponsive)\b${gap(30)}\b(?:(?:the )?(?:microsoft|sign-?in|cdn)\b[\w -]{0,12}\b(?:host ?names?|names)|to resolve)`,
+      String.raw`${DNS_REF}${NOT_A_REPLY_TITLE}${gap(40)}\b(?:fail(?:s|ed|ing)?\b(?!\s?over)|unresponsive)\b${gap(40)}\b(?:for|on|with|resolving)\b${gap(25)}\b(?:[\w-]+\.(?:microsoftonline|windows|live|office|office365|msauth|msftauth)\.\w+|(?:the )?sign-?in (?:host ?names?|names|hosts?|endpoints?))`,
+      String.raw`${DNS_REF}${NOT_A_REPLY_TITLE}${gap(40)}\b(?:fail(?:s|ed|ing)?\b(?!\s?over)|unresponsive|times? out|timed out)\b${gap(20)}\b(?:(?:\w+|\d+) (?:times? )?out of (?:\w+|\d+)|\d+ (?:of|in) \d+|half (?:of )?(?:the|them|all)|every (?:other|second|third) (?:time|query|lookup|try|attempt|request))\b`,
     ].map((pattern) => rx(pattern, AS_TESTED)),
     ...[
-      String.raw`${NOT_A_REPLY_TITLE}\b${DNS_NOUN}\b${gap(70)}\b(?:(?:did|does|do)(?:n['’]t| not) (?:answer|respond|reply|resolve)|not (?:answering|responding|replying)|(?:could ?n['’]?t|could not|cannot|can['’]t|unable to) resolve|stays? silent|no answers?)`,
+      String.raw`${NOT_A_REPLY_TITLE}\b${DNS_NOUN_WIDE}\b${gap(70)}\b(?:(?:did|does|do)(?:n['’]t| not) (?:answer|respond|reply|resolve)|not (?:answering|responding|replying)|(?:could ?n['’]?t|could not|cannot|can['’]t|unable to) resolve|stays? silent|no answers?)`,
       String.raw`${NOT_A_REPLY_TITLE}\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b${gap(60)}\b(?:(?:did|does|do)(?:n['’]t| not) (?:answer|reply|resolve)|not (?:answering|replying)|(?:could ?n['’]?t|could not|cannot|can['’]t|unable to) resolve|no answers?)`,
     ].map((pattern) => rx(pattern, AS_TESTED_DENIAL)),
   ],
@@ -1418,7 +1443,11 @@ const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetec
   'sig.resolvers-consistent': [
     ...[
       String.raw`\b(?:all|every|each|both)\b(?! (?:the )?other)${gap(14)}\b${DNS_NOUN}\b${gap(40)}\b${ANSWERS}\b${gap(50)}\b${ALL_FINE}\b(?!${gap(40)}\bexcept\b)`,
+      String.raw`\b(?:all|every|each|both|the (?:two|three|four|five))\b(?! (?:the )?other)${gap(20)}\b(?:${DNS_NOUN}|ns ?\d)\b${gap(60)}\b${ANSWERS}\b${gap(40)}\b(?:the )?(?:same|identical|equal\w*|consistent\w*|correct\w*|fine|normally|every time|success\w*|within|(?:in )?under)\b(?!${gap(40)}\bexcept\b)`,
       String.raw`\b${DNS_NOUN}\b[^\n]{0,140}?[.!?] (?:all|both) (?:three|two|four|five|of them)\b${gap(10)}\b(?:answer\w*|respond\w*|repl(?:y|ies|ied)|worked|resolved)\b${gap(30)}\b(?:every time|normally|fine|correct\w*|within|in under|each time)`,
+      String.raw`\b${DNS_NOUN}\b${gap(100)}[.;!?] (?:all|both|each|they all|every one)(?: (?:three|two|four|five|of them))?\b${gap(10)}\b(?:answer\w*|respond\w*|repl(?:y|ies|ied)|return\w*|worked|resolved?|resolves)\b${gap(30)}\b(?:every time|normally|fine|correct\w*|within|in under|each time|the same)\b`,
+      String.raw`\b${IPV4}\b${gap(15)}\band\b${gap(5)}\b${IPV4}\b${gap(40)}\b${ANSWERS}\b${gap(30)}\b(?:identical|the same|correct\w*|fine|normally|equal\w*|consistent\w*)\b`,
+      String.raw`\b(?:dns|resol\w+|name resolution)\b${gap(60)}\b(?:both|all|each|every)\b${gap(8)}\bservers?\b${gap(15)}\b${ANSWERS}\b`,
     ].map((pattern) => rx(pattern, AS_TESTED)),
     rx(
       String.raw`\b(?:dns|name resolution|the resolvers?)\b${gap(8)}\b(?:is|are|was|were|looks?|looked|seems?|seemed|works?|worked|checks? out)\b${gap(12)}\b(?:fine|healthy|ok|okay|normal|good|clean|in order|working)\b`,
@@ -1430,11 +1459,12 @@ const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetec
       negativeContent: false,
     }),
     rx(
-      String.raw`\b(?:succeed(?:s|ed)?|passed|worked|answered|resolved)\b${gap(20)}\b(?:on|for|against|from|across|with)\b${gap(6)}\b(?:all|both|every|each)\b(?! (?:the )?other)${gap(14)}\b${DNS_NOUN}\b`,
+      String.raw`\b(?:succeed(?:s|ed)?|pass(?:es|ed)?|work(?:s|ed)?|answer(?:s|ed)?|resolve[sd]?|respond(?:s|ed)?)\b${gap(20)}\b(?:on|for|against|from|across|with)\b${gap(6)}\b(?:all|both|every|each)\b(?! (?:the )?other)${gap(14)}\b${DNS_NOUN}\b`,
       AS_TESTED,
     ),
     ...[
       String.raw`\bno (?:dns|name[- ]resolution|resolver)\b${gap(25)}\b(?:issues?|problems?|errors?|failures?|faults?)\b`,
+      String.raw`\bno (?:real |significant |visible |noticeable )?differences?\b${gap(8)}\bbetween\b${gap(15)}\b(?:${DNS_NOUN}|ns ?\d)\b`,
       String.raw`\b(?:no|zero|0) (?:servfail|nxdomain)s?\b${gap(40)}\b(?:from|on|for|across|at)\b${gap(15)}\b(?:any|all|every|each|either|both|the)\b${gap(10)}\b${DNS_NOUN}\b`,
       String.raw`\b(?:all|every|each|both)\b(?! (?:the )?other)${gap(14)}\b${DNS_NOUN}\b${gap(40)}\b${ANSWERS}\b${gap(30)}\bwithout (?:a |any )?(?:servfail|nxdomain|errors?|failures?|timeouts?)\b`,
     ].map((pattern) => rx(pattern, AS_TESTED_DENIAL)),
@@ -1444,13 +1474,19 @@ const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetec
   'sig.proxy-node-inconsistent': [
     ...[
       String.raw`${NOT_A_REPLY_TITLE}${PROXY_NODE}${gap(60)}\b${NODE_FAILS}\b`,
+      String.raw`${PROXY_NODE_MORE}${NOT_A_REPLY_TITLE}${gap(60)}\b${NODE_FAILS}\b`,
       String.raw`${NOT_A_REPLY_TITLE}\b(?:one|1|a single|only one)\b${gap(8)}\bprox(?:y|ies)(?: nodes?| servers?| gateways?)?\b${gap(60)}\b${NODE_FAILS}\b`,
+      String.raw`\bone of (?:the |our )?(?:two|three|four|five|six|seven|eight|\d+) prox(?:y|ies)(?: nodes?| servers?)?\b${NOT_A_REPLY_TITLE}${gap(40)}\b${NODE_FAILS}\b`,
+      String.raw`\b(?:only|just) (?:the |our )?[a-z]+ (?:proxy|gateway)\b${NOT_A_REPLY_TITLE}${gap(30)}\b${NODE_FAILS}\b`,
+      String.raw`\bprox(?:y|ies)(?: farm| cluster| pool)?\b${NOT_A_REPLY_TITLE}${gap(40)}\b(?:one|1|a single|a)\b${gap(15)}\b(?:node|member|server)\b${gap(30)}\b${NODE_FAILS}\b`,
+      String.raw`\bprox(?:y|ies)\b${NOT_A_REPLY_TITLE}${gap(60)}\b${NODE_FAILS}\b${gap(60)}\bthe (?:other|others|rest|remaining)\b`,
       String.raw`${NOT_A_REPLY_TITLE}\bproxy (?:nodes?|servers?|pool|cluster)\b${gap(80)}\bnode ?\d{1,2}\b${gap(40)}\b${NODE_FAILS}\b`,
       String.raw`${NOT_A_REPLY_TITLE}\bnode ?\d{1,2}\b${gap(20)}\bproxy (?:pool|cluster|farm)\b${gap(40)}\b${NODE_FAILS}\b`,
     ].map((pattern) => rx(pattern, AS_TESTED)),
     ...[
       String.raw`${NOT_A_REPLY_TITLE}${PROXY_NODE}${gap(60)}\b(?:not (?:responding|answering)|(?:did|does|do)(?:n['’]t| not) (?:respond|answer|reply))\b`,
       String.raw`${NOT_A_REPLY_TITLE}\b(?:one|1|a single|only one)\b${gap(8)}\bprox(?:y|ies)(?: nodes?| servers?| gateways?)?\b${gap(60)}\b(?:not (?:responding|answering)|(?:did|does|do)(?:n['’]t| not) (?:respond|answer|reply))\b`,
+      String.raw`\bprox(?:y|ies)\b${NOT_A_REPLY_TITLE}${gap(60)}\b(?:(?:did|does|do)(?:n['’]t| not) (?:respond|answer|reply)|not (?:responding|answering))\b${gap(20)}\bthe (?:others?|rest|remaining)\b`,
     ].map((pattern) => rx(pattern, AS_TESTED_DENIAL)),
   ],
   // Every proxy node answers: "all four proxy nodes respond normally", "the proxy test: all three nodes answered within a
@@ -1459,9 +1495,14 @@ const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetec
     ...[
       String.raw`\b(?:all|every|each|both)\b(?! (?:the )?other)${gap(14)}\b(?:proxy|proxies|proxy (?:nodes?|servers?))\b${gap(30)}\b${ANSWERS}\b${gap(40)}\b${ALL_FINE}\b(?!${gap(40)}\bexcept\b)`,
       String.raw`\bproxy\b${gap(60)}\b(?:all|every|each|both)\b(?! (?:the )?other)${gap(10)}\bnodes?\b${gap(30)}\b${ANSWERS}\b${gap(40)}\b${ALL_FINE}\b`,
+      String.raw`\b(?:all|every|each|both)\b(?! (?:the )?other)${gap(14)}\b(?:proxy|proxies|proxy (?:nodes?|servers?))\b${gap(40)}\b(?:answer\w*|respond\w*|repl(?:y|ies|ied)|return\w*|work\w*|succeed\w*|pass\w*|complet\w+)\b${gap(40)}\b(?:200|ok|okay|success\w*|fine|normally|correct\w*|within|under|every time|as expected|the same|equally|tests?|checks?|probes?)\b`,
+      String.raw`\bprox(?:y|ies)\b${gap(50)}\b(?:behav\w+|perform\w*|respond\w*|answer\w*)\b${gap(10)}\b(?:the same|identically|equally|alike|similarly|consistently)\b`,
+      String.raw`${PROXY_NODE}${gap(60)}\ball\b${gap(8)}\b(?:succeeded|answered|responded|worked|passed|returned)\b`,
     ].map((pattern) => rx(pattern, AS_TESTED)),
     ...[
       String.raw`\b(?:no|zero|none of)\b${gap(25)}\b(?:proxy|proxies)\b${gap(20)}\b(?:times? out|timed out|failed|fail|dropped|timeouts?)\b`,
+      String.raw`\b(?:each|every|all|both)\b${gap(10)}\bprox(?:y|ies)(?: nodes?| servers?)?\b${gap(40)}\b(?:none of (?:them|the nodes|these|the proxies)|no (?:one|node|proxy)|neither|nothing)\b${gap(15)}\b(?:times? out|timed out|failed|fail|dropped|stalled|hung|timeouts?)\b`,
+      String.raw`\bprox(?:y|ies)\b${gap(80)}\b(?:no|not a single) (?:bad|faulty|failing|broken|slow|odd|outlier|misbehaving) (?:node|proxy|proxies)\b`,
       String.raw`\b(?:no|zero) (?:timeouts?|time-?outs?|failures?|errors?|drops?)\b${gap(30)}\b(?:through|on|from|at|via|across)\b${gap(15)}\b(?:any|all|every|each|the|a)\b${gap(8)}\b(?:proxy|proxies|nodes?)\b`,
       String.raw`\b(?:all|every|each|both)\b(?! (?:the )?other)${gap(14)}\b(?:proxy|proxies|proxy (?:nodes?|servers?))\b${gap(30)}\b${ANSWERS}\b${gap(30)}\bwithout (?:a |any )?(?:timeouts?|time-?outs?|errors?|failures?|drops?)\b`,
     ].map((pattern) => rx(pattern, AS_TESTED_DENIAL)),
@@ -1475,6 +1516,10 @@ const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetec
       String.raw`\b${WHEN_ANY}\b${gap(60)}\b${NET_DID}\b${gap(40)}\b${NET_PART}\b`,
       String.raw`\b(?:got|received|has|have|had|installed|pushed|renewed|replaced|updated)\b${gap(25)}\b(?:inspection|tls|ssl|proxy|gateway|firewall) certificate\b${gap(30)}\b${WHEN_ANY}\b`,
     ].map((pattern) => rx(pattern, { roles: [...CUSTOMER_ROLES] })),
+    ...[
+      String.raw`\b(?:new|extra|additional)\b${gap(25)}\b(?:rule|category|filter|exception)\b${gap(70)}\b(?:turned on|switched on|enabled|activated|added|created|pushed|deployed|put in place)\b${gap(30)}\b${WHEN_ANY}\b`,
+      String.raw`\b${WHEN_ANY}\b${gap(60)}\b(?:turned on|switched on|enabled|activated|added|created|pushed|deployed|put in place)\b${gap(30)}\b(?:new|extra|additional)\b${gap(25)}\b(?:rule|category|filter|exception)\b`,
+    ].map((pattern) => rx(pattern, { roles: ['customer_network_admin'] })),
   ],
   // A change to the access policy, told by the customer (a policy that requires MFA rolled out, the sign-in frequency set) or read
   // by the engineer in the audit log or the recap of the case.
@@ -1554,7 +1599,8 @@ const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetec
       String.raw`\bclock\b${gap(12)}\bof\b${gap(8)}\b${FED_NODE}\b${gap(30)}\b${FED_CLOCK}\b`,
       String.raw`\bfederat\w+\b${gap(60)}\b(?:token|signature|certificate|assertion)\b${gap(50)}\b(?:rejected|invalid|refused|expired)\b`,
       String.raw`\b(?:tokens?|assertions?|signatures?)\b${gap(40)}\b(?:federation|ad ?fs|sts|identity provider|idp)\b${gap(40)}\b(?:rejected|invalid|refused)\b`,
-      String.raw`\b${FED_NODE}\b${gap(45)}\b(?:down|unreachable|unresponsive|(?:failing|failed)(?!\s?(?:over|attempts?|sign|log|users?|auth|requests?))|returning errors|returns? (?:http )?(?:5\d\d|errors?)|time[sd]? out|overloaded|crash\w*|stopped|offline)\b`,
+      String.raw`\b${FED_NODE}\b${gap(45)}\b(?:down|unreachable|unresponsive|(?:failing|failed)(?!\s?(?:over|attempts?|sign|log|users?|auth|requests?))|return(?:s|ed|ing)? (?:an? )?(?:http )?(?:5\d\d|errors?)|time[sd]? out|overloaded|crash\w*|stopped|offline)\b`,
+      String.raw`\b(?:time|clock) (?:skew|drift|offset)\b${gap(40)}\b(?:on|of|at|between)\b${gap(20)}\b${FED_NODE}\b`,
     ].map((pattern) =>
       rx(pattern, {
         eventTypes: [...FINDING_TYPES, ...CUSTOMER_LOG_TYPES],
