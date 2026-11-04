@@ -125,7 +125,11 @@ fragments (`GAP`, `SIGNIN_CONTEXT`, `WHEN_RELATIVE`, `WHEN_WEEKDAY`, `CHANGED`, 
 name that is not resolved, a timeout) need a Teams or sign-in context; the error codes stay unguarded. Gaps between words
 are bounded (`[\w ]{0,25}`), never open-ended. `robustness.test.ts` guards this for every pattern: a static check rejects
 nested repetition, back-references and unreviewed runs of unbounded repetition, and a probe feeds each pattern text
-derived from itself (repeated, cut short, over long gaps) and fails when one takes 100 ms of CPU.
+derived from itself (repeated, cut short, over long gaps) and fails when one takes 100 ms of CPU. The static check stops at
+the first look-around, and most patterns have one (the bounded gap `(?:[^.\n]|\.(?=\w))` has one inside it), so a second
+pass reads every pattern again with its look-arounds taken out and that one gap idiom replaced by the class it stands for;
+what it still flags is listed in the test with the reason it was accepted, and a new pattern that hides a nested repetition
+behind a look-around fails it.
 
 `detector-families.test.ts` holds, for each family, sentences it **must read** and look-alikes it **must not read**. These
 tables are examples written by the pack's author. They are a regression guard, not an independent measure of recall;
@@ -223,6 +227,8 @@ These are properties of the method, not defects awaiting a fix:
    failing sentence.
 2. Write the sentences it must read **and** the look-alikes it must not read (negated, guessed, planned, attributed, a
    neighbouring signal) in `detector-families.test.ts` first.
+   Write them in your own words: the independence check counts every word under `packages/domain/test` (a family's title and
+   a quoted browser message included) against the validation and test cases, and a six-word run that is the same is a failure.
 3. Keep every gap bounded and every phrase that is ambiguous alone tied to its context; run `robustness.test.ts`.
 4. Run the evaluation harness and read **precision as well as recall**; a gain in recall that costs precision is not a
    gain.

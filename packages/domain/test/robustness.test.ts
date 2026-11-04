@@ -148,6 +148,84 @@ describe('[NFR-SEC-05] detectors cannot be used for denial of service (ReDoS)', 
     );
   });
 
+  /**
+   * The check above returns at the first look-around, and most of the pack's patterns have one (the bounded gap
+   * `(?:[^.\n]|\.(?=\w))` has one inside it), so for those it said nothing about nested or open-ended repetition. This
+   * one reads every pattern again with its look-arounds taken out, and with that one gap idiom, whose two alternatives
+   * cannot start with the same character, replaced by the class it stands for. Whatever it still flags is listed with
+   * the reason it was accepted; a new pattern that hides a nested repetition behind a look-around fails here.
+   */
+  const GAP_IDIOM =
+    /\(\?:\[\^[^\]]*\.[^\]]*\]\|(?:\(\?<=[^)]*\)\\\.\(\?=[^)]*\)|\\\.\(\?=[^)]*\)|\\\.)\)/g;
+  const withoutLookArounds = (source: string): string => {
+    let out = '';
+    let inClass = false;
+    for (let i = 0; i < source.length; i += 1) {
+      const ch = source.charAt(i);
+      if (ch === '\\') {
+        out += source.slice(i, i + 2);
+        i += 1;
+      } else if (inClass) {
+        if (ch === ']') inClass = false;
+        out += ch;
+      } else if (ch === '[') {
+        inClass = true;
+        out += ch;
+      } else if (ch === '(' && /^\(\?<?[=!]/.test(source.slice(i, i + 4))) {
+        let depth = 0;
+        let inside = false;
+        for (; i < source.length; i += 1) {
+          const c = source.charAt(i);
+          if (c === '\\') i += 1;
+          else if (inside) inside = c !== ']';
+          else if (c === '[') inside = true;
+          else if (c === '(') depth += 1;
+          else if (c === ')' && (depth -= 1) === 0) break;
+        }
+      } else out += ch;
+    }
+    return out;
+  };
+  // Reviewed: each is a run of bounded gaps between literal words, word-stem alternatives (`answer\w*|respond\w*`) of
+  // which only one is taken, or a group repeated at most twice that opens with a mandatory word. None nests an
+  // unbounded repetition, and none took more than 50 ms on the hostile inputs above.
+  const REVIEWED_BEHIND_LOOK_AROUNDS = [
+    'sig.error-name-not-resolved: it has too many unbounded repetitions',
+    'sig.multiple-users-affected: it has too many unbounded repetitions',
+    'sig.proxy-nodes-consistent: it has too many unbounded repetitions',
+    'sig.resolver-inconsistent: it has too many unbounded repetitions',
+    'sig.resolvers-consistent: it has too many unbounded repetitions',
+    'sig.site-correlated: it has too many unbounded repetitions',
+    'sig.site-correlated: it repeats a group that itself repeats or branches',
+  ];
+
+  it('no pattern hides a nested repetition or an unreviewed run of unbounded repetitions behind a look-around', () => {
+    const risky = new Set<string>();
+    for (const { name, re } of regexes) {
+      const why = describeBacktrackingRisk(
+        withoutLookArounds(re.source.replace(GAP_IDIOM, '[^\\n]')),
+      );
+      if (why !== null) risky.add(`${name}: ${why}`);
+    }
+    expect([...risky].sort()).toEqual(REVIEWED_BEHIND_LOOK_AROUNDS);
+  });
+
+  it('really reads what stands behind a look-around, and nothing else', () => {
+    // Without the look-around this is a nested repetition; with it, the first checker stops at the look-around.
+    const nested = String.raw`(?<![a-z])(?:\w+\s?)+x`;
+    expect(describeBacktrackingRisk(nested)).toBe('it uses a look-around assertion');
+    expect(describeBacktrackingRisk(withoutLookArounds(nested))).toBe(
+      'it repeats a group that itself repeats or branches',
+    );
+    // The reviewed gap idiom is a class, not a repeated branch.
+    const gap = String.raw`\ba(?:[^.\n]|\.(?=\w)){0,40}b`;
+    expect(
+      describeBacktrackingRisk(withoutLookArounds(gap.replace(GAP_IDIOM, '[^\\n]'))),
+    ).toBeNull();
+    // Text in a class that looks like a look-around is not one.
+    expect(withoutLookArounds(String.raw`[(?=]x(?!y)z`)).toBe(String.raw`[(?=]xz`);
+  });
+
   it('finds an e-mail address as before, and scans a long run of dots and hyphens in linear time', () => {
     const detector = compiled.requirementDetectors
       .get('req.sample-users')
