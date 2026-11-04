@@ -130,6 +130,7 @@ export function methodNotes(section: MethodSection, ctx: MethodContext): MethodN
           paragraphs: [
             'A decision point is a moment where a step was taken although a better-supported one was available.',
             'Each one is judged only from what was on record at that moment. Later events and the final resolution are never used, which is why the page lists what was not yet known. The time and effort of each choice are estimates.',
+            'How well decision points match a reviewer’s has been measured only on synthetic cases labelled by an AI assistant, and most of the ones the analysis reported there did not match one the reviewer had labelled. Read each as a question to discuss with the engineer, not as a finding.',
           ],
           facts: [],
         },

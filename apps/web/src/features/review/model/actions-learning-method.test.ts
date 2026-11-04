@@ -292,6 +292,13 @@ describe('[REV-METHOD-01] how it was calculated, in plain language', () => {
     expect(model[0]?.paragraphs[0]).toContain('gpt-x');
   });
 
+  it('says that decision points are questions to discuss, because their agreement with a reviewer is low', () => {
+    const [note] = methodNotes('decisions', ctx);
+    const text = note?.paragraphs.join(' ') ?? '';
+    expect(text).toContain('did not match one the reviewer had labelled');
+    expect(text).toContain('not as a finding');
+  });
+
   it('explains the simulation with its own figures, and marks synthetic data', () => {
     const [note] = methodNotes('paths', ctx);
     expect(note?.paragraphs.join(' ')).toContain('run 200 times');
