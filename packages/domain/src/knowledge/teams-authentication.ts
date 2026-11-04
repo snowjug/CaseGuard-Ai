@@ -1034,6 +1034,44 @@ const withLog = (statement: string, before = 80, after = 60): string[] => [
   String.raw`\b${SIGNIN_LOG}\b${gap(before)}${statement}`,
   String.raw`${statement}${gap(after)}\b${SIGNIN_LOG}\b`,
 ];
+/**
+ * What a test of the network is reported in (the engineer's findings, the validation after a fix, the network
+ * administrator's own mail) and who runs one: the engineers and the customer's network administrator, not the helpdesk that
+ * passes on what it was told.
+ */
+const NETWORK_TEST_TYPES: typeof LOG_RESULT_TYPES = [
+  ...FINDING_TYPES,
+  'validation_result',
+  'case_note',
+  'customer_email',
+  'customer_call',
+];
+const TESTER_ROLES = [...ENG_ROLES, 'customer_network_admin'] as const;
+/** A test result that states what is there: a denial inside its words ("does not time out") counts against it. */
+const AS_TESTED: Parameters<typeof rx>[1] = {
+  roles: [...TESTER_ROLES],
+  eventTypes: NETWORK_TEST_TYPES,
+  negativeContent: false,
+};
+/** A test result whose words are themselves a denial ("did not answer"): the failure it reports. */
+const AS_TESTED_DENIAL: Parameters<typeof rx>[1] = { ...AS_TESTED, negativeContent: true };
+/** A test as it is run, not the recap of a closed case, which names the cause ("a filter rule sinkholes the CDN names"). */
+const AS_TESTED_NOW: Parameters<typeof rx>[1] = {
+  ...AS_TESTED,
+  eventTypes: NETWORK_TEST_TYPES.filter((type) => type !== 'resolution_note'),
+};
+/** A subject line that repeats the one of an earlier message ("Re: One DNS server is failing") says nothing new. */
+const NOT_A_REPLY_TITLE = String.raw`(?<!^(?:re|fwd?):[^\n]{0,80})`;
+/** A name server, as an engineer points at it: a noun, an address (10.30.4.6) or the last part of one (.6). */
+const DNS_NOUN = String.raw`(?:resolvers?|dns servers?|name ?servers?|forwarders?)`;
+const DNS_REF = String.raw`(?:\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|\B\.\d{1,3}\b|\b(?:dns|ns|resolver)-?\d{1,2}\b|\b${DNS_NOUN}\b)`;
+/** A proxy node by its name (gbg-prx2, proxy-04, swg3), by its number ("proxy node 3"), by its letter or by its place in the list. */
+const PROXY_NODE = String.raw`(?:\b[a-z0-9-]{0,16}(?:prx|proxy|pxy|swg|wsg)[a-z0-9-]{0,10}\d\b|\bproxy (?:node |server )?#?\d{1,2}\b|\bproxy[- ][a-h]\b|\b(?:first|second|third|fourth|fifth|last) proxy\b)`;
+/** A node that does not answer, in the affirmative: what a timeout or a drop is called. */
+const NODE_FAILS = String.raw`(?:times? out|timed out|timing out|time-?outs?|fail(?:s|ed|ing)?\b(?!\s?over)|drops?|dropped|hung|hangs?|stall(?:s|ed)?|unresponsive|returns? (?:a )?(?:gateway time-?out|50[234]))`;
+/** "All answered normally": the way a test that finds nothing wrong is worded. */
+const ALL_FINE = String.raw`(?:normally|fine|(?:the )?(?:correct|right)\w*|every time|okay?|properly|as expected|within|under|identical|\d+ of \d+|(?:ten|five|three|four|two|twenty) of \w+)`;
+const ANSWERS = String.raw`(?:answer\w*|respond\w*|repl(?:y|ies|ied)|return\w*|resolve[sd]?|work(?:s|ed)?|succeeded|complet\w+)`;
 
 /**
  * Wording families for the signals about the server side: what the logs and the infrastructure show (name servers, proxy
@@ -1139,6 +1177,78 @@ const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetec
       String.raw`\b(?:results?|rows?|entries|sign-?ins?|attempts?|events?)\b${gap(60)}\b(?:mfa|multi-?factor)\b${gap(25)}\b(?:required|interrupted|not completed|not satisfied|failed|abandoned|challenge)`,
       String.raw`\bconditional ?access ?(?:result|status|outcome)s?\b[^.\n]{0,15}\b(?:failure|failed|blocked|denied|interrupted)\b`,
     ].map((pattern) => rx(pattern, { eventTypes: FINDING_TYPES })),
+  ],
+  // One name server that does not answer, or answers wrongly: a code (SERVFAIL, NXDOMAIN, a sinkhole) next to an address or a
+  // name server, a name server that fails, times out or drops the queries, an address that fails for the sign-in hosts, a
+  // filter that blocks them. Whoever tested it: an engineer or the network administrator.
+  'sig.resolver-inconsistent': [
+    // A code and an address: as a test is run, not as the recap of a closed case explains it.
+    ...[
+      String.raw`${NOT_A_REPLY_TITLE}${DNS_REF}${gap(70)}\b(?:servfail|nxdomain|non-?existent domain|sinkhole\w*)\b`,
+      String.raw`${NOT_A_REPLY_TITLE}\b(?:servfail|nxdomain|non-?existent domain|sinkhole\w*)\b${gap(60)}${DNS_REF}`,
+      String.raw`${NOT_A_REPLY_TITLE}\b(?:dns (?:filter\w*|security)(?: service)?|${DNS_NOUN})\b${gap(60)}\b(?:blocks?|blocked|blocking|sinkholes?|sinkholed)\b${gap(40)}\b(?:login\.microsoftonline\.com|cdn|aadcdn|microsoft|sign-?in)`,
+    ].map((pattern) => rx(pattern, AS_TESTED_NOW)),
+    ...[
+      String.raw`${NOT_A_REPLY_TITLE}\b${DNS_NOUN}\b${gap(70)}\b(?:fail(?:s|ed|ing)?\b(?!\s?over)|times? out|timed out|timing out|(?:is|was|are|were) (?:silent|unresponsive|down|unreachable)|drops? (?:the )?quer\w+|refus(?:es|ed|ing) (?:the )?quer\w+|(?:returns?|gives?|answers? with) (?:an? |the )?(?:wrong|bogus|invalid|empty|null|blank)\b)`,
+      String.raw`${NOT_A_REPLY_TITLE}${DNS_REF}${gap(40)}\b(?:fail(?:s|ed|ing)?\b(?!\s?over)|unresponsive)\b${gap(30)}\b(?:to resolve|(?:the )?(?:microsoft|sign-?in|cdn)\b[\w -]{0,12}\b(?:host ?names?|names))`,
+    ].map((pattern) => rx(pattern, AS_TESTED)),
+    ...[
+      String.raw`${NOT_A_REPLY_TITLE}\b${DNS_NOUN}\b${gap(70)}\b(?:(?:did|does|do)(?:n['’]t| not) (?:answer|respond|reply|resolve)|not (?:answering|responding|replying)|(?:could ?n['’]?t|could not|cannot|can['’]t|unable to) resolve|stays? silent|no answers?)`,
+      String.raw`${NOT_A_REPLY_TITLE}\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b${gap(60)}\b(?:(?:did|does|do)(?:n['’]t| not) (?:answer|reply|resolve)|not (?:answering|replying)|(?:could ?n['’]?t|could not|cannot|can['’]t|unable to) resolve|no answers?)`,
+    ].map((pattern) => rx(pattern, AS_TESTED_DENIAL)),
+  ],
+  // Every name server answers: "all three answered every time", "both servers resolve the sign-in hosts normally", "DNS is fine",
+  // "no DNS problems". An engineer's word, or the network administrator's own test; a dashboard's colour is not a test.
+  'sig.resolvers-consistent': [
+    ...[
+      String.raw`\b(?:all|every|each|both)\b(?! (?:the )?other)${gap(14)}\b${DNS_NOUN}\b${gap(40)}\b${ANSWERS}\b${gap(50)}\b${ALL_FINE}\b(?!${gap(40)}\bexcept\b)`,
+      String.raw`\b${DNS_NOUN}\b[^\n]{0,140}?[.!?] (?:all|both) (?:three|two|four|five|of them)\b${gap(10)}\b(?:answer\w*|respond\w*|repl(?:y|ies|ied)|worked|resolved)\b${gap(30)}\b(?:every time|normally|fine|correct\w*|within|in under|each time)`,
+    ].map((pattern) => rx(pattern, AS_TESTED)),
+    rx(
+      String.raw`\b(?:dns|name resolution|the resolvers?)\b${gap(8)}\b(?:is|are|was|were|looks?|looked|seems?|seemed|works?|worked|checks? out)\b${gap(12)}\b(?:fine|healthy|ok|okay|normal|good|clean|in order|working)\b`,
+      { roles: [...ENG_ROLES], eventTypes: NETWORK_TEST_TYPES, negativeContent: false },
+    ),
+    rx(String.raw`\b(?:dns|name resolution)\b${gap(6)}\b(?:checks?|checked) out\b`, {
+      roles: [...ENG_ROLES],
+      eventTypes: NETWORK_TEST_TYPES,
+      negativeContent: false,
+    }),
+    rx(
+      String.raw`\b(?:succeed(?:s|ed)?|passed|worked|answered|resolved)\b${gap(20)}\b(?:on|for|against|from|across|with)\b${gap(6)}\b(?:all|both|every|each)\b(?! (?:the )?other)${gap(14)}\b${DNS_NOUN}\b`,
+      AS_TESTED,
+    ),
+    ...[
+      String.raw`\bno (?:dns|name[- ]resolution|resolver)\b${gap(25)}\b(?:issues?|problems?|errors?|failures?|faults?)\b`,
+      String.raw`\b(?:no|zero|0) (?:servfail|nxdomain)s?\b${gap(40)}\b(?:from|on|for|across|at)\b${gap(15)}\b(?:any|all|every|each|either|both|the)\b${gap(10)}\b${DNS_NOUN}\b`,
+      String.raw`\b(?:all|every|each|both)\b(?! (?:the )?other)${gap(14)}\b${DNS_NOUN}\b${gap(40)}\b${ANSWERS}\b${gap(30)}\bwithout (?:a |any )?(?:servfail|nxdomain|errors?|failures?|timeouts?)\b`,
+    ].map((pattern) => rx(pattern, AS_TESTED_DENIAL)),
+  ],
+  // One proxy node that does not answer: its name (gbg-prx2, proxy-04, "proxy node 3") next to a timeout or a drop, "one proxy
+  // server out of four times out", "node 3 timed out" in a list of the proxy nodes.
+  'sig.proxy-node-inconsistent': [
+    ...[
+      String.raw`${NOT_A_REPLY_TITLE}${PROXY_NODE}${gap(60)}\b${NODE_FAILS}\b`,
+      String.raw`${NOT_A_REPLY_TITLE}\b(?:one|1|a single|only one)\b${gap(8)}\bprox(?:y|ies)(?: nodes?| servers?| gateways?)?\b${gap(60)}\b${NODE_FAILS}\b`,
+      String.raw`${NOT_A_REPLY_TITLE}\bproxy (?:nodes?|servers?|pool|cluster)\b${gap(80)}\bnode ?\d{1,2}\b${gap(40)}\b${NODE_FAILS}\b`,
+      String.raw`${NOT_A_REPLY_TITLE}\bnode ?\d{1,2}\b${gap(20)}\bproxy (?:pool|cluster|farm)\b${gap(40)}\b${NODE_FAILS}\b`,
+    ].map((pattern) => rx(pattern, AS_TESTED)),
+    ...[
+      String.raw`${NOT_A_REPLY_TITLE}${PROXY_NODE}${gap(60)}\b(?:not (?:responding|answering)|(?:did|does|do)(?:n['’]t| not) (?:respond|answer|reply))\b`,
+      String.raw`${NOT_A_REPLY_TITLE}\b(?:one|1|a single|only one)\b${gap(8)}\bprox(?:y|ies)(?: nodes?| servers?| gateways?)?\b${gap(60)}\b(?:not (?:responding|answering)|(?:did|does|do)(?:n['’]t| not) (?:respond|answer|reply))\b`,
+    ].map((pattern) => rx(pattern, AS_TESTED_DENIAL)),
+  ],
+  // Every proxy node answers: "all four proxy nodes respond normally", "the proxy test: all three nodes answered within a
+  // second", "none of the proxies timed out", "no timeouts through any proxy".
+  'sig.proxy-nodes-consistent': [
+    ...[
+      String.raw`\b(?:all|every|each|both)\b(?! (?:the )?other)${gap(14)}\b(?:proxy|proxies|proxy (?:nodes?|servers?))\b${gap(30)}\b${ANSWERS}\b${gap(40)}\b${ALL_FINE}\b(?!${gap(40)}\bexcept\b)`,
+      String.raw`\bproxy\b${gap(60)}\b(?:all|every|each|both)\b(?! (?:the )?other)${gap(10)}\bnodes?\b${gap(30)}\b${ANSWERS}\b${gap(40)}\b${ALL_FINE}\b`,
+    ].map((pattern) => rx(pattern, AS_TESTED)),
+    ...[
+      String.raw`\b(?:no|zero|none of)\b${gap(25)}\b(?:proxy|proxies)\b${gap(20)}\b(?:times? out|timed out|failed|fail|dropped|timeouts?)\b`,
+      String.raw`\b(?:no|zero) (?:timeouts?|time-?outs?|failures?|errors?|drops?)\b${gap(30)}\b(?:through|on|from|at|via|across)\b${gap(15)}\b(?:any|all|every|each|the|a)\b${gap(8)}\b(?:proxy|proxies|nodes?)\b`,
+      String.raw`\b(?:all|every|each|both)\b(?! (?:the )?other)${gap(14)}\b(?:proxy|proxies|proxy (?:nodes?|servers?))\b${gap(30)}\b${ANSWERS}\b${gap(30)}\bwithout (?:a |any )?(?:timeouts?|time-?outs?|errors?|failures?|drops?)\b`,
+    ].map((pattern) => rx(pattern, AS_TESTED_DENIAL)),
   ],
 };
 

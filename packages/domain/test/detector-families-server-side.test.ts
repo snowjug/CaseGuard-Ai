@@ -352,3 +352,200 @@ describeFamilies(
   'wording families of the server side: policy window, tokens, Conditional Access',
   POLICY_AND_TOKEN,
 );
+
+const NETWORK: readonly Family[] = [
+  {
+    id: 'one name server fails: a code next to an address, or a name server that fails, times out or drops the queries',
+    signal: 'sig.resolver-inconsistent',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      'Pointed Resolve-DnsName at both servers: 10.5.0.2 answers instantly, 10.5.0.3 returns SERVFAIL for the sign-in host.',
+      'dns2 keeps failing for the Microsoft sign-in names; dns1 answers.',
+      'The second name server times out for the CDN host most of the time.',
+      'One of the three DNS servers in Brno does not answer for the sign-in hosts.',
+      'nslookup against 192.168.7.53 gives NXDOMAIN for aadcdn.msauth.net, 192.168.7.54 answers correctly.',
+      'Resolver 10.1.2.3 drops queries for the Microsoft hosts.',
+      '10.20.30.41: 8 of 10 lookups came back SERVFAIL.',
+      'DNS server 172.16.4.11 returned no answer for the sign-in host in 6 of 10 tests.',
+      'The Dublin resolver at 10.2.2.2 is intermittently timing out on the CDN host.',
+      'We see SERVFAIL responses coming from 10.3.3.3 for the CDN host.',
+      'One of the two DNS servers returns the wrong address for the sign-in host.',
+      'The secondary DNS server is unreachable from the branch.',
+      'Both Gdansk DNS servers forward to a datacentre resolver, and that resolver fails for the sign-in names at times.',
+    ],
+    doesNotRead: [
+      'Please run nslookup against 10.5.0.3 and tell me whether it returns SERVFAIL.',
+      'If the resolver returns SERVFAIL we remove it from the scope.',
+      '10.5.0.3 fails over to 10.5.0.2 when the primary is busy.',
+      'The proxy at 10.5.0.9 times out for the sign-in hosts.',
+      'I suspect the resolver is returning SERVFAIL.',
+      'DNS is less likely given the timeout code.',
+      'The label printer cannot resolve its print server name.',
+    ],
+  },
+  {
+    id: 'one name server fails: a filter that blocks the sign-in names, and the network administrator who tested it',
+    signal: 'sig.resolver-inconsistent',
+    role: 'customer_network_admin',
+    type: 'customer_email',
+    reads: [
+      'Our secondary resolver .14 refuses queries for login.microsoftonline.com about half the time.',
+      'From a Tallinn laptop: 10.9.0.2 answers all hosts, 10.9.0.3 returns NXDOMAIN for the CDN names.',
+      'The DNS filtering service sinkholes the CDN host that Teams needs.',
+    ],
+    doesNotRead: [
+      'My colleague thinks the resolver might return SERVFAIL.',
+      'We will test each resolver for SERVFAIL tomorrow.',
+    ],
+  },
+  {
+    id: 'one name server fails: the helpdesk that only passes on what it was told',
+    signal: 'sig.resolver-inconsistent',
+    role: 'customer_admin',
+    type: 'customer_email',
+    reads: [],
+    doesNotRead: [
+      'The network team told us that 10.5.0.3 returns SERVFAIL for the sign-in names.',
+      'Our helpdesk says dns2 times out for the CDN host.',
+    ],
+  },
+  {
+    id: 'every name server answers: all of them, both of them, "DNS is fine", no DNS problems',
+    signal: 'sig.resolvers-consistent',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      'I asked all three resolvers for the sign-in host ten times; every resolver answered correctly each time.',
+      'Both DNS servers answer the sign-in and CDN hosts normally.',
+      'All 4 name servers respond fine for the Microsoft hosts.',
+      'DNS is fine: every lookup returned the right address.',
+      'Name resolution looks healthy on every server we tested.',
+      'No DNS problems found on any resolver.',
+      'Queried each resolver in turn. All three answered every time, within a few milliseconds.',
+      'None of the resolvers returned SERVFAIL for the sign-in hosts.',
+      'Resolver 10.5.0.3 does not time out for the sign-in host.',
+      'All three DNS servers returned the right address for the sign-in hosts.',
+      'DNS checks out.',
+      'No SERVFAIL or NXDOMAIN from any resolver.',
+      'Resolve-DnsName succeeded on both resolvers for 200 consecutive queries.',
+    ],
+    doesNotRead: [
+      'Please check that all three resolvers answer normally.',
+      'If all resolvers answer fine, DNS is ruled out.',
+      'One resolver answers normally, the other one times out.',
+      'All proxy nodes respond normally.',
+      'DNS is less likely given the timeout code.',
+      'All the resolvers answer normally except 10.5.0.3, which returns SERVFAIL.',
+      'I will test whether every resolver answers within a second.',
+    ],
+  },
+  {
+    id: 'every name server answers: the network administrator after the fix, and a dashboard that is not a test',
+    signal: 'sig.resolvers-consistent',
+    role: 'customer_network_admin',
+    type: 'customer_email',
+    reads: [
+      'From a Riga PC: every resolver answers the sign-in hosts, ten of ten queries each.',
+      'Both resolvers answered all 200 queries normally after the change.',
+    ],
+    doesNotRead: [
+      'The monitoring page is green for both resolvers.',
+      'I am fairly sure all the DNS servers are healthy.',
+    ],
+  },
+  {
+    id: 'one proxy node does not answer: its name next to a timeout, a drop or a hang',
+    signal: 'sig.proxy-node-inconsistent',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      'pxy-ams-03 timed out on every request while the other nodes answered in under a second.',
+      'One proxy server out of four drops the connection to login.microsoftonline.com.',
+      'Through the Utrecht proxies one by one: utr-prx1 and utr-prx2 fine, utr-prx3 timing out.',
+      'The second proxy node times out for the sign-in addresses, the first and third are fine.',
+      'Of the four proxy nodes, node 2 returns a gateway timeout.',
+      'From a branch PC: proxy-a answers in 0.4 s, proxy-b hangs.',
+      'wsg-02 is not responding for the sign-in hosts.',
+      'proxy-c: 7 of 10 timed out. proxy-b: 10 of 10 fine.',
+      'Node 3 of the proxy cluster returns 502 for the sign-in host.',
+      'One of the proxies is overloaded and drops sign-in requests.',
+    ],
+    doesNotRead: [
+      'Please test whether proxy-04 times out.',
+      'If proxy-04 times out again we will take it out of the pool.',
+      'The proxy dashboard shows all nodes green.',
+      'Teams times out at sign-in for people in Oslo.',
+      'I suspect one proxy node is timing out.',
+      'All three proxy nodes answered within a second.',
+    ],
+  },
+  {
+    id: 'one proxy node does not answer: the network administrator, and the recap of a closed case',
+    signal: 'sig.proxy-node-inconsistent',
+    role: 'customer_network_admin',
+    type: 'customer_email',
+    reads: [
+      'proxy node 3 times out for the Microsoft sign-in hosts.',
+      'Tested all the proxies from Oslo: osl-prx2 times out one in three times.',
+    ],
+    doesNotRead: ['We have two proxies in Oslo and I am sure that both are healthy.'],
+  },
+  {
+    id: 'every proxy node answers: all of them, none timed out, no timeouts',
+    signal: 'sig.proxy-nodes-consistent',
+    role: 'support_engineer',
+    type: 'diagnostic_result',
+    reads: [
+      'All three proxy nodes answered the sign-in hosts within a second, five of five times each.',
+      'Every proxy responds normally now.',
+      'None of the proxies timed out in the test.',
+      'No timeouts through any of the proxy nodes.',
+      'The proxy test: all four nodes answered normally.',
+      'All proxy nodes responded without a timeout after the change.',
+      '100 requests through each of the three proxy nodes completed without a timeout.',
+    ],
+    doesNotRead: [
+      'Please check that all proxy nodes respond normally.',
+      'pxy-03 timed out while all the other proxies answered normally.',
+      'All resolvers answer normally.',
+      'If every proxy answers fine, the proxy pool is ruled out.',
+      'The proxy dashboard shows all nodes green.',
+    ],
+  },
+  {
+    id: 'every proxy node answers: the helpdesk that only passes on what it was told',
+    signal: 'sig.proxy-nodes-consistent',
+    role: 'customer_admin',
+    type: 'customer_email',
+    reads: [],
+    doesNotRead: ['The network team says all four proxy nodes answer fine.'],
+  },
+];
+
+describeFamilies('wording families of the server side: name servers and proxy nodes', NETWORK);
+
+describe('the pairs of the name servers and the proxy nodes', () => {
+  it('reads a denial of a failure as the other side, and says which signal it denied', () => {
+    const found = observationsOf(
+      eventOf(
+        'support_engineer',
+        'diagnostic_result',
+        'None of the resolvers failed for the sign-in hosts.',
+      ),
+    );
+    const consistent = found.find((o) => o.signalId === 'sig.resolvers-consistent');
+    expect(consistent?.negationOf).toBe('sig.resolver-inconsistent');
+    expect(found.map((o) => o.signalId)).not.toContain('sig.resolver-inconsistent');
+  });
+
+  it('does not read a subject line that repeats an earlier one', () => {
+    const event = { ...eventOf('support_engineer', 'engineer_email', 'Closing the case.') };
+    expect(
+      signalsOf({ ...event, title: 'Re: One DNS server is failing for the sign-in names' }),
+    ).not.toContain('sig.resolver-inconsistent');
+    expect(
+      signalsOf({ ...event, title: 'One DNS server is failing for the sign-in names' }),
+    ).toContain('sig.resolver-inconsistent');
+  });
+});
