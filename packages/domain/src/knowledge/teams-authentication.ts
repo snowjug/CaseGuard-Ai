@@ -986,9 +986,174 @@ const WORDING_FAMILIES: Readonly<Record<string, readonly SignalDetector[]>> = {
   ],
 };
 
+// Fragments for the families below: a count that is more than a handful, the people or machines it counts, and the
+// words that say they have a problem. A detector pattern is at most 500 characters once these are filled in.
+const DIGITS_MANY = String.raw`(?:[6-9]|\d{2,5})`;
+const WORDS_MANY = String.raw`(?:six|seven|eight|nine|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundreds?|dozens?)`;
+const PEOPLE = String.raw`(?:(?:mobile|field|remote|office|shift|frontline)\s+)?(?:users|people|persons|employees|staff|colleagues|workers|agents|laptops|devices|pcs|machines|accounts|seats|tablets|phones)`;
+const TROUBLE = String.raw`(?:cannot|can['’]?t|can not|unable to|(?:fails?|failing) to|locked out|stuck|blocked|not able to|(?<!\bnot\s)affect\w*)`;
+const OTHER_PLACE = String.raw`(?:site|office|location|branch|building|campus|floor|network)`;
+const IS_FINE = String.raw`(?:(?:(?:is|are)\s+)?(?:fine|ok|okay|working|unaffected|normal|not (?:affected|impacted))|works?\b|(?:has|have) no (?:problem|trouble|issue)s?|no problem)`;
+// A sentence: its characters, with a dot allowed inside a token ("k.saar", "10.1.2.3") but not at a sentence boundary.
+const SENT = String.raw`(?:[^.?!\n]|(?<=\w)\.(?=\w))`;
+// Said in a paragraph that is about Teams or signing in: the words before the message, so that the message is matched on its
+// own and a "cannot" earlier in the sentence does not reach it. A printer's message has no such words before it.
+const ABOUT_TEAMS = String.raw`(?<=\b(?:teams|sign(?:ing)?[- ]?in|log(?:ging)?[- ]?in)\b[^\n]{0,200})`;
+
+/**
+ * Wording families for how many are affected and where, how the failure shows itself, and what the people at the keyboard
+ * tried. Said the way a customer says it: a count in words, a place that is fine, a second try that works, a cache that
+ * was cleared to no effect. Kept apart from the maps beside it so that two authors can add families at the same time.
+ */
+const WORDING_FAMILIES_SCOPE: Readonly<Record<string, readonly SignalDetector[]>> = {
+  // F21: more than a handful of people or machines, with a count in digits or in words, whatever they are called, and a
+  // failure that is stated: cannot, unable, locked out, stuck, blocked, affected. The count and the failure are said in the
+  // same sentence, in either order. Words such as "problem", "error" or "reported" are not enough: "no more errors for
+  // twelve users" is a fix, not a failure.
+  'sig.multiple-users-affected': [
+    rx(
+      String.raw`\b${DIGITS_MANY}\s+(?:of\s+(?:our|the|my)\s+)?(?:(?:more|other)\s+)?${PEOPLE}\b${GAP}{0,100}\b${TROUBLE}\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+    rx(String.raw`\b${WORDS_MANY}\s+${PEOPLE}\b${GAP}{0,80}\b${TROUBLE}\b`, {
+      roles: [...CUSTOMER_ROLES],
+    }),
+    rx(String.raw`\b${TROUBLE}\b${GAP}{0,60}\b${DIGITS_MANY}\s+(?:(?:more|other)\s+)?${PEOPLE}\b`, {
+      roles: [...CUSTOMER_ROLES],
+    }),
+    rx(String.raw`\b${TROUBLE}\b${GAP}{0,60}\b${WORDS_MANY}\s+${PEOPLE}\b`, {
+      roles: [...CUSTOMER_ROLES],
+    }),
+    rx(
+      String.raw`\b(?:lots of|a lot of|a number of|numerous|plenty of|loads of)\s+(?:our\s+|the\s+)?${PEOPLE}\b${GAP}{0,60}\b${TROUBLE}\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+    rx(
+      String.raw`\b(?:the )?whole\s+(?:office|site|floor|building|branch|team|department|company|campus|plant|warehouse)\b${GAP}{0,60}\b${TROUBLE}\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+  ],
+  // F22: only the writer is affected, said by the people next to them being fine, or by nobody else having it.
+  'sig.single-user-scope': [
+    rx(
+      String.raw`\b(?:a|one|my|the)\s+(?:colleague|coworker|co-worker|teammate|team ?mate|neighbou?r|desk ?mate)s?\b${GAP}{0,40}\b(?:has|have|is|are|does|do)\s+(?:no (?:problem|trouble|issue)s?|fine|ok|okay|normal|unaffected|not affected|not have (?:this|the|any) (?:problem|issue))`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+    rx(
+      String.raw`\b(?:nobody|no one|no-one) else\b${GAP}{0,50}\b(?:has|have|gets?|sees?|reports?)\s+(?:this|it|the same|the problem|that)\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+    rx(
+      String.raw`\bmy (?:colleagues|coworkers|co-workers|teammates|team ?mates)\s+(?:are|is|seem)\s+(?:fine|ok|okay|normal|unaffected|not affected)\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+  ],
+  // F23: the failures follow a place or a network: another site is fine, one floor is not affected, mobile data works.
+  'sig.site-correlated': [
+    rx(String.raw`\b(?:the|our|my|another|one) other ${OTHER_PLACE}\b${GAP}{0,40}\b${IS_FINE}\b`, {
+      roles: [...CUSTOMER_ROLES],
+    }),
+    rx(
+      String.raw`\bthe rest of (?:the|our) (?:sites|offices|locations|branches|floors|company|group)\b${GAP}{0,40}\b${IS_FINE}\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+    rx(
+      String.raw`\b(?:floors?|buildings?|sites?|offices?|wings?)\s+[\p{L}\p{N}]{1,12}\s+(?:is|are)\s+(?:not|un)\s?(?:affected|impacted)\b`,
+      { roles: [...CUSTOMER_ROLES], flags: 'iu' },
+    ),
+    rx(
+      String.raw`\bonly\s+(?!(?:one|1|a|an|me|my|this|that|the|few|some|two|three|admins?|users?|people|staff|members|those|laptops|devices|accounts)\b)[\p{L}]{3,25}(?:\s+[\p{L}]{3,25})?\s+(?:is|are)\s+(?:affected|impacted)\b`,
+      { roles: [...CUSTOMER_ROLES], flags: 'iu' },
+    ),
+    rx(
+      String.raw`\b(?:mobile data|(?:my|his|her|their) (?:phone|hotspot)|a different network|another network|home (?:wi-?fi|network|broadband)|4g|5g|lte|tethering)\b${GAP}{0,60}\b(?:works?|worked|signs? in|signed in|fine|ok|okay|fast|no problem)\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+    rx(
+      String.raw`\b(?:works?|worked|signs? in|signed in)\b${GAP}{0,30}\b(?:on|over|with|using|via)\s+(?:mobile data|(?:my|his|her|their) (?:phone|hotspot)|a different network|another network|home (?:wi-?fi|network|broadband)|4g|5g|lte|tethering)\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+  ],
+  // F24: a retry that works, said by the attempt that did: "the second try", "after three attempts", "sometimes... sometimes".
+  'sig.intermittent-failures': [
+    rx(
+      String.raw`\b(?:second|third|next|2nd|3rd) (?:try|attempt|time)\b${GAP}{0,30}\b(?:works?|worked|succeeds?|ok|okay|goes? through)\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+    rx(
+      String.raw`\b(?:works?|worked|succeeds?|goes? through|gets? in|got in|signs? in|signed in|logs? in|logged in|opens?|connects?)\b${GAP}{0,30}\b(?:on|at|after) (?:the )?(?:second|third|2nd|3rd|(?:two|three|four|2|3|4|a few|several) (?:attempts|tries|retries))\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+    rx(
+      String.raw`\b(?:needs?|need|takes?|took|required?)\s+(?:two|three|2|3|a few|several)(?: or (?:two|three|four|2|3|4))? (?:attempts|tries|retries)\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+    rx(String.raw`\bsometimes\b${GAP}{0,50}[,;]?\s*(?:and |but )?sometimes\b`, {
+      roles: [...CUSTOMER_ROLES],
+    }),
+    rx(
+      String.raw`\bworked\b${GAP}{0,30}\bfor (?:a|one) (?:minute|moment|while|few minutes)\b${GAP}{0,30}\b(?:then|and then)\b${GAP}{0,20}\b(?:failed|stopped|broke|fails)\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+  ],
+  // F25: a connection timeout in the words of a message on the screen, in a paragraph about Teams or signing in (a
+  // printer's "connection timed out" has no such words before it).
+  'sig.error-timeout': [
+    rx(
+      String.raw`${ABOUT_TEAMS}\b(?:error|message|says?|shows?|displays?|gives?|gets?|got|see(?:s|ing)?)\b${GAP}{0,40}\bconnection (?:timed out|time-?out)\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+  ],
+  // F26: a name that could not be found, in the words of the screen: "could not find the server", in a paragraph about
+  // Teams or signing in.
+  'sig.error-name-not-resolved': [
+    rx(
+      String.raw`${ABOUT_TEAMS}\b(?:says?|shows?|displays?|message|error|gets?|got)\b${GAP}{0,40}\b(?:could ?n['’]?t|could not|cannot|can['’]?t|unable to)\s+(?:find|reach|locate|resolve)\s+(?:the\s+|a\s+|that\s+)?(?:server|name|host(?:name)?|address)\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+  ],
+  // F27: the browser version does the same.
+  'sig.web-client-also-fails': [
+    rx(
+      String.raw`\b(?:web|browser)(?: version| client| app)?\b${GAP}{0,30}\b(?:does|do) the same\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+  ],
+  // F28: the cache was cleared or Teams reinstalled and the outcome is in the same sentence or opens the next one ("same
+  // result", "still there"). A question is not crossed.
+  'sig.cache-clear-no-effect': [
+    rx(
+      String.raw`\b(?:clear(?:ed|ing)?|emptied|empty(?:ing)?|deleted?|wiped?|removed?|reset|purged?|reinstall(?:ed|ing)?)\b${SENT}{0,60}\b(?:cache|app ?data|folder|profile|credentials?)\b${SENT}{0,120}\b(?:same (?:result|error|message|thing|problem|code)|nothing changed|no (?:change|difference)|did(?:n['’]?t| not) (?:help|change|fix)|still (?:fails?|failing|there|the same|happens|blocked|asks?|shows?|says?)|exactly (?:as before|the same)|not (?:fixed|helped|resolved))`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+    rx(
+      String.raw`\b(?:clear(?:ed|ing)?|emptied|empty(?:ing)?|deleted?|wiped?|removed?|reset|purged?|reinstall(?:ed|ing)?)\b${SENT}{0,60}\b(?:cache|app ?data|folder|profile|credentials?)\b${SENT}{0,100}[.!]\s+(?:the )?(?:same|nothing changed|no (?:change|difference)|still|exactly)\b`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+  ],
+  // F29: clearing or resetting fixed it, in the customer's words or in a resolution note. Only a stated result counts: a
+  // request to sign in again, or a failure that came back, is not one.
+  'sig.cache-clear-resolved': [
+    rx(
+      String.raw`\b(?:clear(?:ed|ing)?|emptied|empty(?:ing)?|deleted?|wiped?|reset(?:ting)?|purged?|reinstall(?:ed|ing)?)\b[^\n]{0,60}\b(?:cache|cached data|app ?data|teams folder|folder|profile|broker|credentials?|both)\b[^\n]{0,80}\b(?:fixed|resolved|solved|cured|corrected|worked|works|working)\b`,
+    ),
+  ],
+  // F30: the sessions were revoked and nothing changed, or the same error came back.
+  'sig.revoke-sessions-no-effect': [
+    rx(
+      String.raw`\b(?:revoked?|revoking|invalidated?)\b[^\n]{0,60}\b(?:sessions?|tokens?)\b[^\n]{0,120}\b(?:same (?:thing|result|failures?|error|message|problem|code)|nothing changed|no (?:change|difference)|did ?n['’]?t help|still (?:fail|failing|say|says|get|got|the same|happening))`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+    rx(
+      String.raw`\bsessions? (?:were |was )?revoked\b[^\n]{0,120}\b(?:(?:got|get|gets|see|saw|had|have)\s+[^.\n]{0,25}\bagain\b|same (?:thing|result|error|message|code)|nothing changed|no change|still (?:fail|failing|say|says))`,
+      { roles: [...CUSTOMER_ROLES] },
+    ),
+  ],
+};
+
 /**
  * Wording families for the signals about the server side: what the logs and the infrastructure show (name servers, proxy
- * nodes, federation, device tokens, service health) and what changed in the access policy. Kept apart from the map above
+ * nodes, federation, device tokens, service health) and what changed in the access policy. Kept apart from the maps above
  * so that two authors can add families at the same time; read both when looking for what detects a signal. The same
  * rules hold: a family is a way of saying a thing, never a list of the sentences that failed; every family has
  * look-alike sentences it must not read in `test/detector-families.test.ts`; gaps are bounded.
@@ -998,6 +1163,7 @@ const WORDING_FAMILIES_SERVER_SIDE: Readonly<Record<string, readonly SignalDetec
 for (const signal of signals) {
   const extra = [
     ...(WORDING_FAMILIES[signal.id] ?? []),
+    ...(WORDING_FAMILIES_SCOPE[signal.id] ?? []),
     ...(WORDING_FAMILIES_SERVER_SIDE[signal.id] ?? []),
   ];
   if (extra.length > 0) signal.detectors.push(...extra);
