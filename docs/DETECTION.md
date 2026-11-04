@@ -55,7 +55,7 @@ line break or a contrast word (`but`, `however`, `although`, …). Abbreviations
 | `whether`             | conditional   | 10, comma-bounded | "Please check whether the logs hold a failed row." |
 | `counterfactual`      | conditional   |                10 | "The engineer would have checked the logs first."  |
 | `negation-verb`       | negated       |  5, comma-bounded | "The engineer did not check the logs."             |
-| `negation-quantifier` | negated       |                 4 | "No log review was performed." "Nothing active."   |
+| `negation-quantifier` | negated       |                 4 | "No log review was performed." "Zero failed rows." |
 | `guess`               | speculative   |                 8 | "It might be a DNS issue." "I suspect the proxy."  |
 | `request`             | requested     |                 8 | "Please send a HAR capture."                       |
 | `intention`           | future intent |                 8 | "I will check the logs tomorrow."                  |
@@ -71,6 +71,10 @@ check whether service health lists nothing active" therefore deny nothing, while
 know why?" still states the 120 users: the question comes after a comma. A wh-question ("Why are all the Warsaw users locked
 out?") is not one on purpose: it presupposes what it asks about, and a customer often reports a problem in that form. The
 `whether` cue reaches six words, so that a statement after a dash is not taken for part of the question.
+
+The quantifier cue reads "zero", "nil", "0 of 6" and a bare "0" as it reads "no", so that "0 of 6 failing attempts have a
+matching sign-in" is a denial and not a record that is there; "Zero Trust" and the 0 of "2.0" or "10.20.0.1" are not
+negations.
 
 Every cue carries a purpose, sentences it must decide and look-alikes it must **not** decide (`not only`, `no problem`,
 `please note`, `if possible`, a habit such as "if you wait it sometimes works"). A test runs all of them, so the list

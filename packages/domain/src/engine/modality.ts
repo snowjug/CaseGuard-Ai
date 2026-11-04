@@ -140,22 +140,36 @@ const CUE_DEFINITIONS: readonly ModalityCue[] = [
     id: 'negation-quantifier',
     modality: 'negated',
     priority: 4,
-    pattern:
-      /\b(?:none|nothing|nobody|neither|nor|without)\b|\bno\b(?!\s+(?:problem|worries|matter|idea)\b)/i,
+    pattern: new RegExp(
+      [
+        String.raw`\b(?:none|nothing|nobody|neither|nor|without|nil)\b`,
+        // "zero rows", "0 failed sign-ins" and "0 of 6 attempts", but not "Zero Trust" or the 0 of "2.0" and "10.20.0.1".
+        String.raw`\bzero\b(?![\s-]+(?:trust|day|touch|config|downtime|knowledge))`,
+        String.raw`(?<![\d.,])0\s+of\s+\d+\b|(?<![\d.,])\b0\b(?![.,]\d)`,
+        String.raw`\bno\b(?!\s+(?:problem|worries|matter|idea)\b)`,
+      ].join('|'),
+      'i',
+    ),
     reach: 4,
     stopsAtComma: false,
     purpose:
-      'The writer says there is none of it: no, nothing, none, without. It reaches over a short list ("no DNS, proxy or CA issues").',
+      'The writer says there is none of it: no, nothing, none, zero, without. It reaches over a short list ("no DNS, proxy or CA issues").',
     fires: [
       'No [log review] was performed.',
       'The logs show no evidence of [a token issue].',
       'They signed in without [any problem].',
       'Service health lists nothing [active].',
       'No DNS, proxy or [CA issues] found.',
+      'Zero [failed sign-ins] were recorded for the three users.',
+      'The query returned 0 [failed attempts] for the window.',
+      '0 of 6 failing attempts have [a matching record].',
     ],
     quiet: [
       'No problem, [the logs] are attached.',
       'Muitos utilizadores bloqueados no Teams, in all offices, more than [100 people].',
+      'Zero Trust blocks [unmanaged devices].',
+      'The 2.0 [client] is blocked for the Warsaw users.',
+      'Resolved 10.20.0.1 and [the other server] answered.',
     ],
   },
   {

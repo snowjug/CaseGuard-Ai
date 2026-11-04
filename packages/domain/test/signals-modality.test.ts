@@ -213,6 +213,27 @@ describe('an engineer action is a step that was done, or one the customer was as
   });
 });
 
+describe('a count of zero is a denial', () => {
+  const log = (body: string) => eventOf('support_engineer', 'diagnostic_result', body);
+
+  it('does not read "0 of 6 failing attempts have a matching sign-in" as records that are there', () => {
+    const event = log('0 of 6 failing attempts have a matching sign-in in the Entra logs.');
+    const found = read(event).signals(event);
+    expect(found).toContain('sig.no-server-side-failure-records');
+    expect(found).not.toContain('sig.server-side-failure-records-present');
+  });
+
+  it('still reads a count that is not zero as records that are there', () => {
+    for (const body of [
+      '6 of 6 failing attempts have a matching sign-in in the Entra logs.',
+      '10 of 10 failing attempts have a matching sign-in in the Entra logs.',
+    ]) {
+      const event = log(body);
+      expect(read(event).signals(event), body).toContain('sig.server-side-failure-records-present');
+    }
+  });
+});
+
 describe('a question and the title of a reply are not statements', () => {
   const engineerNote = (body: string, title: string | null = null) =>
     eventOf('support_engineer', 'diagnostic_result', body, title);
