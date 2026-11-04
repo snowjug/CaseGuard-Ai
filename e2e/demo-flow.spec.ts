@@ -183,12 +183,12 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
       await expect(page.getByText(/later events? (are )?withheld|withheld/i).first()).toBeVisible();
     });
 
-    test('the evidence ledger classifies 61 claims into eight categories; a claim shows its classification and its source event', async ({
+    test('the evidence ledger classifies 59 claims into eight categories; a claim shows its classification and its source event', async ({
       page,
     }) => {
       const { caseOneId } = ids();
       await openPage(page, `/cases/${caseOneId}/evidence`);
-      await expect(page.getByRole('button', { name: /^All categories 61/ })).toBeVisible();
+      await expect(page.getByRole('button', { name: /^All categories 59/ })).toBeVisible();
       for (const category of [
         'Confirmed fact',
         'Customer-reported observation',
@@ -203,7 +203,7 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
           page.getByRole('button', { name: new RegExp(`^${category} \\d+`) }),
         ).toBeVisible();
       }
-      const claims = page.getByRole('list', { name: /^Claims, 61 shown/ });
+      const claims = page.getByRole('list', { name: /^Claims, 59 shown/ });
       // A claim that comes from an event cites it; a claim about missing evidence has no event to cite.
       const cited = claims
         .getByRole('article')

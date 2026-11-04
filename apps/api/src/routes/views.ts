@@ -9,6 +9,7 @@ import {
   getGraph,
   getMetrics,
   getQuality,
+  getRecordFindings,
   getTimeline,
   getTwin,
   listActions,
@@ -26,7 +27,7 @@ import {
 /**
  * Read and review views over a stored analysis: twin.get, timeline.get, events.get,
  * provenance.resolve, evidence.list, claims.review, hypotheses.list, actions.list, actionValue.rank,
- * actionValue.override, forks.list, forks.get, graph.get, quality.get, metrics.get, warnings.list,
+ * actionValue.override, forks.list, forks.get, recordFindings.get, graph.get, quality.get, metrics.get, warnings.list,
  * warnings.dismiss, coaching.get, compare.cases. Owner: API views workstream. The routes only map
  * HTTP to `services/views`; the binder enforces each route's permission and validates its
  * parameters, query and body.
@@ -57,6 +58,8 @@ export function viewsRoutes(infra: Infrastructure): HandlerMap {
     'forks.list': ({ params, query, ctx }) => listForks(ctx, deps, params.caseId, query),
     'forks.get': ({ params, query, ctx }) =>
       getFork(ctx, deps, params.caseId, params.forkId, query),
+    'recordFindings.get': ({ params, query, ctx }) =>
+      getRecordFindings(ctx, deps, params.caseId, query),
     'graph.get': ({ params, query, ctx }) => getGraph(ctx, deps, params.caseId, query),
     'quality.get': ({ params, query, ctx }) => getQuality(ctx, deps, params.caseId, query),
     'metrics.get': ({ params, query, ctx }) => getMetrics(ctx, deps, params.caseId, query),

@@ -1,7 +1,7 @@
 # Views services (`apps/api/src/services/views`)
 
 The read and review views over a stored analysis: twin, timeline, source events, evidence ledger,
-hypotheses, actions, action value, decision forks, investigation graph, quality, metrics, warnings,
+hypotheses, actions, action value, decision forks, record findings, investigation graph, quality, metrics, warnings,
 coaching and case comparison. The routes (`src/routes/views.ts`) only map HTTP to these services; the
 binder enforces permissions and validates parameters.
 
@@ -110,6 +110,11 @@ did not know.
   (never a filtered copy of the stored one). Evidence and claims are checked against the immutable stored
   event on every read (`verifyExcerpt`) and are quoted only when verified. It writes nothing, audits nothing
   and logs no case text; a link that resolves to nothing is reported in `unresolved`, never dropped.
+- `recordFindings.get` (`record-findings.ts`) serves what the record itself shows, read without a model:
+  conflicts, sequence findings and the words the detectors set aside. It keeps no copy: it reads the engine's
+  analysis of the window (the whole record without `asOf`) through the same computation and budget as the
+  other views, so nothing recorded after `asOf` can reach a field, and it cuts each list at its contract limit
+  while `setAsideTotal` keeps the true count. It writes nothing and audits nothing.
 
 ## Tests
 
@@ -123,3 +128,4 @@ did not know.
 | `views-overrides.test.ts`       | The override scan (no database): list and window, latest per pair, the same answer with or without later overrides, malformed decisions, the 200 and 25-page bounds |
 | `engine-budget.test.ts`         | The token bucket                                                                                                                                                    |
 | `provenance.test.ts`            | `provenance.resolve`: every link type, as of an instant, tenant isolation, the three verification states, limits and malformed links, nothing written or logged     |
+| `record-findings.test.ts`       | `recordFindings.get`: the contract on both samples, a conflict quoting both sides, nothing after `asOf`, the set-aside words and their total                        |

@@ -653,9 +653,13 @@ evaluation cases, with at least two for each answer, built on the real samples a
   same fact is worded ([DETECTION.md](DETECTION.md)); the analysis carries what was set aside, the conflicts and the
   sequence findings. On the two samples Case One reads the same 26 signals (one excerpt a few words longer) and Case Two
   reads two more; the score, band, forks and leading hypothesis (and its final posterior) of both are unchanged, and some
-  intermediate confidence bounds and per-action values of Case Two moved by at most 0.04 with the two extra observations (`packages/domain/test/engine-golden.ts` and `fixtures/engine-golden.json`
+  intermediate confidence bounds and per-action values of Case Two moved by at most 0.04 with the two extra observations.
+  Figures and times the customer gives are read by the same rule, so a denial such as "no tickets since 11:45" is no longer
+  a second start of the failures: against `2026.3.1` Case One's ledger loses the two claims that mistake caused (61 to 59),
+  and Case Two's loses the same two and gains the two its extra signals make (31 before and after); no score, band, fork
+  or simulated figure moves (`packages/domain/test/engine-golden.ts` and `fixtures/engine-golden.json`
   pin the digests of both samples, with only the source linkage and the citation lists left out of the comparison, and
-  were regenerated once for this version). Stored artefacts are replaced at the next analysis; until
+  were regenerated for this version). Stored artefacts are replaced at the next analysis; until
   then a stored citation has no field and is `not_checkable`. After a version
   change a reviewer's decision on a counterfactual scenario survives only if the regenerated simulation is identical;
   otherwise it is reset and the reset is audited. Because the seed no longer covers the engine version, the skill library or

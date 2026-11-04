@@ -61,6 +61,7 @@ import {
   ReviewCounterfactualBodySchema,
   RunCounterfactualBodySchema,
 } from './counterfactual';
+import { RecordFindingsSchema } from './conflicts';
 import {
   CaseWarningSchema,
   CoachingReportSchema,
@@ -506,6 +507,16 @@ export const ROUTES = {
     params: CaseForkParams,
     query: AsOfQuerySchema,
     response: DecisionForkSchema,
+  },
+  'recordFindings.get': {
+    method: 'GET',
+    path: `${API_PREFIX}/cases/:caseId/record-findings`,
+    summary: 'Statements that disagree, patterns across events, and words read but not counted',
+    tags: ['Case analysis'],
+    permission: 'case:read',
+    params: CaseParams,
+    query: AsOfQuerySchema,
+    response: RecordFindingsSchema,
   },
   'counterfactuals.run': {
     method: 'POST',

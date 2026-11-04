@@ -139,7 +139,7 @@ show instead.
 
 ## Main capabilities
 
-The web app has 13 destinations (`apps/web/src/lib/nav.ts`), all backed by the typed route registry (77 routes, see
+The web app has 13 destinations (`apps/web/src/lib/nav.ts`), all backed by the typed route registry (78 routes, see
 [API documentation](#api-documentation)). Roles decide what a person can open and change: five roles and 30 permissions
 ([RBAC matrix](docs/SECURITY.md#4-rbac-matrix)).
 
@@ -435,7 +435,7 @@ the diagram is in [ARCHITECTURE.md](docs/ARCHITECTURE.md#3-module-boundaries)).
 
 | Module                   | Owns                                                                                                                                                               |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `packages/schemas`       | Zod contracts: entities, case bundle, knowledge-pack format, the route registry `ROUTES` (77 routes, a permission per route)                                       |
+| `packages/schemas`       | Zod contracts: entities, case bundle, knowledge-pack format, the route registry `ROUTES` (78 routes, a permission per route)                                       |
 | `packages/config`        | Environment parsing, defaults and the fail-fast guards                                                                                                             |
 | `packages/security`      | RBAC, identity strategies (development persona, Entra JWT), tenant assertions, redaction, injection screening, upload validation, URL safety, security headers     |
 | `packages/observability` | Logger with redaction, correlation context, in-process metrics, health registry                                                                                    |
@@ -962,7 +962,7 @@ around:
 │   ├── config/           Environment parsing and the fail-fast guards
 │   ├── domain/           The deterministic engine: ingest, knowledge, engine, quality, metrics, warnings, coaching, skills
 │   ├── observability/    Logger, correlation context, metrics, health registry
-│   ├── schemas/          Zod contracts and the route registry (77 routes)
+│   ├── schemas/          Zod contracts and the route registry (78 routes)
 │   ├── security/         RBAC, identity, redaction, injection screening, upload validation, security headers
 │   ├── testing/          Fixtures, builders, fake clock, in-memory database harness
 │   └── ui/               Design tokens, Fluent theme, accessible charts, investigation graph
@@ -979,7 +979,7 @@ around:
 
 ## API documentation
 
-The API has **77 routes in 13 groups**, all under `/api/v1`, each declaring exactly one permission in the registry
+The API has **78 routes in 13 groups**, all under `/api/v1`, each declaring exactly one permission in the registry
 (`packages/schemas/src/api.ts`). [API.md](docs/API.md) holds the conventions (authentication, authorization and tenancy, request
 ids, `application/problem+json` errors, pagination, idempotency, asynchronous jobs, as-of reads, rate limits, size limits), worked
 examples and the route tables, which are **generated** from the registry: `pnpm docs:api` rewrites them and `pnpm docs:api --check`

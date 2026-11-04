@@ -159,3 +159,37 @@ export const TemporalFindingSchema = z.object({
   evidenceIds: z.array(IdSchema).max(20),
 });
 export type TemporalFinding = z.infer<typeof TemporalFindingSchema>;
+
+// ---------------------------------------------------------------- what the record itself shows
+
+/** Words of a signal that the detectors found and did not count, because the sentence does not state the fact. */
+export const SetAsideObservationSchema = z.object({
+  signalId: z.string().max(80),
+  signalLabel: z.string().max(160),
+  eventId: IdSchema,
+  /** Why it was not counted: how the sentence stands to the fact (negated, speculative, a plan, a request, …). */
+  modality: StatementModalitySchema,
+  /** The words that decided it ("did not", "might be", "I will"). */
+  cue: z.string().max(80).nullable(),
+  excerpt: z.string().max(600),
+});
+export type SetAsideObservation = z.infer<typeof SetAsideObservationSchema>;
+
+export const RECORD_FINDINGS_LIMIT = 100;
+export const SET_ASIDE_LIMIT = 200;
+
+/**
+ * What the record itself shows, read without a model: statements of one case that cannot both stand, patterns that need
+ * more than one event, and the words that were read and not counted. Everything is computed from the events of the
+ * view (`asOf` limits it to what was recorded by then), so nothing here uses anything said later.
+ */
+export const RecordFindingsSchema = z.object({
+  /** The instant the view is limited to, or null for the whole record. */
+  asOf: IsoTimestampSchema.nullable(),
+  conflicts: z.array(ConflictSchema).max(RECORD_FINDINGS_LIMIT),
+  sequenceFindings: z.array(TemporalFindingSchema).max(RECORD_FINDINGS_LIMIT),
+  setAside: z.array(SetAsideObservationSchema).max(SET_ASIDE_LIMIT),
+  /** How many were set aside in all; more than `setAside` holds when the list was cut at its limit. */
+  setAsideTotal: z.number().int().min(0),
+});
+export type RecordFindings = z.infer<typeof RecordFindingsSchema>;

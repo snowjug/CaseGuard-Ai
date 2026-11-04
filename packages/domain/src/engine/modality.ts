@@ -374,7 +374,7 @@ export function hedgeNear(text: string, start: number, end: number): string | nu
 }
 
 /** What a detector is used for decides which modalities let it fire. */
-export type DetectionUse = 'signal' | 'requirement' | 'action' | 'delegated_action';
+export type DetectionUse = 'signal' | 'requirement' | 'action' | 'delegated_action' | 'attribute';
 
 const FIRES_ON: Readonly<Record<DetectionUse, ReadonlySet<StatementModality>>> = {
   // A fact the writer states, one reported from a customer, or a correction of an earlier statement.
@@ -389,6 +389,9 @@ const FIRES_ON: Readonly<Record<DetectionUse, ReadonlySet<StatementModality>>> =
     'requested',
     'future_intent',
   ]),
+  // A figure or a time the customer gives ("140 users", "since 08:50"). A guess is still a figure the customer gave, and
+  // is read as softened; a denial ("no tickets since 11:45"), a plan, a condition or a request is not a figure given.
+  attribute: new Set<StatementModality>(['asserted', 'attributed', 'corrected', 'speculative']),
 };
 
 export const firesFor = (use: DetectionUse, modality: StatementModality): boolean =>

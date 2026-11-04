@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CaseEvent, EventType, ParticipantRole } from '@caseguard/schemas';
 import {
+  MAX_SUPPRESSED_KEPT,
   createFullView,
   detectObservations,
   getCompiledPack,
@@ -157,6 +158,20 @@ describe('a denial of one side of a declared pair is the other side', () => {
     const { observations, suppressed } = read(event);
     expect(observations).toEqual([]);
     expect(suppressed.map((s) => s.signalId)).toEqual(['sig.single-user-scope']);
+  });
+
+  it('keeps a bounded list of what it set aside and still counts all of it', () => {
+    const events = Array.from({ length: MAX_SUPPRESSED_KEPT + 40 }, () =>
+      eventOf('customer_end_user', 'customer_email', 'This is not just one user.'),
+    );
+    const notes = { suppressed: [] as SuppressedObservation[], total: 0 };
+    detectObservations(createFullView(events, null), pack, 'case_1', notes);
+    expect(notes.suppressed).toHaveLength(MAX_SUPPRESSED_KEPT);
+    expect(notes.total).toBe(events.length);
+    // The kept notes are the first ones in the record's order, not a sample.
+    expect(notes.suppressed.map((s) => s.eventIndex)).toEqual(
+      Array.from({ length: MAX_SUPPRESSED_KEPT }, (_, index) => index),
+    );
   });
 });
 

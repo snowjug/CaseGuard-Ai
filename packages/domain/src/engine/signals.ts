@@ -327,17 +327,21 @@ export interface SuppressedObservation extends SuppressedMatch {
   eventIndex: number;
 }
 
+/** The most set-aside matches a view keeps; the rest are counted. A hostile text could otherwise set aside one per signal per event. */
+export const MAX_SUPPRESSED_KEPT = 500;
+
 /**
  * Detects every knowledge-pack signal in every event of a temporal view. A sentence that mentions a signal's words
  * without stating the fact (a denial, a guess, a plan, a condition) is not an observation; when `notes` is given the
- * set-aside matches are collected in it. A denial of the positive side of a declared signal pair is an observation of
- * the negative side ("service health lists nothing active" is "no active incident").
+ * set-aside matches are collected in it (at most `MAX_SUPPRESSED_KEPT`, with every one counted in `total`). A denial of
+ * the positive side of a declared signal pair is an observation of the negative side ("service health lists nothing
+ * active" is "no active incident").
  */
 export function detectObservations(
   view: TemporalView,
   pack: CompiledPack,
   caseId: string,
-  notes?: { suppressed: SuppressedObservation[] },
+  notes?: { suppressed: SuppressedObservation[]; total?: number },
 ): Observation[] {
   const out: Observation[] = [];
   const seenCount = new Map<string, number>();
@@ -386,7 +390,10 @@ export function detectObservations(
       }
     }
     for (const note of setAside) {
-      notes?.suppressed.push(note);
+      if (notes) {
+        notes.total = (notes.total ?? 0) + 1;
+        if (notes.suppressed.length < MAX_SUPPRESSED_KEPT) notes.suppressed.push(note);
+      }
       if (note.modality !== 'negated') continue;
       const link = pack.signalPairs.get(note.signalId);
       if (!link || link.side !== 'positive' || !link.pair.denialIsNegative) continue;

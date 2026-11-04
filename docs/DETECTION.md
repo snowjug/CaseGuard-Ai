@@ -124,17 +124,44 @@ both sides is rejected when it is loaded.
 
 `detectConflicts` finds two statements of one case that cannot both stand and keeps both sides, with the event, the role,
 the modality and the source reference of each. It sees only what the pack models: a signal pair stated from both sides,
-and a claim attribute stated with two values (how many users). The first rule that applies decides the class:
+and a claim attribute stated with two values (how many users, when the failures began). The first rule that applies
+decides the class:
 
 1. the later statement is worded as a correction: `corrected_information`;
-2. either statement is hedged ("seems", "mostly", "I think"): `ambiguous_wording`;
+2. either statement is hedged ("seems", "mostly", "I think", or a figure marked "roughly" or "about" that the other
+   figure is within a quarter of, or half an hour of): `ambiguous_wording`;
 3. the same person made both: `temporal_update` when the pair is declared time-varying (a fault that was fixed),
    otherwise `direct_contradiction`;
 4. two people made them: `source_disagreement` when a later statement takes one side, otherwise `unresolved_conflict`.
 
 A positive-to-negative move on a time-varying pair (the fault is gone) is an update, not a conflict. The sixth class,
 `ambiguous_wording`, is what a reviewer should read as "possibly the same fact worded two ways". Each conflict names the
-rule that found it and carries an uncertainty (a level and a note); none of this is a reading of meaning.
+rule that found it and carries an uncertainty (a level and a note); none of this is a reading of meaning. The subject of a
+conflict is the label of the pair or of the attribute ("Number of affected users"), the text both of its sides carry; its
+id is derived from the pack's key for it, so rewording a label does not rename a conflict.
+
+The API serves what this section and the next one find, together with the observations that were set aside (section 3),
+as `GET /api/v1/cases/{caseId}/record-findings` ([API.md](API.md#temporal-reads-asof)): computed from the events of the
+window, so that with `asOf` nothing recorded later is named.
+
+**What is not a side.** A figure or a time is read through `readAttributes` (`engine/attributes.ts`), the one place both
+the evidence ledger and the conflict finder read attributes from. It applies the modality of section 3 first, so a
+denial ("no sign-in tickets since 11:45 UTC"), a plan, a condition or a request is not a statement of the figure, and
+text an email quotes from an earlier message is not read as the replier's own. A summary written at the end of the case
+(a resolution note or a status change) recounts how things were: it is not read as a later change of state, while a new
+measurement (a validation result) still is.
+
+**A correction made while checking the sample cases.** The first version of this rule read the two sample cases as holding
+conflicts: "since 13:00 UTC" in Case One and "since 11:45 UTC" in Case Two (both about when the helpdesk's tickets
+_stopped_) were read as a second start of the failures, and a post-fix validation of the proxy nodes was set against the
+resolution summary that explains the fault. All three were wrong, the first two were already in the evidence ledger of
+engine `2026.3.1` as a "conflicting evidence" claim, and the finding had been labelled low uncertainty. The attribute
+reader now applies the negation rule, summaries are not read as a later state, and a change of state found only from
+wording carries medium uncertainty. The samples now hold no conflicts (a test pins it). The ledger of Case One has the two
+claims fewer that the mistake caused (61 to 59) and nothing else moved: the digests of every score, band, fork, hypothesis,
+warning and scenario are byte-identical to the version before the fix. That the check was needed is itself a result:
+conflicts are the least tested part of the engine on realistic text, so the evaluation set has a contradiction category
+([EVALUATION.md](EVALUATION.md)) and its figures are reported with that in mind.
 
 ## 8. Sequence findings
 

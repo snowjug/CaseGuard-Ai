@@ -200,6 +200,7 @@ const READ_PATHS = [
   '/metrics',
   '/warnings',
   '/coaching',
+  '/record-findings',
 ];
 const QUALITY_PATHS = ['/quality', '/metrics', '/coaching'];
 

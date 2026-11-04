@@ -22,7 +22,7 @@ const CATEGORIES = [
   'Simulated outcome',
 ] as const;
 
-/** `All categories 61` / `Confirmed fact 8` → the number at the end of a tile's name. */
+/** `All categories 59` / `Confirmed fact 8` → the number at the end of a tile's name. */
 const countOf = (name: string): number => Number(/(\d+)$/.exec(name.trim())![1]);
 
 /** The sentence that says how many claims are listed and how many filters are on ("Showing 9 claims, 1 filter on."). */
@@ -37,14 +37,14 @@ const claimPanel = (page: Page): Locator =>
   page.getByRole('complementary', { name: 'What was known, and the selected claim' });
 
 test.describe('[FR-EV-01] Evidence Ledger: claims classified into eight categories', () => {
-  test('61 claims of Case One in eight categories whose counts add up, with each category named in words', async ({
+  test('59 claims of Case One in eight categories whose counts add up, with each category named in words', async ({
     page,
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/evidence`);
     await expect(page.getByRole('heading', { level: 1, name: 'Evidence Ledger' })).toBeVisible();
     const tiles = page.getByRole('list', { name: 'Filter by evidence category' });
-    await expect(tiles.getByRole('button', { name: /^All categories 61$/ })).toHaveAttribute(
+    await expect(tiles.getByRole('button', { name: /^All categories 59$/ })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
@@ -56,8 +56,8 @@ test.describe('[FR-EV-01] Evidence Ledger: claims classified into eight categori
         (await tile.getAttribute('aria-label')) ?? (await tile.innerText()).replace(/\s+/g, ' '),
       );
     }
-    expect(total, 'the eight categories add up to the 61 claims').toBe(61);
-    await expect(claimsStatus(page)).toHaveText('Showing 61 claims.');
+    expect(total, 'the eight categories add up to the 59 claims').toBe(59);
+    await expect(claimsStatus(page)).toHaveText('Showing 59 claims.');
   });
 
   test('choosing a category filters the claims to exactly that many, and the filter is in the URL', async ({
@@ -81,7 +81,7 @@ test.describe('[FR-EV-01] Evidence Ledger: claims classified into eight categori
     }
     await expect(page).toHaveURL(/category=/);
     await page.getByRole('button', { name: 'Clear filters' }).click();
-    await expect(claimsStatus(page)).toHaveText('Showing 61 claims.');
+    await expect(claimsStatus(page)).toHaveText('Showing 59 claims.');
     await expect(page).not.toHaveURL(/category=/);
   });
 
@@ -95,7 +95,7 @@ test.describe('[FR-EV-01] Evidence Ledger: claims classified into eight categori
     // The sentence changes with the filter at once; the claims follow when the narrower request has answered.
     await expect
       .poll(() => shownCount(page), { message: 'the search narrows the list' })
-      .toBeLessThan(61);
+      .toBeLessThan(59);
     await expect(claimsStatus(page)).toHaveText(/^Showing \d+ claims?, 1 filter on\.$/);
     const found = await shownCount(page);
     expect(found).toBeGreaterThan(0);
@@ -109,7 +109,7 @@ test.describe('[FR-EV-01] Evidence Ledger: claims classified into eight categori
       mainRegion(page).getByRole('heading', { name: 'No claims match these filters' }),
     ).toBeVisible();
     await mainRegion(page).getByRole('button', { name: 'Clear filters' }).last().click();
-    await expect(claimsStatus(page)).toHaveText('Showing 61 claims.');
+    await expect(claimsStatus(page)).toHaveText('Showing 59 claims.');
   });
 
   test('every claim says what it is, when, who said it and how sure the model is, and cites its source event', async ({
@@ -292,7 +292,7 @@ test.describe('[FR-TL-06] the ledger is a window onto the past too', () => {
     ).toContainText('9 Mar 2026, 09:41 UTC');
     await expect(claimsStatus(page)).toHaveText(/^Showing \d+ claims?\./);
     const known = await shownCount(page);
-    expect(known).toBeLessThan(61);
+    expect(known).toBeLessThan(59);
     expect(known).toBeGreaterThan(0);
     await expect(mainRegion(page)).toContainText(/withheld|later/i);
   });

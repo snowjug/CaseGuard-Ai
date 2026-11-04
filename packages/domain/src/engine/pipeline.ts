@@ -71,6 +71,8 @@ export interface DeterministicAnalysis {
    * condition). They are why an expected signal is missing, and the first thing to look at when one is.
    */
   suppressed: SuppressedObservation[];
+  /** How many were set aside in all; `suppressed` keeps the first `MAX_SUPPRESSED_KEPT`. */
+  suppressedTotal: number;
   /** Statements of the case that cannot both stand, with both sides and the kind of disagreement. */
   conflicts: Conflict[];
   /** Conclusions that need more than one event, each anchored at the event that makes it true. */
@@ -85,7 +87,10 @@ export interface DeterministicAnalysis {
 /** Runs the full deterministic pipeline: signals -> beliefs -> claims -> actions -> forks. */
 export function runDeterministicAnalysis(input: AnalysisInput): DeterministicAnalysis {
   const { view, pack, config, ctx } = input;
-  const suppressedNotes: { suppressed: SuppressedObservation[] } = { suppressed: [] };
+  const suppressedNotes: { suppressed: SuppressedObservation[]; total: number } = {
+    suppressed: [],
+    total: 0,
+  };
   const observations = detectObservations(view, pack, ctx.caseId, suppressedNotes);
   const evidence = buildEvidence(view, pack, observations, ctx);
   const timeline = buildBeliefTimeline(view, pack, observations, { seed: ctx.seed });
@@ -163,6 +168,7 @@ export function runDeterministicAnalysis(input: AnalysisInput): DeterministicAna
     forks,
     earliestMeaningfulForkId,
     suppressed: suppressedNotes.suppressed,
+    suppressedTotal: suppressedNotes.total,
     conflicts,
     sequenceFindings,
     notes,

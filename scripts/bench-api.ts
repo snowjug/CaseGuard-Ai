@@ -258,7 +258,7 @@ async function main(): Promise<number> {
     // (3) evidence retrieval
     results.push({
       label: 'Evidence retrieval',
-      request: 'GET /cases/:id/evidence?limit=200 (Case One, 61 claims)',
+      request: 'GET /cases/:id/evidence?limit=200 (Case One, 59 claims)',
       stats: summarize(
         await measure(
           async () =>

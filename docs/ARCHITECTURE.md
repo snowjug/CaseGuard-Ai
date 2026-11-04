@@ -89,7 +89,7 @@ but nothing in its `src` imports it. The web app never imports the API: they mee
 
 | Package / app            | Owns                                                                                                                                                                                                  | Must not                                                                     |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `packages/schemas`       | Zod contracts: entities, case bundle, knowledge-pack format, governance, metrics notices, enums, the **route registry** `ROUTES` (77 routes, permission per route)                                    | Import any other package; contain logic beyond validation                    |
+| `packages/schemas`       | Zod contracts: entities, case bundle, knowledge-pack format, governance, metrics notices, enums, the **route registry** `ROUTES` (78 routes, permission per route)                                    | Import any other package; contain logic beyond validation                    |
 | `packages/config`        | Environment parsing, defaults, the fail-fast guards, the `Secret` wrapper                                                                                                                             | Read secrets from anywhere but the environment                               |
 | `packages/security`      | RBAC (`ROLE_PERMISSIONS`), identity strategies (dev persona, Entra JWT), tenant assertions, redaction, injection detection, upload validation, malware hook, URL safety, headers/CSP                  | Know about HTTP frameworks or databases                                      |
 | `packages/observability` | Logger with four-layer redaction, correlation context, in-process metrics, health registry, tracing hooks                                                                                             | Log case content                                                             |
@@ -557,8 +557,8 @@ purely a runtime variable of the web container, set by the template from the API
 
 ## 16. Route-group status
 
-The contract (`ROUTES`) has 77 routes. A route group is "implemented" when its handlers exist and call real services; outside deployed
-environments the API answers `501` for a contract route nobody claimed. Status when this document was last checked: all 77 routes
+The contract (`ROUTES`) has 78 routes. A route group is "implemented" when its handlers exist and call real services; outside deployed
+environments the API answers `501` for a contract route nobody claimed. Status when this document was last checked: all 78 routes
 have a handler (`apps/api/test/route-coverage.test.ts` asserts it on every run, and a static scan of `apps/api/src/routes` agrees),
 including the `dashboard` and `demo` groups (with `services/demo`,
 `services/dashboard`, `services/efficiency`, `services/analytics` and the `demo:*` scripts). I started the API with an in-memory

@@ -166,7 +166,7 @@ test.describe('[FR-TWIN-01] Case overview: the digital twin and the links to eve
     const pages = page.getByRole('list', { name: 'Case pages' });
     await expect(pages.getByRole('listitem')).toHaveCount(5);
     await expect(pages.getByRole('link', { name: /^Case Timeline/ })).toContainText('31 events');
-    await expect(pages.getByRole('link', { name: /^Evidence Ledger/ })).toContainText('61 claims');
+    await expect(pages.getByRole('link', { name: /^Evidence Ledger/ })).toContainText('59 claims');
     await expect(pages.getByRole('link', { name: /^Hypothesis Arena/ })).toContainText(
       '9 hypotheses',
     );

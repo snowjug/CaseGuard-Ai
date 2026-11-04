@@ -101,6 +101,19 @@ describe('a signal pair stated from both sides', () => {
     expect(conflict?.sides[1].sourceRef.excerpt).toMatch(/active incident|active/i);
   });
 
+  it('names what the sides disagree about by the label of the pair, not by its id', () => {
+    const [conflict] = analyse(clear(), incident()).conflicts;
+    const labels = new Set(pack.pack.signalPairs.map((pair) => pair.label));
+    const ids = new Set(pack.pack.signalPairs.map((pair) => pair.id));
+    expect(conflict).toBeDefined();
+    expect(labels.has(conflict?.subject ?? '')).toBe(true);
+    expect(ids.has(conflict?.subject ?? '')).toBe(false);
+    expect(conflict?.sides.map((side) => side.subject)).toEqual([
+      conflict?.subject,
+      conflict?.subject,
+    ]);
+  });
+
   it('is a disagreement between sources, settled, when a later statement takes one side', () => {
     const [conflict] = analyse(
       clear(),
@@ -220,6 +233,150 @@ describe('an attribute stated with two values', () => {
     const { conflicts } = analyse(a, b, c);
     expect(conflicts.map((x) => x.class)).toEqual(['temporal_update', 'unresolved_conflict']);
     expect(conflicts[0]?.sides.map((s) => s.sourceRef.excerpt)).toEqual(['45 users', '120 users']);
+  });
+
+  it('names what the sides disagree about by the label of the attribute, not by its key', () => {
+    const a = ev('customer_admin', 'customer_email', '08:00', 'About 45 users are affected.');
+    const b = ev('customer_admin', 'customer_email', '09:00', 'Now 120 users are affected.');
+    const [conflict] = analyse(a, b).conflicts;
+    expect(conflict?.subject).toBe('Number of affected users');
+    expect(conflict?.sides.map((side) => side.subject)).toEqual([
+      'Number of affected users',
+      'Number of affected users',
+    ]);
+  });
+
+  it('is read from a sentence that states it, not from a denial, a plan, a condition or a request', () => {
+    const start = ev(
+      'customer_admin',
+      'customer_email',
+      '08:00',
+      'Since about 08:50 UTC 140 users cannot sign in to Teams.',
+    );
+    for (const body of [
+      // The time something stopped is not the time it started.
+      'Our helpdesk has had no sign-in tickets since 11:45 UTC.',
+      'If 300 users are affected we will escalate it.',
+      'We will check by Friday whether 300 users are affected.',
+      'Please confirm whether 300 users are affected.',
+    ]) {
+      const later = ev('customer_admin', 'customer_email', '15:00', body);
+      const { conflicts, claims } = analyse(start, later);
+      expect(conflicts, body).toEqual([]);
+      expect(
+        claims.filter((c) => c.subject === 'failure_start' || c.subject === 'affected_user_count'),
+        body,
+      ).toHaveLength(2);
+      expect(
+        claims.some((c) => c.category === 'conflicting_evidence'),
+        body,
+      ).toBe(false);
+    }
+  });
+
+  it('reads a figure restated with different rounding as ambiguous wording, and a real change as an update', () => {
+    const a = ev('customer_admin', 'customer_email', '08:00', 'Roughly 140 users are affected.');
+    const b = ev('customer_admin', 'customer_email', '09:00', 'Around 150 users are affected.');
+    const c = ev('customer_admin', 'customer_email', '10:00', 'Now 300 users are affected.');
+    expect(analyse(a, b).conflicts[0]).toMatchObject({ class: 'ambiguous_wording', favours: null });
+    expect(analyse(a, b, c).conflicts.map((x) => x.class)).toEqual([
+      'ambiguous_wording',
+      'temporal_update',
+    ]);
+    const early = ev(
+      'customer_admin',
+      'customer_email',
+      '08:00',
+      'Since about 08:50 UTC 60 users fail.',
+    );
+    const late = ev(
+      'customer_admin',
+      'customer_email',
+      '09:00',
+      'It began at about 09:05 UTC for 60 people. Since 09:10 UTC it is worse.',
+    );
+    expect(analyse(early, late).conflicts.map((x) => x.class)).toEqual(['ambiguous_wording']);
+  });
+
+  it('does not read a quoted earlier message as a second statement by the person who replied', () => {
+    const first = ev('customer_admin', 'customer_email', '08:00', 'We see 60 users affected.');
+    const reply = ev(
+      'customer_admin',
+      'customer_email',
+      '09:00',
+      'Now 300 users are affected.\n\nOn Mon, 5 Jan 2026 at 08:00 Customer Admin wrote:\n> We see 60 users affected.',
+    );
+    const { conflicts, claims } = analyse(first, reply);
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]?.sides.map((s) => s.eventId)).toEqual([first.id, reply.id]);
+    const reported = claims.filter(
+      (c) => c.subject === 'affected_user_count' && c.category === 'customer_reported',
+    );
+    expect(reported.map((c) => c.text)).toEqual([
+      'Number of affected users: 60',
+      'Number of affected users: 300',
+    ]);
+  });
+});
+
+describe('a summary at the end of the case', () => {
+  /** A per-node test result: the pack reads the number of failing nodes from the structured fields. */
+  const validation = (at: string, body: string, failing: number): CaseEvent => ({
+    ...ev('support_engineer', 'validation_result', at, body),
+    structured: { proxyNodesTested: 3, proxyNodesFailing: failing },
+  });
+  const allFine = (at: string) =>
+    validation(
+      at,
+      'Validation: 100 requests through each of the three proxy nodes completed without a timeout after the change.',
+      0,
+    );
+  const fault = 'proxy-rtm-2 was saturated and timed out for about one in three requests.';
+  const read = (...events: CaseEvent[]) => analyse(...events);
+  const seesFault = (events: CaseEvent[], id: string) =>
+    read(...events).observations.some(
+      (o) => o.eventId === id && o.signalId === 'sig.proxy-node-inconsistent',
+    );
+
+  it('recounts how things were, so it is not a later change of state', () => {
+    const checked = allFine('09:00');
+    const summary = ev(
+      'support_engineer',
+      'resolution_note',
+      '10:00',
+      `Resolution summary. Root cause: ${fault}`,
+    );
+    // The summary does state the fault (so this is not vacuous); it just does not say the state changed again.
+    expect(seesFault([checked, summary], summary.id)).toBe(true);
+    expect(read(checked, summary).conflicts).toEqual([]);
+  });
+
+  it('does not stop a new measurement that shows the fault again from being a change', () => {
+    const checked = allFine('09:00');
+    const again = validation(
+      '11:00',
+      'Validation: the same test now shows proxy-rtm-2 failing.',
+      1,
+    );
+    expect(seesFault([checked, again], again.id)).toBe(true);
+    expect(read(checked, again).conflicts[0]).toMatchObject({
+      class: 'temporal_update',
+      favours: 'second',
+      uncertainty: { level: 'medium' },
+    });
+  });
+});
+
+describe('the two sample cases', () => {
+  it('hold no statements that disagree: what looked like one was a denial and a recap', () => {
+    for (const file of [CASE_ONE, CASE_TWO]) {
+      const { analysis } = prepareCase(file);
+      expect(analysis.conflicts, file).toEqual([]);
+      expect(
+        analysis.claims.filter((c) => c.category === 'conflicting_evidence' && c.subject !== null),
+        file,
+      ).toEqual([]);
+    }
   });
 });
 

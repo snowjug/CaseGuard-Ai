@@ -5,6 +5,7 @@ export { ViewCache, type ViewCacheOptions, type ViewDeps } from './computation';
 export { viewDepsFor } from './deps';
 export { getEventDetail } from './events';
 export { getFork, listForks } from './forks';
+export { getRecordFindings } from './record-findings';
 export { getGraph } from './graph';
 export { listActions, listHypotheses } from './hypotheses';
 export { listLedger } from './ledger';

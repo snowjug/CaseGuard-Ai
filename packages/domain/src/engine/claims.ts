@@ -12,8 +12,9 @@ import type { CompiledPack } from '../knowledge/compile';
 import { stableId } from '../util/ids';
 import { round } from '../util/math';
 import { compareIso } from '../util/time';
+import { readAttributes } from './attributes';
 import { type Belief, type BeliefTimeline, topHypotheses } from './belief';
-import { type EngineContext, isCustomerSide, metaOf } from './context';
+import { type EngineContext, metaOf } from './context';
 import type { RequirementState } from './requirements';
 import { isSatisfiedAt } from './requirements';
 import { MAX_EXCERPT_CHARS, type Observation } from './signals';
@@ -499,13 +500,8 @@ export function buildClaims(input: ClaimsInput): ClaimsOutput {
   }
   const bySubject = new Map<string, { value: string; claim: Claim }[]>();
   for (const event of view.events) {
-    if (!isCustomerSide(event.participantRole)) continue;
-    for (const pattern of pack.claimPatterns) {
-      if (pattern.subject === 'root_cause') continue;
-      if (pattern.roles && !pattern.roles.includes(event.participantRole)) continue;
-      const match = pattern.regex.exec(event.body);
-      const value = match?.[pattern.valueGroup]?.trim();
-      if (!match || !value) continue;
+    for (const statement of readAttributes(event, pack)) {
+      const { pattern, value } = statement;
       const claim = base(`attribute.${pattern.subject}`, `${event.id}:${value}`, {
         text: `${pattern.label}: ${value}`,
         category: 'customer_reported',
@@ -515,8 +511,8 @@ export function buildClaims(input: ClaimsInput): ClaimsOutput {
           'Value stated by the customer; kept as an attribute so contradicting statements can be detected.',
         confidence: 0.8,
         subject: pattern.subject,
-        span: { field: 'body', start: match.index, end: match.index + match[0].length },
-        excerpt: match[0],
+        span: { field: 'body', start: statement.start, end: statement.end },
+        excerpt: statement.excerpt,
       });
       claims.push(claim);
       const list = bySubject.get(pattern.subject) ?? [];
