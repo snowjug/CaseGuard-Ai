@@ -10,6 +10,7 @@ import {
 import { createTemporalView } from '@caseguard/domain';
 import {
   VALID_PROPOSAL_COUNT,
+  budgetOf,
   conclusionsOf,
   criticReply,
   emptyCriticReply,
@@ -326,10 +327,7 @@ describe('model-assisted review', () => {
         config: {
           agentBudgets: {
             ...DEFAULT_MODEL_CONFIG.agentBudgets,
-            case_reasoner: {
-              ...DEFAULT_MODEL_CONFIG.agentBudgets.case_reasoner,
-              maxInputTokens: 400,
-            },
+            case_reasoner: { ...budgetOf('case_reasoner'), maxInputTokens: 400 },
           },
         },
       });

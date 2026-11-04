@@ -4,6 +4,7 @@ import { runModelAssistedReview, type Script } from '../../src';
 import { viewUpTo } from '../tasks';
 import {
   VALID_PROPOSAL_COUNT,
+  budgetOf,
   conclusionsOf,
   criticReply,
   emptyCriticReply,
@@ -14,7 +15,7 @@ import {
   validReply,
 } from './case-one';
 
-const REASONER_MAX_OUTPUT = DEFAULT_MODEL_CONFIG.agentBudgets.case_reasoner.maxOutputTokens;
+const REASONER_MAX_OUTPUT = budgetOf('case_reasoner').maxOutputTokens;
 
 function happyScript(): Script {
   const conclusions = conclusionsOf();
@@ -98,12 +99,11 @@ describe('cost: ceilings stop a call before it is made', () => {
   it('applies a default ceiling of what the two tasks may use once, and no more', async () => {
     const h = reviewHarness(happyScript());
     const result = await runModelAssistedReview(h.deps, reviewInput());
-    const budgets = DEFAULT_MODEL_CONFIG.agentBudgets;
     const ceiling =
-      budgets.case_reasoner.maxInputTokens +
-      budgets.case_reasoner.maxOutputTokens +
-      budgets.case_critic.maxInputTokens +
-      budgets.case_critic.maxOutputTokens;
+      budgetOf('case_reasoner').maxInputTokens +
+      budgetOf('case_reasoner').maxOutputTokens +
+      budgetOf('case_critic').maxInputTokens +
+      budgetOf('case_critic').maxOutputTokens;
     expect(result.assistance.tokens.total).toBeLessThanOrEqual(ceiling);
   });
 
@@ -171,7 +171,7 @@ describe('latency: timeout, retries, concurrency', () => {
         config: {
           agentBudgets: {
             ...DEFAULT_MODEL_CONFIG.agentBudgets,
-            case_reasoner: { ...DEFAULT_MODEL_CONFIG.agentBudgets.case_reasoner, timeoutMs: 40 },
+            case_reasoner: { ...budgetOf('case_reasoner'), timeoutMs: 40 },
           },
         },
       },

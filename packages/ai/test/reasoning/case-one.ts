@@ -1,4 +1,4 @@
-import { DEFAULT_MODEL_CONFIG, type ModelConfig } from '@caseguard/schemas';
+import { DEFAULT_MODEL_CONFIG, type AgentBudget, type ModelConfig } from '@caseguard/schemas';
 import {
   AiOrchestrator,
   createScriptedTestProvider,
@@ -196,8 +196,15 @@ export function validReply(): Record<string, unknown> {
 /** The number of proposals of `validReply`. */
 export const VALID_PROPOSAL_COUNT = 8;
 
-export function reasonerTask(): AgentTask {
+export function reasonerTask(): Extract<AgentTask, { agent: 'case_reasoner' }> {
   return { agent: 'case_reasoner', input: baseOf(one, view) };
+}
+
+/** The default budget of one of the two review agents (the record is keyed by plain strings, so it may lack a key). */
+export function budgetOf(agent: 'case_reasoner' | 'case_critic'): AgentBudget {
+  const budget = DEFAULT_MODEL_CONFIG.agentBudgets[agent];
+  if (!budget) throw new Error(`no default budget for ${agent}`);
+  return budget;
 }
 
 const dependencies = new AiOrchestrator({ config: DEFAULT_MODEL_CONFIG }).prepareDependencies;

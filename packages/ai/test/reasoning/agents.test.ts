@@ -15,7 +15,7 @@ import {
 } from '../../src';
 import { MODEL_ASSISTANCE_NOT_USED } from '../../src/providers/deterministic/reasoning-handlers';
 import { baseOf } from '../tasks';
-import { conclusionsOf, one, reasonerTask, view } from './case-one';
+import { conclusionsOf, one, reasonerTask, view, budgetOf } from './case-one';
 
 const deps = new AiOrchestrator({ config: DEFAULT_MODEL_CONFIG }).prepareDependencies;
 const BLOCK =
@@ -93,10 +93,7 @@ describe('the two agents of the model-assisted review', () => {
           ...DEFAULT_MODEL_CONFIG,
           agentBudgets: {
             ...DEFAULT_MODEL_CONFIG.agentBudgets,
-            case_reasoner: {
-              ...DEFAULT_MODEL_CONFIG.agentBudgets.case_reasoner,
-              maxInputTokens: 400,
-            },
+            case_reasoner: { ...budgetOf('case_reasoner'), maxInputTokens: 400 },
           },
         },
       }).prepareDependencies;
