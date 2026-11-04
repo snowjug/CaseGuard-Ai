@@ -1,7 +1,7 @@
 {
   "schema": "caseguard.eval-manifest/1",
   "datasetVersion": "2.0.0",
-  "annotationVersion": 3,
+  "annotationVersion": 4,
   "splits": {
     "dev": [
       "ev-d-001-p1-warsaw-resolver",
@@ -87,7 +87,15 @@
       "ev-t-013-vet-practice-admin-jobs",
       "ev-t-014-council-mfa-go-live-plan",
       "ev-t-015-monday-password-overdue",
-      "ev-t-016-vpn-hourly-rekey-drop"
+      "ev-t-016-vpn-hourly-rekey-drop",
+      "ev-t-017-supplier-mail-stuck-queue",
+      "ev-t-018-reimaged-laptops-primary-school",
+      "ev-t-019-the-outage-everyone-saw",
+      "ev-t-020-third-floor-wp3",
+      "ev-t-021-excluded-and-still-failing",
+      "ev-t-022-reception-two-token-stories",
+      "ev-t-023-sales-demo-stale-session",
+      "ev-t-024-guests-wait-in-the-lobby"
     ]
   },
   "cases": {
@@ -524,6 +532,62 @@
       "derivedFrom": null,
       "eventsSha256": "704c17386045f8501138b7704f1ae9bd4684576cb6fc9a3efe0cdaa0f5ba6625",
       "annotationsSha256": "c2cd9dcea378f71a6056b0f5e03a1b8ba3c3b80938e92db3168d53fca827d2f4"
+    },
+    "ev-t-017-supplier-mail-stuck-queue": {
+      "split": "test",
+      "family": "fam-217",
+      "derivedFrom": null,
+      "eventsSha256": "bb264b37ef70fbd65cf96cb56347f7dec3ebb8f66ebab94f5d148da675efc7b3",
+      "annotationsSha256": "c16705ec9d653e93596236e961da0617a4c40cf2fd9ee404d2ddfa22f93890ff"
+    },
+    "ev-t-018-reimaged-laptops-primary-school": {
+      "split": "test",
+      "family": "fam-218",
+      "derivedFrom": null,
+      "eventsSha256": "1e4b8db16cbf1218090d3568cb6764ce362a5d5c70444980a3ad23afbe5592e7",
+      "annotationsSha256": "17ac2ae909991d51d0e4a4250f3b36fdef7dc9ee0500a65a5687aebdd3f78db6"
+    },
+    "ev-t-019-the-outage-everyone-saw": {
+      "split": "test",
+      "family": "fam-219",
+      "derivedFrom": null,
+      "eventsSha256": "8445ac765f6a10090f6f2b9de0b829f3dc5a820d264596c5e567a5be5c7d7556",
+      "annotationsSha256": "dc1cd9c9e578755842fe03d9e434a5c88941a771cf5c5ce319931cf5d83d8ee3"
+    },
+    "ev-t-020-third-floor-wp3": {
+      "split": "test",
+      "family": "fam-220",
+      "derivedFrom": null,
+      "eventsSha256": "e1d45f9fcbaff96314cf8dd6ee015776cf81c0a9146dd9819d56724fa5fb4eaf",
+      "annotationsSha256": "3f578f7c3d8d498b132986a3d2cabb9b7853fef54f0935672596a9e3e2def4f4"
+    },
+    "ev-t-021-excluded-and-still-failing": {
+      "split": "test",
+      "family": "fam-221",
+      "derivedFrom": null,
+      "eventsSha256": "1ac32fefee2516305d1a1c63d98e5ef506dceefee8519d6e999b5d98234e711b",
+      "annotationsSha256": "b8c3bceeda38c4904d68faa9c68ea7ce176052c5cbbb029666b3d840f12f3ddf"
+    },
+    "ev-t-022-reception-two-token-stories": {
+      "split": "test",
+      "family": "fam-222",
+      "derivedFrom": null,
+      "eventsSha256": "84e4ea4eab6c29e489b90385bb9decf2300ed53d3f5e060e38cc26809b5bb18a",
+      "annotationsSha256": "77992afdff52d2d655e20071ae2932b9109b01c5ace6a1a97a64dba4f190681b"
+    },
+    "ev-t-023-sales-demo-stale-session": {
+      "split": "test",
+      "family": "fam-223",
+      "derivedFrom": null,
+      "eventsSha256": "a51e2a026299373954c1d60daeb16dfb7ab5432836c9cc30e4d1db1da2e42f54",
+      "annotationsSha256": "68e712238c7a03960499632cb93f3f9bddb02414984d0b3b5f541751b9fdf393"
+    },
+    "ev-t-024-guests-wait-in-the-lobby": {
+      "split": "test",
+      "family": "fam-224",
+      "derivedFrom": null,
+      "eventsSha256": "a8c9885319bf902b1a2dcff874b376ffc5e4f03615c29beec4a53e7cb2eb82a1",
+      "annotationsSha256": "5327ac883f30fe5d0caf5d343a89a5eeda69477058f6597bd2cd93f15a5b8b2b"
     },
     "ev-v-001-graz-new-filter": {
       "split": "validation",

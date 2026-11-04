@@ -1,0 +1,105 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-018-reimaged-laptops-primary-school",
+  "split": "test",
+  "family": "fam-218",
+  "title": "Teacher laptops rebuilt over the weekend fail at Teams login, app and browser alike",
+  "scenario": "A part-time school IT person writes in chat style. Twelve re-imaged laptops fail in both the app and the browser, wiping the Teams cache does nothing, and registration output shows no refresh token on the new builds but one on an old laptop. The engineer's reply quotes the pasted output.",
+  "categories": ["noisy"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-09-28T10:45:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "cant sign in teams - reimaged laptops",
+      "text": "hi, blessing here (orchard hill primary, i do the IT 2 days a week). 12 teacher laptops we reimaged over the weekend cant sign in to teams. just spins then 'something went wrong'. same in edge browser too!! the old not-reimaged ones are fine. i tried clearing the teams cache on 3 of them, nothing changed. sorry if this is the wrong place. B"
+    },
+    {
+      "key": "ev02",
+      "at": 1,
+      "who": "system",
+      "type": "system_event",
+      "channel": "tool",
+      "title": "Auto-reply",
+      "text": "Thank you for contacting support. Your ticket was received 10:45 UTC. Business-hours SLA applies. Please do not reply to this notification."
+    },
+    {
+      "key": "ev03",
+      "at": 13,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Health pages",
+      "text": "10:58 UTC: Microsoft's health dashboard lists nothing live for Teams or Entra, and the Message center has no related post today."
+    },
+    {
+      "key": "ev04",
+      "at": 20,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: cant sign in teams - reimaged laptops",
+      "text": "Hi Blessing, no worries, this is the right place. Nothing wrong at Microsoft's end as far as the health pages show. Please run dsregcmd /status on two of the reimaged laptops and on one old laptop that works, and paste back the SSO State part of each. Also three names who were hit with a UTC time each, and whether any other building has reimaged laptops. I'll look at what comes back at 13:00 UTC.\n\nTobias"
+    },
+    {
+      "key": "ev05",
+      "at": 95,
+      "who": "customer",
+      "type": "diagnostic_result",
+      "channel": "portal",
+      "title": "Re: cant sign in teams - reimaged laptops",
+      "text": "ok here you go. T-07 and T-11 = reimaged, T-02 = old one\n\n--- T-07 ---\nAzureAdJoined : YES\nDomainJoined : NO\nDevice Name : OH-T-07\nAzureAdPrt : NO\n--- T-11 ---\nAzureAdJoined : YES\nAzureAdPrt : NO\nWamDefaultSet : ERROR\n--- T-02 ---\nAzureAdJoined : YES\nAzureAdPrt : YES\n\nnames: m.hughes 09:20 utc, a.ncube 09:41, l.farrow 10:02. only the reimaged ones so far, i dont know about other buildings, we only have the one"
+    },
+    {
+      "key": "ev06",
+      "at": 130,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: cant sign in teams - reimaged laptops",
+      "text": "> --- T-07 ---\n> AzureAdJoined : YES\n> AzureAdPrt : NO\n> --- T-11 ---\n> AzureAdPrt : NO\n> --- T-02 ---\n> AzureAdPrt : YES\n\nThanks Blessing, that's enough to go on. The reimaged laptops need their device join redone. Please re-run the join on T-07 (steps below), restart it, run dsregcmd /status again and send me the AzureAdPrt line. If that one is right we do the other eleven the same way.\nSteps: 1) dsregcmd /leave from an elevated prompt 2) restart 3) run the join task from the image folder 4) restart 5) sign in.\n\nTobias"
+    },
+    {
+      "key": "ev07",
+      "at": 210,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: cant sign in teams - reimaged laptops",
+      "text": "did T-07 - rejoined, rebooted, dsregcmd says AzureAdPrt : YES now and teams signs in, even in edge. will do the other 11 tomorrow morning"
+    },
+    {
+      "key": "ev08",
+      "at": 225,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: cant sign in teams - reimaged laptops",
+      "text": "Great. Go ahead with the other eleven using the same steps. I'll check in on Thursday at 10:00 UTC to hear how it went.\n\nTobias"
+    },
+    {
+      "key": "ev09",
+      "at": 1380,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: cant sign in teams - reimaged laptops",
+      "text": "all 12 done. checked 4 of them with dsregcmd after: AzureAdPrt : YES on all 4. everyones in. thank you!!"
+    },
+    {
+      "key": "ev10",
+      "at": 1500,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "portal",
+      "title": "Closing",
+      "text": "Customer confirmed 12 of 12 signed in and a healthy token on the 4 sampled laptops. No further tickets from Orchard Hill since. Closing the case.\n\nTobias"
+    }
+  ]
+}

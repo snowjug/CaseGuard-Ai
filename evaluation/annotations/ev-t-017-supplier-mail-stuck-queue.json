@@ -1,0 +1,51 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-017-supplier-mail-stuck-queue",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T12:20:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [],
+      "actions": [],
+      "absent": [
+        {
+          "event": "ev03",
+          "id": "sig.error-timeout",
+          "reason": "other",
+          "note": "A timed-out MX lookup in mail flow, not a Teams client error."
+        },
+        {
+          "event": "ev03",
+          "id": "sig.error-name-not-resolved",
+          "reason": "other",
+          "note": "A DNS query failure for a mail domain, not a Teams client error."
+        },
+        {
+          "event": "ev03",
+          "id": "sig.recent-network-change-reported",
+          "reason": "other",
+          "note": "The supplier moved DNS provider; unrelated to any Teams sign-in."
+        },
+        {
+          "event": "ev04",
+          "id": "sig.resolver-inconsistent",
+          "reason": "other",
+          "note": "A per-resolver MX test for a supplier domain, not a test of sign-in hosts."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": [],
+      "rationale": "A mail-flow problem with a different workload; there is no Teams sign-in in it, so the engine must refuse. DNS words and a per-resolver comparison appear, but about a supplier's MX record and not about the sign-in hosts of this domain, so they are look-alike text. Nothing is labelled as a signal, action or cause.",
+      "uncertainty": "none"
+    }
+  ],
+  "adjudication": null
+}

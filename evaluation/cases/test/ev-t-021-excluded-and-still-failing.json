@@ -1,0 +1,114 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-021-excluded-and-still-failing",
+  "split": "test",
+  "family": "fam-221",
+  "title": "Bristol solicitors: half the floor cannot reach Teams login, MFA blamed",
+  "scenario": "The customer blames last week's MFA rollout and the engineer goes along, asking for users to be excluded. The test changes nothing; the log lookup shows the attempts never reach Entra, and a resolver comparison finds a new filtering resolver that gives no answers on two floors.",
+  "categories": ["paraphrase", "noisy"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-09-15T13:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Bristol floor cant log into teams since lunch",
+      "text": "Hello. Since lunchtime a good part of the Bristol floor (fifteen to twenty of us, I'd say) can't get Teams to log in. The page says it can't find login.microsoftonline.com and offers a reload button. A few people get through if they hit reload a couple of times. We rolled out the new MFA rules last Friday so I assume it's that.\n\nGreta Wollstein, Hollis & Pike Solicitors"
+    },
+    {
+      "key": "ev02",
+      "at": 14,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Bristol floor cant log into teams since lunch",
+      "text": "Hi Greta. New MFA rules from Friday and failures from today: let's rule MFA in or out first. Could your admin exclude three of the affected users from the new MFA policy for the time being, and tell me whether they can then sign in?\n\nDara"
+    },
+    {
+      "key": "ev03",
+      "at": 66,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Bristol floor cant log into teams since lunch",
+      "text": "rhys here (admin). excluded nia.rees, rob.pike and c.baines from 'MFA-all' at 14:05 UTC. still failing for all three, same page. rob got in on the 2nd try again like before but the other two no. any ideas?"
+    },
+    {
+      "key": "ev04",
+      "at": 80,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Bristol floor cant log into teams since lunch",
+      "text": "> still failing for all three, same page.\n\nThanks Rhys, noted. Please send me the exact text the page shows, the three names with a UTC time each, and which sites fail and which are fine; then I'll look at the logs.\n\nDara"
+    },
+    {
+      "key": "ev05",
+      "at": 105,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Bristol floor cant log into teams since lunch",
+      "text": "text on the page: \"login.microsoftonline.com's server IP address could not be found.\" names: nia.rees 13:48 UTC, rob.pike 13:55, c.baines 14:12. failing = Bristol floors 2 and 3. fine = Bristol floor 1 and the Cardiff office."
+    },
+    {
+      "key": "ev06",
+      "at": 130,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Entra lookup",
+      "text": "Entra, 13:48 / 13:55 / 14:12 UTC +/- 5 min for nia.rees, rob.pike, c.baines: no rows. Also no MFA or CA failure results for those three since Friday. So the attempts don't reach Entra, and the exclusion test could never have changed anything. My mistake: I should have looked at the logs before asking Rhys to touch the policy."
+    },
+    {
+      "key": "ev07",
+      "at": 145,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Sorry for the detour",
+      "text": "Greta, Rhys: sorry for the detour. The three attempts never reach Entra, so something before Entra is stopping them; name resolution on floors 2 and 3 is the first thing to test. Rhys, from a floor-2 PC please query login.microsoftonline.com and the CDN name on every resolver in your DHCP scopes and send me the answers. You can put the MFA exclusion back as it was. I'll look again at 16:00 UTC.\n\nDara"
+    },
+    {
+      "key": "ev08",
+      "at": 190,
+      "who": "network",
+      "type": "diagnostic_result",
+      "channel": "email",
+      "title": "resolver answers",
+      "text": "resolvers: 192.168.20.5 and .6 answer in ~10 ms. 192.168.20.7 returns nothing for login and CDN names, 10 of 10 tries. that's the new filtering one our network team added last Friday. DHCP gives all three to floors 2 and 3, only .5 and .6 on floor 1.\n\nRhys"
+    },
+    {
+      "key": "ev09",
+      "at": 215,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Workaround and permanent change",
+      "text": "That's it then. Workaround: drop 192.168.20.7 from the floor 2 and 3 scopes and renew leases. Permanent: ask whoever runs the filtering to amend the rule so Microsoft's published endpoint hostnames are never blocked, through change control.\n\nDara"
+    },
+    {
+      "key": "ev10",
+      "at": 280,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Workaround and permanent change",
+      "text": "Took .7 out of the scopes at 15:40 UTC. People on floors 2 and 3 are logging in now and nobody has sent the error page since.\n\nGreta"
+    },
+    {
+      "key": "ev11",
+      "at": 1500,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "portal",
+      "title": "24 hours on",
+      "text": "No reports from Bristol since the change, and the resolver test repeated from floor 2 passes for .5 and .6. Waiting for the filtering rule correction before closing.\n\nDara"
+    }
+  ]
+}

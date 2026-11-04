@@ -1,0 +1,57 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-t-018-reimaged-laptops-primary-school",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-04T12:30:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.web-client-also-fails" },
+        { "event": "ev01", "id": "sig.cache-clear-no-effect" },
+        { "event": "ev03", "id": "sig.service-health-clear" },
+        { "event": "ev04", "id": "sig.service-health-clear" },
+        { "event": "ev05", "id": "sig.prt-missing" },
+        { "event": "ev05", "id": "sig.prt-healthy" },
+        { "event": "ev07", "id": "sig.prt-healthy" },
+        { "event": "ev09", "id": "sig.prt-healthy" },
+        {
+          "event": "ev10",
+          "id": "sig.prt-healthy",
+          "uncertainty": "low",
+          "note": "Stated as a healthy token on the sampled laptops, not as the dsregcmd line."
+        }
+      ],
+      "actions": [
+        { "event": "ev03", "id": "act.check-service-health" },
+        { "event": "ev04", "id": "act.device-registration-check" },
+        { "event": "ev04", "id": "act.request-minimal-scoping" },
+        { "event": "ev04", "id": "act.communicate-status" },
+        { "event": "ev06", "id": "act.device-registration-check" },
+        { "event": "ev08", "id": "act.communicate-status" },
+        { "event": "ev10", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        {
+          "event": "ev07",
+          "id": "sig.web-client-also-fails",
+          "reason": "negated",
+          "note": "After the re-join Teams signs in, even in the browser."
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.device-state"],
+      "rationale": "The customer's opening (ev01) already separates new images from old ones; the engineer checks the health pages (ev03), then asks for registration output from two failing laptops and one working laptop (ev04). The pasted output (ev05) shows no token on the new images and a token on the old one. The engineer's reply (ev06) quotes that output; the quoted lines are not new statements, so ev06 carries no signal. A one-laptop test before the roll-out (ev06 to ev07) and a sampled check after (ev09, ev10) complete a proportionate process.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

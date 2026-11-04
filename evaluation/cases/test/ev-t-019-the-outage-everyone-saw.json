@@ -1,0 +1,96 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-t-019-the-outage-everyone-saw",
+  "split": "test",
+  "family": "fam-219",
+  "title": "Three offices report Teams down; first health check shows nothing, a later one does",
+  "scenario": "A customer is sure Microsoft is down because of social media; the first service health check is clear and a contact in one office reports no problem, but later an incident appears that matches the other two offices.",
+  "categories": ["contradiction"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-10-13T08:05:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "TEAMS DOWN - microsoft outage?",
+      "text": "Teams will not let any of us in, Microsoft must be down - it's all over social media and one of the tech sites says it's a major outage. All three of our offices (Dunmore, Galway, Cork), about 60 people, none can sign in. The browser says ERR_CONNECTION_TIMED_OUT. What are Microsoft saying?\n\nCathal Brennan, Dunmore Estates"
+    },
+    {
+      "key": "ev02",
+      "at": 1,
+      "who": "system",
+      "type": "system_event",
+      "channel": "tool",
+      "title": "Auto-acknowledgement",
+      "text": "Ticket logged, priority P2. A support engineer will pick it up shortly."
+    },
+    {
+      "key": "ev03",
+      "at": 35,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Service health look",
+      "text": "08:40 UTC: nothing is open on the Service health board for Teams or Entra, and the Message center has no related post. The outage claim comes from the customer's reading of social media, not from the tenant's health view."
+    },
+    {
+      "key": "ev04",
+      "at": 40,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: TEAMS DOWN - microsoft outage?",
+      "text": "Hi Cathal, I have just been through the Service health board and the Message center posts for Teams and Entra: nothing is listed as active (08:40 UTC), so I can't confirm an outage yet. To get to the bottom of it I need three people it hit, with a rough UTC time for each, the offices that fail and any that work, and anything changed recently on your DNS, proxy or MFA settings. I'll look at Service health again at 09:30 UTC.\n\nOdalys"
+    },
+    {
+      "key": "ev05",
+      "at": 75,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: TEAMS DOWN - microsoft outage?",
+      "text": "Orla in Cork here, Cathal asked me to add what I see. We have no problem in Cork: I signed in at 07:55 UTC and calls have been fine all morning. As far as I know it's Dunmore and Galway that can't get in."
+    },
+    {
+      "key": "ev06",
+      "at": 125,
+      "who": "engineer",
+      "type": "engineer_action",
+      "channel": "internal",
+      "title": "Service health again",
+      "text": "10:10 UTC: Service health now lists an active incident, TM618204, 'Some users may have trouble signing in to Microsoft Teams', Europe, start 09:48 UTC. Matches the Dunmore and Galway reports."
+    },
+    {
+      "key": "ev07",
+      "at": 130,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Incident posted",
+      "text": "Cathal, Orla: update. Microsoft has now posted an incident (TM618204) for Teams sign-ins in Europe, beginning 09:48 UTC. What I told you earlier was right at 08:40 and is no longer true. That fits Dunmore and Galway; Cork may simply be routed through a different part of the service. Nothing needs changing on your side. I'll write as soon as Microsoft marks it resolved, and by 13:00 UTC in any case.\n\nOdalys"
+    },
+    {
+      "key": "ev08",
+      "at": 200,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Incident posted",
+      "text": "Dunmore is back since 11:20 UTC, Galway too. Thanks for keeping us posted.\n\nCathal"
+    },
+    {
+      "key": "ev09",
+      "at": 260,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Incident resolved",
+      "text": "Checked Service health once more: TM618204 now shows as resolved by Microsoft (11:10 UTC). Please tell me if anyone still fails today; otherwise I close this tomorrow morning.\n\nOdalys"
+    }
+  ]
+}
