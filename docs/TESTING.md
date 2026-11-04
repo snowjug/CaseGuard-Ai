@@ -27,7 +27,19 @@ tiers for this document**; only the end-to-end tiers below were run for it.
 
 ## 2. The last full run
 
-**The latest full run is CI's.** GitHub Actions run 41546529865 (commit `69c4c85` of `build/wave-1`, 2 November 2026; the commits
+**Wave 2, local, on the final detectors** (Linux VM, 4 shared vCPU, run at low priority beside other jobs; the engine and pack code
+is that of commit `15dde3c`, and the later commits changed only lint fixes in the model-assisted review and documents). The
+unit and integration tests, package by package: **domain 72 files, 2,133 tests; API 112 files, 2,083 tests (1 skipped), on PGlite;
+web 70 files, 1,303; ai 51 files, 1,120; security 21 files, 847; observability 16 files, 939; config 8 files, 394; ui 12 files,
+213; schemas 3 files, 87: 9,119 tests, all passing.** The typecheck of all nine workspaces, the whole-repository lint and format
+check, the generated API reference check (78 routes) and the secret scan are clean. The domain suite includes the sample digests,
+the ReDoS probe and the new static pass behind look-arounds. Three timing tests (the ReDoS probe over derived inputs, the claim bound and one skill-condition test) failed once, when the
+load average on the shared machine reached 14; they pass at normal load, and the pattern probe is measured in CPU time. **Not run:** Docker, a real PostgreSQL server (every API test ran on PGlite), the full Playwright
+suite (focused specs only, for the evidence ledger and the record-findings panel: 10 of 10, axe in both themes, and a
+phone-width check), and anything that needs Azure. The evaluation commands (`eval:check`, `eval:dev`, `eval:validation`, and the
+single `eval:locked`) are described in [EVALUATION.md](EVALUATION.md#10-wave-2-the-evaluation-sets-the-protocol-the-verdict-criteria-and-the-result).
+
+**The latest full CI run** (PostgreSQL 16 and the whole Playwright suite, which the local Wave 2 run above did not repeat) is GitHub Actions run 41546529865 (commit `69c4c85` of `build/wave-1`, 2 November 2026; the commits
 after it change documents and the tolerance of one property test) passed all 8 jobs: **6,152 unit tests** (256 files; 4 more are expected failures that pin
 known defects of the signal detectors), **1,033 integration tests on PostgreSQL 16** (56 files) and **374 Playwright tests**
 (desktop and mobile, axe checks included, 15.5 minutes), plus the compose smoke test (12 checks), the secret scan with gitleaks

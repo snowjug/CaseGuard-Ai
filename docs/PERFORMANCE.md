@@ -10,39 +10,34 @@ Timed iterations per row: 20 (after 3 warm-up requests that are not counted), un
 
 | Operation                                                                                                                                       | Request                                                                                  |   n | p50 (ms) | p95 (ms) | max (ms) |
 | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | --: | -------: | -------: | -------: |
-| Timeline retrieval, whole record                                                                                                                | GET /cases/:id/timeline?limit=200 (Case One, 31 events)                                  |  20 |    34.53 |    41.76 |    44.00 |
-| Timeline retrieval as of an earlier instant, cold (20 distinct windows, no warm-up: the per-user budget of cold earlier views is 30 per minute) | GET /cases/:id/timeline?asOf=<event instant> (first time that window is asked for)       |  20 |    53.34 |    83.83 |    86.03 |
-| Timeline retrieval as of an earlier instant, warm                                                                                               | the same requests again (window already computed and cached)                             |  20 |    31.06 |    38.88 |    40.77 |
-| Evidence retrieval                                                                                                                              | GET /cases/:id/evidence?limit=200 (Case One, 61 claims)                                  |  20 |    25.25 |    71.41 |    93.35 |
-| Quality-score retrieval                                                                                                                         | GET /cases/:id/quality (whole record)                                                    |  20 |    10.63 |    14.94 |    15.37 |
-| Counterfactual job initiation                                                                                                                   | POST /cases/:id/forks/:forkId/counterfactuals, time to the 202 response (not the job)    |  20 |    20.42 |    27.84 |    28.04 |
-| Counterfactual job duration (for reference) (includes up to 20 ms of polling resolution)                                                        | request start until jobs.get reports a terminal state, polled every 20 ms                |  20 |    29.73 |   234.17 |   254.94 |
-| Case ingestion                                                                                                                                  | POST /cases with a 15-event bundle under a new reference each time, analysis not started |  20 |    49.11 |    69.49 |    70.38 |
+| Timeline retrieval, whole record                                                                                                                | GET /cases/:id/timeline?limit=200 (Case One, 31 events)                                  |  20 |    27.28 |    38.35 |    38.88 |
+| Timeline retrieval as of an earlier instant, cold (20 distinct windows, no warm-up: the per-user budget of cold earlier views is 30 per minute) | GET /cases/:id/timeline?asOf=<event instant> (first time that window is asked for)       |  20 |    63.68 |    94.71 |   126.18 |
+| Timeline retrieval as of an earlier instant, warm                                                                                               | the same requests again (window already computed and cached)                             |  20 |    24.78 |    30.48 |    33.19 |
+| Evidence retrieval                                                                                                                              | GET /cases/:id/evidence?limit=200 (Case One, 59 claims)                                  |  20 |    20.09 |    24.20 |    24.33 |
+| Quality-score retrieval                                                                                                                         | GET /cases/:id/quality (whole record)                                                    |  20 |     8.76 |    11.75 |    13.34 |
+| Counterfactual job initiation                                                                                                                   | POST /cases/:id/forks/:forkId/counterfactuals, time to the 202 response (not the job)    |  20 |    18.26 |    27.39 |    30.07 |
+| Counterfactual job duration (for reference) (includes up to 20 ms of polling resolution)                                                        | request start until jobs.get reports a terminal state, polled every 20 ms                |  20 |    22.51 |   502.37 |   525.33 |
+| Case ingestion                                                                                                                                  | POST /cases with a 15-event bundle under a new reference each time, analysis not started |  20 |    37.37 |    40.82 |    58.87 |
 
 ## Environment
 
 |                                     |                                                                                        |
 | ----------------------------------- | -------------------------------------------------------------------------------------- |
-| Date of the run (UTC)               | 2026-10-31T00:34:43.710Z                                                               |
-| Operating system                    | win32 10.0.26300 (x64)                                                                 |
-| CPU                                 | 11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz, 8 logical cores                        |
-| Memory                              | 31.3 GiB total, 3.6 GiB free at the end of the run                                     |
-| Node.js                             | v26.13.0                                                                               |
+| Date of the run (UTC)               | 2026-11-04T12:21:47.114Z                                                               |
+| Operating system                    | linux 7.0.0-1017-azure (x64)                                                           |
+| CPU                                 | AMD EPYC 7763 64-Core Processor, 4 logical cores                                       |
+| Memory                              | 15.6 GiB total, 9.0 GiB free at the end of the run                                     |
+| Node.js                             | v24.22.2                                                                               |
 | Database                            | PGlite (embedded PostgreSQL), in memory                                                |
 | AI provider                         | deterministic (offline, simulated); no external service is called                      |
 | Data                                | the synthetic demo story (Case One: 31 events; Case Two: 15 events)                    |
-| Machine busy before / after the run | 77 % / 53 % of all logical CPUs, measured over one second each (includes this process) |
+| Machine busy before / after the run | 87 % / 65 % of all logical CPUs, measured over one second each (includes this process) |
 
 > **Other processes were running while this was measured, so the numbers are noisy.** The machine was already busy before the benchmark started. Treat the figures as an order of magnitude and re-run on a quiet machine before quoting them.
 
 ## Browser: the Case Timeline page
 
-Measured by `e2e/perf/timeline-render.spec.ts` on 2026-10-31 (10 timed navigations after 2 warm-up ones; production build, standalone server, local API, deterministic AI provider; browser: msedge). Milliseconds from the start of the navigation. Re-running the spec updates `test-results/perf-timeline-render.json`; the next `pnpm bench:api` copies it here.
-
-| Measure                                                             |   n | p50 (ms) | p95 (ms) | max (ms) |
-| ------------------------------------------------------------------- | --: | -------: | -------: | -------: |
-| First timeline row of Case Timeline, Case One (31 events) on screen |  10 |  1263.60 |  2606.50 |  2606.50 |
-| Largest contentful paint                                            |  10 |   404.00 |  1116.00 |  1116.00 |
+Not measured by this run: the page-render timing comes from the on-demand Playwright spec (`$env:PW_PERF = "1"; pnpm.cmd exec playwright test --project=perf`), which needs the web app and the API running. Run it, then run `pnpm bench:api` again to include its figures here.
 
 ## Reading the table
 

@@ -15,6 +15,10 @@ statements that deny the signal. The misses were not random: the pack's patterns
 (error tags, codes, literal phrases) and people write cases in their own words. The false positives were all one
 mistake: a detector found the words of a signal inside a sentence that says the opposite.
 
+Where it stands now: on a locked test split of synthetic cases the detectors read 42 % of the labelled signals at 83 % precision (47 %
+and 91 % on a validation set; 83 % and 98 % on the set they were tuned on), and a denial is no longer read as a finding. That is better
+than the first evaluation and still less than half; see [EVALUATION.md](EVALUATION.md#106-the-locked-test-split-and-the-verdict).
+
 Nothing here is a model. Detection stays deterministic, explainable and cheap: the same text gives the same
 observations, in every database, at every time.
 
@@ -134,6 +138,21 @@ behind a look-around fails it.
 `detector-families.test.ts` holds, for each family, sentences it **must read** and look-alikes it **must not read**. These
 tables are examples written by the pack's author. They are a regression guard, not an independent measure of recall;
 that comes from the held-out evaluation sets ([EVALUATION.md](EVALUATION.md)).
+
+**Where the families are.** The pack keeps them in three maps that one loop merges into the signals' detectors:
+`WORDING_FAMILIES` (the twenty of the first wave, tested in `detector-families.test.ts`), `WORDING_FAMILIES_SCOPE` (how many
+people are affected and where, how the failure shows itself, what the people at the keyboard tried;
+`detector-families-scope.test.ts`) and `WORDING_FAMILIES_SERVER_SIDE` (what the logs, the name servers, the proxy nodes, the
+device token, federation, the access policy and service health show; `detector-families-server-side.test.ts`). Two authors added
+families at the same time, which is why there are three. A family reads a way of saying a thing and is tied to a role and an
+event type where only some authors say it (an engineer's log finding, a network administrator's change), so the same wording from
+another role is not read. Before a family is kept it has to pass: the typecheck, its own must-read and must-not-read tests, the
+robustness probe (no pattern slower than 50 ms of CPU on the hostile inputs; the slowest is about 31 ms), the dev measures
+(precision and recall not lower, no negative control reporting), and the sample digests unchanged. The pattern text is capped at 500
+characters after the shared fragments are filled in, and one that overflows makes the whole pack fail to compile.
+
+**What they achieved, and what that does not mean.** On the set they were tuned on the families raised recall from 46 % to 83 %. On
+text they were not tuned on it is 47 % (validation) and 42 % (the locked test split): see [EVALUATION.md](EVALUATION.md#106-the-locked-test-split-and-the-verdict).
 
 **Signal pairs.** Two signals can state the same thing from opposite sides ("an incident is active" / "no incident is
 active"). The pack declares eight pairs: server-side records, name servers, proxy nodes, service health, access-policy

@@ -672,6 +672,9 @@ What the table says, and what it does not:
   Each look decided whether a family transferred: it kept, narrowed or removed it. The first scope-count family added 15 false
   positives and no true positive on validation and was narrowed to stated failures. This is model selection on the set, so its
   figures are mildly optimistic too. The exact number of the early re-runs was not recorded.
+- The locked test split was not run until every detector, cue and pattern was final and committed (the engine and pack versions
+  were bumped, the sample digests checked, every suite run). It was run once, from a clean tree, on the final detectors
+  (record 1 of `evaluation/runs/locked-runs.json`, commit `cf2a92e`), and nothing in the detectors changed afterwards.
 - The cases, the evaluation tooling and the wording families were written by AI assistants working apart. The case authors never
   opened the pack or the detectors; the family authors never read a validation or a test case (only aggregates of `validation`).
   The independence check caught six detector-test sentences that shared a six-word run with held-out cases (they were reworded)
@@ -690,3 +693,55 @@ What the table says, and what it does not:
   a scripted provider, which is labelled as a simulation (134 of 134 planted mechanical errors were caught by deterministic checks;
   that says nothing about a model).
 - **Estimates stay estimates.** Confidence, quality, avoidable effort and simulated time come from authored priors.
+
+### 10.6 The locked test split, and the verdict
+
+One run, on the final detectors (engine 2026.5.0, pack 1.2.0, commit `cf2a92e`): 30 cases (28 with a supported workload), 296
+events, 267 labelled signal occurrences, one AI annotator. The two other splits are repeated for comparison.
+
+| Measure                                                | `dev` (tuned on)               | `validation` (looked at in aggregate) | **locked test (untouched)**      |
+| ------------------------------------------------------ | ------------------------------ | ------------------------------------- | -------------------------------- |
+| Signals: true / false positives / misses               | 259 / 4 / 54                   | 61 / 6 / 68                           | **112 / 23 / 155**               |
+| Signal precision                                       | 98 %                           | 91 %                                  | **83 %** [76-88 %]               |
+| Signal recall                                          | 83 %                           | 47 %                                  | **42 %** [36-48 %]               |
+| Silent where the label says the fact is absent         | 99 % (77 of 78)                | 93 % (37 of 40)                       | **94 %** (115 of 122)            |
+| Negative controls: nothing reported, no decision point | 6 of 6                         | 2 of 4                                | **3 of 5**                       |
+| Unsupported workload refused                           | 3 of 3                         | 1 of 1                                | 2 of 2                           |
+| Contradictions: labelled conflicts found; class right  | 1 of 19; 1 of 1                | 2 of 9; 0 of 2                        | 1 of 14; 1 of 1                  |
+| Decision points: precision; recall                     | 21 % (6 of 28); 64 % (7 of 11) | 0 of 10; 0 of 3                       | **4 % (1 of 26)**; 17 % (1 of 6) |
+| Earliest missed moment: spurious in                    | 9 of 40 cases                  | 5 of 17                               | 11 of 28                         |
+| Engineer actions: precision; recall                    | 94 %; 19 %                     | 70 %; 6 %                             | 72 %; 10 % (18 of 179)           |
+| The leading hypothesis is a labelled cause             | 73 % (24 of 33)                | 62 % (8 of 13)                        | 52 % (12 of 23)                  |
+| Citations verified against the stored text; mismatches | 91 %; 0                        | 88 %; 0                               | 92 % (n = 343); 0                |
+
+Applying the criteria of section 10.2, which were written before this run:
+
+| #   | Criterion                                     | Needed              | Measured on the locked split | Met |
+| --- | --------------------------------------------- | ------------------- | ---------------------------- | --- |
+| 1   | Signal precision; signal recall               | at least 0.85; 0.60 | 0.83; 0.42                   | no  |
+| 2   | Silent on the facts the labels say are absent | at least 95 %       | 94 %                         | no  |
+| 3   | Every negative control silent                 | all                 | 3 of 5                       | no  |
+| 4   | No mismatching citation; citations verified   | 0; at least 85 %    | 0; 92 %                      | yes |
+| 5   | Decision-point precision                      | at least 0.50       | 0.04                         | no  |
+| 6   | Nothing that protects the data regressed      | all green           | all green                    | yes |
+
+**Verdict: ANALYTICAL QUALITY NOT READY.** Four of the six criteria for even the first level are not met, and the levels above it
+(precision 0.90 and recall 0.75, contradictions, human-reviewed labels, a real-model evaluation) are further away still.
+
+What the run says:
+
+- **Each step away from the tuning set reads less.** Precision falls 98 % (`dev`), 91 % (`validation`), 83 % (locked); recall 83 %,
+  47 %, 42 %. The locked precision is 8 points under the validation figure and there are 23 false positives against 6 on
+  validation: looking at `validation` in aggregate, and choosing variants by it, made it optimistic, as section 10.4 said it would.
+  The locked split is the figure to quote.
+- **Two criteria are close and two are far.** Precision (0.83 against 0.85) and silence on absent facts (94 % against 95 %) are
+  inside their intervals (76-88 % and 89-97 %). Recall (0.42 against 0.60), the negative controls (two of five report something) and
+  the decision points (one of 26) are not close.
+- **Negation is the part that holds.** The engine stayed silent on 70 of 70 facts the labels call negated and on every one of the
+  11 that are corrected; it is weaker on the conditional (9 of 13) and the attributed (7 of 9), counts too small to rest on.
+- **Nothing was read by signal.** To keep the split usable as a check, its per-signal and per-case output was not read, and it must not
+  guide a detector change. It is spent for this release: the next release needs a new locked split.
+
+What would have to change before the first level is met, in the order of how far each is: decision points (precision 0.04 against 0.50),
+recall of the engine's wording (0.42 against 0.60), the negative controls (over-reading on text that is not a Teams sign-in failure),
+and then silence on conditional and reported statements. None of it can be shown with labels that no human has reviewed.
