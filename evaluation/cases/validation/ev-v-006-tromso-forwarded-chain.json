@@ -1,0 +1,114 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-v-006-tromso-forwarded-chain",
+  "split": "validation",
+  "family": "fam-106",
+  "title": "FW: FW: Teams logging us out again and again",
+  "scenario": "A forwarded thread full of headers, an image tag, markup residue, an auto-reply and a disclaimer hides a sign-in frequency that was cut from 24 hours to 3 hours; the logs and the audit log show it, and the fix is made the next morning.",
+  "categories": ["noisy"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-08-19T09:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "FW: FW: Teams logging us out again and again",
+      "text": "Hi support team,\n\nsee below, our manager keeps asking. Can you please look at this today?\n\nThanks,\nSigrid\nSent from my mobile\n\n-----Original Message-----\nFrom: Anders Moe <anders.moe@example.com>\nSent: Wednesday, 19 August 2026 08:41\nTo: IT Service Desk <servicedesk@example.com>\nSubject: FW: Teams logging us out\n\n[cid:image001.png]\n\nHello IT,\nwe get logged out of Teams roughly every 3 hours since the end of last week and have to type our password and approve on the phone again. It is annoying during meetings. About 45 of us in the Tromso office. I asked the Narvik office and they have no such issue.&nbsp;<br>\nAnders\n\nPrivileged and confidential. If this message reached you by mistake, tell the sender and remove it from your system."
+    },
+    {
+      "key": "ev02",
+      "at": 3,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Automatic reply: FW: FW: Teams logging us out again and again",
+      "text": "Automatic reply: I am away from my desk until 24 August 2026 and will respond after my return. In urgent cases write to the service desk instead."
+    },
+    {
+      "key": "ev03",
+      "at": 15,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: FW: FW: Teams logging us out again and again",
+      "text": "Hello Sigrid, thank you for forwarding. Could you send me three names of affected people and the UTC moment of their latest forced sign-in, and tell me whether your security team changed any sign-in or session policy lately?"
+    },
+    {
+      "key": "ev04",
+      "at": 70,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: FW: FW: Teams logging us out again and again",
+      "text": "Names: f.nilsen 07:05 UTC, h.olsen 08:20 UTC, p.hagen 08:44 UTC. From the thread of our security group: 'Last Thursday we tightened the sign-in frequency of the Teams policy from 24h to 3h following the audit.' I did not know about it earlier.\n\n> -----Original Message-----\n> From: Security Group <secgroup@example.com>\n> Sent: Thursday, 13 August 2026 14:30\n> Subject: Change done"
+    },
+    {
+      "key": "ev05",
+      "at": 95,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Log search",
+      "text": "Sign-in logs for f.nilsen 07:05, h.olsen 08:20 and p.hagen 08:44 UTC: a failed non-interactive row for each of them, error AADSTS700082: the session had outlived the sign-in frequency, so the stored refresh token was no longer valid."
+    },
+    {
+      "key": "ev06",
+      "at": 100,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Audit log",
+      "text": "Audit log: the policy 'Teams session control' was updated on Thursday at 14:12 UTC, sign-in frequency changed from 24 hours to 3 hours, assigned to all users."
+    },
+    {
+      "key": "ev07",
+      "at": 112,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: FW: FW: Teams logging us out again and again",
+      "text": "Sigrid, the three-hour frequency of that policy is the likely reason. Please ask the security group to set it back to 24 hours, or to exempt the office network, and tell me when it is done."
+    },
+    {
+      "key": "ev08",
+      "at": 200,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "FW: Re: FW: FW: Teams logging us out again and again",
+      "text": "FW from the security group: 'We will change it back tomorrow at 06:00 UTC, after the change board has approved.'\n\nSigrid\nSent from my mobile"
+    },
+    {
+      "key": "ev09",
+      "at": 1500,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: FW: FW: Teams logging us out again and again",
+      "text": "Update Thursday 09:30 UTC: the frequency was set to 24 hours at 06:10 UTC. Since then nobody in Tromso has reported a forced sign-in."
+    },
+    {
+      "key": "ev10",
+      "at": 1800,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Check after the change",
+      "text": "Check on Thursday at 15:00 UTC: no AADSTS700082 rows for Tromso since 06:10 UTC, and the three sample users stayed signed in for the last 8 hours."
+    },
+    {
+      "key": "ev11",
+      "at": 1810,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Closing summary",
+      "text": "Sigrid, closing summary: the sign-in frequency of the policy was cut to 3 hours last Thursday and restored to 24 hours today at 06:10 UTC. The logs confirm the effect. Please ask the security group to tell the service desk before the next change to that policy."
+    }
+  ]
+}

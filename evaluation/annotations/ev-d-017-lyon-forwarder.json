@@ -1,0 +1,69 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-017-lyon-forwarder",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T14:10:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev01", "id": "sig.site-correlated" },
+        {
+          "event": "ev01",
+          "id": "sig.error-name-not-resolved",
+          "uncertainty": "low",
+          "note": "could not find the server, paraphrased; the code comes in ev03"
+        },
+        { "event": "ev03", "id": "sig.error-name-not-resolved" },
+        {
+          "event": "ev03",
+          "id": "sig.recent-network-change-reported",
+          "uncertainty": "low",
+          "note": "a DNS service moved to a new rack"
+        },
+        { "event": "ev04", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev05", "id": "sig.resolver-inconsistent" },
+        { "event": "ev06", "id": "sig.resolver-inconsistent" },
+        { "event": "ev08", "id": "sig.dns-fix-resolved" },
+        { "event": "ev09", "id": "sig.dns-fix-resolved" },
+        {
+          "event": "ev10",
+          "id": "sig.resolver-inconsistent",
+          "uncertainty": "low",
+          "note": "the closing note restates the finding"
+        }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.dns-resolver-comparison" },
+        { "event": "ev06", "id": "act.remove-resolver-from-service" },
+        { "event": "ev06", "id": "act.communicate-status" },
+        { "event": "ev09", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        {
+          "event": "ev06",
+          "id": "act.validate-fix",
+          "reason": "future_intent",
+          "note": "I will check back at 10:30 UTC with test sign-ins"
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.dns-resolution"],
+      "rationale": "A clean DNS story told by an anxious customer: part of one site fails intermittently with a name-resolution message, the Entra logs show nothing for the failing attempts, and a per-server test shows one of the two DHCP-issued servers failing. The engineer asks for the minimal scoping data and the recent changes straight away, correlates the logs, compares the two servers and removes the bad one from the scope. The fix is checked before and after. The check-back at 10:30 is only announced in ev06, so it is an absence there and an action in ev09.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

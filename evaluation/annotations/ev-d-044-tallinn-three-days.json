@@ -1,0 +1,93 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-044-tallinn-three-days",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T19:00:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.error-timeout" },
+        { "event": "ev01", "id": "sig.site-correlated" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev03", "id": "sig.site-correlated", "uncertainty": "low", "note": "restated" },
+        { "event": "ev03", "id": "sig.ca-config-unchanged" },
+        { "event": "ev04", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev05", "id": "sig.service-health-clear" },
+        { "event": "ev07", "id": "sig.ca-exclusion-no-effect" },
+        { "event": "ev07", "id": "sig.error-timeout" },
+        {
+          "event": "ev08",
+          "id": "sig.multiple-users-affected",
+          "uncertainty": "low",
+          "note": "restated in a phone note"
+        },
+        { "event": "ev10", "id": "sig.cache-clear-no-effect" },
+        { "event": "ev10", "id": "sig.error-timeout" },
+        { "event": "ev12", "id": "sig.resolvers-consistent" },
+        { "event": "ev14", "id": "sig.proxy-node-inconsistent" },
+        {
+          "event": "ev15",
+          "id": "sig.recent-network-change-reported",
+          "note": "a renewed inspection certificate on one node"
+        },
+        { "event": "ev19", "id": "sig.proxy-fix-resolved" },
+        { "event": "ev24", "id": "sig.proxy-fix-resolved" },
+        {
+          "event": "ev25",
+          "id": "sig.proxy-fix-resolved",
+          "uncertainty": "low",
+          "note": "before and after counts"
+        }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.check-service-health" },
+        { "event": "ev06", "id": "act.exclude-users-from-mfa-ca" },
+        { "event": "ev09", "id": "act.clear-teams-cache" },
+        { "event": "ev11", "id": "act.dns-resolver-comparison" },
+        { "event": "ev13", "id": "act.proxy-node-comparison" },
+        { "event": "ev16", "id": "act.remove-proxy-node-from-rotation" },
+        { "event": "ev20", "id": "act.bypass-proxy-inspection" },
+        { "event": "ev20", "id": "act.communicate-status" },
+        { "event": "ev22", "id": "act.communicate-status" },
+        { "event": "ev25", "id": "act.validate-fix" },
+        { "event": "ev27", "id": "act.communicate-status" }
+      ],
+      "absent": [
+        {
+          "event": "ev03",
+          "id": "sig.recent-network-change-reported",
+          "reason": "speculative",
+          "note": "someone touched the proxy at some point, the writer does not know when or what"
+        }
+      ],
+      "forks": [
+        {
+          "event": "ev06",
+          "category": "low_value_action",
+          "note": "a policy exclusion test although no server-side failure record exists"
+        },
+        {
+          "event": "ev09",
+          "category": "low_value_action",
+          "note": "a cache clear when the failures never reach the identity service"
+        }
+      ],
+      "earliestMissed": "ev06",
+      "counterfactualDirection": "better",
+      "conflicts": [],
+      "qualityBand": "adequate",
+      "causes": ["hyp.proxy-egress"],
+      "rationale": "A long case with the usual noise: footers, a phone note, a quoted block that repeats the first report, and a message from a phone. The engineer scopes and correlates at once and checks service health, which is right. Because no failure record exists for the three attempts, a policy exclusion test and a cache clear are low-value steps and they cost the customer a day. The resolver comparison and the per-node comparison then find the node that times out, which fits a certificate that was renewed on it. The workaround and the permanent fix are asked for in the right order and documented apart, and the effect is confirmed with counts from before and after. The speculation that someone touched the proxy is not a change report, and the quoted block must not count as a second report of an intermittent failure.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

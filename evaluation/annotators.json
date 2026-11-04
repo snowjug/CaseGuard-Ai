@@ -1,0 +1,23 @@
+{
+  "schema": "caseguard.eval-annotators/1",
+  "annotators": [
+    {
+      "id": "copilot-wave1",
+      "kind": "ai_draft",
+      "description": "An AI assistant (GitHub Copilot) that wrote the Wave 1 evaluation cases and their labels after the engine and its knowledge pack existed. Not a human. The labels are migrated without change; Wave 1 recorded no uncertainty per label.",
+      "addedAt": "2026-11-02T19:59:46Z"
+    },
+    {
+      "id": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "description": "An AI assistant (GitHub Copilot, Wave 2 agent A) that wrote the dev and validation cases and labelled them from the scenario it invented, using only the vocabulary and never the engine or the detectors. Not a human.",
+      "addedAt": "2026-11-03T14:00:00Z"
+    },
+    {
+      "id": "copilot-wave2-t",
+      "kind": "ai_draft",
+      "description": "An AI assistant (GitHub Copilot, Wave 2) that writes the locked test split and its labels without seeing the dev or validation cases, the engine or the detectors. Not a human.",
+      "addedAt": "2026-11-03T14:00:00Z"
+    }
+  ]
+}

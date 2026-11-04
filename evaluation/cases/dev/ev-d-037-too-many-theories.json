@@ -1,0 +1,87 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-037-too-many-theories",
+  "split": "dev",
+  "family": "fam-031",
+  "title": "Teams stopped signing in on my laptop",
+  "scenario": "An end user and the engineer's own working notes list many possible causes, none confirmed; the logs are clean and a local reset fixes one laptop, so the theories are guesses and denials, not findings.",
+  "categories": ["negation"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-07-08T09:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Teams stopped signing in",
+      "text": "Hi, Teams on my laptop stopped signing in yesterday. It says Something went wrong, try again. My colleagues are fine. I read online that it could be an expired token, or maybe a Conditional Access thing, or Microsoft having an outage, or a broken device registration, or perhaps our company's ADFS. I really do not know which. Dara"
+    },
+    {
+      "key": "ev02",
+      "at": 11,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Teams stopped signing in",
+      "text": "Hello Dara, theories are welcome, but let us start with facts. Does Teams in a web browser let you in? And have you tried signing out and clearing the Teams cache?"
+    },
+    {
+      "key": "ev03",
+      "at": 40,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Teams stopped signing in",
+      "text": "The browser works fine. I have not cleared the cache yet. If that does not help, do I have to reinstall?"
+    },
+    {
+      "key": "ev04",
+      "at": 48,
+      "who": "engineer",
+      "type": "case_note",
+      "channel": "internal",
+      "title": "Working notes",
+      "text": "Possible causes, none confirmed: (a) token expiry, (b) a Conditional Access block, (c) a service incident, (d) a broken device registration, (e) the customer's federation. The browser works, so (c) and (e) look unlikely. (a) and (b) would show in the sign-in logs, so I will check those next. Nothing is known yet."
+    },
+    {
+      "key": "ev05",
+      "at": 62,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log lookup",
+      "text": "Sign-in logs for dara.k today: no failure rows at all. No Conditional Access results and no token errors for her attempts."
+    },
+    {
+      "key": "ev06",
+      "at": 70,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: Teams stopped signing in",
+      "text": "The logs are clean, so this is local to your laptop. Please sign out, close Teams, delete the Teams cache folder and the Teams entry in the Web Account Manager data, and start Teams again."
+    },
+    {
+      "key": "ev07",
+      "at": 110,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: Teams stopped signing in",
+      "text": "Done, and it signed in at once. Thank you!"
+    },
+    {
+      "key": "ev08",
+      "at": 120,
+      "who": "engineer",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Closing note",
+      "text": "Cause: corrupted local Teams cache and broker state on one laptop; the reset fixed it. None of the theories raised in the case was confirmed: not an expired token, not a Conditional Access change, not a service incident, not a device registration fault, not the federation."
+    }
+  ]
+}

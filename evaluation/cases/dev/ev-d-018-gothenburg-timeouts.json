@@ -1,0 +1,132 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-018-gothenburg-timeouts",
+  "split": "dev",
+  "family": "fam-012",
+  "title": "Teams login timeouts at the Gothenburg site",
+  "scenario": "One of three proxy servers at a site times out for Microsoft sign-in addresses after a TLS inspection policy was switched on; the engineer first asks for heavy traces and a reinstall and finds it a day later.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-10T08:30:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams timeouts Gothenburg",
+      "text": "Hello support,\n- site: Gothenburg, 4th floor and the warehouse\n- when: from Tuesday afternoon, still now (Wednesday)\n- what: Teams login stops with a message about connection timed out, after some minutes\n- how many: around 35 persons reported it, maybe more\n- sometimes it works the second time\n- other sites no problem (Malmö is ok)\nPlease help, thank you. Anders"
+    },
+    {
+      "key": "ev02",
+      "at": 35,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams timeouts Gothenburg",
+      "text": "Hi Anders, thanks. Timeouts like this are often down to the client, so I want to see what the client is doing. Please ask three of the affected users to reproduce the problem while recording a HAR capture in the browser version and a Fiddler trace on the desktop client, and send me the capture files (they can be large, zip them). I will analyse them when they arrive."
+    },
+    {
+      "key": "ev03",
+      "at": 330,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams timeouts Gothenburg",
+      "text": "We tried the traces. Two users could not install the tool, the third one managed but the file is 180 MB so I send a share link. It took them the whole morning and they are not happy. They also say the web version of Teams in the browser gives the same timeout."
+    },
+    {
+      "key": "ev04",
+      "at": 345,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams timeouts Gothenburg",
+      "text": "Thank you, and sorry for the effort. While I go through the file, please empty the Teams cache folder on those three computers and, if the problem is still there, reinstall the Teams app, then test again."
+    },
+    {
+      "key": "ev05",
+      "at": 520,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams timeouts Gothenburg",
+      "text": "Cache cleared and Teams reinstalled on all three, exactly the same timeout. One thing: a colleague in the warehouse tried on his phone using mobile data and Teams signs in fast there. Maybe it is the building network?"
+    },
+    {
+      "key": "ev06",
+      "at": 1360,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log check",
+      "text": "Looked at the Entra sign-in logs of the three users around the times of their traces. No failures are recorded for them. So the requests are not reaching Entra, which points at something between the Gothenburg network and Microsoft."
+    },
+    {
+      "key": "ev07",
+      "at": 1370,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Network question",
+      "text": "Please ask your network team whether the Gothenburg sites use a proxy or TLS inspection, and whether anything was changed there lately."
+    },
+    {
+      "key": "ev08",
+      "at": 1420,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Network question",
+      "text": "Yes, we have three proxy servers in Gothenburg (gbg-prx1, gbg-prx2, gbg-prx3) behind a load balancer. On Tuesday morning we switched on the new TLS inspection policy on the cluster. Nothing else was changed."
+    },
+    {
+      "key": "ev09",
+      "at": 1450,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Per-proxy test",
+      "text": "From a Gothenburg PC I requested login.microsoftonline.com through each of the three proxies separately. gbg-prx1 returned the page in 0.4 s and gbg-prx3 in 0.5 s. gbg-prx2 failed with a timeout after 30 s on every one of five tries."
+    },
+    {
+      "key": "ev10",
+      "at": 1465,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Found it",
+      "text": "gbg-prx2 times out for the Microsoft sign-in addresses while the other two proxies are fine. Please take gbg-prx2 out of the load balancer now. For the longer term, Microsoft 365 endpoints should be exempt from TLS inspection, so please ask the owner of the new policy to add that exemption through your change process."
+    },
+    {
+      "key": "ev11",
+      "at": 1500,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Found it",
+      "text": "gbg-prx2 has been out of the pool since 09:25 UTC. I told the floor to try again."
+    },
+    {
+      "key": "ev12",
+      "at": 1560,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Found it",
+      "text": "10:30 UTC. No more timeout reports since 09:25. I did 15 logins from different desks and all were fine. Thank you Anders"
+    },
+    {
+      "key": "ev13",
+      "at": 1580,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Check of the helpdesk count",
+      "text": "Helpdesk shows 31 timeout tickets from Gothenburg between Tuesday 13:00 and Thursday 09:25 UTC and none since. Closing with the customer's agreement. The workaround holds; the inspection exemption stays open with their network team."
+    }
+  ]
+}

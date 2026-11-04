@@ -1,0 +1,69 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-030-mailbox-misfiled",
+  "split": "dev",
+  "family": "fam-024",
+  "title": "Supplier mail to our invoices mailbox bounces",
+  "scenario": "A mail delivery problem filed under Teams by mistake: the bounce messages say connection timed out and host name could not be resolved, but they come from a mail server, and the case is moved to another team.",
+  "categories": ["negative-control"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-29T08:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "invoices mailbox gets nothing",
+      "text": "Hello, our shared mailbox invoices@shop.example has not received anything from one supplier since Friday. The supplier sends me their bounce: first 451 4.4.1 connection timed out while delivering to mx1.shop.example, later 550 5.4.4 DNS lookup failed, host name could not be resolved. I put this under Teams by accident, the form has a dropdown and I picked the first line, sorry."
+    },
+    {
+      "key": "ev02",
+      "at": 20,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: invoices mailbox gets nothing",
+      "text": "Hello Kavya, thank you for the details. This is a mail delivery problem and not a Teams one, so I am moving the case to the Exchange Online team. In the meantime please send me the complete bounce message with its headers."
+    },
+    {
+      "key": "ev03",
+      "at": 50,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: invoices mailbox gets nothing",
+      "text": "Here is the bounce as text. Reporting-MTA: dns; mx.supplier.example. Final-Recipient: rfc822; invoices@shop.example. Status: 4.4.1. Diagnostic-Code: smtp; 451 4.4.1 connection timed out. Last-Attempt-Date: Sat, 27 Jun 2026 06:12:44 +0000."
+    },
+    {
+      "key": "ev04",
+      "at": 52,
+      "who": "system",
+      "type": "system_event",
+      "channel": "tool",
+      "title": "Queue changed",
+      "text": "Workload changed from Teams authentication to Exchange mail flow. Case assigned to the mail flow queue."
+    },
+    {
+      "key": "ev05",
+      "at": 60,
+      "who": "engineer",
+      "type": "case_note",
+      "channel": "internal",
+      "title": "Handover note",
+      "text": "For the mail flow team: customer mailbox invoices@shop.example, supplier bounces of 451 4.4.1 connection timed out and 550 5.4.4 host name could not be resolved since Friday. The customer filed the case under Teams by mistake. Nothing was checked on the Teams side."
+    },
+    {
+      "key": "ev06",
+      "at": 75,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: invoices mailbox gets nothing",
+      "text": "Thank you, I will wait for the mail team to write to me."
+    }
+  ]
+}

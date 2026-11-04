@@ -1,0 +1,60 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-024-restored-profiles",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T15:20:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev04", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev06", "id": "sig.cache-clear-resolved" },
+        {
+          "event": "ev09",
+          "id": "sig.cache-clear-resolved",
+          "uncertainty": "low",
+          "note": "restated in the closing note"
+        },
+        {
+          "event": "ev09",
+          "id": "sig.no-server-side-failure-records",
+          "uncertainty": "low",
+          "note": "restated in the closing note"
+        }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.clear-teams-cache" }
+      ],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.web-client-also-fails",
+          "reason": "negated",
+          "note": "the browser works inside the same desktop"
+        },
+        {
+          "event": "ev03",
+          "id": "sig.site-correlated",
+          "reason": "negated",
+          "note": "different offices, so not a place"
+        },
+        { "event": "ev09", "id": "sig.web-client-also-fails", "reason": "negated" }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.client-cache"],
+      "rationale": "Nine users on virtual desktops share one history: their profile disks were restored from backup. The customer already says the browser works, and the engineer rules out a shared site before looking at the logs, which hold nothing for the failing attempts. A targeted reset of the Teams data and the account broker data in one profile fixes it, then the other eight. Here a cache reset is the right first remedy, so it is an action without a fork, and the fix is reported by the customer. Only the signals that the text states are labelled; the browser works and the nine are not in one place, which are denials.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

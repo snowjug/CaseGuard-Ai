@@ -1,0 +1,141 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-025-chat-risky-signins",
+  "split": "dev",
+  "family": "fam-019",
+  "title": "London office blocked from Teams",
+  "scenario": "Chat-style exchange: a new VPN egress range makes a sign-in risk policy block the London office; DNS and proxies are ruled out, an exclusion aimed at the wrong group changes nothing, and adding the contractors group fixes it.",
+  "categories": ["noisy"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-22T09:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "teams blocking ppl",
+      "text": "hi. teams keeps blocking ppl at our london office, msg says something like access blocked contact ur admin. since this morning approx 25 users. ive tried restarting the app and the pc, nothing"
+    },
+    {
+      "key": "ev02",
+      "at": 4,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: teams blocking ppl",
+      "text": "hi, sorry about that. can u send 3 users + a utc time for a failed login for each, and the exact text on the screen?"
+    },
+    {
+      "key": "ev03",
+      "at": 22,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: teams blocking ppl",
+      "text": "ok. j.smith 08:12, a.patel 08:20, m.okafor 08:31 (thats local, we are UTC+1 so 07:12 etc sorry). text: You cannot access this right now. Your sign-in was successful but does not meet the criteria to access this resource."
+    },
+    {
+      "key": "ev04",
+      "at": 25,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: teams blocking ppl",
+      "text": "thx. looking at the logs now, back in 10"
+    },
+    {
+      "key": "ev05",
+      "at": 38,
+      "who": "engineer",
+      "type": "query_output",
+      "channel": "tool",
+      "title": "SigninLogs for the three users",
+      "text": "SigninLogs | where UserPrincipalName in (j.smith, a.patel, m.okafor) | where TimeGenerated between (07:00 .. 07:45)\n07:12:09Z j.smith    ResultType 53003  Blocked by Conditional Access  Policy: Block risky sign-ins  RiskLevelDuringSignIn: medium  IP 203.0.113.44\n07:20:41Z a.patel    ResultType 53003  Blocked by Conditional Access  Policy: Block risky sign-ins  RiskLevelDuringSignIn: medium  IP 203.0.113.51\n07:31:02Z m.okafor   ResultType 53003  Blocked by Conditional Access  Policy: Block risky sign-ins  RiskLevelDuringSignIn: medium  IP 203.0.113.47"
+    },
+    {
+      "key": "ev06",
+      "at": 41,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: teams blocking ppl",
+      "text": "found it: the CA policy Block risky sign-ins is blocking them, risk = medium (unfamiliar sign-in properties). has anything changed on ur side re ip / vpn / egress lately? it usually happens when the sign-in ip changes"
+    },
+    {
+      "key": "ev07",
+      "at": 55,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: teams blocking ppl",
+      "text": "yes!! we moved to a new vpn provider last wed so everybody now exits from a new ip range 203.0.113.0/24. is that the thing?? btw is there any news on the teams rooms firmware, someone asked me"
+    },
+    {
+      "key": "ev08",
+      "at": 71,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "dns and proxy checks from the london vpn",
+      "text": "likely yes. to rule out the usual suspects i tested from the london vpn: all 3 resolvers (10.50.0.2, .3, .4) answer the sign-in hosts fine, and all 4 proxy nodes respond normally. so its not dns or proxy, its the CA risk policy reacting to the new ip range"
+    },
+    {
+      "key": "ev09",
+      "at": 78,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: teams blocking ppl",
+      "text": "pls ask ur identity team to (1) add the new vpn ranges as a trusted named location or (2) exclude the london group from the risk policy while they review it. if u do (2) tell me the time so i can check the logs. (re rooms firmware: not my area, ask the devices team)"
+    },
+    {
+      "key": "ev10",
+      "at": 125,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: teams blocking ppl",
+      "text": "excluded the london-staff group from Block risky sign-ins at 10:05 utc. people still blocked :( one just refreshed and got the same msg"
+    },
+    {
+      "key": "ev11",
+      "at": 135,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "logs after 10:05",
+      "text": "yes: the exclusion is on the group London Staff, but the 3 users are in London Contractors, which is not excluded. their new rows still show the policy applied and blocked"
+    },
+    {
+      "key": "ev12",
+      "at": 150,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: teams blocking ppl",
+      "text": "oh!! added the contractors group too, 10:40 utc. testing with the 3 of them now"
+    },
+    {
+      "key": "ev13",
+      "at": 165,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: teams blocking ppl",
+      "text": "all 3 can sign in now. others in london say the same"
+    },
+    {
+      "key": "ev14",
+      "at": 180,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "check after the second exclusion",
+      "text": "confirmed: from 10:40 utc no CA blocks for london users in the logs (checked 25 mins, 118 sign-ins). pls fix it properly with the trusted ranges. closing after ur ok"
+    }
+  ]
+}

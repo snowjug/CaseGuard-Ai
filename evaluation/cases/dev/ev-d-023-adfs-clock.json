@@ -1,0 +1,96 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-023-adfs-clock",
+  "split": "dev",
+  "family": "fam-017",
+  "title": "Intermittent Microsoft 365 sign-in failures with our own AD FS",
+  "scenario": "One of three federation servers runs six minutes fast after patching, so the tokens it issues are rejected as not yet valid and users routed to it fail; taking it out of the load balancer fixes it.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-18T13:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Login failures Teams and other 365 applications",
+      "text": "Good afternoon. We have intermittent login failures to Teams and to the other Microsoft 365 applications for approximately 3000 users. It started after the weekend. A second attempt often works. Users in the office and users on the VPN have the same. We use federated sign-in with our own AD FS farm of three servers. Please support us as soon as possible."
+    },
+    {
+      "key": "ev02",
+      "at": 15,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Login failures Teams and other 365 applications",
+      "text": "Hello, since you use AD FS I would like to check the federation side first. Could you look at the health of each of the three servers: the token-signing and service communication certificates, the system time, and the AD FS event log around failed attempts? Please also send me the names of three failing users and the UTC moment of one failure for each of them."
+    },
+    {
+      "key": "ev03",
+      "at": 55,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Login failures Teams and other 365 applications",
+      "text": "Users: h.berg 12:31 UTC, a.solheim 12:44 UTC, k.moe 12:58 UTC. Server check: ADFS01 and ADFS02 look normal. On ADFS03 the clock is about 6 minutes fast and its event log has many errors saying a token is not valid yet. The certificates are valid on all three servers until next year. We think ADFS03 lost its time sync during the Sunday patching."
+    },
+    {
+      "key": "ev04",
+      "at": 70,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log lookup",
+      "text": "Entra sign-in logs for the three users: a failed row at each of the times given, all for the federated path, with the token from the identity provider rejected as not yet valid. For each of them there are successful sign-ins a few minutes before or after."
+    },
+    {
+      "key": "ev05",
+      "at": 82,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "That is the cause",
+      "text": "That fits what you found. The clock of ADFS03 runs 6 minutes fast, so the tokens it issues are not valid yet when Microsoft receives them. Users who are routed to that server fail and the others succeed, which is why a second try often works. Please (1) take ADFS03 out of the load balancer now, (2) resync its time with your domain time source, and (3) put it back only after you have checked it. Tell me when the first step is done."
+    },
+    {
+      "key": "ev06",
+      "at": 140,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: That is the cause",
+      "text": "ADFS03 has been out of the load balancer since 14:20 UTC. We resynced the time and it is correct now, but we will leave the server out until tomorrow morning."
+    },
+    {
+      "key": "ev07",
+      "at": 185,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: That is the cause",
+      "text": "15:05 UTC: since 14:20 no more failures have been reported. Our service desk had 60 tickets this morning and none since."
+    },
+    {
+      "key": "ev08",
+      "at": 195,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Sign-ins before and after",
+      "text": "Federated sign-ins from 14:20 to 15:15 UTC: about 41,000 successful and no rejected tokens. Before the change roughly one attempt in three had been rejected. I will keep the case open until you confirm tomorrow's check before ADFS03 goes back."
+    },
+    {
+      "key": "ev09",
+      "at": 1500,
+      "who": "engineer",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Closing note",
+      "text": "Cause: the clock of one AD FS node ran about six minutes fast after the Sunday patching, so its tokens were rejected as not yet valid. Workaround: node out of rotation, time resynced. The customer re-added the node after checking it and will alert on time drift. Closed with their confirmation."
+    }
+  ]
+}

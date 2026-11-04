@@ -1,0 +1,105 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-v-003-bergen-second-factor",
+  "split": "validation",
+  "family": "fam-103",
+  "title": "Teams keeps asking for the second factor in Bergen",
+  "scenario": "A new access policy with no trusted location sends the head office through repeated second-factor requests; sign-in logs and the audit log show it, a test exclusion confirms it and the policy is corrected.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-08-10T08:30:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Second factor over and over in Teams",
+      "text": "Hello. Since the early morning many colleagues in the Bergen head office keep getting a second-factor request in Teams, over and over, and then Teams says 'Authentication failed'. The IT desk counts 80 tickets. People in the Stavanger office have no trouble. No code is shown, only the message."
+    },
+    {
+      "key": "ev02",
+      "at": 16,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Second factor over and over in Teams",
+      "text": "Hi, thank you for the report. Please pick three affected people and give me the UTC moment when each of them last failed. I would also like to hear whether anybody edited an access policy, a network rule or a proxy setting recently."
+    },
+    {
+      "key": "ev03",
+      "at": 60,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Second factor over and over in Teams",
+      "text": "People: e.dahl 06:55 UTC, t.lunde 07:20 UTC, r.berg 07:48 UTC. Yes: our security group published a new Conditional Access policy yesterday at 15:00 UTC that asks for MFA on every sign-in from outside the office network. Nothing was changed in networking."
+    },
+    {
+      "key": "ev04",
+      "at": 85,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log search",
+      "text": "Sign-in log search: each of the three attempts has a failed row at the reported time. e.dahl and r.berg show 'Interrupted: MFA required' (AADSTS50076), t.lunde shows a Conditional Access failure."
+    },
+    {
+      "key": "ev05",
+      "at": 95,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Audit log",
+      "text": "Audit log of the last 7 days: the policy 'MFA outside office' was created yesterday at 15:02 UTC and assigned to all users. Its list of trusted locations is empty."
+    },
+    {
+      "key": "ev06",
+      "at": 110,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Second factor over and over in Teams",
+      "text": "Thanks. As a test, please ask your security group to leave e.dahl, t.lunde and r.berg out of that policy for an hour, and tell me the time they do it."
+    },
+    {
+      "key": "ev07",
+      "at": 190,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Second factor over and over in Teams",
+      "text": "They were left out at 10:40 UTC. All three signed in at once, without any request for the second factor."
+    },
+    {
+      "key": "ev08",
+      "at": 205,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Second factor over and over in Teams",
+      "text": "Good, that points to the policy. Please let your security group edit it: add the office ranges as a trusted location, or limit the policy to the people who need it, and then take the test exclusion away. Tell me when the change is made so that I can read the sign-in logs afterwards."
+    },
+    {
+      "key": "ev09",
+      "at": 360,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Second factor over and over in Teams",
+      "text": "Change made at 13:15 UTC: the office ranges are a trusted location now and the test exclusion is removed. The IT desk has had no new tickets since 13:30 UTC."
+    },
+    {
+      "key": "ev10",
+      "at": 390,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Check after the change",
+      "text": "Check at 15:00 UTC: there are no failed Conditional Access rows for Bergen since 13:20 UTC, over more than an hour and a half of logs, and the three sample users signed in without a second-factor request."
+    }
+  ]
+}

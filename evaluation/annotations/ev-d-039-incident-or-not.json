@@ -1,0 +1,68 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-039-incident-or-not",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T17:50:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.error-timeout" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev05", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev06", "id": "sig.service-health-clear" },
+        { "event": "ev09", "id": "sig.service-health-incident" },
+        { "event": "ev10", "id": "sig.error-timeout" },
+        { "event": "ev11", "id": "sig.service-health-incident" }
+      ],
+      "actions": [
+        { "event": "ev03", "id": "act.request-minimal-scoping" },
+        { "event": "ev05", "id": "act.signin-log-correlation" },
+        { "event": "ev06", "id": "act.check-service-health" },
+        { "event": "ev09", "id": "act.check-service-health" },
+        { "event": "ev11", "id": "act.communicate-status" },
+        { "event": "ev12", "id": "act.validate-fix", "uncertainty": "low" }
+      ],
+      "absent": [
+        {
+          "event": "ev07",
+          "id": "sig.service-health-incident",
+          "reason": "attributed",
+          "note": "the office manager says the status page showed a red banner; no screenshot"
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [
+        {
+          "class": "source_disagreement",
+          "events": ["ev06", "ev07"],
+          "subject": "sig.service-health-incident",
+          "note": "the engineer's check shows no incident, the office manager says a banner was shown"
+        },
+        {
+          "class": "temporal_update",
+          "events": ["ev06", "ev09"],
+          "subject": "sig.service-health-incident",
+          "note": "clear at 12:10, an incident posted by 13:30 with a start time of 10:25"
+        },
+        {
+          "class": "ambiguous_wording",
+          "events": ["ev08", "ev10"],
+          "subject": "whether sign-in works",
+          "note": "it works now: for whom and how completely? A Leeds user says it still fails"
+        }
+      ],
+      "qualityBand": "strong",
+      "causes": ["hyp.service-incident"],
+      "rationale": "A vendor incident whose evidence arrives in contradictory pieces. The customer's own synthetic probe says 100 percent success, but it runs from the datacentre, not from the office, so it does not speak about the office. The first health check is clear and a status banner is only hearsay without a screenshot, which is attributed and not a signal. The incident is then posted with a start time hours earlier, so the health state changes between two checks. The customer's it works now is too loose to tell apart from a difference of phrasing, and a user in the office says it still fails. The engineer checks logs and health in the right order and communicates with timings.",
+      "uncertainty": "medium"
+    }
+  ],
+  "adjudication": null
+}

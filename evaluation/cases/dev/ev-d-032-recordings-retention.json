@@ -1,0 +1,69 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-032-recordings-retention",
+  "split": "dev",
+  "family": "fam-026",
+  "title": "Meeting recordings disappeared from the meeting chats",
+  "scenario": "Recordings vanish after a retention policy was shortened: a policy change and missing items, but nothing about signing in.",
+  "categories": ["negative-control"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-07-01T10:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Recordings gone",
+      "text": "Hello, meeting recordings from the last weeks have disappeared from the meeting chats. Last week our compliance officer changed the retention policy for Teams recordings from 120 days to 14 days. Could that be the reason? Everybody can still sign in and use Teams without any trouble."
+    },
+    {
+      "key": "ev02",
+      "at": 18,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Recordings gone",
+      "text": "Hello, very likely yes: a 14-day retention policy removes recordings that are older than 14 days. To confirm, which meeting dates are missing?"
+    },
+    {
+      "key": "ev03",
+      "at": 45,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Recordings gone",
+      "text": "Everything older than 14 days. Meetings from 20 May to 12 June are gone, newer ones are there."
+    },
+    {
+      "key": "ev04",
+      "at": 60,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Recordings gone",
+      "text": "That matches the new setting. Deleted recordings can be restored from the recycle bin for 93 days by an administrator. Ask your OneDrive administrator to search the deleted items of the meeting organisers and restore the recordings you need."
+    },
+    {
+      "key": "ev05",
+      "at": 140,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Recordings gone",
+      "text": "We restored them all. We will raise the policy to 60 days. Thank you."
+    },
+    {
+      "key": "ev06",
+      "at": 150,
+      "who": "engineer",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Closing note",
+      "text": "Recordings were removed by a retention policy that was shortened to 14 days. Restored from the recycle bin by the customer's administrator. No sign-in or access problem was involved."
+    }
+  ]
+}

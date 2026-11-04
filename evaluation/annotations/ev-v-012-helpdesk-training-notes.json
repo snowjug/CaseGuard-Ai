@@ -1,0 +1,57 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-v-012-helpdesk-training-notes",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T23:20:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [],
+      "actions": [],
+      "absent": [
+        {
+          "event": "ev04",
+          "id": "act.request-minimal-scoping",
+          "reason": "conditional",
+          "note": "taught as what to do if a user complains, not asked of this customer"
+        },
+        {
+          "event": "ev04",
+          "id": "act.signin-log-correlation",
+          "reason": "conditional",
+          "note": "taught as a step for a future complaint"
+        },
+        {
+          "event": "ev04",
+          "id": "act.review-ca-policy-config",
+          "reason": "conditional",
+          "note": "taught as a step for a future complaint"
+        },
+        {
+          "event": "ev04",
+          "id": "act.revoke-user-sessions",
+          "reason": "conditional",
+          "note": "taught as the last step for a future complaint"
+        },
+        {
+          "event": "ev04",
+          "id": "act.exclude-users-from-mfa-ca",
+          "reason": "conditional",
+          "note": "taught as the last step for a future complaint"
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": null,
+      "causes": [],
+      "rationale": "A request for a plain explanation for a course. The engineer teaches a sequence of steps for a future complaint, and each step that is named is a conditional description and not something done or asked in this case. No fault, no data and no change exist.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

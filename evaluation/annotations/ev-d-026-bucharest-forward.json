@@ -1,0 +1,75 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-026-bucharest-forward",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T15:40:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        {
+          "event": "ev01",
+          "id": "sig.multiple-users-affected",
+          "note": "from the forwarded helpdesk message"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.web-client-also-fails",
+          "note": "the web version does the same, in the forwarded message"
+        },
+        { "event": "ev03", "id": "sig.error-name-not-resolved" },
+        { "event": "ev05", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev06", "id": "sig.resolver-inconsistent" },
+        { "event": "ev07", "id": "sig.resolver-inconsistent" },
+        { "event": "ev09", "id": "sig.recent-network-change-reported" },
+        { "event": "ev10", "id": "sig.dns-fix-resolved" },
+        { "event": "ev11", "id": "sig.dns-fix-resolved" },
+        {
+          "event": "ev12",
+          "id": "sig.recent-network-change-reported",
+          "uncertainty": "low",
+          "note": "restated in the closing note"
+        }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev05", "id": "act.signin-log-correlation" },
+        { "event": "ev06", "id": "act.dns-resolver-comparison" },
+        {
+          "event": "ev07",
+          "id": "act.remove-resolver-from-service",
+          "uncertainty": "low",
+          "note": "points clients at the healthy resolver instead of the filtered ones"
+        },
+        { "event": "ev07", "id": "act.restore-dns-policy" },
+        { "event": "ev11", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.resolver-inconsistent",
+          "reason": "speculative",
+          "note": "we think maybe it is DNS"
+        },
+        {
+          "event": "ev08",
+          "id": "act.remove-resolver-from-service",
+          "reason": "attributed",
+          "note": "a quote of the engineer's own step"
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.dns-resolution"],
+      "rationale": "A noisy thread: a forwarded helpdesk message with a disclaimer, a pasted client log with the name-resolution error, an out-of-office reply, and a customer reply that quotes the engineer's own instruction. The forwarded text is the first statement of the facts, so its scope and the web-client failure are labelled on ev01. The customer's guess about DNS is a speculation, not a finding. The engineer correlates the logs, compares a filtered resolver with an unfiltered one and asks for a workaround in DHCP and a rule correction with an exception for the Microsoft endpoints. The quote in ev08 repeats the engineer's step and is not a new action.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

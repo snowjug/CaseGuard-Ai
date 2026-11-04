@@ -1,0 +1,45 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-031-exclude-group-howto",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T16:25:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [],
+      "actions": [],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "future_intent",
+          "note": "an MFA roll-out planned for next month, not done"
+        },
+        {
+          "event": "ev02",
+          "id": "act.exclude-users-from-mfa-ca",
+          "reason": "other",
+          "note": "a how-to explanation, nothing is excluded or asked for"
+        },
+        {
+          "event": "ev04",
+          "id": "act.exclude-users-from-mfa-ca",
+          "reason": "future_intent",
+          "note": "advice to try a test account before the real roll-out"
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": null,
+      "causes": [],
+      "rationale": "A negative control with the vocabulary of a policy problem and no problem: a customer plans an MFA roll-out and asks how exclusions work. No change has been made, nothing fails, and no step of this case is a diagnostic action. The words about excluding users from the policy appear twice in the engineer's replies as general explanation and as advice for later, so they are absences (other, future intent), and the planned roll-out is not a reported change.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

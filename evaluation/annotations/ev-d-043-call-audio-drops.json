@@ -1,0 +1,18 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-043-call-audio-drops",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T18:35:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [],
+      "rationale": "Wireless congestion in a call-quality case. It speaks of sign-in and of a site, and it has a diagnostic result, but the workload is not the one the knowledge pack covers, so nothing in it is a signal of the vocabulary and the engine has to refuse the case.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

@@ -1,0 +1,105 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-029-dsregcmd-paste",
+  "split": "dev",
+  "family": "fam-023",
+  "title": "Teams desktop will not sign in on new laptops in Madrid",
+  "scenario": "Six laptops from a new image have duplicate device registrations and no primary refresh token; a pasted device status shows it next to a healthy older laptop, and a re-registration fixes them.",
+  "categories": ["noisy"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-26T14:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "teams no entra en portatiles nuevos",
+      "text": "buenas, we have 6 users in finance with the new laptops (image from last week), teams desktop no entra: it asks for login and then asks again, in a loop. outlook on the web is ok for them. they sit in madrid office 2nd floor, but not everybody on the floor, only the new laptops. thanks"
+    },
+    {
+      "key": "ev02",
+      "at": 11,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: teams no entra en portatiles nuevos",
+      "text": "Hi, thanks. Could you run dsregcmd /status on one of the new laptops and paste the Device State and SSO State parts here? Please do the same on an older laptop of someone for whom Teams works."
+    },
+    {
+      "key": "ev03",
+      "at": 40,
+      "who": "customer",
+      "type": "log_sample",
+      "channel": "portal",
+      "title": "dsregcmd outputs",
+      "text": "NEW laptop (Elena):\n+----------------------------------------------------------------------+\n| Device State                                                         |\n+----------------------------------------------------------------------+\n             AzureAdJoined : YES\n          EnterpriseJoined : NO\n              DomainJoined : YES\n                DomainName : CORP\n+----------------------------------------------------------------------+\n| SSO State                                                            |\n+----------------------------------------------------------------------+\n                AzureAdPrt : NO\n      AzureAdPrtUpdateTime :\n\nOLD laptop (Carmen):\n             AzureAdJoined : YES\n              DomainJoined : YES\n                AzureAdPrt : YES\n      AzureAdPrtUpdateTime : 2026-06-26 08:11:03.000 UTC"
+    },
+    {
+      "key": "ev04",
+      "at": 43,
+      "who": "system",
+      "type": "system_event",
+      "channel": "tool",
+      "title": "Status changed",
+      "text": "Case status changed from Waiting for customer to In progress. Reason: customer reply received."
+    },
+    {
+      "key": "ev05",
+      "at": 58,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in logs for the six users",
+      "text": "Looked up the six users in the Entra sign-in logs of today. No failed rows for any of them. The failures happen on the laptop and never reach the service."
+    },
+    {
+      "key": "ev06",
+      "at": 66,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "portal",
+      "title": "Re: teams no entra en portatiles nuevos",
+      "text": "Thanks. On Elena's laptop there is no primary refresh token, and on Carmen's older one there is. With a fresh image the usual reason is a broken or duplicate device registration. Please check in the directory whether each of the six new laptops has two device records, delete the stale one, and rejoin the laptop. Then run dsregcmd /status again and tell me the AzureAdPrt line."
+    },
+    {
+      "key": "ev07",
+      "at": 150,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: teams no entra en portatiles nuevos",
+      "text": "you were right!! each of the 6 has 2 records, one old from the image template. we deleted the old ones and rejoined them, done 15:35 UTC"
+    },
+    {
+      "key": "ev08",
+      "at": 175,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "portal",
+      "title": "Re: teams no entra en portatiles nuevos",
+      "text": "checked 3 of them myself: AzureAdPrt YES now and teams opens at the first try. the other 3 users say ok too. gracias!"
+    },
+    {
+      "key": "ev09",
+      "at": 190,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "After the re-registration",
+      "text": "All six users have a successful Teams sign-in since 15:50 UTC and show a fresh primary refresh token. No further failures from them."
+    },
+    {
+      "key": "ev10",
+      "at": 200,
+      "who": "engineer",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Closing note",
+      "text": "Cause: the new image template left a stale device record, so each reimaged laptop had two registrations and no primary refresh token. Fixed by deleting the stale records and rejoining. The customer will clean the template before the next batch."
+    }
+  ]
+}

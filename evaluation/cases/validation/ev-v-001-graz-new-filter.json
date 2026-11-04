@@ -1,0 +1,132 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-v-001-graz-new-filter",
+  "split": "validation",
+  "family": "fam-101",
+  "title": "Teams stops with a service error in the Graz office",
+  "scenario": "After a Sunday switch to a filtering service, one DNS resolver gives errors for the CDN hostnames; the engineer finds it by comparing resolvers, rules out the proxy, takes the resolver out of use for the moment and gets the policy corrected.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-08-03T09:30:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams does not start in Graz",
+      "text": "Dear colleagues, from about 08:15 UTC on Monday a large part of our Graz office cannot open Teams: the client stops with the code caa82ee7 and the words 'We can't reach the service'. I count roughly 55 colleagues so far. The Vienna and Salzburg offices are not affected. If people retry several times, some of them get through."
+    },
+    {
+      "key": "ev02",
+      "at": 18,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams does not start in Graz",
+      "text": "Hi Elisabeth, thanks for the report. For my log search I need three people who are affected, plus a failure time in UTC for every one of them. In addition: which offices are healthy, and did anyone touch DNS, the firewall, the proxy or identity during the last two days?"
+    },
+    {
+      "key": "ev03",
+      "at": 70,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams does not start in Graz",
+      "text": "Names and times: l.huber 08:20 UTC, m.gruber 08:41 UTC, s.pichler 09:03 UTC. Healthy are Vienna and Salzburg, as I wrote. Our infrastructure group switched the Graz resolvers to the new filtering service on Sunday at around 22:00 UTC. Conditional Access is untouched."
+    },
+    {
+      "key": "ev04",
+      "at": 92,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Log search for the three attempts",
+      "text": "Sign-in log search for l.huber 08:20, m.gruber 08:41 and s.pichler 09:03 UTC: none of the three attempts has a failed row."
+    },
+    {
+      "key": "ev05",
+      "at": 96,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Provider status",
+      "text": "Provider status at 11:05 UTC: Teams and Entra ID show no open incident."
+    },
+    {
+      "key": "ev06",
+      "at": 110,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams does not start in Graz",
+      "text": "Elisabeth, thank you. Since the filtering service arrived on Sunday, could your network colleague query login.microsoftonline.com and a few Microsoft CDN names against each resolver that Graz clients receive by DHCP, from a machine inside Graz, and send me the answers?"
+    },
+    {
+      "key": "ev07",
+      "at": 150,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams does not start in Graz",
+      "text": "Result from a Graz machine at 11:50 UTC. Resolver A (10.40.1.2): all names resolved. Resolver B (10.40.1.3): all names resolved. Resolver C (10.40.1.4, the one with the filtering service): login.microsoftonline.com resolved, but the Microsoft CDN names came back as 'non-existent domain' in 6 of 10 queries."
+    },
+    {
+      "key": "ev08",
+      "at": 165,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams does not start in Graz",
+      "text": "Thank you, that is a clear difference. For now please take resolver C out of the Graz DHCP scopes, so that clients only receive A and B, and tell me the time. In parallel, could somebody time a sign-in request through every proxy node from Graz, to leave the proxy out of the picture?"
+    },
+    {
+      "key": "ev09",
+      "at": 250,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams does not start in Graz",
+      "text": "Resolver C left the Graz scopes at 12:55 UTC. Proxy test from Graz at 13:05 UTC: every node answered in under a second, 5 of 5 times each."
+    },
+    {
+      "key": "ev10",
+      "at": 325,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams does not start in Graz",
+      "text": "Update 14:55 UTC: Teams opens again for everybody I asked, about 20 people, since roughly 13:00 UTC."
+    },
+    {
+      "key": "ev11",
+      "at": 340,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams does not start in Graz",
+      "text": "Great. Taking resolver C out is only a stop-gap. For the lasting fix the filtering policy has to be corrected: the rule that blocks the Microsoft CDN names must go, or those names need an exception, through your change process. Please tell me when it is planned. I will compare the number of failures once the change is made."
+    },
+    {
+      "key": "ev12",
+      "at": 2930,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams does not start in Graz",
+      "text": "The infrastructure group changed the rule on Wednesday at 09:30 UTC and put resolver C back into the scopes at 10:00 UTC. Nobody in Graz has reported a problem since."
+    },
+    {
+      "key": "ev13",
+      "at": 2990,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Check after the change",
+      "text": "Check on Wednesday at 11:20 UTC: the repeated comparison shows all three resolvers answering every name, and the ticket count for Graz is Monday 63, Tuesday 4, Wednesday morning 0."
+    }
+  ]
+}

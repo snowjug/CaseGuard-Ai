@@ -1,0 +1,2 @@
+# The migration script reads the Wave 1 corpus from git into this directory and removes it again.
+.legacy-wave1/

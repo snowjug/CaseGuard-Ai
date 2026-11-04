@@ -1,0 +1,78 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-045-tartu-one-laptop",
+  "split": "dev",
+  "family": "fam-039",
+  "title": "Teams does not let one person sign in",
+  "scenario": "One person is shut out of Teams on a single laptop while the browser works and colleagues are fine; the device token is healthy, no failure record reaches the identity service, and a cache clear fixes it.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-07-22T07:20:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams problem for one user, Tartu",
+      "text": "Good morning. Our colleague Anne Ilves cannot get into Teams on her laptop since yesterday afternoon. The window says 'We hit a snag' and stays on the sign-in screen. Nobody else at the Tartu office has this, and Teams in her browser works without any problem."
+    },
+    {
+      "key": "ev02",
+      "at": 12,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams problem for one user, Tartu",
+      "text": "Good morning, thank you. Please run dsregcmd /status on Anne's laptop and paste the SSO State section, and send me the UTC moment of a failed attempt today."
+    },
+    {
+      "key": "ev03",
+      "at": 50,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams problem for one user, Tartu",
+      "text": "She tried at 07:46 UTC. This is the output:\n\nAzureAdPrt : YES\nAzureAdPrtUpdateTime : 2026-07-22 05:31:07.000 UTC\nDeviceAuthStatus : SUCCESS"
+    },
+    {
+      "key": "ev04",
+      "at": 62,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log lookup",
+      "text": "Sign-in logs for Anne Ilves at 07:46 UTC: no failed sign-in row exists at that time."
+    },
+    {
+      "key": "ev05",
+      "at": 70,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams problem for one user, Tartu",
+      "text": "Thank you. Please close Teams completely on Anne's laptop, clear the Teams cache folder and open Teams again, then tell me what happens."
+    },
+    {
+      "key": "ev06",
+      "at": 115,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams problem for one user, Tartu",
+      "text": "I cleared the cache at 08:25 UTC and Anne signed in at once. Teams has worked all morning."
+    },
+    {
+      "key": "ev07",
+      "at": 1500,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Next-day check",
+      "text": "Check on the next day at 08:20 UTC: Anne's laptop signed in to Teams without an error at 07:58 UTC and there is no new report from the Tartu office. Closing the case."
+    }
+  ]
+}

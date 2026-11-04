@@ -1,0 +1,75 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-028-expired-signing-cert",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T16:00:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev03", "id": "sig.multiple-users-affected" },
+        { "event": "ev06", "id": "sig.federation-node-error" },
+        { "event": "ev07", "id": "sig.server-side-failure-records-present" },
+        {
+          "event": "ev07",
+          "id": "sig.federation-node-error",
+          "uncertainty": "low",
+          "note": "the federated token or certificate rejected as not valid"
+        },
+        {
+          "event": "ev08",
+          "id": "sig.federation-node-error",
+          "uncertainty": "low",
+          "note": "the engineer restates the cause"
+        },
+        {
+          "event": "ev12",
+          "id": "sig.federation-node-error",
+          "uncertainty": "low",
+          "note": "restated in the closing note"
+        }
+      ],
+      "actions": [
+        { "event": "ev03", "id": "act.escalate-to-identity-team" },
+        {
+          "event": "ev04",
+          "id": "act.check-federation-health",
+          "uncertainty": "low",
+          "note": "advice to ask for the certificate check"
+        },
+        { "event": "ev04", "id": "act.request-minimal-scoping", "uncertainty": "low" },
+        { "event": "ev05", "id": "act.request-minimal-scoping" },
+        { "event": "ev05", "id": "act.check-federation-health" },
+        { "event": "ev07", "id": "act.signin-log-correlation" },
+        { "event": "ev11", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        {
+          "event": "ev02",
+          "id": "act.escalate-to-identity-team",
+          "reason": "future_intent",
+          "note": "I am escalating right away; the escalation itself is ev03"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.federation-node-error",
+          "reason": "other",
+          "note": "the quoted monitoring alert says there are warnings, without saying what"
+        }
+      ],
+      "forks": [{ "event": "ev03", "category": "premature_escalation" }],
+      "earliestMissed": "ev03",
+      "counterfactualDirection": "better",
+      "conflicts": [],
+      "qualityBand": "needs_attention",
+      "causes": ["hyp.federation"],
+      "rationale": "A formal outage report with capital letters, a quoted monitoring alert and inline answers. All users and all sites failing from midnight, plus an AD FS alert, are a strong hint at the federation farm, but the engineer escalates to the backend team straight away, before any sample user, any log lookup or any certificate check, so the escalation is premature. The escalation response sends the engineer back to collect users and check the signing certificate, and the customer finds it expired. The alert quoted in ev01 only says there are warnings, so the federation signal is first stated in ev06. The engineer's own closing note admits the escalation was early.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

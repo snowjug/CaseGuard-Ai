@@ -1,0 +1,150 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-040-rotterdam-prt-restart",
+  "split": "dev",
+  "family": "fam-034",
+  "title": "Laptops ask for credentials every time Teams opens",
+  "scenario": "A laptop group loses its token after a restart: the number of affected laptops is corrected from three to eleven, a healthy device report turns into a missing one, and a client-side detour is tried before the cause is found.",
+  "categories": ["contradiction"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-07-13T09:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Credentials prompt in Teams, Rotterdam",
+      "text": "Hello. Three laptops in our Rotterdam office ask for credentials every time Teams is opened, since Friday evening. Examples from this morning: n.vos 07:12 UTC, k.dekker 07:40 UTC, s.jansen 08:05 UTC. Teams in the browser works for these users."
+    },
+    {
+      "key": "ev02",
+      "at": 20,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt in Teams, Rotterdam",
+      "text": "Hello, thanks for the information. Please run dsregcmd /status on one of the three laptops while the problem is there and paste the SSO State section here."
+    },
+    {
+      "key": "ev03",
+      "at": 65,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt in Teams, Rotterdam",
+      "text": "Here is the output from n.vos's laptop:\n\n| SSO State |\nAzureAdPrt : YES\nAzureAdPrtUpdateTime : 2026-07-13 06:58:11.000 UTC\nAzureAdPrtExpiryTime : 2026-07-27 06:58:11.000 UTC"
+    },
+    {
+      "key": "ev04",
+      "at": 75,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt in Teams, Rotterdam",
+      "text": "Thank you, that is useful. Please run the same command on the other two laptops and paste the output."
+    },
+    {
+      "key": "ev05",
+      "at": 130,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt in Teams, Rotterdam",
+      "text": "k.dekker and s.jansen both show AzureAdPrt : NO. One correction to my first email: I wrote three laptops, but the helpdesk now tells me eleven laptops are affected, all of them in Rotterdam and none in Utrecht."
+    },
+    {
+      "key": "ev06",
+      "at": 145,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log lookup",
+      "text": "Sign-in logs for n.vos 07:12, k.dekker 07:40 and s.jansen 08:05 UTC: a failed interactive sign-in row exists at each of those times, with error AADSTS50173, the grant has expired and a fresh authentication is needed."
+    },
+    {
+      "key": "ev07",
+      "at": 190,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt in Teams, Rotterdam",
+      "text": "Update: after a restart, n.vos's laptop shows AzureAdPrt : NO as well. It said YES this morning."
+    },
+    {
+      "key": "ev08",
+      "at": 200,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt in Teams, Rotterdam",
+      "text": "Understood. As a quick test, please empty the Teams cache folder of k.dekker's laptop and open Teams again."
+    },
+    {
+      "key": "ev09",
+      "at": 250,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt in Teams, Rotterdam",
+      "text": "I emptied the Teams cache folder of k.dekker's laptop and the credentials prompt is still there, exactly as before."
+    },
+    {
+      "key": "ev10",
+      "at": 262,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt in Teams, Rotterdam",
+      "text": "Thank you. Please also uninstall and reinstall Teams on s.jansen's laptop and open it afterwards."
+    },
+    {
+      "key": "ev11",
+      "at": 320,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Credentials prompt in Teams, Rotterdam",
+      "text": "Reinstalled Teams on s.jansen's laptop. The same prompt appears again."
+    },
+    {
+      "key": "ev12",
+      "at": 335,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Escalation",
+      "text": "Thank you. I am escalating this to our identity backend team now, with the dsregcmd output and the sign-in log rows, and I will write again at 15:00 UTC with their answer."
+    },
+    {
+      "key": "ev13",
+      "at": 470,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Answer from the identity team",
+      "text": "The identity team found that the device synchronisation from your on-premises directory has been paused since Friday evening, so the registration of those laptops stopped being refreshed. Please resume the synchronisation on the Entra Connect server and tell me when a cycle has completed."
+    },
+    {
+      "key": "ev14",
+      "at": 560,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Answer from the identity team",
+      "text": "The synchronisation was resumed at 16:20 UTC and a cycle completed at 16:32 UTC. I restarted the three laptops and they show AzureAdPrt : YES now."
+    },
+    {
+      "key": "ev15",
+      "at": 580,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Check after the synchronisation",
+      "text": "Check at 16:50 UTC: the failure rate of the eleven laptops is zero since the restarts, and the pasted output of the three sample laptops shows AzureAdPrt : YES. I am closing the case."
+    }
+  ]
+}

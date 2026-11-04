@@ -1,0 +1,50 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-v-005-split-farm-clock",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T21:10:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev01", "id": "sig.web-client-also-fails" },
+        { "event": "ev04", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev05", "id": "sig.service-health-clear" },
+        {
+          "event": "ev07",
+          "id": "sig.federation-node-error",
+          "note": "a clock that is 7 minutes ahead on one server"
+        }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.check-service-health" },
+        { "event": "ev06", "id": "act.check-federation-health" },
+        {
+          "event": "ev08",
+          "id": "act.communicate-status",
+          "uncertainty": "medium",
+          "note": "tells what was found and what to do next"
+        },
+        { "event": "ev11", "id": "act.validate-fix" }
+      ],
+      "absent": [],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.federation"],
+      "rationale": "A federated sign-in in which the app and the browser both fail a share of the time. The sign-in logs name the federation service, provider status is clear, and the engineer sends the farm admin to check server health, certificate and clocks. One server has a clock seven minutes ahead after a host move. The fix is the time sync and the validation compares failure rates before and after.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

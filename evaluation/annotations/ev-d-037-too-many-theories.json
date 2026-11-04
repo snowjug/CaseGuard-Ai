@@ -1,0 +1,161 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-037-too-many-theories",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T17:30:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.single-user-scope" },
+        { "event": "ev05", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev07", "id": "sig.cache-clear-resolved" },
+        {
+          "event": "ev08",
+          "id": "sig.cache-clear-resolved",
+          "uncertainty": "low",
+          "note": "restated in the closing note"
+        }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.clear-teams-cache" },
+        { "event": "ev05", "id": "act.signin-log-correlation" },
+        { "event": "ev06", "id": "act.clear-teams-cache" }
+      ],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.token-expiry-errors",
+          "reason": "speculative",
+          "note": "it could be an expired token"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "speculative",
+          "note": "maybe a Conditional Access thing"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.service-health-incident",
+          "reason": "speculative",
+          "note": "or Microsoft having an outage"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.prt-missing",
+          "reason": "speculative",
+          "note": "or a broken device registration"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.federation-node-error",
+          "reason": "speculative",
+          "note": "or perhaps our company's ADFS"
+        },
+        {
+          "event": "ev02",
+          "id": "sig.web-client-also-fails",
+          "reason": "requested",
+          "note": "asks whether the browser lets her in"
+        },
+        {
+          "event": "ev03",
+          "id": "sig.web-client-also-fails",
+          "reason": "negated",
+          "note": "the browser works fine"
+        },
+        {
+          "event": "ev03",
+          "id": "sig.cache-clear-no-effect",
+          "reason": "conditional",
+          "note": "If that does not help"
+        },
+        {
+          "event": "ev04",
+          "id": "sig.token-expiry-errors",
+          "reason": "speculative",
+          "note": "possible cause (a)"
+        },
+        {
+          "event": "ev04",
+          "id": "sig.mfa-ca-events-in-logs",
+          "reason": "conditional",
+          "note": "(b) would show in the sign-in logs"
+        },
+        {
+          "event": "ev04",
+          "id": "sig.service-health-incident",
+          "reason": "speculative",
+          "note": "(c) looks unlikely"
+        },
+        {
+          "event": "ev04",
+          "id": "sig.prt-missing",
+          "reason": "speculative",
+          "note": "(d) a broken device registration"
+        },
+        {
+          "event": "ev04",
+          "id": "sig.federation-node-error",
+          "reason": "speculative",
+          "note": "(e) looks unlikely"
+        },
+        {
+          "event": "ev05",
+          "id": "sig.mfa-ca-events-in-logs",
+          "reason": "negated",
+          "note": "no Conditional Access results"
+        },
+        {
+          "event": "ev05",
+          "id": "sig.token-expiry-errors",
+          "reason": "negated",
+          "note": "no token errors"
+        },
+        {
+          "event": "ev08",
+          "id": "sig.token-expiry-errors",
+          "reason": "negated",
+          "note": "not an expired token"
+        },
+        {
+          "event": "ev08",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "negated",
+          "note": "not a Conditional Access change"
+        },
+        {
+          "event": "ev08",
+          "id": "sig.service-health-incident",
+          "reason": "negated",
+          "note": "not a service incident"
+        },
+        {
+          "event": "ev08",
+          "id": "sig.prt-missing",
+          "reason": "negated",
+          "note": "not a device registration fault"
+        },
+        {
+          "event": "ev08",
+          "id": "sig.federation-node-error",
+          "reason": "negated",
+          "note": "not the federation"
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.client-cache"],
+      "rationale": "A case made of theories. The user names five possible causes without knowing which, the engineer's working note lists the same five as unconfirmed and says which would show in the logs, and the closing note denies all five. None of them is a finding. The facts are few: one laptop is affected, the browser works, the logs hold no failure and no Conditional Access or token rows, and a local reset fixes it. The engineer moves from facts, asks the cheap questions first and uses the log lookup to decide between a local and a service-side cause.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

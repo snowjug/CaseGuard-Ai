@@ -1,0 +1,72 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-027-phones-after-reset",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T15:50:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev03", "id": "sig.ca-config-unchanged" },
+        {
+          "event": "ev03",
+          "id": "sig.token-expiry-errors",
+          "uncertainty": "low",
+          "note": "the phone says the session expired"
+        },
+        { "event": "ev04", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev04", "id": "sig.token-expiry-errors" },
+        { "event": "ev05", "id": "sig.policy-events-outside-failure-window" },
+        {
+          "event": "ev05",
+          "id": "sig.ca-config-unchanged",
+          "uncertainty": "low",
+          "note": "no policy change since Friday"
+        },
+        {
+          "event": "ev06",
+          "id": "sig.token-expiry-errors",
+          "uncertainty": "low",
+          "note": "sessions ended by the password change"
+        }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.review-ca-policy-config" },
+        { "event": "ev06", "id": "act.request-recent-changes" },
+        { "event": "ev10", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.recent-network-change-reported",
+          "reason": "negated",
+          "note": "because we did not"
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [
+        {
+          "class": "corrected_information",
+          "events": ["ev01", "ev07"],
+          "subject": "whether anything changed on the customer side",
+          "note": "we did not change anything, then a forced password change for 400 users"
+        }
+      ],
+      "qualityBand": "strong",
+      "causes": ["hyp.token-session"],
+      "rationale": "A phone call with a bad line, an unrelated aside, local times in UTC+7 and a caller whose English is limited. The caller says nothing changed on their side, but the logs show a password change for every user checked and an error that says the grant expired because of it; the caller later remembers the forced reset, which corrects the first statement. The engineer asks for the change history, converts the times, correlates the logs and runs the audit query, whose only rows are old. The labelled absence is the caller's denial of any change, which the later message corrects. The engineer's solution costs nothing: one fresh sign-in per phone.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

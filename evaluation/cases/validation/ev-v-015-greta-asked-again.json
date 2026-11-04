@@ -1,0 +1,105 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-v-015-greta-asked-again",
+  "split": "validation",
+  "family": "fam-115",
+  "title": "Is it my laptop or Teams that keeps asking me",
+  "scenario": "One user guesses at everything: it is only her, a cache clear may have helped, the message may have been a time-out, nobody changed a policy; the logs show that her sign-in was invalidated by a password change.",
+  "categories": ["negation"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-09-16T10:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams keeps asking me to sign in",
+      "text": "Hi, Teams keeps asking me to sign in since about yesterday afternoon. I think it is only me, my colleagues in the office do not have it, so it is not many people. Maybe it is the cache: I cleared it this morning and it seemed to help for a while, but I am not sure. The message might have been a time-out, I did not read it properly. I believe nobody changed any policy. Greta"
+    },
+    {
+      "key": "ev02",
+      "at": 20,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams keeps asking me to sign in",
+      "text": "Hello Greta, thanks. Please send me your user name, the UTC moment of your last prompt, and whether it also happens in the browser version of Teams."
+    },
+    {
+      "key": "ev03",
+      "at": 55,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams keeps asking me to sign in",
+      "text": "My user name is g.bakker, the last prompt was today at 09:42 UTC. In the browser it also asks me, so it is not only the app."
+    },
+    {
+      "key": "ev04",
+      "at": 75,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Log search",
+      "text": "Sign-in logs for g.bakker at 09:42 UTC: a failed row exists with error AADSTS50173. The stored grant is no longer valid, because the password of the user was changed or reset."
+    },
+    {
+      "key": "ev05",
+      "at": 80,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams keeps asking me to sign in",
+      "text": "Greta, thanks. Did you change or reset your password yesterday afternoon?"
+    },
+    {
+      "key": "ev06",
+      "at": 110,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams keeps asking me to sign in",
+      "text": "Yes, I changed it yesterday at 13:30 UTC after the reminder. I did not sign in again on my phone though."
+    },
+    {
+      "key": "ev07",
+      "at": 125,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams keeps asking me to sign in",
+      "text": "That explains the prompts. Please sign out of Teams everywhere, phone included, then sign in once with the new password and tell me whether the prompts stop."
+    },
+    {
+      "key": "ev08",
+      "at": 200,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams keeps asking me to sign in",
+      "text": "I signed out everywhere and signed in again at 13:15 UTC. No prompt since."
+    },
+    {
+      "key": "ev09",
+      "at": 400,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Check after the sign-in",
+      "text": "Check at 16:40 UTC: g.bakker has no failed rows since 13:15 UTC, and both the Teams app and the browser stay signed in."
+    },
+    {
+      "key": "ev10",
+      "at": 410,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Closing note",
+      "text": "Greta, closing note: your sign-in was invalidated by the password change and the phone still held the old one. After a password change please sign in again on every device. I am closing the case."
+    }
+  ]
+}

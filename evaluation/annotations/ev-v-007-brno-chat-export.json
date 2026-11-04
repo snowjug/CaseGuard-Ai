@@ -1,0 +1,62 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-v-007-brno-chat-export",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T21:50:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.error-timeout", "note": "'timed out' on the screen" },
+        { "event": "ev01", "id": "sig.site-correlated" },
+        { "event": "ev04", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev05", "id": "sig.service-health-incident" },
+        {
+          "event": "ev06",
+          "id": "sig.service-health-incident",
+          "uncertainty": "low",
+          "note": "restated"
+        },
+        { "event": "ev09", "id": "sig.service-health-incident" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.check-service-health" },
+        { "event": "ev06", "id": "act.communicate-status" },
+        { "event": "ev08", "id": "act.communicate-status" },
+        { "event": "ev09", "id": "act.check-service-health" },
+        { "event": "ev11", "id": "act.validate-fix" },
+        { "event": "ev12", "id": "act.communicate-status" }
+      ],
+      "absent": [
+        {
+          "event": "ev03",
+          "id": "sig.recent-network-change-reported",
+          "reason": "speculative",
+          "note": "Lukas said maybe he touched the firewall, not sure"
+        },
+        {
+          "event": "ev07",
+          "id": "sig.service-health-clear",
+          "reason": "speculative",
+          "note": "maybe the incident is over, idk"
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.service-incident"],
+      "rationale": "A provider incident told through pasted chat lines with abbreviations, typos and guesses. The customer's team guesses that a firewall might have been touched and, later, that the incident might be over: both are guesses and neither is a fact. The logs hold no failure rows for the three attempts, the engineer checks provider status twice, tells the customer to change nothing, keeps a rhythm of updates and validates with ticket counts after the incident ends.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

@@ -1,0 +1,69 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-005-p5-single-laptop",
+  "split": "dev",
+  "family": "fam-005",
+  "title": "Evaluation case p5-single-laptop: a single laptop is refused by Teams because it holds no primary refresh token",
+  "scenario": "A single laptop is refused by Teams because it holds no primary refresh token.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-02T08:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Cannot sign in on my laptop",
+      "text": "My laptop will not sign in to Teams since yesterday. My teammates sitting next to me are fine on their own machines."
+    },
+    {
+      "key": "ev02",
+      "at": 40,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Cannot sign in on my laptop",
+      "text": "Hello, I am sorry about that. Could your IT admin confirm that only this device is affected, and try removing the Teams cache and reinstalling the app?"
+    },
+    {
+      "key": "ev03",
+      "at": 130,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Cannot sign in on my laptop",
+      "text": "Confirmed, it is only this one device. We removed the cache folder and reinstalled Teams and nothing changed. Teams in the browser on the same laptop signs in without any problem."
+    },
+    {
+      "key": "ev04",
+      "at": 170,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Device registration check",
+      "text": "The device registration status from the laptop says it is joined to the tenant, but there is no primary refresh token on it."
+    },
+    {
+      "key": "ev05",
+      "at": 195,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Next step",
+      "text": "Please disconnect the laptop from the tenant, restart it, and join it again with the work account."
+    },
+    {
+      "key": "ev06",
+      "at": 300,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Next step",
+      "text": "After joining the laptop again it signs in normally."
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-042-vpn-drops-half-hourly",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T18:25:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [],
+      "rationale": "A gateway that drops sessions on a default timer. The text uses words that look like sign-in and name-resolution words, but the workload has no knowledge pack, so none of it is a signal of the vocabulary and the engine has to refuse the case.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

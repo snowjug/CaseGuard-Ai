@@ -1,0 +1,42 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-013-z4-negations",
+  "split": "dev",
+  "family": "fam-010",
+  "title": "Evaluation case z4-negations: a single user says what is not the case: not intermittent, not a whole team, nothing changed",
+  "scenario": "A single user says what is not the case: not intermittent, not a whole team, nothing changed.",
+  "categories": ["negative-control", "negation"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-02T08:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams will not let me in",
+      "text": "To be clear, this is not intermittent: it fails every single time I try. It is only me, not a whole team, and nothing was changed in our access policies."
+    },
+    {
+      "key": "ev02",
+      "at": 25,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams will not let me in",
+      "text": "Thank you. Please tell me your user name and when exactly, in UTC, one of the failed attempts happened."
+    },
+    {
+      "key": "ev03",
+      "at": 70,
+      "who": "enduser",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams will not let me in",
+      "text": "It was 08:41 UTC and my user name is k.larsen. Same as always, it fails each time."
+    }
+  ]
+}

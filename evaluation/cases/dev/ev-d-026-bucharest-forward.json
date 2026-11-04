@@ -1,0 +1,123 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-026-bucharest-forward",
+  "split": "dev",
+  "family": "fam-020",
+  "title": "Teams cannot reach the server in Bucharest",
+  "scenario": "Noisy thread with a forwarded helpdesk message, a pasted client log, an out-of-office reply and a quoted chain: a cloud DNS filter sinkholes a CDN host for one site only, fixed by pointing clients at an unfiltered resolver and then correcting the rule.",
+  "categories": ["noisy"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-23T07:40:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "FW: teams problem bucuresti",
+      "text": "Hello, pls see bellow. Our users in Bucharest cannot enter Teams and we think maybe it is DNS. Please help. Radu\n\n-----Original Message-----\nFrom: Elena (helpdesk)\nSent: Tuesday 23 June 07:12\nSubject: teams problem bucuresti\n\nRadu, since 07:00 about 30 people on floor 3 get the message that Teams cannot reach the server. The web version does the same. I rebooted my own pc, no change.\n\nNOTICE: this message is meant only for its addressee and can hold confidential information. If it reached you by mistake please remove it and tell the sender."
+    },
+    {
+      "key": "ev02",
+      "at": 14,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: FW: teams problem bucuresti",
+      "text": "Hello Radu, thank you for forwarding it. Please send me the names of three affected users and the UTC moment of one failure for each, a few lines of the Teams log from one of them, and which DNS servers the Bucharest PCs use and whether a DNS filtering service sits in front of them."
+    },
+    {
+      "key": "ev03",
+      "at": 49,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "RE: FW: teams problem bucuresti",
+      "text": "Sorry for the long text. Users: i.petrescu 07:21 UTC, c.dumitru 07:30 UTC, a.ionescu 07:44 UTC. DNS: 10.70.2.10 and 10.70.2.11, they forward to our cloud DNS security service. Log from i.petrescu:\n[2026-06-23 07:21:44.412] [error] net::ERR_NAME_NOT_RESOLVED https://login.microsoftonline.com/common/oauth2/authorize\n[2026-06-23 07:21:44.980] [error] sign-in failed: ERR_NAME_NOT_RESOLVED aadcdn.msauth.net\n[2026-06-23 07:22:10.113] [info] retry in 30s"
+    },
+    {
+      "key": "ev04",
+      "at": 50,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Automatic reply: RE: FW: teams problem bucuresti",
+      "text": "I am out of the office until 29 June with limited access to e-mail. For urgent IT matters please call Elena in the helpdesk, extension 4410."
+    },
+    {
+      "key": "ev05",
+      "at": 62,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log lookup",
+      "text": "Looked up i.petrescu, c.dumitru and a.ionescu in the Entra sign-in logs around the times given. There is no row for any of those attempts."
+    },
+    {
+      "key": "ev06",
+      "at": 75,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Name resolution by resolver",
+      "text": "Remote session on a Bucharest PC. Resolved the CDN host aadcdn.msauth.net against 10.70.2.10: a sinkhole address made of zeros, four times out of four. Against 10.80.1.10, the Cluj resolver, which does not use the filtering service: normal answers every time."
+    },
+    {
+      "key": "ev07",
+      "at": 88,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Cause and what to do",
+      "text": "Your cloud DNS security service answers with a sinkhole for the CDN host that Teams needs, and only the Bucharest resolvers use it. Please (1) point the Bucharest clients at the Cluj resolver 10.80.1.10 in the DHCP scope for now, and (2) ask whoever manages the filtering service to find the rule or category that matches this host and either roll it back or add an exception for the published Microsoft 365 endpoints, through your change process."
+    },
+    {
+      "key": "ev08",
+      "at": 130,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "RE: Cause and what to do",
+      "text": "Thanks, we do the dhcp change now. The owner of the filter is on holiday (see automatic reply) but Elena will call him.\n\n> (1) point the Bucharest clients at the Cluj resolver 10.80.1.10 in the DHCP scope for now"
+    },
+    {
+      "key": "ev09",
+      "at": 140,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "RE: Cause and what to do",
+      "text": "DHCP scope for Bucharest changed at 09:50 UTC, clients get 10.80.1.10 and 10.80.1.11 now, leases are renewing. In the vendor portal I see a new rule Block newly observed domains that somebody turned on last Monday."
+    },
+    {
+      "key": "ev10",
+      "at": 170,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "RE: Cause and what to do",
+      "text": "10:30 UTC. No more complaints from floor 3 and I tested 10 PCs, all sign in at once. Thank you!!"
+    },
+    {
+      "key": "ev11",
+      "at": 185,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Before and after",
+      "text": "From 09:55 UTC the Bucharest PCs get normal answers for the CDN host and 30 of 30 test sign-ins succeed. In the two hours before the change roughly half of the attempts had failed."
+    },
+    {
+      "key": "ev12",
+      "at": 200,
+      "who": "engineer",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Closing note",
+      "text": "Cause: a new category rule in the cloud DNS filter sinkholes the CDN host for resolvers that use it. Workaround: Bucharest DHCP points at the unfiltered Cluj resolvers. The rule correction and the Microsoft 365 exception are pending with the filter owner, who is away until Monday."
+    }
+  ]
+}

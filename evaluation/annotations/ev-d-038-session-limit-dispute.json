@@ -1,0 +1,88 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-038-session-limit-dispute",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T17:40:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.ca-config-unchanged" },
+        {
+          "event": "ev01",
+          "id": "sig.site-correlated",
+          "uncertainty": "low",
+          "note": "floors 3 and 4, not floor 2"
+        },
+        { "event": "ev04", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev04", "id": "sig.token-expiry-errors" },
+        {
+          "event": "ev04",
+          "id": "sig.recent-ca-change-reported",
+          "uncertainty": "low",
+          "note": "from the audit log, not from the customer"
+        },
+        { "event": "ev05", "id": "sig.recent-ca-change-reported" },
+        {
+          "event": "ev06",
+          "id": "sig.token-expiry-errors",
+          "uncertainty": "low",
+          "note": "restated as the cause"
+        },
+        {
+          "event": "ev09",
+          "id": "sig.token-expiry-errors",
+          "uncertainty": "low",
+          "note": "signed out every few hours"
+        }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.review-ca-policy-config" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev04", "id": "act.review-ca-policy-config" },
+        { "event": "ev06", "id": "act.communicate-status", "uncertainty": "low" },
+        {
+          "event": "ev08",
+          "id": "act.review-ca-policy-config",
+          "uncertainty": "low",
+          "note": "asks for the member list of the policy group"
+        },
+        { "event": "ev11", "id": "act.validate-fix" }
+      ],
+      "absent": [],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [
+        {
+          "class": "direct_contradiction",
+          "events": ["ev01", "ev05"],
+          "subject": "sig.ca-config-unchanged",
+          "note": "nothing was touched, then I set the sign-in frequency on Monday"
+        },
+        {
+          "class": "unresolved_conflict",
+          "events": ["ev06", "ev07"],
+          "subject": "membership of floor 2 in the policy group",
+          "note": "floor 2 is not in the group, 14 floor 2 people are in the group; the member list never arrives"
+        },
+        {
+          "class": "direct_contradiction",
+          "events": ["ev01", "ev09"],
+          "subject": "whether floor 2 is affected",
+          "note": "floor 2 is not affected, then a floor 2 user says they are"
+        }
+      ],
+      "qualityBand": "strong",
+      "causes": ["hyp.token-session", "hyp.conditional-access"],
+      "rationale": "A session-limit story in which people disagree and the record does not settle everything. The customer's admin says nothing was touched, a colleague then says he set the limit on Monday: a direct contradiction between two people, with the audit log on the colleague's side. Floor 2 is said to be unaffected and then a floor 2 user says they are affected, another direct contradiction. About group membership the engineer and the admin say opposite things and the member list that would settle it never arrives, so that conflict stays unresolved. The cause fits two hypotheses, a token or session lifetime problem and a Conditional Access policy, so both are labelled. The engineer asks for the right evidence and reaches the cause fast.",
+      "uncertainty": "medium"
+    }
+  ],
+  "adjudication": null
+}

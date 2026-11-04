@@ -1,0 +1,108 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-035-hearsay-proxy",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T17:10:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.error-timeout" },
+        { "event": "ev01", "id": "sig.site-correlated" },
+        { "event": "ev04", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev05", "id": "sig.service-health-clear" },
+        { "event": "ev06", "id": "sig.resolvers-consistent" },
+        { "event": "ev07", "id": "sig.proxy-node-inconsistent" },
+        {
+          "event": "ev08",
+          "id": "sig.resolvers-consistent",
+          "uncertainty": "low",
+          "note": "DNS is fine, restated"
+        },
+        {
+          "event": "ev08",
+          "id": "sig.service-health-clear",
+          "uncertainty": "low",
+          "note": "service health is clear, restated"
+        },
+        { "event": "ev08", "id": "sig.proxy-node-inconsistent" },
+        { "event": "ev09", "id": "sig.recent-network-change-reported" },
+        { "event": "ev10", "id": "sig.proxy-fix-resolved" },
+        { "event": "ev11", "id": "sig.proxy-fix-resolved" },
+        {
+          "event": "ev12",
+          "id": "sig.proxy-node-inconsistent",
+          "uncertainty": "low",
+          "note": "restated in the closing note"
+        }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.check-service-health" },
+        { "event": "ev06", "id": "act.dns-resolver-comparison" },
+        { "event": "ev07", "id": "act.proxy-node-comparison" },
+        { "event": "ev08", "id": "act.request-recent-changes" },
+        { "event": "ev11", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.resolvers-consistent",
+          "reason": "attributed",
+          "note": "the network team says all three DNS servers answer fine"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.proxy-nodes-consistent",
+          "reason": "attributed",
+          "note": "all four proxy nodes are green on their dashboard"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.service-health-clear",
+          "reason": "attributed",
+          "note": "our helpdesk says the status page is green"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.prt-healthy",
+          "reason": "attributed",
+          "note": "the desktop team says the token state is healthy"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.recent-network-change-reported",
+          "reason": "attributed",
+          "note": "the network team says nothing was changed"
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [
+        {
+          "class": "source_disagreement",
+          "events": ["ev01", "ev07"],
+          "subject": "sig.proxy-nodes-consistent",
+          "note": "the dashboard says all four nodes are green, the engineer's test finds one timing out"
+        },
+        {
+          "class": "corrected_information",
+          "events": ["ev01", "ev09"],
+          "subject": "sig.recent-network-change-reported",
+          "note": "nothing was changed, then a TLS inspection profile pushed last Thursday"
+        }
+      ],
+      "qualityBand": "strong",
+      "causes": ["hyp.proxy-egress"],
+      "rationale": "The customer opens by relaying five statements from other teams and says she has checked none of them, so none is a finding of this case: they are attributed. The engineer tests the points that can be tested. DNS, service health and the empty logs agree with what was relayed; the proxy dashboard does not, because one node times out in the engineer's own test, which makes the dashboard and the test two sources that disagree. The relayed statement that nothing changed is then corrected by the network admin, who finds a TLS inspection profile pushed the previous Thursday. The token state claim is never tested, so it stays attributed and unconfirmed.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

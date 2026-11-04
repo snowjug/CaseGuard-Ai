@@ -1,0 +1,69 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-v-012-helpdesk-training-notes",
+  "split": "validation",
+  "family": "fam-112",
+  "title": "Explaining sign-in rules to new helpdesk staff",
+  "scenario": "A trainer asks for a plain explanation of access rules and session limits for a course; the engineer describes what a helpdesk person would do if a user complained, which is conditional teaching and not a step in this case.",
+  "categories": ["negative-control"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-09-09T13:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Training for new helpdesk staff",
+      "text": "Hi, I am preparing a short course for our new helpdesk staff about how Teams sign-in works. There is no incident, this is only for the course. Could you explain in a few lines what Conditional Access does and what 'sign-in frequency' means? I will keep it generic. Ilse"
+    },
+    {
+      "key": "ev02",
+      "at": 30,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Training for new helpdesk staff",
+      "text": "Hello Ilse, happy to help. Conditional Access is a set of rules that decide whether a sign-in is allowed, needs a second factor or is blocked, based on user, device, location and risk. Sign-in frequency is a session control inside such a rule: it sets how long a session may last before people have to sign in again."
+    },
+    {
+      "key": "ev03",
+      "at": 80,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Training for new helpdesk staff",
+      "text": "Thank you. And what would a helpdesk person do if somebody said they are asked to sign in all the time?"
+    },
+    {
+      "key": "ev04",
+      "at": 110,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Training for new helpdesk staff",
+      "text": "That depends, so I would teach a sequence for such a case: ask for the exact message and a UTC time for one failed attempt, look it up in the sign-in logs, and only then read the policies. Revoking someone's sessions or leaving them out of a rule comes last, at the request of the policy owner, and never as a first reaction."
+    },
+    {
+      "key": "ev05",
+      "at": 160,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Training for new helpdesk staff",
+      "text": "That is useful, I will use the sequence on my slides. Thank you."
+    },
+    {
+      "key": "ev06",
+      "at": 170,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Training for new helpdesk staff",
+      "text": "You are welcome. I will close the case. If you want a second look at the slides, reply here."
+    }
+  ]
+}

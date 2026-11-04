@@ -1,0 +1,58 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-018-gothenburg-timeouts",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T14:20:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.error-timeout" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        { "event": "ev01", "id": "sig.site-correlated" },
+        { "event": "ev03", "id": "sig.web-client-also-fails" },
+        { "event": "ev05", "id": "sig.cache-clear-no-effect" },
+        {
+          "event": "ev05",
+          "id": "sig.site-correlated",
+          "uncertainty": "low",
+          "note": "works on mobile data, not on the building network"
+        },
+        { "event": "ev06", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev08", "id": "sig.recent-network-change-reported" },
+        { "event": "ev09", "id": "sig.proxy-node-inconsistent" },
+        { "event": "ev10", "id": "sig.proxy-node-inconsistent" },
+        { "event": "ev12", "id": "sig.proxy-fix-resolved" },
+        { "event": "ev13", "id": "sig.proxy-fix-resolved" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-har-capture" },
+        { "event": "ev04", "id": "act.clear-teams-cache" },
+        { "event": "ev04", "id": "act.reinstall-teams" },
+        { "event": "ev06", "id": "act.signin-log-correlation" },
+        { "event": "ev07", "id": "act.request-recent-changes" },
+        { "event": "ev09", "id": "act.proxy-node-comparison" },
+        { "event": "ev10", "id": "act.remove-proxy-node-from-rotation" },
+        { "event": "ev10", "id": "act.bypass-proxy-inspection" },
+        { "event": "ev13", "id": "act.validate-fix" }
+      ],
+      "absent": [],
+      "forks": [
+        { "event": "ev02", "category": "disproportionate_customer_effort" },
+        { "event": "ev04", "category": "low_value_action" }
+      ],
+      "earliestMissed": "ev02",
+      "counterfactualDirection": "better",
+      "conflicts": [],
+      "qualityBand": "needs_attention",
+      "causes": ["hyp.proxy-egress"],
+      "rationale": "A proxy story with a wasteful engineer. The first reply asks three users for a browser trace and a client trace for a problem that is already scoped to a site and shows timeouts, which costs the customer a whole morning for nothing. When the customer says the browser version fails too, the engineer still sends them to clear the cache and reinstall the client, a low-value step. The log lookup and the question about the network, which were available from the first message, come only the next day, and the per-proxy test then finds the bad node at once. The earliest missed moment is the trace request, and a log check and a proxy comparison there would clearly have been faster and cheaper for the customer.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

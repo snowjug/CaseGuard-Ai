@@ -11,7 +11,16 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "bench": "tsx bench/bench.ts",
-    "eval": "tsx test/evaluation/report.ts",
+    "eval": "tsx test/evaluation/run.ts dev",
+    "eval:check": "tsx test/evaluation/check.ts",
+    "eval:dev": "tsx test/evaluation/run.ts dev",
+    "eval:validation": "tsx test/evaluation/run.ts validation",
+    "eval:locked": "tsx test/evaluation/run.ts locked",
+    "eval:manifest": "tsx test/evaluation/manifest.ts",
+    "eval:coverage": "tsx test/evaluation/coverage.ts",
+    "eval:annotate": "tsx test/evaluation/annotate.ts",
+    "eval:agreement": "tsx test/evaluation/agreement.ts",
+    "eval:migrate": "tsx test/evaluation/migrate-wave1.ts",
     "eval:vocabulary": "tsx test/evaluation/vocabulary.ts"
   },
   "dependencies": {

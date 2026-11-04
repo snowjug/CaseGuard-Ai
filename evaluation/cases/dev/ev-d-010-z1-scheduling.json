@@ -1,0 +1,51 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-010-z1-scheduling",
+  "split": "dev",
+  "family": "fam-007",
+  "title": "Evaluation case z1-scheduling: two people arrange a call about the roll-out",
+  "scenario": "Two people arrange a call about the roll-out.",
+  "categories": ["negative-control"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-06-02T08:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Call tomorrow",
+      "text": "Hi, could we move tomorrow's call about the Teams roll-out to 15:00? The training team has a clash in the morning."
+    },
+    {
+      "key": "ev02",
+      "at": 20,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Call tomorrow",
+      "text": "Sure, 15:00 works for me. I will send a new invitation now."
+    },
+    {
+      "key": "ev03",
+      "at": 45,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Call tomorrow",
+      "text": "Thanks. Could you also send the agenda beforehand?"
+    },
+    {
+      "key": "ev04",
+      "at": 60,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Call tomorrow",
+      "text": "The agenda is attached: roll-out plan, training dates and the list of support contacts."
+    }
+  ]
+}

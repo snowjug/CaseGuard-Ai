@@ -1,0 +1,65 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-v-002-linz-warehouse-node",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T20:25:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        { "event": "ev01", "id": "sig.error-timeout" },
+        { "event": "ev01", "id": "sig.site-correlated" },
+        { "event": "ev01", "id": "sig.intermittent-failures" },
+        {
+          "event": "ev03",
+          "id": "sig.recent-network-change-reported",
+          "note": "a renewed inspection certificate on one proxy"
+        },
+        { "event": "ev03", "id": "sig.site-correlated", "uncertainty": "low", "note": "restated" },
+        { "event": "ev04", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev05", "id": "sig.service-health-clear" },
+        { "event": "ev07", "id": "sig.proxy-node-inconsistent" },
+        { "event": "ev09", "id": "sig.resolvers-consistent" },
+        { "event": "ev10", "id": "sig.proxy-fix-resolved" },
+        { "event": "ev12", "id": "sig.proxy-fix-resolved" },
+        { "event": "ev13", "id": "sig.proxy-nodes-consistent" },
+        {
+          "event": "ev13",
+          "id": "sig.proxy-fix-resolved",
+          "uncertainty": "low",
+          "note": "before and after counts"
+        }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.check-service-health" },
+        { "event": "ev06", "id": "act.proxy-node-comparison" },
+        { "event": "ev08", "id": "act.remove-proxy-node-from-rotation" },
+        {
+          "event": "ev08",
+          "id": "act.dns-resolver-comparison",
+          "note": "a side check of name resolution"
+        },
+        { "event": "ev11", "id": "act.bypass-proxy-inspection" },
+        { "event": "ev11", "id": "act.communicate-status" },
+        { "event": "ev13", "id": "act.validate-fix" }
+      ],
+      "absent": [],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.proxy-egress"],
+      "rationale": "A time-out story in a warehouse. The engineer scopes and correlates first and checks provider status, then sends the customer straight to compare the proxy nodes, which finds the one with the renewed certificate. The short-term measure and the permanent fix are asked for in the right order and the name-resolution side check comes back consistent. The repeated per-node test and the ticket counts validate the fix.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

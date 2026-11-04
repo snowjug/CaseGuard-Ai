@@ -1,0 +1,87 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-041-second-floor-print-queue",
+  "split": "dev",
+  "family": "fam-035",
+  "title": "Print jobs stay in the queue on the second floor",
+  "scenario": "A print-server queue blocked by a corrupt job: an ordinary support case for a workload that has no knowledge pack, so the engine has to refuse it.",
+  "categories": ["unsupported"],
+  "workload": "printer-queue",
+  "openedAt": "2026-07-14T08:30:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Printing stuck, second floor",
+      "text": "Since about 08:00 UTC no print job from the second floor leaves the queue. Every job shows Printing and never finishes. The first floor prints normally. About 40 people are affected."
+    },
+    {
+      "key": "ev02",
+      "at": 12,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Printing stuck, second floor",
+      "text": "Hello, thank you. Which print server hosts the queue, and does the queue show Error or Paused anywhere? Please also send me the name of one affected printer."
+    },
+    {
+      "key": "ev03",
+      "at": 40,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Printing stuck, second floor",
+      "text": "The server is PRN02, the printer is PRT-2F-East. The queue status says Printing, there is no Error. We restarted the printer and it made no difference."
+    },
+    {
+      "key": "ev04",
+      "at": 55,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Spooler check on PRN02",
+      "text": "The Print Spooler service on PRN02 is running. The spool folder holds 212 files, the oldest from 07:58 UTC. The file at the head of the queue has a size of 0 KB."
+    },
+    {
+      "key": "ev05",
+      "at": 62,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "A job at the head of the queue",
+      "text": "The job at the head of the queue is a zero-byte file and blocks everything behind it. Please stop the Print Spooler service on PRN02, delete the files in the spool folder and start the service again."
+    },
+    {
+      "key": "ev06",
+      "at": 105,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: A job at the head of the queue",
+      "text": "Done at 09:42 UTC. The queue is empty and a test page printed on PRT-2F-East."
+    },
+    {
+      "key": "ev07",
+      "at": 135,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Check on the queues",
+      "text": "Check at 10:15 UTC: the queues of all second floor printers are empty and 15 jobs completed in the last half hour."
+    },
+    {
+      "key": "ev08",
+      "at": 140,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Closing note",
+      "text": "The cause was a corrupt job at the head of the queue. If it comes back, please send me the time and the name of the user who printed first. I am closing the case."
+    }
+  ]
+}

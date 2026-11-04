@@ -1,0 +1,123 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-035-hearsay-proxy",
+  "split": "dev",
+  "family": "fam-029",
+  "title": "Madrid office gets connection timed out in Teams",
+  "scenario": "A customer relays what other teams told her instead of what she checked: DNS, proxies, service health and token state are all said to be fine; the engineer tests each, confirms three and finds that the proxy dashboard is wrong about one node and that the network did change.",
+  "categories": ["negation", "contradiction"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-07-06T08:30:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Madrid timeouts, Teams",
+      "text": "Hello, our Madrid office (about 60 people) gets the message connection timed out when opening Teams since Friday afternoon. Barcelona is fine. I am only passing on what I was told: the network team says all three DNS servers answer fine and all four proxy nodes are green on their dashboard; our helpdesk says the Microsoft status page is green; the desktop team says the token state is healthy on the laptops. I have not checked any of it myself. The network team also says nothing was changed on the network."
+    },
+    {
+      "key": "ev02",
+      "at": 14,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Madrid timeouts, Teams",
+      "text": "Hello Lucía, thank you for saying clearly who said what. I will test those points myself instead of relying on them. Please send me the names of three affected users and the UTC moment of one failure each."
+    },
+    {
+      "key": "ev03",
+      "at": 40,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Madrid timeouts, Teams",
+      "text": "Users: c.ortega 08:12 UTC, j.molina 08:41 UTC, r.navarro 09:05 UTC."
+    },
+    {
+      "key": "ev04",
+      "at": 55,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log lookup",
+      "text": "Looked up the three users in the Entra sign-in logs at the times given. There is no failure row for any of them."
+    },
+    {
+      "key": "ev05",
+      "at": 60,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Service health",
+      "text": "Service health at 09:30 UTC: nothing active for Teams or Entra ID."
+    },
+    {
+      "key": "ev06",
+      "at": 75,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Name resolution by server",
+      "text": "From a Madrid PC I resolved login.microsoftonline.com against each of the three DNS servers, ten times each. All three answered every time, within milliseconds."
+    },
+    {
+      "key": "ev07",
+      "at": 90,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Per-proxy test",
+      "text": "Requested the sign-in host through each of the four Madrid proxy nodes, five times each. mad-prx1, mad-prx2 and mad-prx4 answered in under a second. mad-prx3 timed out after 30 s on all five."
+    },
+    {
+      "key": "ev08",
+      "at": 98,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "What I found",
+      "text": "I tested the points. DNS is fine, as the network team said, and service health is clear. The proxy dashboard is wrong, though: mad-prx3 times out on the Microsoft sign-in address, and the other three nodes answer normally. Please ask the network team what changed on the proxy cluster, because the statement that nothing changed may not hold."
+    },
+    {
+      "key": "ev09",
+      "at": 150,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: What I found",
+      "text": "I looked again. The security team pushed a new TLS inspection profile to the proxy cluster last Thursday evening and I was not told. mad-prx3 took the profile but its certificate store is full. I am taking mad-prx3 out of the pool now."
+    },
+    {
+      "key": "ev10",
+      "at": 205,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: What I found",
+      "text": "mad-prx3 has been out since 11:20 UTC. At 11:55 nobody in Madrid has reported a timeout since then, I asked on all floors."
+    },
+    {
+      "key": "ev11",
+      "at": 215,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Test sign-ins",
+      "text": "20 of 20 test sign-ins from Madrid succeed since 11:25 UTC. Before the change about three in ten had timed out."
+    },
+    {
+      "key": "ev12",
+      "at": 225,
+      "who": "engineer",
+      "type": "resolution_note",
+      "channel": "internal",
+      "title": "Closing note",
+      "text": "Cause: one proxy node of four timed out for the Microsoft sign-in host after a TLS inspection profile was pushed without the network team knowing; the proxy dashboard still showed all nodes green. DNS, service health and the token state were as reported. Workaround: node out of the pool. The customer's security and network teams will agree how profile changes are announced."
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-v-014-not-dns-we-think",
+  "split": "validation",
+  "family": "fam-114",
+  "title": "Teams sign-in problem in Finance, but not what you think",
+  "scenario": "A customer who mostly says what the problem is not: no time-out, no cache clearing yet, DNS fine according to an old check, a policy change that cannot be confirmed; one proxy node turns out to time out.",
+  "categories": ["negation"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-09-15T09:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Finance cannot sign in to Teams",
+      "text": "Hello, Teams will not sign in for part of our Finance department in Lodz, about 12 people, since this morning. It is not everybody and it is not the whole company. The client shows caa82ee7 and 'Can't reach the sign-in service'. It is not a time-out, nothing says 'timed out'. I did not clear any cache yet, and I will not reinstall anything before you say so. Marek"
+    },
+    {
+      "key": "ev02",
+      "at": 18,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Finance cannot sign in to Teams",
+      "text": "Hello Marek, thank you. Could you name three affected people, each with a UTC moment, and tell me what your network, proxy, DNS and identity teams changed in the last two days?"
+    },
+    {
+      "key": "ev03",
+      "at": 70,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Finance cannot sign in to Teams",
+      "text": "People: i.nowak 08:10 UTC, r.wisniewska 08:35 UTC, p.zielinski 09:20 UTC. It is not DNS, our network admin says the resolvers are fine, he looked at them yesterday. I do not think anything changed in Conditional Access, but I cannot confirm that. Our parent company's network team may have touched something, I do not know."
+    },
+    {
+      "key": "ev04",
+      "at": 90,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Log search",
+      "text": "Sign-in logs for i.nowak 08:10, r.wisniewska 08:35 and p.zielinski 09:20 UTC: no failed row exists for any of the three."
+    },
+    {
+      "key": "ev05",
+      "at": 95,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Provider status",
+      "text": "Provider status at 10:35 UTC: Teams and Entra ID show no open incident."
+    },
+    {
+      "key": "ev06",
+      "at": 110,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Finance cannot sign in to Teams",
+      "text": "Marek, thank you. The affected people sit in one department, so I would rather have the proxy nodes tested than guess. Please let your network admin time a sign-in request through every proxy node from the Finance floor and send me the numbers for each node."
+    },
+    {
+      "key": "ev07",
+      "at": 140,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Finance cannot sign in to Teams",
+      "text": "Finance floor, 11:15 UTC, three nodes. Node 1: 0.5 s. Node 2: 0.4 s. Node 3: no answer within 20 s, three tries out of three. I did not expect that, I had only checked DNS."
+    },
+    {
+      "key": "ev08",
+      "at": 145,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Finance cannot sign in to Teams",
+      "text": "So it is not DNS after all. I still do not know whether anybody changed anything on node 3."
+    },
+    {
+      "key": "ev09",
+      "at": 150,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Finance cannot sign in to Teams",
+      "text": "Please take node 3 out of the rotation for now and tell me the time. No cache clearing and no reinstall is needed on any laptop."
+    },
+    {
+      "key": "ev10",
+      "at": 240,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Finance cannot sign in to Teams",
+      "text": "Node 3 has been out since 12:05 UTC. At 12:30 UTC the people in Finance said it works again. One person says it still does not, but that may be her Wi-Fi."
+    },
+    {
+      "key": "ev11",
+      "at": 330,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Check after the change",
+      "text": "Check at 14:30 UTC: the three sample users signed in without an error, and the ticket count for Finance has been 0 since 12:30 UTC."
+    }
+  ]
+}

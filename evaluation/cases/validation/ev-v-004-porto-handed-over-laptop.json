@@ -1,0 +1,123 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-v-004-porto-handed-over-laptop",
+  "split": "validation",
+  "family": "fam-104",
+  "title": "A new colleague cannot sign in to Teams in Porto",
+  "scenario": "One reused laptop has no primary refresh token and fails in the app and in the browser; a cache clear changes nothing, the device record turns out to be stale and the identity team has to clean it up.",
+  "categories": ["paraphrase"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-08-12T07:45:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "New colleague cannot sign in to Teams",
+      "text": "Hello, our new colleague Rita Alves cannot sign in to Teams on her laptop, which was handed to her on Monday. Teams in the browser fails for her as well, it just returns to the sign-in page. She is the only one: two other new colleagues with the same laptop model are fine."
+    },
+    {
+      "key": "ev02",
+      "at": 14,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: New colleague cannot sign in to Teams",
+      "text": "Hello. Could you ask Rita to open a command prompt on the laptop, run dsregcmd /status and send me the SSO State block? And please give me the UTC time of her last failed attempt."
+    },
+    {
+      "key": "ev03",
+      "at": 40,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: New colleague cannot sign in to Teams",
+      "text": "Her last failed attempt was today at 07:31 UTC. From the SSO State block:\n\nAzureAdPrt : NO\nDeviceAuthStatus : FAILED"
+    },
+    {
+      "key": "ev04",
+      "at": 55,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Log search",
+      "text": "Sign-in logs for r.alves at 07:31 UTC: a failed row exists, error 50155, device authentication failed."
+    },
+    {
+      "key": "ev05",
+      "at": 60,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: New colleague cannot sign in to Teams",
+      "text": "Thanks. Next, wipe the cached Teams data on the laptop, sign out of the browser as well, and try once more."
+    },
+    {
+      "key": "ev06",
+      "at": 75,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: New colleague cannot sign in to Teams",
+      "text": "The cache was cleared at 08:50 UTC. Same result in the Teams app and in the browser."
+    },
+    {
+      "key": "ev07",
+      "at": 90,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: New colleague cannot sign in to Teams",
+      "text": "Understood. Could your admin tell me whether the laptop appears in your device list with a recent activity time? Afterwards please restart the laptop and run dsregcmd /status again."
+    },
+    {
+      "key": "ev08",
+      "at": 150,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: New colleague cannot sign in to Teams",
+      "text": "The laptop is listed as hybrid joined, but its last activity is six days ago, before it was given to Rita. After the restart the output still says AzureAdPrt : NO."
+    },
+    {
+      "key": "ev09",
+      "at": 170,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Escalation",
+      "text": "Thank you. I am handing the case to the backend specialists of the identity service, and I attach what the laptop reported (dsregcmd) plus the failed log row. You will hear from me by 16:00 UTC."
+    },
+    {
+      "key": "ev10",
+      "at": 410,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Update on the stale record",
+      "text": "Update from the identity team: the laptop had a stale registration record from its previous user, which blocked the new registration, and they removed it. Please let the laptop leave and join again, then run dsregcmd /status once more."
+    },
+    {
+      "key": "ev11",
+      "at": 520,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Update on the stale record",
+      "text": "Done at 16:20 UTC. dsregcmd now shows AzureAdPrt : YES and Rita signed in to Teams, in the app and in the browser."
+    },
+    {
+      "key": "ev12",
+      "at": 1470,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Next-morning check",
+      "text": "Check at 08:00 UTC the next morning: Rita signed in to Teams at 07:42 UTC without an error."
+    }
+  ]
+}

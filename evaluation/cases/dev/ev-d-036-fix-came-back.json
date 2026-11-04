@@ -1,0 +1,141 @@
+{
+  "schema": "caseguard.eval-case/2",
+  "id": "ev-d-036-fix-came-back",
+  "split": "dev",
+  "family": "fam-030",
+  "title": "Name could not be resolved in Teams at the Gdańsk site",
+  "scenario": "A fix that was declared complete after testing on one floor is corrected the next day; the first resolver test is contradicted by a later one, and the real fault is the datacentre resolver that both local DNS servers forward to.",
+  "categories": ["negation", "contradiction"],
+  "workload": "teams-authentication",
+  "openedAt": "2026-07-07T07:00:00Z",
+  "derivedFrom": null,
+  "handedOverOrder": null,
+  "events": [
+    {
+      "key": "ev01",
+      "at": 0,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Teams: name could not be resolved, Gdańsk",
+      "text": "Hi, since 06:30 UTC about 70 users at our Gdańsk site get the message that the name could not be resolved when they sign in to Teams. It comes and goes. Our other site in Poznań is fine."
+    },
+    {
+      "key": "ev02",
+      "at": 12,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: Teams: name could not be resolved, Gdańsk",
+      "text": "Hello, thanks. Please send the names of three affected users and the UTC moment of one failure each, and tell me which DNS servers the Gdańsk PCs use and whether there is a proxy."
+    },
+    {
+      "key": "ev03",
+      "at": 35,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: Teams: name could not be resolved, Gdańsk",
+      "text": "Users: a.zielinski 06:41 UTC, b.wrona 06:55 UTC, k.mazur 07:10 UTC. DNS: 10.60.3.10 and 10.60.3.11 from DHCP. No proxy in Gdańsk."
+    },
+    {
+      "key": "ev04",
+      "at": 50,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Sign-in log lookup",
+      "text": "No failure rows in the Entra sign-in logs of the three users at the times given. The attempts do not reach the service."
+    },
+    {
+      "key": "ev05",
+      "at": 64,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Name resolution by server",
+      "text": "From a Gdańsk PC, login.microsoftonline.com against 10.60.3.10: ten answers out of ten. Against 10.60.3.11: six answers out of ten, four SERVFAIL."
+    },
+    {
+      "key": "ev06",
+      "at": 70,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "One DNS server is failing",
+      "text": "10.60.3.11 is failing for the Microsoft sign-in names and 10.60.3.10 is fine. Please take .11 out of the DHCP scope. If .11 was the only bad one, this should be fixed within the hour."
+    },
+    {
+      "key": "ev07",
+      "at": 190,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: One DNS server is failing",
+      "text": "Done at 08:55 UTC. All fixed! 25 of 25 test logins OK on floor 1."
+    },
+    {
+      "key": "ev08",
+      "at": 200,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "Re: One DNS server is failing",
+      "text": "Great. I will close the case tomorrow morning unless you write to me before."
+    },
+    {
+      "key": "ev09",
+      "at": 1480,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: One DNS server is failing",
+      "text": "Sorry, I have to correct myself. Yesterday I wrote that all was fixed, but I had only tested on floor 1. Floor 3 and the warehouse still fail this morning with the same message, about 25 users. It is not the proxy, we do not have one here, and Poznań is still fine."
+    },
+    {
+      "key": "ev10",
+      "at": 1500,
+      "who": "engineer",
+      "type": "diagnostic_result",
+      "channel": "tool",
+      "title": "Name resolution by server, second test",
+      "text": "From a floor 3 PC today: 10.60.3.10 fails three times out of ten for login.microsoftonline.com, which it did not yesterday, and 10.60.3.11, which is out of the scope, fails too. Both forward to the datacentre resolver 10.60.0.2."
+    },
+    {
+      "key": "ev11",
+      "at": 1515,
+      "who": "engineer",
+      "type": "engineer_email",
+      "channel": "email",
+      "title": "The problem is further up",
+      "text": "Both Gdańsk DNS servers forward to the datacentre resolver 10.60.0.2, and that one fails for the Microsoft names at times. Please point the forwarders of both Gdańsk servers to the Poznań resolver 10.60.4.2 until the datacentre one is repaired. I will run my 40 test sign-ins again after the change."
+    },
+    {
+      "key": "ev12",
+      "at": 1580,
+      "who": "network",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: The problem is further up",
+      "text": "Forwarders of both Gdańsk servers changed at 09:10 UTC."
+    },
+    {
+      "key": "ev13",
+      "at": 1610,
+      "who": "customer",
+      "type": "customer_email",
+      "channel": "email",
+      "title": "Re: The problem is further up",
+      "text": "09:50 UTC. Floor 1, floor 3 and the warehouse all sign in now. I tested 12 PCs on three floors this time."
+    },
+    {
+      "key": "ev14",
+      "at": 1625,
+      "who": "engineer",
+      "type": "validation_result",
+      "channel": "tool",
+      "title": "Test sign-ins on all floors",
+      "text": "From 09:15 UTC 40 of 40 test sign-ins from the three floors succeed. Before the change about one in three had failed. The first change, tested on floor 1 only, had not been enough."
+    }
+  ]
+}

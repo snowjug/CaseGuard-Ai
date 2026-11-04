@@ -1,0 +1,58 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-019-field-staff-mfa-loop",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T14:30:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.multiple-users-affected" },
+        {
+          "event": "ev01",
+          "id": "sig.site-correlated",
+          "uncertainty": "low",
+          "note": "by location of sign-in rather than by office"
+        },
+        { "event": "ev03", "id": "sig.service-health-clear" },
+        { "event": "ev04", "id": "sig.recent-ca-change-reported" },
+        { "event": "ev05", "id": "sig.server-side-failure-records-present" },
+        { "event": "ev05", "id": "sig.mfa-ca-events-in-logs" },
+        {
+          "event": "ev10",
+          "id": "sig.recent-ca-change-reported",
+          "uncertainty": "low",
+          "note": "restated in the closing note"
+        }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.request-minimal-scoping" },
+        { "event": "ev02", "id": "act.request-recent-changes" },
+        { "event": "ev03", "id": "act.check-service-health" },
+        { "event": "ev05", "id": "act.signin-log-correlation" },
+        { "event": "ev06", "id": "act.exclude-users-from-mfa-ca" },
+        { "event": "ev09", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        {
+          "event": "ev02",
+          "id": "act.check-service-health",
+          "reason": "future_intent",
+          "note": "I will check service health first"
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.conditional-access"],
+      "rationale": "A formal customer reports staff abroad stuck in MFA prompts and then blocked. The engineer announces a service health check, does it, asks for users, times and recent policy changes, and the customer names a policy rolled out the day before with the wrong assignment. The sign-in logs show the interrupted and blocked rows with the policy name. The engineer suggests narrowing the assignment and a one-user exclusion as a test, which works, and checks the logs after the change. The signals are the customer's change report, the log rows and the clear service health; the exclusion works, so there is no no-effect signal.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

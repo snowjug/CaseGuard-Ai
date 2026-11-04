@@ -1,0 +1,45 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-032-recordings-retention",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T16:30:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [],
+      "actions": [],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "other",
+          "note": "a retention policy was changed, not an access policy"
+        },
+        {
+          "event": "ev02",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "other",
+          "note": "the retention policy again"
+        },
+        {
+          "event": "ev06",
+          "id": "sig.recent-ca-change-reported",
+          "reason": "other",
+          "note": "the retention policy again"
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": null,
+      "causes": [],
+      "rationale": "A negative control about missing recordings after a shortened retention policy. A policy was changed shortly before the problem, but it is a retention policy and nothing is said about signing in, so the reported change is not an access-policy change and no signal is stated. The customer even says that everybody can still sign in. The engineer explains the cause and the restore path; none of it is a diagnostic action of the pack.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

@@ -1,0 +1,41 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-004-p4-hourly-signout",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave1",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-02T19:59:46Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        {
+          "event": "ev01",
+          "id": "sig.multiple-users-affected"
+        },
+        {
+          "event": "ev01",
+          "id": "sig.recent-ca-change-reported"
+        },
+        {
+          "event": "ev04",
+          "id": "sig.token-expiry-errors"
+        },
+        {
+          "event": "ev04",
+          "id": "sig.server-side-failure-records-present"
+        },
+        {
+          "event": "ev05",
+          "id": "sig.service-health-clear"
+        }
+      ],
+      "earliestMissed": null,
+      "causes": ["hyp.token-session", "hyp.conditional-access"],
+      "rationale": "Migrated without change from the Wave 1 corpus. Every event lists the signals a reader of that event would say it states, judged against the signal descriptions and not against the detector patterns; the story names the cause or causes a reader of the whole story accepts and the earliest missed moment where there is one. An AI assistant wrote these labels, no human checked them, and Wave 1 recorded no uncertainty per label.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}

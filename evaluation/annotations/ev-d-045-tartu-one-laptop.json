@@ -1,0 +1,49 @@
+{
+  "schema": "caseguard.eval-annotations/2",
+  "caseId": "ev-d-045-tartu-one-laptop",
+  "annotations": [
+    {
+      "annotatorId": "copilot-wave2-a",
+      "kind": "ai_draft",
+      "version": 1,
+      "annotatedAt": "2026-11-03T19:15:00Z",
+      "excluded": false,
+      "exclusionReason": null,
+      "signals": [
+        { "event": "ev01", "id": "sig.single-user-scope" },
+        { "event": "ev03", "id": "sig.prt-healthy" },
+        { "event": "ev04", "id": "sig.no-server-side-failure-records" },
+        { "event": "ev06", "id": "sig.cache-clear-resolved" }
+      ],
+      "actions": [
+        { "event": "ev02", "id": "act.device-registration-check" },
+        {
+          "event": "ev02",
+          "id": "act.request-minimal-scoping",
+          "uncertainty": "medium",
+          "note": "asks for one UTC failure time and the device output only"
+        },
+        { "event": "ev04", "id": "act.signin-log-correlation" },
+        { "event": "ev05", "id": "act.clear-teams-cache" },
+        { "event": "ev07", "id": "act.validate-fix" }
+      ],
+      "absent": [
+        {
+          "event": "ev01",
+          "id": "sig.web-client-also-fails",
+          "reason": "negated",
+          "note": "Teams in her browser works"
+        }
+      ],
+      "forks": [],
+      "earliestMissed": null,
+      "counterfactualDirection": "none",
+      "conflicts": [],
+      "qualityBand": "strong",
+      "causes": ["hyp.client-cache"],
+      "rationale": "A single user on a single laptop. The browser works, which denies that the web client fails. The device output shows a healthy token, and the sign-in log has no failure row, so the failure stays on the device; the cache clear that fixes it is the right step, taken after the cheap checks, and the next-day check validates it.",
+      "uncertainty": "low"
+    }
+  ],
+  "adjudication": null
+}
