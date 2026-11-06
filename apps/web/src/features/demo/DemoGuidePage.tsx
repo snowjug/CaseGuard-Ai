@@ -2,88 +2,121 @@
 
 import { ROLE_LABELS, type DemoState, type DemoStep } from '@caseguard/schemas';
 import {
+  AccordionItem,
+  BlurFade,
+  Button,
+  ButtonLink,
   EmptyState,
-  KeyValueList,
   Notice,
   PageHeader,
-  Panel,
   ProvenanceBadge,
+  RelativeTime,
   SectionHeader,
   UiLink,
   cg,
-  formatDateTimeUtc,
+  type KeyValueItem,
 } from '@caseguard/ui';
-import { Button, ProgressBar, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
-import {
-  ArrowRightRegular,
-  ArrowSyncRegular,
-  PersonSwapRegular,
-  PlayCircleRegular,
-  SlideTextRegular,
-} from '@fluentui/react-icons';
+import { ProgressBar, makeStyles, tokens } from '@fluentui/react-components';
 import { keepPreviousData } from '@tanstack/react-query';
+import {
+  ArrowRightIcon,
+  CirclePlayIcon,
+  DatabaseIcon,
+  PresentationIcon,
+  RefreshCwIcon,
+  ShieldCheckIcon,
+  UserCogIcon,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { LinkButton } from '../../components/common/LinkButton';
 import { QueryBoundary } from '../../components/common/QueryBoundary';
 import { useApiQuery } from '../../lib/api/hooks';
 import { useAuth } from '../../lib/auth/context';
+import { DetailSections, SummaryCard } from '../../lib/advanced-view-parts';
 import { PROVIDER_LABELS } from '../../lib/labels';
 import { usePresentation } from '../../lib/presentation';
 import { useRoleSwitch } from '../../lib/presentation/use-role-switch';
 import { safeInternalHref } from '../../lib/safe-href';
 import { useShortcut } from '../../lib/shortcuts';
 import { useSelectionState } from '../../lib/url-state';
-import { DemoGuideSkeleton } from './Skeleton';
 import { SeedControls } from './SeedControls';
+import { DemoGuideSkeleton } from './Skeleton';
 import { StepList } from './StepList';
 
 const useStyles = makeStyles({
   page: { display: 'flex', flexDirection: 'column', gap: cg.space[6], minWidth: 0 },
-  busy: { opacity: 0.72 },
-  actions: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: cg.space[3] },
-  progressRow: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: cg.space[3] },
-  bar: { flex: '1 1 240px', minWidth: 0 },
-  count: {
-    fontSize: tokens.fontSizeBase400,
-    fontWeight: tokens.fontWeightSemibold,
-    fontVariantNumeric: 'tabular-nums',
-  },
   next: {
     display: 'flex',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: `${cg.space[2]} ${cg.space[4]}`,
-    padding: cg.space[3],
-    borderRadius: cg.radius.md,
-    border: `2px solid ${cg.tone.brand.solid}`,
-    backgroundColor: cg.tone.brand.tint,
+    gap: `${cg.space[3]} ${cg.space[6]}`,
+    padding: cg.space[4],
+    borderRadius: cg.radius.lg,
+    backgroundColor: `color-mix(in srgb, ${cg.tone.brand.tint} 60%, transparent)`,
+    border: `1px solid color-mix(in srgb, ${cg.tone.brand.border} 45%, transparent)`,
   },
   nextText: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '2px',
+    gap: cg.space[1],
     flex: '1 1 280px',
     minWidth: 0,
   },
-  nextTitle: { margin: 0, fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold },
-  nextMeta: { margin: 0, fontSize: tokens.fontSizeBase300, color: cg.textSecondary },
-  chips: { display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: cg.space[2] },
+  nextTitle: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase400,
+    lineHeight: tokens.lineHeightBase400,
+    fontWeight: tokens.fontWeightSemibold,
+    letterSpacing: '-0.01em',
+    color: cg.text,
+  },
+  nextMeta: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase300,
+    color: cg.textSecondary,
+  },
+  nextActions: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: cg.space[2],
+    minWidth: 0,
+    maxWidth: '100%',
+  },
+  // A person's name can be long ("Switch to Morgan Manager (synthetic)"): the label wraps instead of leaving the card.
+  wrapLabel: {
+    maxWidth: '100%',
+    flexShrink: 1,
+    paddingBlock: cg.space[2],
+    whiteSpace: 'normal',
+    textAlign: 'start',
+    lineHeight: tokens.lineHeightBase300,
+  },
+  section: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
+  caption: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+    color: cg.textMuted,
+  },
   notices: {
     margin: 0,
     paddingLeft: cg.space[4],
     display: 'flex',
     flexDirection: 'column',
-    gap: cg.space[1],
+    gap: cg.space[2],
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase300,
+    color: cg.textSecondary,
   },
-  section: { display: 'flex', flexDirection: 'column', gap: cg.space[3] },
   link: { color: cg.textLink },
 });
 
 const PAGE_HELP = (
   <>
     <p>
-      The Demo Guide is the 13-step story CaseGuard tells: import a case, rebuild its timeline, show
-      the evidence and the competing hypotheses, find the decision forks, simulate and accept a
+      The guided demo is the 13-step story CaseGuard tells: import a case, rebuild its timeline,
+      show the evidence and the competing hypotheses, find the key decisions, simulate and accept a
       better path, measure quality, turn the path into a skill, approve it with two people, import a
       second case, and show the skill applying to it.
     </p>
@@ -95,18 +128,20 @@ const PAGE_HELP = (
   </>
 );
 
-function Overview({
+function ProgressCard({
   state,
   next,
   presenting,
   onSwitch,
   switcher,
+  busy,
 }: {
   state: DemoState;
   next: DemoStep | null;
   presenting: boolean;
   onSwitch: ReturnType<typeof useRoleSwitch>;
   switcher: boolean;
+  busy: boolean;
 }) {
   const styles = useStyles();
   const completed = state.steps.filter((step) => step.completed).length;
@@ -120,67 +155,65 @@ function Overview({
       {label}
     </UiLink>
   );
+  const facts: KeyValueItem[] = [
+    {
+      id: 'provider',
+      label: 'AI provider',
+      value: PROVIDER_LABELS[state.provider],
+      hint: state.providerSimulated ? 'Simulated: no language model is called' : undefined,
+    },
+    {
+      id: 'seeded',
+      label: 'Seeded',
+      value: state.seededAt ? <RelativeTime value={state.seededAt} /> : 'Not seeded',
+    },
+    {
+      id: 'case1',
+      label: 'Case One',
+      value: state.caseOneId
+        ? idLink(`/cases/${encodeURIComponent(state.caseOneId)}`, 'Open Case One')
+        : 'Not imported yet',
+    },
+    {
+      id: 'case2',
+      label: 'Case Two',
+      value: state.caseTwoId
+        ? idLink(`/cases/${encodeURIComponent(state.caseTwoId)}`, 'Open Case Two')
+        : 'Not imported yet',
+    },
+    {
+      id: 'skill',
+      label: 'Story skill',
+      value: state.skillId
+        ? idLink(`/skills/${encodeURIComponent(state.skillId)}`, 'Open the skill')
+        : 'Not generated yet',
+    },
+  ];
   return (
-    <Panel
+    <SummaryCard
       title="Progress"
-      description="Derived from the data stored in this environment."
-      actions={
-        <span className={styles.chips}>
-          <ProvenanceBadge kind="synthetic" label={state.datasetLabel} />
-          {state.providerSimulated ? <ProvenanceBadge kind="simulated" /> : null}
-        </span>
-      }
-    >
-      <div className={styles.progressRow}>
+      icon={<CirclePlayIcon />}
+      tone={allDone ? 'productive' : 'brand'}
+      headline={`${completed} of ${total} steps complete`}
+      description="A step counts as done only when its data exists in this environment."
+      meter={
         <ProgressBar
-          className={styles.bar}
           value={completed}
           max={Math.max(total, 1)}
           thickness="large"
           aria-label={`Demo progress: ${completed} of ${total} steps complete`}
         />
-        <span className={styles.count}>
-          {completed} of {total} steps complete
-        </span>
-      </div>
-      <KeyValueList
-        columns={3}
-        aria-label="Demo data"
-        items={[
-          {
-            id: 'provider',
-            label: 'AI provider',
-            value: PROVIDER_LABELS[state.provider],
-            hint: state.providerSimulated ? 'Simulated: no language model is called' : undefined,
-          },
-          {
-            id: 'seeded',
-            label: 'Seeded',
-            value: state.seededAt ? formatDateTimeUtc(state.seededAt) : 'Not seeded',
-          },
-          {
-            id: 'case1',
-            label: 'Case One',
-            value: state.caseOneId
-              ? idLink(`/cases/${encodeURIComponent(state.caseOneId)}`, 'Open Case One')
-              : 'Not imported yet',
-          },
-          {
-            id: 'case2',
-            label: 'Case Two',
-            value: state.caseTwoId
-              ? idLink(`/cases/${encodeURIComponent(state.caseTwoId)}`, 'Open Case Two')
-              : 'Not imported yet',
-          },
-          {
-            id: 'skill',
-            label: 'Story skill',
-            value: state.skillId
-              ? idLink(`/skills/${encodeURIComponent(state.skillId)}`, 'Open the skill')
-              : 'Not generated yet',
-          },
-        ]}
-      />
+      }
+      badges={
+        <>
+          <ProvenanceBadge kind="synthetic" label={state.datasetLabel} size="medium" />
+          {state.providerSimulated ? <ProvenanceBadge kind="simulated" size="medium" /> : null}
+        </>
+      }
+      factsLabel="Demo environment"
+      facts={facts}
+      busy={busy}
+    >
       {next ? (
         <div className={styles.next} role="group" aria-label="Next step">
           <div className={styles.nextText}>
@@ -196,33 +229,36 @@ function Overview({
               <p className={styles.nextMeta}>{next.lockedReason}</p>
             ) : null}
           </div>
-          {!presenting && switcher && !matches && persona ? (
-            <Button
-              appearance="outline"
-              icon={<PersonSwapRegular />}
-              onClick={() => onSwitch.switchTo(persona)}
-            >
-              {`Switch to ${persona.displayName}`}
-            </Button>
-          ) : null}
-          {href ? (
-            <LinkButton
-              href={href}
-              appearance="primary"
-              icon={<ArrowRightRegular />}
-              iconPosition="after"
-              className={presenting ? 'cg-presenter-target' : undefined}
-            >
-              {next.actionLabel}
-            </LinkButton>
-          ) : (
-            <Button appearance="primary" disabledFocusable>
-              {next.actionLabel}
-            </Button>
-          )}
+          <div className={styles.nextActions}>
+            {!presenting && switcher && !matches && persona ? (
+              <Button
+                variant="secondary"
+                icon={<UserCogIcon />}
+                className={styles.wrapLabel}
+                onClick={() => onSwitch.switchTo(persona)}
+              >
+                {`Switch to ${persona.displayName}`}
+              </Button>
+            ) : null}
+            {href ? (
+              <ButtonLink
+                href={href}
+                variant="primary"
+                icon={<ArrowRightIcon />}
+                iconPosition="end"
+                className={presenting ? 'cg-presenter-target' : undefined}
+              >
+                {next.actionLabel}
+              </ButtonLink>
+            ) : (
+              <Button variant="primary" disabledFocusable>
+                {next.actionLabel}
+              </Button>
+            )}
+          </div>
         </div>
       ) : null}
-    </Panel>
+    </SummaryCard>
   );
 }
 
@@ -233,69 +269,95 @@ function Content({ state, isRefreshing }: { state: DemoState; isRefreshing: bool
   const [selected, select] = useSelectionState('step');
   const next = state.steps.find((step) => step.isNextAction) ?? null;
   const nothingYet = state.steps.every((step) => !step.completed);
+  const hasNotices = state.notices.length > 0;
 
   return (
-    <div
-      className={mergeClasses(styles.page, isRefreshing && styles.busy)}
-      aria-busy={isRefreshing}
-    >
-      <Overview
-        state={state}
-        next={next}
-        presenting={presenting}
-        onSwitch={roleSwitch}
-        switcher={roleSwitch.available}
-      />
-      {nothingYet ? (
-        <Notice variant="info" title="Nothing has been loaded yet">
-          Start with step 1 to load the synthetic Case One, or ask an administrator to play the
-          whole story from the controls below.
-        </Notice>
-      ) : null}
-      {state.notices.length > 0 ? (
-        <Notice variant="synthetic" title="Honest labels">
-          <ul className={styles.notices} aria-label="What is synthetic, simulated or estimated">
-            {state.notices.map((notice) => (
-              <li key={notice}>{notice}</li>
-            ))}
-          </ul>
-        </Notice>
-      ) : null}
-      {presenting ? (
-        <Notice variant="info" compact title={null}>
-          Seeding and persona controls are hidden while presenting. Use Reset in the presenter strip
-          to start the story again.
-        </Notice>
-      ) : (
-        <SeedControls />
-      )}
-      <section className={styles.section} aria-labelledby="demo-steps-heading">
-        <SectionHeader
-          id="demo-steps-heading"
-          title="The story, step by step"
-          description="Steps unlock in order. Open a step to see it in the product, with the role to present as."
-        />
-        <StepList
-          steps={state.steps}
-          selectedId={selected}
-          onSelect={select}
+    <div className={styles.page} aria-busy={isRefreshing}>
+      <BlurFade index={0}>
+        <ProgressCard
+          state={state}
+          next={next}
           presenting={presenting}
-          actingAs={roleSwitch.actingAs}
-          personaFor={roleSwitch.personaFor}
-          onSwitch={roleSwitch.switchTo}
+          onSwitch={roleSwitch}
+          switcher={roleSwitch.available}
+          busy={isRefreshing}
         />
-      </section>
+      </BlurFade>
+      {nothingYet ? (
+        <BlurFade index={1}>
+          <Notice variant="info" title="Nothing has been loaded yet">
+            Start with step 1 to load the synthetic Case One, or ask an administrator to play the
+            whole story from the demo data tools below.
+          </Notice>
+        </BlurFade>
+      ) : null}
+      <BlurFade index={2}>
+        <section className={styles.section} aria-labelledby="demo-steps-heading">
+          <SectionHeader
+            id="demo-steps-heading"
+            title="The story, step by step"
+            description="Steps unlock in order. Open a step to see it in the product, with the role to present as."
+          />
+          {presenting ? (
+            <p className={styles.caption}>
+              Seeding and persona controls are hidden while presenting. Use Reset in the presenter
+              strip to start the story again.
+            </p>
+          ) : null}
+          <StepList
+            steps={state.steps}
+            selectedId={selected}
+            onSelect={select}
+            presenting={presenting}
+            actingAs={roleSwitch.actingAs}
+            personaFor={roleSwitch.personaFor}
+            onSwitch={roleSwitch.switchTo}
+          />
+        </section>
+      </BlurFade>
+      {!presenting || hasNotices ? (
+        <BlurFade index={3}>
+          <DetailSections>
+            {presenting ? null : (
+              <AccordionItem
+                headingLevel={2}
+                icon={<DatabaseIcon />}
+                title="Demo data tools"
+                subtitle="Seed or reset the story. Administrators only."
+              >
+                <SeedControls />
+              </AccordionItem>
+            )}
+            {hasNotices ? (
+              <AccordionItem
+                headingLevel={2}
+                icon={<ShieldCheckIcon />}
+                title="What is synthetic, simulated or estimated"
+                subtitle="The honest labels behind this demo"
+              >
+                <ul
+                  className={styles.notices}
+                  aria-label="What is synthetic, simulated or estimated"
+                >
+                  {state.notices.map((notice) => (
+                    <li key={notice}>{notice}</li>
+                  ))}
+                </ul>
+              </AccordionItem>
+            ) : null}
+          </DetailSections>
+        </BlurFade>
+      ) : null}
     </div>
   );
 }
 
 /**
- * Demo Guide (`/demo`): the 13-step story with presenter notes, the role to present as, deep links into the product and
- * live progress derived from stored data. Administrators can seed and reset the synthetic tenant here; anyone can
- * switch presentation mode on. The selected step's notes are in the URL (`?step=`).
+ * Guided demo (`/demo`): the 13-step story as a vertical stepper with presenter notes, the role to present as, deep links
+ * into the product and live progress derived from stored data. Administrators can seed and reset the synthetic tenant
+ * (in a collapsed section); anyone can switch presentation mode on. The selected step's notes are in the URL (`?step=`).
  */
 export function DemoGuidePage() {
-  const styles = useStyles();
   const auth = useAuth();
   const router = useRouter();
   const presentation = usePresentation();
@@ -305,12 +367,13 @@ export function DemoGuidePage() {
   });
   const next = query.data?.steps.find((step) => step.isNextAction);
   const nextHref = next && next.enabled ? safeInternalHref(next.route) : null;
+  const refreshing = query.isFetching && !query.isPending;
 
   useShortcut({
     id: 'demo-next',
     keys: 'n',
     description: 'Open the next demo step',
-    group: 'Demo Guide',
+    group: 'Guided demo',
     enabled: nextHref !== null,
     handler: () => {
       if (nextHref) router.push(nextHref);
@@ -320,43 +383,44 @@ export function DemoGuidePage() {
   return (
     <>
       <PageHeader
-        title="Demo Guide"
-        description="The 13-step story, with presenter notes and live progress derived from the stored data."
+        title="Guided demo"
+        description="A short walk through the product, step by step, with presenter notes."
         help={PAGE_HELP}
         actions={
-          <div className={styles.actions}>
+          <>
             <Button
-              appearance={presentation.enabled ? 'outline' : 'primary'}
-              icon={presentation.enabled ? <SlideTextRegular /> : <PlayCircleRegular />}
+              variant="secondary"
+              icon={<PresentationIcon />}
               aria-pressed={presentation.enabled}
               onClick={presentation.toggle}
             >
               {presentation.enabled ? 'Exit presentation mode' : 'Start presentation mode'}
             </Button>
             <Button
-              appearance="outline"
-              icon={<ArrowSyncRegular />}
-              disabled={auth.status !== 'ready' || query.isFetching}
+              variant="ghost"
+              icon={<RefreshCwIcon />}
+              loading={refreshing}
+              disabledFocusable={auth.status !== 'ready' || query.isPending}
               onClick={() => void query.refetch()}
             >
-              {query.isFetching && !query.isPending ? 'Refreshing…' : 'Refresh'}
+              {refreshing ? 'Refreshing…' : 'Refresh'}
             </Button>
-          </div>
+          </>
         }
       />
       <QueryBoundary
         query={query}
-        subject="The demo guide"
+        subject="The guided demo"
         skeleton={<DemoGuideSkeleton />}
         isEmpty={(state) => state.steps.length === 0}
         empty={
           <EmptyState
             headingLevel={2}
-            icon={<PlayCircleRegular />}
-            title="The demo guide has no steps"
-            description="The API returned no steps for this environment. Reload the page; if it persists, the demo guide is not available in this build."
+            icon={<CirclePlayIcon />}
+            title="The guided demo has no steps"
+            description="The API returned no steps for this environment. Reload the page; if it persists, the guided demo is not available in this build."
             action={
-              <Button appearance="primary" onClick={() => void query.refetch()}>
+              <Button variant="primary" onClick={() => void query.refetch()}>
                 Reload
               </Button>
             }
