@@ -24,17 +24,18 @@ All of it lives in `e2e/a11y.spec.ts` (and the `mobile`, `theme` and per-page sp
 **The review and the report** have their own scans in `e2e/pages/review.spec.ts`, added with them: both pages in the light and
 the dark theme, each at 1440x900 and then at 390x844 (eight scans), the evidence drawer open on a verified quotation (with a Tab
 loop that must stay inside it and Escape to close), and the keyboard path from a fix to the source passage and back.
-`e2e/mobile.spec.ts` checks that neither page, nor the review of the second case, scrolls sideways at 390x844.
+`e2e/mobile.spec.ts` checks that neither page, nor the review of the second case, scrolls sideways at 390x844 (it does the same
+for every page at 390x844 and at 320x640).
 
-| Check                        | How                                                                                                                                                                                                                    |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Rules                        | `@axe-core/playwright` 4.14.0 (axe-core 4.14.0) with the tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa` and `best-practice`. Only `violations` are asserted: the list must be empty                                   |
-| Pages                        | Sixteen views (the twelve pages, the Add a case wizard, Case details, the Quality page for all cases and the skill detail), each as the persona that normally uses it, at 1440x900, in the light and in the dark theme |
-| Phones                       | The six key pages (Home, Cases, Timeline, What if, Usage and cost, Guided demo) at 390x844 with touch, in both themes                                                                                                  |
-| States behind a click or URL | Every tab or section of the pages that have them, an open drawer, an earlier moment with an event open, the wizard's check step, Presentation mode, the no-identity, not-found and missing-permission states           |
-| Open overlays                | The command palette, the keyboard shortcuts dialog, the persona picker and the phone navigation drawer                                                                                                                 |
-| Keyboard, no pointer         | Section 2                                                                                                                                                                                                              |
-| Motion                       | The system preference `prefers-reduced-motion` and the in-app "Reduce motion" setting, section 2                                                                                                                       |
+| Check                        | How                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rules                        | `@axe-core/playwright` 4.14.0 (axe-core 4.14.0) with the tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa` and `best-practice`. Only `violations` are asserted: the list must be empty                                                                                                                                                                                                                       |
+| Pages                        | Nineteen views (Home, Cases, Add a case with and without the sample, Case details, Review, Timeline, Evidence, Possible causes, What if, Score, Quality, Skills, a skill, Advanced, Usage and cost, Settings and audit, System status and Guided demo), each as the persona that normally uses it, at 1440x900, in the light and in the dark theme. The report has its own scans in `pages/review.spec.ts` |
+| Phones                       | Nine key pages (Home, Cases, Add a case, Review, Timeline, What if, Advanced, Usage and cost, Guided demo) at 390x844 with touch, in both themes; the layout of every page at 320x640 and 390x844 is checked for sideways scroll (`mobile.spec.ts`)                                                                                                                                                        |
+| States behind a click or URL | 42 states: every tab or section of the pages that have them, an open drawer, an earlier moment with an event open, the wizard's check step and its error, Presentation mode, the first visit with no identity, not-found pages and missing-permission pages                                                                                                                                                |
+| Open overlays                | The command palette, the keyboard shortcuts dialog, the persona picker and the phone navigation bar                                                                                                                                                                                                                                                                                                        |
+| Keyboard, no pointer         | Section 2                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Motion                       | The system preference `prefers-reduced-motion` and the in-app "Reduce motion" setting, section 2                                                                                                                                                                                                                                                                                                           |
 
 **The only exclusion** is `[data-tabster-dummy]`: Fluent UI's focus-trap sentinels, inert `<i tabindex="0" aria-hidden="true">`
 elements that redirect focus when a dialog or popover traps it. axe reports them as hidden-but-focusable, nobody can operate them,
@@ -70,30 +71,35 @@ alternatives.
 
 ## 3. What was scanned, with the numbers
 
-From the second full run (production build, Microsoft Edge 156, one worker; [TESTING.md](TESTING.md#2-the-last-full-run)): the
-whole of `a11y.spec.ts` ran in 14 minutes and **all 128 tests passed**.
+From the final run of the interface redesign (production build, bundled Chromium, one worker; [TESTING.md](TESTING.md#2-the-last-full-run)):
+the whole of `a11y.spec.ts` ran in about 9 minutes and **all 152 tests passed**.
 
 | Group                                      |   Tests | axe analyses | Violations |
 | ------------------------------------------ | ------: | -----------: | ---------: |
-| The sixteen views, 1440x900, light theme   |      16 |           16 |          0 |
-| The sixteen views, 1440x900, dark theme    |      16 |           16 |          0 |
-| The six key pages, 390x844, light theme    |       6 |            6 |          0 |
-| The six key pages, 390x844, dark theme     |       6 |            6 |          0 |
-| 36 states behind a click or URL, light     |      36 |           36 |          0 |
-| 36 states behind a click or URL, dark      |      36 |           36 |          0 |
+| The nineteen views, 1440x900, light theme  |      19 |           19 |          0 |
+| The nineteen views, 1440x900, dark theme   |      19 |           19 |          0 |
+| The nine key pages, 390x844, light theme   |       9 |            9 |          0 |
+| The nine key pages, 390x844, dark theme    |       9 |            9 |          0 |
+| 42 states behind a click or URL, light     |      42 |           42 |          0 |
+| 42 states behind a click or URL, dark      |      42 |           42 |          0 |
 | Open overlays (palette, shortcuts, picker) |       1 |            3 |          0 |
-| The open phone navigation drawer           |       1 |            1 |          0 |
+| The phone navigation bar                   |       1 |            1 |          0 |
 | Keyboard-only paths (section 2)            |       8 |            - |          - |
 | Reduced motion (section 2)                 |       2 |            - |          - |
-| **Total**                                  | **128** |      **120** |      **0** |
+| **Total**                                  | **152** |      **144** |      **0** |
 
-**What axe could not decide.** A separate, one-off run of the same rules over the sixteen views in both themes (32 scans; a
-throw-away script, not part of the suite) counted the "incomplete" results that the suite does not assert. There were 0 violations
-again and **454 incomplete nodes, all of the rule `color-contrast`**: text that axe cannot measure because it sits on a chart, a
-hatched range or an overlapping graphic. They are on six views and are the same in both themes: Timeline 21, Possible causes
-26, What if 125, Score 2, Quality 49 and Usage and cost 4 nodes per theme. Nobody
-has measured those 227 nodes per theme by hand; the colour pairs of the design tokens are unit-tested for WCAG AA in both themes
-([apps/web/README.md](../apps/web/README.md#testing)), which covers text drawn in token colours but not what it is drawn over.
+The review and the report have four more axe tests in `pages/review.spec.ts` (both pages, both themes, each on a desktop and on a
+phone) and the evidence drawer one more; they passed in the same run. `mobile.spec.ts` checks that no page scrolls sideways at
+390x844 and at 320x640 (WCAG 1.4.10 reflow; 22 pages each, with touch).
+
+**What axe could not decide.** Before the redesign, a separate, one-off run of the same rules over the sixteen views of that time
+in both themes (32 scans; a throw-away script, not part of the suite) counted the "incomplete" results that the suite does not
+assert. There were 0 violations again and **454 incomplete nodes, all of the rule `color-contrast`**: text that axe cannot measure
+because it sits on a chart, a hatched range or an overlapping graphic. They were on six views (Timeline, Possible causes, What if,
+Score, Quality and Usage and cost) and were the same in both themes. The redesign changed those views and **that count has not
+been repeated**; treat text drawn over a chart, a hatched range or a graphic as unmeasured. The colour pairs of the design
+tokens are unit-tested for WCAG AA in both themes ([apps/web/README.md](../apps/web/README.md#testing)), which covers text drawn in
+token colours but not what it is drawn over.
 
 ## 4. What was not done
 
@@ -103,10 +109,12 @@ Said plainly, so that nobody reads the result as more than it is.
   Playwright's accessibility tree and axe, which is not the same as listening to the page.
 - **No real users.** Nobody who relies on assistive technology tried the product.
 - **No audit by an accessibility specialist** and no VPAT or conformance report.
-- **Not tested:** WCAG 2.2 (target size 2.5.8, dragging 2.5.7, consistent help 3.2.6 and the rest), 320 CSS px reflow and 400 %
-  zoom (the phone checks use 390 px), text-spacing overrides, Windows forced-colours (high contrast) mode, voice control, switch
-  access, and printing (apart from the report's print stylesheet, which is checked in Chromium's print emulation and a PDF render:
-  no application chrome, page breaks, the address of every link, not a printed page).
+- **Not tested:** WCAG 2.2 as a whole (a one-off touch sweep, a throw-away script, found every control at 44 px or more except
+  the event marks that the Timeline chart draws, which have a full-size row each, but target size 2.5.8, dragging 2.5.7,
+  consistent help 3.2.6 and the rest were not assessed), 400 % zoom itself (the reflow at 320 CSS px, which is what 400 % zoom
+  of a 1280 px window gives in width, is tested: no page scrolls sideways), text-spacing overrides, Windows forced-colours (high
+  contrast) mode, voice control, switch access, and printing (apart from the report's print stylesheet, which is checked in
+  Chromium's print emulation and a PDF render: no application chrome, page breaks, the address of every link, not a printed page).
 - **Engines:** only Chromium (Microsoft Edge locally, the bundled Chromium in CI). Firefox and Safari were not run.
 - **The development identity picker** is a local-only control; it was scanned and its keyboard behaviour tested, but the production
   sign-in (Microsoft Entra, a redirect flow outside the product) was not.

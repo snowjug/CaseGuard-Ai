@@ -34,6 +34,47 @@ tiers for this document**; only the end-to-end tiers below were run for it.
 
 ## 2. The last full run
 
+**The interface redesign, on the final tree** (branch `ui/caseguard-redesign`, commit `181965a`, 6 November 2026; Linux VM, 4
+shared vCPU, the bundled Chromium with `PW_CHANNEL=` empty, one worker, a fresh production build and a fresh API). The typecheck,
+the lint, the format check, the docs check, the secret scan, the dependency audit and the production build all exit 0.
+`pnpm test` (unit and integration tests together): **370 files, 9,281 tests passed, 1 skipped**, in 18.6 minutes.
+`pnpm exec playwright test --project=desktop --project=mobile`: **447 tests, 447 passed, 0 failed, 0 flaky, 0 skipped**, in 20.2
+minutes (desktop 395, mobile 52). The baseline before the redesign was 375 end-to-end tests (369 passed, 2 failed because of how
+that run was started, 4 skipped; `docs/ui-redesign/baseline.md`) and 8,087 unit tests (`pnpm test:unit`, which leaves the
+integration tests out). An earlier full unit run on a loaded machine had failed two files: a guard test that found the repository
+root from the working directory, so that it could not load when vitest starts at the root, and a deletion test that raced the
+confirmation dialog. Both were fixed and the run above is the one on the final commit.
+
+| Project   | Spec                               |   Tests |  Passed | Failed | Test time |
+| --------- | ---------------------------------- | ------: | ------: | -----: | --------: |
+| desktop   | `a11y.spec.ts`                     |     152 |     152 |      0 |     543 s |
+| desktop   | `demo-flow.spec.ts`                |      24 |      24 |      0 |      70 s |
+| desktop   | `pages/cases.spec.ts`              |       8 |       8 |      0 |      22 s |
+| desktop   | `pages/counterfactual-lab.spec.ts` |       8 |       8 |      0 |      24 s |
+| desktop   | `pages/demo-guide.spec.ts`         |       9 |       9 |      0 |      28 s |
+| desktop   | `pages/efficiency.spec.ts`         |       5 |       5 |      0 |      11 s |
+| desktop   | `pages/evidence-ledger.spec.ts`    |      10 |      10 |      0 |      26 s |
+| desktop   | `pages/governance.spec.ts`         |      15 |      15 |      0 |      49 s |
+| desktop   | `pages/home.spec.ts`               |       6 |       6 |      0 |      12 s |
+| desktop   | `pages/hypothesis-arena.spec.ts`   |       7 |       7 |      0 |      16 s |
+| desktop   | `pages/ingestion.spec.ts`          |      12 |      12 |      0 |      27 s |
+| desktop   | `pages/presentation-mode.spec.ts`  |       7 |       7 |      0 |      17 s |
+| desktop   | `pages/quality-review.spec.ts`     |       8 |       8 |      0 |      18 s |
+| desktop   | `pages/review.spec.ts`             |      30 |      30 |      0 |      87 s |
+| desktop   | `pages/skilldna-library.spec.ts`   |       8 |       8 |      0 |      14 s |
+| desktop   | `pages/system-health.spec.ts`      |       6 |       6 |      0 |      11 s |
+| desktop   | `pages/timeline.spec.ts`           |       6 |       6 |      0 |      17 s |
+| desktop   | `resilience.spec.ts`               |      16 |      16 |      0 |      29 s |
+| desktop   | `security-http.spec.ts`            |      31 |      31 |      0 |      13 s |
+| desktop   | `smoke.spec.ts`                    |      20 |      20 |      0 |      33 s |
+| desktop   | `theme.spec.ts`                    |       7 |       7 |      0 |      14 s |
+| mobile    | `mobile.spec.ts`                   |      52 |      52 |      0 |      91 s |
+| **Total** |                                    | **447** | **447** |  **0** |   1,173 s |
+
+`smoke.spec.ts` opens every main route and asserts its heading and that it renders with no console error; `mobile.spec.ts`
+checks that no page scrolls sideways at 390x844 and at 320x640 (WCAG 1.4.10 reflow). The records below are earlier runs, kept
+with their dates and their own page names.
+
 **Wave 2, local, on the final detectors** (Linux VM, 4 shared vCPU, run at low priority beside other jobs; the engine and pack code
 is that of commit `15dde3c`, and the later commits changed only lint fixes in the model-assisted review and documents). The
 unit and integration tests, package by package: **domain 72 files, 2,133 tests; API 112 files, 2,083 tests (1 skipped), on PGlite;
