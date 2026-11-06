@@ -1,5 +1,6 @@
 export * from './tokens';
 export * from './theme';
+export * from './motion';
 export * from './format';
 export * from './link-context';
 export * from './a11y/VisuallyHidden';
@@ -7,6 +8,7 @@ export * from './a11y/ScrollRegion';
 export * from './hooks/useMediaQuery';
 export * from './hooks/useSafeId';
 export * from './hooks/useElementSize';
+export * from './kit';
 export * from './primitives';
 export * from './charts';
 export * from './graph';

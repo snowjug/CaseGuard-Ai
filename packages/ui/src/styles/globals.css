@@ -226,6 +226,13 @@ svg.lucide {
   }
 }
 
+/* The spinner inside a busy button: a loading indicator, so it repeats until the work is done. */
+@keyframes cg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Loading placeholders: the one animation that repeats, and only until the request finishes. */
 .cg-shimmer {
   background-image: linear-gradient(

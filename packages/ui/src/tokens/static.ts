@@ -31,12 +31,15 @@ export const borderWidth = { thin: 1, thick: 2, focus: 3 } as const;
  * ease-out, purposeful only. Components must also honour `prefers-reduced-motion` and the in-app override
  * (see `useReducedMotion`).
  */
+const curve = [0.16, 1, 0.3, 1] as const;
 export const motion = {
   fast: 150,
   base: 200,
   slow: 250,
   max: 300,
-  easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+  /** The one ease-out curve, as numbers for JS-driven animation (Motion) and as CSS below. */
+  curve,
+  easing: `cubic-bezier(${curve.join(', ')})`,
 } as const;
 
 /**
