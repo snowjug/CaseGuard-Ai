@@ -2,20 +2,27 @@
 
 import type { CaseComparison, CaseComparisonRow, CaseSummary } from '@caseguard/schemas';
 import {
+  BentoGrid,
+  BentoItem,
+  BlurFade,
+  Button,
+  Card,
   DataTable,
   EmptyState,
+  Field,
   KeyValueList,
   LoadingSkeleton,
-  Notice,
   Panel,
   ProvenanceBadge,
+  Select,
   StatusBadge,
   UiLink,
+  cg,
   formatProbability,
   type DataTableColumn,
 } from '@caseguard/ui';
-import { Button, Field, Select } from '@fluentui/react-components';
-import { ArrowSwapRegular, SearchRegular } from '@fluentui/react-icons';
+import { makeStyles, tokens } from '@fluentui/react-components';
+import { ArrowLeftRightIcon, SearchIcon } from 'lucide-react';
 import { keepPreviousData } from '@tanstack/react-query';
 import { useMemo, useRef } from 'react';
 import { PermissionNeeded } from '../../components/common/PermissionNeeded';
@@ -23,13 +30,39 @@ import { useApiQuery } from '../../lib/api/hooks';
 import { useAuth } from '../../lib/auth/context';
 import { useSession } from '../../lib/auth/session';
 import { formatNumber } from '../../lib/format';
-import { codecs, useUrlState } from '../../lib/url-state';
-import { PanelBoundary } from './PanelBoundary';
+import { codecs, useUrlChoiceState } from '../../lib/url-state';
 import { HindsightBadge } from './HindsightBadge';
+import { useLook } from './look';
+import { PanelBoundary } from './PanelBoundary';
 import { ReadableTable } from './ReadableTable';
-import { useInsightStyles } from './styles';
 
 const WITH_CODEC = codecs.optionalString();
+
+const useStyles = makeStyles({
+  fill: { height: '100%', boxSizing: 'border-box' },
+  frame: { gap: cg.space[2], border: `1px dashed ${cg.borderControl}` },
+  label: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightSemibold,
+    color: cg.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+  },
+  chooser: { maxWidth: '420px' },
+  link: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    minHeight: '24px',
+    color: cg.textLink,
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightSemibold,
+    textDecorationLine: 'none',
+    ':hover': { textDecorationLine: 'underline' },
+    '@media (pointer: coarse)': { minHeight: '44px' },
+  },
+});
 
 /** The change from the first case to the second, as the API computed it, in words that do not say "better". */
 export function changeText(deltaPct: number | null): string {
@@ -43,11 +76,11 @@ function referenceOf(comparison: CaseComparison, caseId: string): string {
 }
 
 function MetricCell({ row }: { row: CaseComparisonRow }) {
-  const styles = useInsightStyles();
+  const look = useLook();
   return (
     <div>
       <div>{row.label}</div>
-      <div className={styles.meta}>{row.note}</div>
+      <div className={look.meta}>{row.note}</div>
     </div>
   );
 }
@@ -101,84 +134,102 @@ function buildColumns(comparison: CaseComparison): DataTableColumn<CaseCompariso
 }
 
 function ComparisonBody({ comparison }: { comparison: CaseComparison }) {
-  const styles = useInsightStyles();
+  const styles = useStyles();
+  const look = useLook();
   const columns = useMemo(() => buildColumns(comparison), [comparison]);
   const reuse = comparison.skillReuse;
   return (
-    <div className={styles.page}>
-      <Panel
-        title="What the comparison says"
-        description="The narrative the API wrote from the estimates."
-        actions={
-          <>
-            <ProvenanceBadge kind="estimated" />
-            {comparison.labels.synthetic ? <ProvenanceBadge kind="synthetic" /> : null}
-          </>
-        }
-      >
-        <ul className={styles.bullets}>
-          {comparison.narrative.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
-        <Notice variant="model-estimate" compact title="Differences are estimates">
-          {comparison.notice}
-        </Notice>
-      </Panel>
-      <Panel
-        title="Estimate by estimate"
-        description="Both values, which case has the stronger estimate, and how far apart they are."
-        help="Each row compares one estimate for the two cases. “Stronger” follows the direction that is better for that estimate (a higher quality score, a lower effort). The change is relative to the first case. None of this shows cause and effect."
-      >
-        <ReadableTable columns={columns.length}>
-          <DataTable
-            caption="Comparison of the two cases"
-            columns={columns}
-            rows={comparison.rows}
-            getRowId={(row) => row.metric}
-            dense
-          />
-        </ReadableTable>
-      </Panel>
-      <Panel
-        title="Skill reuse"
-        description="Whether a governed skill guided the later investigation."
-        help="When a published skill matched the second case and its guided plan was followed, the conformance shows how many of its steps were followed. It describes the process, not the person."
-        actions={<ProvenanceBadge kind="estimated" />}
-      >
-        {reuse === null ? (
-          <p className={styles.text}>
-            No governed skill was matched and applied across these two cases.
-          </p>
-        ) : (
-          <>
-            <UiLink href={`/skills/${encodeURIComponent(reuse.skillId)}`} className={styles.link}>
-              {reuse.skillName}
-            </UiLink>
-            <KeyValueList
-              aria-label="Skill reuse"
-              layout="inline"
-              items={[
-                { id: 'version', label: 'Version', value: reuse.skillVersion },
-                {
-                  id: 'match',
-                  label: 'Match score',
-                  value: `${formatProbability(reuse.matchScore, 0)} (estimate)`,
-                },
-                {
-                  id: 'conformance',
-                  label: 'Plan followed',
-                  value:
-                    reuse.conformance === null
-                      ? 'Not applied yet'
-                      : `${formatProbability(reuse.conformance, 0)}: ${reuse.stepsFollowed} of ${reuse.stepsTotal} steps`,
-                },
-              ]}
-            />
-          </>
-        )}
-      </Panel>
-    </div>
+    <BentoGrid>
+      <BentoItem span={12} spanLg={7}>
+        <BlurFade className={styles.fill}>
+          <Panel
+            title="What the comparison says"
+            description="The narrative the API wrote from the estimates."
+            className={styles.fill}
+            actions={
+              <>
+                <ProvenanceBadge kind="estimated" />
+                {comparison.labels.synthetic ? <ProvenanceBadge kind="synthetic" /> : null}
+              </>
+            }
+          >
+            <ul className={look.bullets}>
+              {comparison.narrative.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+            <p className={look.meta}>
+              <span className={look.strong}>Differences are estimates.</span> {comparison.notice}
+            </p>
+          </Panel>
+        </BlurFade>
+      </BentoItem>
+      <BentoItem span={12} spanLg={5}>
+        <BlurFade index={1} className={styles.fill}>
+          <Panel
+            title="Skill reuse"
+            description="Whether a reusable fix guided the later investigation."
+            help="When a published skill matched the second case and its guided plan was followed, the conformance shows how many of its steps were followed. It describes the process, not the person."
+            actions={<ProvenanceBadge kind="estimated" />}
+            className={styles.fill}
+          >
+            {reuse === null ? (
+              <p className={look.text}>
+                No governed skill was matched and applied across these two cases.
+              </p>
+            ) : (
+              <>
+                <UiLink
+                  href={`/skills/${encodeURIComponent(reuse.skillId)}`}
+                  className={styles.link}
+                >
+                  {reuse.skillName}
+                </UiLink>
+                <KeyValueList
+                  aria-label="Skill reuse"
+                  layout="inline"
+                  items={[
+                    { id: 'version', label: 'Version', value: reuse.skillVersion },
+                    {
+                      id: 'match',
+                      label: 'Match score',
+                      value: `${formatProbability(reuse.matchScore, 0)} (estimate)`,
+                    },
+                    {
+                      id: 'conformance',
+                      label: 'Plan followed',
+                      value:
+                        reuse.conformance === null
+                          ? 'Not applied yet'
+                          : `${formatProbability(reuse.conformance, 0)}: ${reuse.stepsFollowed} of ${reuse.stepsTotal} steps`,
+                    },
+                  ]}
+                />
+              </>
+            )}
+          </Panel>
+        </BlurFade>
+      </BentoItem>
+      <BentoItem span={12}>
+        <BlurFade index={2}>
+          <Panel
+            title="Estimate by estimate"
+            description="Both values, which case has the stronger estimate, and how far apart they are."
+            help="Each row compares one estimate for the two cases. “Stronger” follows the direction that is better for that estimate (a higher quality score, a lower effort). The change is relative to the first case. None of this shows cause and effect."
+          >
+            <ReadableTable columns={columns.length}>
+              <DataTable
+                caption="Comparison of the two cases"
+                columns={columns}
+                rows={comparison.rows}
+                getRowId={(row) => row.metric}
+                dense
+              />
+            </ReadableTable>
+          </Panel>
+        </BlurFade>
+      </BentoItem>
+    </BentoGrid>
   );
 }
 
@@ -193,18 +244,18 @@ function CaseToCompareMissing({
   caseId: string | null;
   onChoose: () => void;
 }) {
-  const styles = useInsightStyles();
+  const look = useLook();
   return (
     <EmptyState
       compact
       headingLevel={2}
-      icon={<SearchRegular />}
+      icon={<SearchIcon />}
       title="The case to compare with was not found"
       description={
         <>
           {caseId ? (
             <>
-              No case with the id <span className={styles.mono}>{caseId}</span> is available to
+              No case with the id <span className={look.mono}>{caseId}</span> is available to
               you.{' '}
             </>
           ) : null}
@@ -212,7 +263,7 @@ function CaseToCompareMissing({
         </>
       }
       action={
-        <Button appearance="outline" onClick={onChoose}>
+        <Button variant="secondary" onClick={onChoose}>
           Choose another case
         </Button>
       }
@@ -226,17 +277,18 @@ export interface CompareViewProps {
 }
 
 /**
- * The "Compare cases" tab: this case against another analysed case (`compare.cases`, `?with=`). It compares finished
- * cases, so the time cursor does not apply. Estimates only, with the API's own narrative and notice. A `?with=` that
- * names no case the person can open (404) is explained calmly, with no Retry, and the chooser shows nothing selected so
- * that another case can be picked; every other failure is shown as a failure.
+ * The "Compare" tab: this case against another analysed case (`compare.cases`, `?with=`). It compares finished cases,
+ * so the time cursor does not apply. Estimates only, with the API's own narrative and notice. A `?with=` that names no
+ * case the person can open (404) is explained calmly, with no Retry, and the chooser shows nothing selected so that
+ * another case can be picked; every other failure is shown as a failure.
  */
 export function CompareView({ caseId, cursorIgnored }: CompareViewProps) {
-  const styles = useInsightStyles();
+  const styles = useStyles();
+  const look = useLook();
   const auth = useAuth();
   const { can } = useSession();
   const chooser = useRef<HTMLSelectElement>(null);
-  const [withParam, setWith] = useUrlState('with', WITH_CODEC);
+  const [withParam, setWith] = useUrlChoiceState('with', WITH_CODEC);
   const cases = useApiQuery(
     'cases.list',
     { query: { limit: 100 } },
@@ -271,41 +323,43 @@ export function CompareView({ caseId, cursorIgnored }: CompareViewProps) {
     return (
       <EmptyState
         headingLevel={2}
-        icon={<ArrowSwapRegular />}
+        icon={<ArrowLeftRightIcon />}
         title="There is no other analysed case to compare with"
-        description="Compare needs a second analysed case. Ingest another case, or use a built-in synthetic sample, and analyse it."
+        description="Compare needs a second analysed case. Add another case, or try a sample case, and analyse it."
       />
     );
   }
   return (
-    <div className={styles.page}>
-      <div className={styles.hindsight} role="group" aria-label="Retrospective comparison">
+    <div className={look.page}>
+      <Card
+        role="group"
+        aria-label="Retrospective comparison"
+        padding="md"
+        className={styles.frame}
+      >
         <HindsightBadge />
-        <p className={styles.hindsightTitle}>Retrospective comparison: uses the finished cases</p>
-        <p className={styles.text}>
+        <p className={styles.label}>Retrospective comparison: uses the finished cases</p>
+        <p className={look.text}>
           {cursorIgnored
             ? 'The comparison covers whole cases, so it does not follow the time cursor.'
             : 'The comparison covers whole cases, including how they ended.'}
         </p>
-      </div>
-      <div className={styles.toolbar}>
-        <Field label="Compare with" className={styles.field}>
-          <Select
-            ref={chooser}
-            className={styles.select}
-            value={missing ? '' : (chosen ?? '')}
-            disabled={others.length === 0}
-            onChange={(_event, next) => setWith(next.value || null)}
-          >
-            {missing ? <option value="">Choose another case</option> : null}
-            {others.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.reference} · {item.title}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      </div>
+      </Card>
+      <Field label="Compare with" className={styles.chooser}>
+        <Select
+          ref={chooser}
+          value={missing ? '' : (chosen ?? '')}
+          disabled={others.length === 0}
+          onChange={(event) => setWith(event.target.value || null)}
+        >
+          {missing ? <option value="">Choose another case</option> : null}
+          {others.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.reference} · {item.title}
+            </option>
+          ))}
+        </Select>
+      </Field>
       {missing ? (
         <CaseToCompareMissing caseId={chosen} onChoose={() => chooser.current?.focus()} />
       ) : (
@@ -317,7 +371,7 @@ export function CompareView({ caseId, cursorIgnored }: CompareViewProps) {
           {(comparison, meta) => (
             <div
               aria-busy={meta.isRefreshing}
-              style={meta.isRefreshing ? { opacity: 0.72 } : undefined}
+              className={meta.isRefreshing ? look.busy : undefined}
             >
               <ComparisonBody comparison={comparison} />
             </div>

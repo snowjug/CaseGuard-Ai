@@ -1,16 +1,15 @@
 'use client';
 
 import type { Permission } from '@caseguard/schemas';
-import { ConfirmDialog, type ConfirmDialogProps } from '@caseguard/ui';
-import { Tooltip, type ButtonProps } from '@fluentui/react-components';
+import { ConfirmDialog, Tooltip, type ConfirmDialogProps } from '@caseguard/ui';
 import { cloneElement, type ReactElement } from 'react';
 import { permissionDeniedReason, useSession } from '../../lib/auth/session';
 
 export interface GatedConfirmProps extends Omit<ConfirmDialogProps, 'trigger'> {
   /** The permission the action needs. Without it the opener is disabled and says why. */
   permission: Permission;
-  /** The opener: a Fluent `Button`. */
-  trigger: ReactElement<ButtonProps>;
+  /** The opener: a `Button` (the kit's, or Fluent's while a screen is still on it). */
+  trigger: ReactElement<{ disabledFocusable?: boolean }>;
   /** Set when the API already said this step is not available: the opener is disabled with this explanation. */
   blockedReason?: string | null;
 }
@@ -27,11 +26,7 @@ export function GatedConfirm({ permission, trigger, blockedReason, ...dialog }: 
     ? (blockedReason ?? null)
     : permissionDeniedReason(permission, session);
   if (reason !== null) {
-    return (
-      <Tooltip content={reason} relationship="description" withArrow>
-        {cloneElement(trigger, { disabledFocusable: true })}
-      </Tooltip>
-    );
+    return <Tooltip content={reason}>{cloneElement(trigger, { disabledFocusable: true })}</Tooltip>;
   }
   return <ConfirmDialog trigger={trigger} {...dialog} />;
 }
