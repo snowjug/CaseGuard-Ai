@@ -43,6 +43,7 @@ const useStyles = makeStyles({
     marginInline: 'auto',
     paddingInline: cg.space[8],
     [phone]: { paddingInline: cg.space[4] },
+    '@media (max-width: 359px)': { paddingInline: cg.space[2] },
   },
   brand: {
     display: 'none',
@@ -77,7 +78,13 @@ const useStyles = makeStyles({
     [phone]: { display: 'none' },
   },
   searchText: { flex: '1 1 auto', textAlign: 'start' },
-  right: { display: 'flex', alignItems: 'center', gap: cg.space[2], marginInlineStart: 'auto' },
+  right: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: cg.space[2],
+    marginInlineStart: 'auto',
+    '@media (max-width: 359px)': { gap: cg.space[1] },
+  },
   phoneOnly: { display: 'none', [phone]: { display: 'inline-flex' } },
   tabletUp: { display: 'inline-flex', [phone]: { display: 'none' } },
 });

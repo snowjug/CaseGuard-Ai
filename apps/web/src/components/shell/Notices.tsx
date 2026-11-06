@@ -5,7 +5,7 @@ import {
   RESPONSIBLE_USE_NOTICE,
   SYNTHETIC_DATA_NOTICE,
 } from '@caseguard/schemas';
-import { Button, ProvenanceBadge, cg } from '@caseguard/ui';
+import { Button, ProvenanceBadge, cg, useMediaQuery } from '@caseguard/ui';
 import {
   Popover,
   PopoverSurface,
@@ -74,12 +74,14 @@ const useStyles = makeStyles({
  */
 export function DemoDataPill() {
   const styles = useStyles();
+  // On the narrowest phones the label shortens so that the top bar still fits its row.
+  const narrow = useMediaQuery('(max-width: 359px)');
   const sentence = `${SYNTHETIC_DATA_NOTICE}${publicEnv.appEnv === 'production' ? '' : ` Environment: ${publicEnv.appEnv}.`}`;
   return (
     <Popover positioning="below-end" withArrow>
       <PopoverTrigger disableButtonEnhancement>
         <button type="button" className={styles.pill} aria-label="Demo data: what this means">
-          <ProvenanceBadge kind="synthetic" />
+          <ProvenanceBadge kind="synthetic" {...(narrow ? { label: 'Demo' } : {})} />
         </button>
       </PopoverTrigger>
       <PopoverSurface className={styles.surface} aria-label="About demo data">

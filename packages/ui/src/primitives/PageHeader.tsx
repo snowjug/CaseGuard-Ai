@@ -58,7 +58,14 @@ const useStyles = makeStyles({
     lineHeight: tokens.lineHeightBase300,
     color: cg.textSecondary,
   },
-  actions: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
+  actions: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: cg.space[2],
+    minWidth: 0,
+    maxWidth: '100%',
+  },
   meta: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
   section: {
     display: 'flex',
