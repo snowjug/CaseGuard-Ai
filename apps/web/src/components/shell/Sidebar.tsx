@@ -93,7 +93,7 @@ const useStyles = makeStyles({
     alignItems: 'center',
     gap: cg.space[3],
     minWidth: 0,
-    [rail]: { flexDirection: 'column', flex: '0 0 auto', gap: '2px' },
+    [rail]: { flexDirection: 'column', flex: '0 0 auto', gap: cg.space[1] },
   },
   icon: { display: 'inline-flex', fontSize: '20px', flexShrink: 0 },
   iconActive: { color: cg.tone.brand.fg },

@@ -52,7 +52,7 @@ const useStyles = makeStyles({
     color: cg.tone.productive.fg,
     ...borderColors(cg.tone.productive.border),
   },
-  text: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 },
+  text: { display: 'flex', flexDirection: 'column', gap: cg.space[1], minWidth: 0 },
   label: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300 },
   hint: { fontSize: tokens.fontSizeBase200, color: cg.textSecondary },
 });

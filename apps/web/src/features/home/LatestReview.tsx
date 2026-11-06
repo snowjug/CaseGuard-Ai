@@ -83,9 +83,10 @@ const useStyles = makeStyles({
   actions: { display: 'flex', flexWrap: 'wrap', gap: cg.space[2], marginTop: cg.space[2] },
 });
 
+/** The words of the quality bands, the same ones the Review and the Score page use for this score. */
 const BAND: Record<MetricCard['status'], { status: ScoreStatus; label: string }> = {
-  good: { status: 'good', label: 'Good' },
-  watch: { status: 'watch', label: 'Fair' },
+  good: { status: 'good', label: 'Strong' },
+  watch: { status: 'watch', label: 'Adequate' },
   poor: { status: 'poor', label: 'Poor' },
   unknown: { status: 'unknown', label: 'Not enough data' },
 };

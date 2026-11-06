@@ -30,7 +30,7 @@ const useStyles = makeStyles({
   caseCell: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '2px',
+    gap: cg.space[1],
     minWidth: '220px',
     padding: `${cg.space[1]} 0`,
     '@media (max-width: 1279px)': { minWidth: 0 },
@@ -65,7 +65,7 @@ const useStyles = makeStyles({
   badges: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[1] },
   number: { fontVariantNumeric: 'tabular-nums', fontWeight: tokens.fontWeightSemibold },
   muted: { color: cg.textMuted, fontSize: tokens.fontSizeBase200 },
-  stack: { display: 'flex', flexDirection: 'column', gap: '2px' },
+  stack: { display: 'flex', flexDirection: 'column', gap: cg.space[1] },
   actions: { display: 'flex', alignItems: 'center', gap: cg.space[1], flexWrap: 'wrap' },
   cards: {
     display: 'grid',

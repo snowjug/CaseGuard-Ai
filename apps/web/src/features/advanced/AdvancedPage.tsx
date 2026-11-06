@@ -87,7 +87,7 @@ const useStyles = makeStyles({
     justifyContent: 'space-between',
     gap: cg.space[2],
   },
-  settingLabel: { display: 'flex', flexDirection: 'column', gap: '2px' },
+  settingLabel: { display: 'flex', flexDirection: 'column', gap: cg.space[1] },
   settingName: { fontWeight: tokens.fontWeightMedium, fontSize: tokens.fontSizeBase300 },
   settingHelp: { color: cg.textSecondary, fontSize: tokens.fontSizeBase200 },
   buttons: { display: 'flex', flexWrap: 'wrap', gap: cg.space[2] },
