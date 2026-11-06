@@ -103,14 +103,14 @@ export async function waitUntilAnalysed(caseId: string, timeoutMs = 240_000): Pr
  * read the preview, confirm, create. Returns the id of the new case once its analysis has finished.
  */
 export async function ingestBuiltInSample(page: Page, reference: SampleReference): Promise<string> {
-  await openPage(page, '/cases/new');
+  await openPage(page, '/cases/new?source=sample');
   await page.getByRole('radio', { name: new RegExp(`^${reference}:`) }).check();
-  await page.getByRole('button', { name: 'Validate and preview' }).click();
-  await expect(page.getByRole('heading', { name: /Step 2 of 4/ })).toBeVisible();
-  await expect(page.getByText(/Ready to ingest/)).toBeVisible();
-  await page.getByRole('button', { name: 'Continue to confirm' }).click();
-  await page.getByRole('button', { name: 'Create case' }).click();
-  await expect(page.getByRole('group', { name: 'The case was created' })).toBeVisible({
+  await page.getByRole('button', { name: 'Check case' }).click();
+  await expect(page.getByRole('heading', { name: 'Check what will be created' })).toBeVisible();
+  await expect(page.getByText(/Ready to create/)).toBeVisible();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Create and analyse' }).click();
+  await expect(page.getByRole('heading', { name: 'Your case is ready' })).toBeVisible({
     timeout: 60_000,
   });
   const created = await caseByReference(reference);
