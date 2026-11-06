@@ -384,3 +384,39 @@ Reduced motion (OS setting or the in-app override) removes every item and shows 
 
 Per-fix "mark as done" that persists, case owners and assignment, shareable links with expiry, notifications, server-side
 sort by score, per-user saved filters. The UI uses only existing endpoints: `samples.list` powers "Try a sample case".
+
+## 9. As built (where the finished screens differ from the blueprint, and why)
+
+**Flow and navigation.** As specified: Add a case, See the review, Fix what matters; five navigation items; one Advanced
+hub. A case has the tabs Review, Score, Evidence, What if and Timeline, with Possible causes, Case details and Report under
+"More". On a phone the tab strip scrolls on its own, brings the selected tab into view, and keeps "More" pinned at its end.
+
+| Screen                              | As built                                                                                                                                                                                                                                                                 |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| First visit                         | The promise, the three steps and the demo people as cards picked with one click (the dialog stays as a fallback). The sign-in button in the top bar is an icon button on a phone.                                                                                        |
+| Home                                | Latest review (ring, one-line reason, Open review) beside "Fix first", three key numbers, recent cases, skills you could reuse; every other metric folded under "All metrics". The ring uses the same band words as the Review and Score pages (Strong, Adequate, Poor). |
+| Cases                               | One toolbar row (search, Filters popover with a count, sort), a borderless table with relative dates, a card list on phones.                                                                                                                                             |
+| Add a case                          | Three phases (Add, Check, Create) instead of four steps; the default source is Paste; `?source=sample` opens the sample choice (UI only); the check runs the same pipeline as the create.                                                                                |
+| Review                              | Verdict ring and one-line reason beside the first three fixes (6/6 columns: the 5/7 split of the blueprint made the ring wrap above its text); "Copy fix list" is the one primary action; What went wrong and What to learn start closed.                                |
+| Score                               | Ring, six meters with plain names, "What lowered the score" and "What would raise it" as short animated lists; five tabs underneath. The "What was known then" bar starts open only when `?asOf=` is set.                                                                |
+| Evidence, Timeline, Possible causes | A coverage bar, a chart hero and a "most likely cause" hero respectively; filters in one popover; details in a drawer; a shared collapsed "What was known then" bar. Exact UTC date-times stay on the Timeline (a timeline needs the time of day).                       |
+| What if                             | The outcome in one number (time that could have been saved, with its range, Estimated and Simulated), a key decision picker, strategies as a segmented choice, kit tabs for the detail; the no-hindsight check and "Known only later" are folded.                        |
+| Report, Case details                | The report document and its print rules are unchanged (a sheet on screen, Print is the primary action); Case details opens on the key facts, with refresh, re-run and delete behind one "Manage case" menu.                                                              |
+| Quality, Skills                     | Three stat cards, the trend chart and folded tables; a card grid for skills, and a skill page with its status, benefit and one action.                                                                                                                                   |
+| Advanced views                      | A summary card first (setup, spend, system status, demo progress) and folded sections after it; tables become card lists on phones. Nothing the old pages could do was removed.                                                                                          |
+
+**Data the API does not have (UI shows an honest gap, nothing was added).** The portfolio has no avoidable-effort figure, so
+the third Quality stat card uses the average of the waiting-time pattern and shows a dash when it is absent. A skill's success
+has no confidence range, so none is drawn. Fixes cannot be marked as done or assigned (section 8).
+
+**Kit gaps worked around.** `DataTable` ignores column widths in a fixed layout; `BarChart` picks half-step ticks for tiny
+integer ranges (the page formats counts itself); there is no vertical tab list, filter popover or toggle chip in the kit (the
+Evidence filter popover is local and Timeline reuses it); a menu and a checkbox are the Fluent ones.
+
+**Rules that are now enforced by a test** (`apps/web/src/design-tokens.test.ts`): no colour literal outside the token files
+(the printed report keeps one paper palette), the pre-hydration page colours in `globals.css` equal the palette, and no fixed
+gap, padding, margin or corner radius in any component (the investigation graph is laid out in SVG units and is exempt).
+
+**Touch and keyboard.** Controls on a coarse pointer are at least 44 px (links, summaries, chips, switches and "Show more"
+included); a form control fills its whole frame so a tap anywhere in it focuses the field; the top-bar search button takes its
+name from its visible text and carries `aria-keyshortcuts`.
