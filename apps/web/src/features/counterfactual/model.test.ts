@@ -17,6 +17,7 @@ import {
   resolveSelection,
   scenariosOfFork,
   strategiesConverge,
+  timeSaved,
   withheldAfterBoundary,
 } from './model';
 
@@ -84,7 +85,7 @@ describe('counterfactual model: scenarios and selection', () => {
 });
 
 describe('counterfactual model: acceptance and the temporal boundary', () => {
-  it('has no blockers for a completed, valid path that passed the leak check', () => {
+  it('has no blockers for a completed, valid path that passed the no-hindsight check', () => {
     expect(acceptanceBlockers(scenario())).toEqual([]);
   });
 
@@ -110,7 +111,7 @@ describe('counterfactual model: acceptance and the temporal boundary', () => {
         leakCheck: { ...base.boundary.leakCheck, passed: false, futureReferencesFound: 2 },
       },
     };
-    expect(acceptanceBlockers(leaked)).toEqual(['It did not pass the temporal leak check.']);
+    expect(acceptanceBlockers(leaked)).toEqual(['It did not pass the no-hindsight check.']);
     const unexcluded = {
       ...base,
       boundary: {
@@ -118,7 +119,7 @@ describe('counterfactual model: acceptance and the temporal boundary', () => {
         leakCheck: { ...base.boundary.leakCheck, resolutionExcluded: false },
       },
     };
-    expect(acceptanceBlockers(unexcluded)).toEqual(['It did not pass the temporal leak check.']);
+    expect(acceptanceBlockers(unexcluded)).toEqual(['It did not pass the no-hindsight check.']);
   });
 
   it('counts the events the boundary withheld', () => {
@@ -244,5 +245,57 @@ describe('counterfactual model: metrics and improvements', () => {
     expect(describeImprovement({ key: 'x', label: 'customer effort', fraction: -0.208 })).toBe(
       '21% more customer effort',
     );
+  });
+});
+
+describe('counterfactual model: the time saved, as a range', () => {
+  const withSimulated = (low: number, mid: number, high: number) => {
+    const base = scenario();
+    return {
+      ...base,
+      counterfactualMetrics: {
+        ...base.counterfactualMetrics,
+        timeToDiagnosisMinutes: { low, mid, high },
+      },
+    };
+  };
+
+  it('is a saving only when even the pessimistic end of the simulated range beats what happened', () => {
+    expect(timeSaved(scenario())).toEqual({
+      verdict: 'faster',
+      recorded: 2994,
+      simulated: { low: 197, mid: 444, high: 649 },
+      saved: { low: 2345, mid: 2550, high: 2797 },
+      claimed: true,
+    });
+  });
+
+  it('never presents a range that includes the recorded time as a saving, and says when it is slower', () => {
+    expect(timeSaved(withSimulated(2000, 2800, 3600)).verdict).toBe('unclear');
+    expect(timeSaved(withSimulated(3100, 3500, 3900)).verdict).toBe('slower');
+    expect(timeSaved(withSimulated(3100, 3500, 3900)).saved.mid).toBe(-506);
+  });
+
+  it('claims nothing for an illustration, which the engine marks as claiming no saving', () => {
+    const illustration = scenario({
+      quality: {
+        basis: {
+          scenario: 'illustrative',
+          summary: 'A worked example.',
+          parts: [
+            { what: 'Recorded path', basis: 'measured', note: 'Read from the case.' },
+            { what: 'Alternative path', basis: 'illustrative', note: 'An example.' },
+          ],
+        },
+        feasibility: { level: 'feasible', reasons: [] },
+        constraints: [],
+        skillApplicability: { status: 'not_assessed', skills: [], note: 'Not checked.' },
+        validation: ['Check it before relying on it.'],
+        timeSavedClaim: 'none',
+      },
+    });
+    expect(timeSaved(illustration).claimed).toBe(false);
+    // A scenario stored before the engine wrote its quality down keeps leading with its range.
+    expect(timeSaved(scenario()).claimed).toBe(true);
   });
 });

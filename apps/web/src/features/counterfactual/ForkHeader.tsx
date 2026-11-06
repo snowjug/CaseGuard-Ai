@@ -3,8 +3,8 @@
 import type { DecisionFork } from '@caseguard/schemas';
 import { FORK_CATEGORY_LABELS } from '@caseguard/schemas';
 import {
-  BadgeShell,
-  Panel,
+  Badge,
+  HelpButton,
   ProvenanceBadge,
   StatusBadge,
   UiLink,
@@ -13,12 +13,30 @@ import {
   formatProbability,
 } from '@caseguard/ui';
 import { makeStyles, tokens } from '@fluentui/react-components';
-import { StarRegular } from '@fluentui/react-icons';
+import { StarIcon } from 'lucide-react';
+import { useId } from 'react';
+import { ExpandableText } from '../../components/case/ExpandableText';
 import { caseHref, evidenceLinkHref } from '../../lib/deep-links';
 import { LEVEL_LABELS, SEVERITY_BADGES } from '../reasoning/labels';
 import { instantBefore } from '../reasoning/time';
 
 const useStyles = makeStyles({
+  root: { display: 'flex', flexDirection: 'column', gap: cg.space[3], minWidth: 0 },
+  eyebrow: {
+    margin: 0,
+    color: cg.textMuted,
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightMedium,
+  },
+  titleLine: { display: 'flex', alignItems: 'flex-start', gap: cg.space[1] },
+  title: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase400,
+    lineHeight: tokens.lineHeightBase400,
+    fontWeight: tokens.fontWeightSemibold,
+    letterSpacing: '-0.01em',
+    overflowWrap: 'anywhere',
+  },
   badges: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
   text: {
     margin: 0,
@@ -28,42 +46,54 @@ const useStyles = makeStyles({
     overflowWrap: 'anywhere',
   },
   muted: { margin: 0, fontSize: tokens.fontSizeBase200, color: cg.textMuted },
-  links: { display: 'flex', flexWrap: 'wrap', gap: `${cg.space[1]} ${cg.space[4]}` },
+  footer: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: `${cg.space[2]} ${cg.space[6]}`,
+    paddingTop: cg.space[4],
+    borderTop: `1px solid ${cg.borderSubtle}`,
+  },
   link: {
-    color: cg.textLink,
-    textDecorationLine: 'underline',
-    textUnderlineOffset: '2px',
-    minHeight: '24px',
     display: 'inline-flex',
     alignItems: 'center',
+    minHeight: '24px',
+    color: cg.textLink,
+    fontSize: tokens.fontSizeBase300,
+    textDecorationLine: 'underline',
+    textUnderlineOffset: '2px',
   },
 });
 
+const HELP =
+  'A key decision is a moment where a better path was available. The summary says why this one was flagged. Everything on this screen about it uses only what was known at its decision instant, except the part labelled Known only later.';
+
 export interface ForkHeaderProps {
-  caseId: string;
   fork: DecisionFork;
 }
 
-/** The selected decision fork: why it was flagged, when it happened and how to see the moment in the other pages. */
-export function ForkHeader({ caseId, fork }: ForkHeaderProps) {
+/** The chosen key decision: what it was and why it was flagged. */
+export function ForkHeader({ fork }: ForkHeaderProps) {
   const styles = useStyles();
+  const headingId = useId();
   const severity = SEVERITY_BADGES[fork.severity];
   return (
-    <Panel
-      title={fork.title}
-      description={fork.summary}
-      accent="fork"
-      help="A decision fork is a moment where a better path was available. The summary says why this one was flagged. Everything on this page about the fork uses only what was known at its decision instant, except the clearly labelled hindsight panel."
-    >
+    <section className={styles.root} aria-labelledby={headingId}>
+      <p className={styles.eyebrow}>The decision</p>
+      <div className={styles.titleLine}>
+        <h3 id={headingId} className={styles.title}>
+          {fork.title}
+        </h3>
+        <HelpButton label="About this key decision" title="Key decision">
+          {HELP}
+        </HelpButton>
+      </div>
+      <ExpandableText text={fork.summary} lines={3} label="decision summary" />
       <div className={styles.badges}>
         {fork.isEarliestMeaningful ? (
-          <BadgeShell
-            tone="fork"
-            pattern="solid"
-            icon={<StarRegular />}
-            label="Earliest meaningful fork"
-            size="medium"
-          />
+          <Badge tone="brand" icon={<StarIcon />}>
+            Earliest meaningful decision
+          </Badge>
         ) : null}
         <StatusBadge status={severity.status} label={severity.label} size="small" />
         <ProvenanceBadge kind="estimated" label={`Impact ${formatProbability(fork.impactScore)}`} />
@@ -75,21 +105,33 @@ export function ForkHeader({ caseId, fork }: ForkHeaderProps) {
           : ''}
         . Risk of the step taken: {LEVEL_LABELS[fork.risk]}.
       </p>
+    </section>
+  );
+}
+
+export interface ForkLinksProps {
+  caseId: string;
+  fork: DecisionFork;
+}
+
+/** When the decision happened and how to see that moment on the other pages. */
+export function ForkLinks({ caseId, fork }: ForkLinksProps) {
+  const styles = useStyles();
+  return (
+    <div className={styles.footer}>
       <p className={styles.muted}>Decision at {formatDateTimeUtc(fork.timestamp)}</p>
-      <div className={styles.links}>
-        <UiLink
-          className={styles.link}
-          href={`${caseHref(caseId, 'hypotheses')}?asOf=${encodeURIComponent(instantBefore(fork.timestamp))}`}
-        >
-          See the hypotheses just before this decision
-        </UiLink>
-        <UiLink
-          className={styles.link}
-          href={evidenceLinkHref(caseId, { type: 'event', id: fork.eventId })}
-        >
-          Open the decision event in the timeline
-        </UiLink>
-      </div>
-    </Panel>
+      <UiLink
+        className={styles.link}
+        href={`${caseHref(caseId, 'hypotheses')}?asOf=${encodeURIComponent(instantBefore(fork.timestamp))}`}
+      >
+        See possible causes just before this decision
+      </UiLink>
+      <UiLink
+        className={styles.link}
+        href={evidenceLinkHref(caseId, { type: 'event', id: fork.eventId })}
+      >
+        Open the decision event in the timeline
+      </UiLink>
+    </div>
   );
 }

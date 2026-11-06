@@ -109,14 +109,14 @@ describe('how far to trust a simulated path: the panel', () => {
       screen.getByText('Times are shown as ranges. No exact saving is claimed.'),
     ).toBeInTheDocument();
 
-    const summary = screen.getByText('What it rests on, what limits it and what to check');
-    const details = summary.closest('details');
-    expect(details).not.toBeNull();
-    expect(details?.open).toBe(false);
+    const summary = screen.getByRole('button', {
+      name: 'What it rests on, what limits it and what to check',
+    });
+    expect(summary).toHaveAttribute('aria-expanded', 'false');
     await expectNoAxeViolations(container);
 
     await userEvent.click(summary);
-    expect(details?.open).toBe(true);
+    expect(summary).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('What to check before relying on it')).toBeInTheDocument();
     expect(
       screen.getByText(/Step 1 \(Ask for scoping data\): The customer has to do it\./),

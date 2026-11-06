@@ -28,6 +28,7 @@ import { GatedAction, useSession } from '../../../lib/auth/session';
 import { caseHref } from '../../../lib/deep-links';
 import { useToast } from '../../../lib/toast';
 import { comparisonTracks, metricDeltas } from '../../counterfactual/model';
+import { OutcomeResult } from '../../counterfactual/OutcomeHero';
 import { TrustPanel } from '../../counterfactual/TrustPanel';
 import { explainJobStartFailure } from '../../reasoning/errors';
 import { useActorLabel, useInvalidate } from '../../reasoning/hooks';
@@ -91,6 +92,7 @@ const useStyles = makeStyles({
     color: cg.textLink,
     fontWeight: tokens.fontWeightSemibold,
     minHeight: '24px',
+    '@media (pointer: coarse)': { minHeight: '44px', paddingBlock: cg.space[3] },
   },
   bullets: {
     margin: `${cg.space[2]} 0 0`,
@@ -155,6 +157,7 @@ function PathView({
   const actor = useActorLabel();
   return (
     <div className={styles.stack}>
+      {scenario ? <OutcomeResult scenario={scenario} /> : null}
       <Notice variant="model-estimate" compact title="Simulated estimate">
         {SIMULATED_LABEL}. It replays{' '}
         {path.decision ? `decision point ${path.decision.number}` : 'the decision'} with steps from

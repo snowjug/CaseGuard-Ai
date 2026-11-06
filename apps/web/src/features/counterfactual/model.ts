@@ -5,6 +5,7 @@ import type {
   DiagnosticAction,
   HypothesesResponse,
   PathMetrics,
+  Range,
 } from '@caseguard/schemas';
 import {
   formatDuration,
@@ -91,7 +92,7 @@ export function acceptanceBlockers(scenario: CounterfactualScenario): string[] {
   }
   const leak = scenario.boundary.leakCheck;
   if (!leak.passed || leak.futureReferencesFound > 0 || !leak.resolutionExcluded) {
-    blockers.push('It did not pass the temporal leak check.');
+    blockers.push('It did not pass the no-hindsight check.');
   }
   return blockers;
 }
@@ -369,4 +370,42 @@ export function headlineImprovements(scenario: CounterfactualScenario): Improvem
 export function describeImprovement(line: ImprovementLine): string {
   const share = formatProbability(Math.abs(line.fraction));
   return line.fraction >= 0 ? `${share} less ${line.label}` : `${share} more ${line.label}`;
+}
+
+export type TimeSavedVerdict = 'faster' | 'slower' | 'unclear';
+
+export interface TimeSaved {
+  /**
+   * `faster` only when even the pessimistic end of the simulated range is below what happened (and `slower` when even the
+   * optimistic end is above it): a range that includes the recorded time says nothing either way, and is never presented
+   * as a saving.
+   */
+  verdict: TimeSavedVerdict;
+  /** Minutes from the decision to a diagnosis in the recorded case. */
+  recorded: number;
+  /** The same for the simulated path, as a range. */
+  simulated: Range;
+  /** The saving in minutes, as a range, positive when the simulation is faster. */
+  saved: Range;
+  /** False when the engine says no saving is claimed for this path (an illustration only): no figure may be led with. */
+  claimed: boolean;
+}
+
+/** The headline of the comparison: how much sooner the simulated path reached a diagnosis, with its estimate range. */
+export function timeSaved(scenario: CounterfactualScenario): TimeSaved {
+  const recorded = scenario.actualMetrics.timeToDiagnosisMinutes.mid;
+  const simulated = scenario.counterfactualMetrics.timeToDiagnosisMinutes;
+  const verdict: TimeSavedVerdict =
+    simulated.high < recorded ? 'faster' : simulated.low > recorded ? 'slower' : 'unclear';
+  return {
+    verdict,
+    recorded,
+    simulated,
+    saved: {
+      low: recorded - simulated.high,
+      mid: recorded - simulated.mid,
+      high: recorded - simulated.low,
+    },
+    claimed: scenario.quality === undefined || scenario.quality.timeSavedClaim !== 'none',
+  };
 }

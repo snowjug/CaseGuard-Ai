@@ -3,6 +3,7 @@
 import type { CounterfactualScenario, CounterfactualStep, Evidence } from '@caseguard/schemas';
 import { ACTION_KIND_LABELS, MODEL_ESTIMATE_NOTICE } from '@caseguard/schemas';
 import {
+  Button,
   KeyValueList,
   Notice,
   Panel,
@@ -14,7 +15,7 @@ import {
   formatNumber,
   formatProbability,
 } from '@caseguard/ui';
-import { Button, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
 import { AsOfLimited, isRateLimited } from '../../components/case/as-of';
 import type { ApiError } from '../../lib/api/errors';
 import { EvidenceItem } from '../reasoning/EvidenceItem';
@@ -45,7 +46,7 @@ const useStyles = makeStyles({
     width: '100%',
     boxSizing: 'border-box',
     textAlign: 'start',
-    padding: `${cg.space[2]} ${cg.space[3]}`,
+    padding: `${cg.space[3]} ${cg.space[4]}`,
     borderRadius: cg.radius.md,
     border: `1px dashed ${cg.tone.simulated.border}`,
     backgroundColor: cg.surfaceSunken,
@@ -53,11 +54,16 @@ const useStyles = makeStyles({
     font: 'inherit',
     cursor: 'pointer',
     minHeight: '44px',
-    ':focus-visible': { outline: `3px solid ${cg.focus}`, outlineOffset: '2px' },
+    transitionProperty: 'background-color, border-color, box-shadow',
+    transitionDuration: cg.motion.fast,
+    transitionTimingFunction: cg.motion.easing,
+    ':hover': { backgroundColor: cg.tone.simulated.tint },
+    ':focus-visible': { outline: `2px solid ${cg.focus}`, outlineOffset: '2px' },
   },
   stepSelected: {
-    border: `2px solid ${cg.tone.simulated.solid}`,
+    border: `1px solid ${cg.tone.simulated.solid}`,
     backgroundColor: cg.tone.simulated.tint,
+    boxShadow: `0 14px 36px -18px ${cg.glow}`,
   },
   stepTitle: {
     fontSize: tokens.fontSizeBase300,
@@ -261,7 +267,7 @@ function StepDetail({
             <ul className={styles.chips}>
               {priorSteps.map((prior) => (
                 <li key={prior.id}>
-                  <Button size="small" appearance="outline" onClick={() => onSelectStep(prior.id)}>
+                  <Button size="sm" variant="secondary" onClick={() => onSelectStep(prior.id)}>
                     Step {prior.index + 1}: {prior.label}
                   </Button>
                 </li>

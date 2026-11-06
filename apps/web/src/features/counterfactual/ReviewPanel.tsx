@@ -2,6 +2,7 @@
 
 import type { CounterfactualScenario } from '@caseguard/schemas';
 import {
+  Button,
   ConfirmDialog,
   Notice,
   Panel,
@@ -10,12 +11,8 @@ import {
   formatDateTimeUtc,
   useRestoreFocusTarget,
 } from '@caseguard/ui';
-import { Button, makeStyles, tokens } from '@fluentui/react-components';
-import {
-  CheckmarkCircleRegular,
-  DismissCircleRegular,
-  MoleculeRegular,
-} from '@fluentui/react-icons';
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { CircleCheckIcon, CircleXIcon, DnaIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { JobProgress } from '../../components/common/JobProgress';
@@ -29,8 +26,12 @@ import { REVIEW_STATE_BADGES, isAcceptedState } from '../reasoning/labels';
 import { acceptanceBlockers } from './model';
 
 const useStyles = makeStyles({
-  stack: { display: 'flex', flexDirection: 'column', gap: cg.space[3], minWidth: 0 },
+  stack: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
   section: { display: 'flex', flexDirection: 'column', gap: cg.space[2], minWidth: 0 },
+  skill: {
+    paddingTop: cg.space[4],
+    borderTop: `1px solid ${cg.borderSubtle}`,
+  },
   h3: {
     margin: 0,
     fontSize: tokens.fontSizeBase400,
@@ -110,8 +111,8 @@ function ReviewButtons({
       {accepted ? null : (
         <GatedAction permission="counterfactual:review">
           <Button
-            appearance="primary"
-            icon={<CheckmarkCircleRegular />}
+            variant="primary"
+            icon={<CircleCheckIcon />}
             disabled={acceptDisabledReason !== null}
             onClick={() => setOpen('accept')}
             {...restoreFocus}
@@ -123,8 +124,8 @@ function ReviewButtons({
       {scenario.reviewState === 'rejected' ? null : (
         <GatedAction permission="counterfactual:review">
           <Button
-            appearance="outline"
-            icon={<DismissCircleRegular />}
+            variant="secondary"
+            icon={<CircleXIcon />}
             onClick={() => setOpen('reject')}
             {...restoreFocus}
           >
@@ -203,50 +204,55 @@ function ExtractSkill({ caseId, scenario }: { caseId: string; scenario: Counterf
   };
 
   return (
-    <section className={styles.section} aria-label="Extract SkillDNA">
-      <h3 className={styles.h3}>SkillDNA</h3>
+    <section
+      className={mergeClasses(styles.section, styles.skill)}
+      aria-label="Create a reusable skill"
+    >
+      <h3 className={styles.h3}>Reusable fix</h3>
       <p className={styles.text}>
-        A reviewer-accepted path can be distilled into a draft SkillDNA: a reusable, governed
-        investigation step sequence. It starts as a draft, and nothing is published automatically.
+        A reviewer-accepted path can become a draft skill (technically a SkillDNA): a reusable,
+        governed set of investigation steps. It starts as a draft, and nothing is published
+        automatically.
       </p>
       {!accepted ? (
-        <Notice variant="info" compact title="Accept the path first">
-          Only a path a reviewer has accepted can seed a skill.
-        </Notice>
+        <p className={styles.muted}>
+          <strong>Accept the path first.</strong> Only a path a reviewer has accepted can seed a
+          skill.
+        </p>
       ) : null}
       <div className={styles.row}>
         <GatedAction permission="skill:extract">
           <Button
-            appearance="primary"
-            icon={<MoleculeRegular />}
+            variant={accepted ? 'primary' : 'secondary'}
+            icon={<DnaIcon />}
             disabled={!accepted || extract.isPending || jobId !== null}
             onClick={() => void start()}
             {...restoreFocus}
           >
-            Extract SkillDNA
+            Create skill
           </Button>
         </GatedAction>
       </div>
       {accepted && !isLoading && !can('skill:extract') ? (
         <p className={styles.muted}>
-          Your role cannot extract skills. An engineer or a skill curator can do it from this page.
+          Your role cannot create skills. An engineer or a skill curator can do it from this page.
         </p>
       ) : null}
       {failure ? (
-        <Notice variant="warning" title="The skill could not be extracted">
+        <Notice variant="warning" title="The skill could not be created">
           {failure}
         </Notice>
       ) : null}
       {jobId ? (
         <JobProgress
           jobId={jobId}
-          title="Extracting SkillDNA"
+          title="Creating the skill"
           level={3}
           onTerminal={(job) => {
             if (job.status === 'succeeded') {
               const skillId = job.resultRef?.type === 'skill' ? job.resultRef.id : null;
-              toast.success('Draft SkillDNA created', {
-                body: skillId ? 'Opening the new skill.' : 'It is in the SkillDNA library.',
+              toast.success('Draft skill created', {
+                body: skillId ? 'Opening the new skill.' : 'It is in the skills library.',
               });
               router.push(skillId ? `/skills/${encodeURIComponent(skillId)}` : '/skills');
               return;
@@ -271,7 +277,7 @@ export interface ReviewPanelProps {
 
 /**
  * The reviewer's decision on a simulated path (accept or reject, each with a required reason and an optimistic version
- * check) and, for an accepted path, the gated action that extracts a draft SkillDNA with real job progress.
+ * check) and, for an accepted path, the gated action that creates a draft skill with real job progress.
  */
 export function ReviewPanel({ caseId, scenario }: ReviewPanelProps) {
   const styles = useStyles();
@@ -281,10 +287,10 @@ export function ReviewPanel({ caseId, scenario }: ReviewPanelProps) {
 
   return (
     <Panel
-      title="Review and SkillDNA"
+      title="Review this path"
       level={3}
       description="A person decides whether the simulated path is realistic. Only an accepted path can seed a skill."
-      help="Reviewers accept or reject a simulated path with a reason. The decision is recorded with the reviewer's identity and is audited. A path that failed the leak or validity checks can be rejected but never accepted. Accepting does not publish anything: a skill extracted from an accepted path is a draft that still needs separate validation and a different approver."
+      help="Reviewers accept or reject a simulated path with a reason. The decision is recorded with the reviewer's identity and is audited. A path that failed the no-hindsight or validity checks can be rejected but never accepted. Accepting does not publish anything: a skill created from an accepted path (technically a SkillDNA) is a draft that still needs separate validation and a different approver."
       accent="brand"
     >
       <div className={styles.stack}>
@@ -332,10 +338,11 @@ export function ReviewPanel({ caseId, scenario }: ReviewPanelProps) {
               It can still be rejected, with a reason.
             </Notice>
           ) : null}
-          <Notice variant="info" compact title="Two sets of eyes">
-            Your decision is recorded with your name, role and reason. The person who approves a
-            skill extracted from an accepted path must be someone else.
-          </Notice>
+          <p className={styles.muted}>
+            <strong>Two sets of eyes.</strong> Your decision is recorded with your name, role and
+            reason. The person who approves a skill created from an accepted path must be someone
+            else.
+          </p>
           <ReviewButtons caseId={caseId} scenario={scenario} blockers={blockers} />
         </section>
         <ExtractSkill caseId={caseId} scenario={scenario} />
