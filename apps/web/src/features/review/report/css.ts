@@ -134,6 +134,9 @@ const BASE = `
 .cg-facts{grid-template-columns:minmax(0,1fr)}
 .cg-facts dd{margin-bottom:.4rem}
 }
+@media screen and (pointer:coarse){
+.cg-contents a,.cg-meta a{display:inline-flex;align-items:center;min-height:44px}
+}
 `;
 
 /** Print: no application chrome, black on white, sensible page breaks, and the address of every link written out. */

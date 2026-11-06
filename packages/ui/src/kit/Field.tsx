@@ -46,7 +46,7 @@ const useStyles = makeStyles({
     transitionProperty: 'border-color, box-shadow',
     transitionDuration: cg.motion.fast,
     transitionTimingFunction: cg.motion.easing,
-    '@media (pointer: coarse)': { minHeight: '44px' },
+    '@media (pointer: coarse)': { minHeight: '46px' },
     ':focus-within': { ...borderColors(cg.focus), boxShadow: `0 0 0 3px ${cg.glow}` },
   },
   invalid: borderColors(cg.tone.unsupported.border),

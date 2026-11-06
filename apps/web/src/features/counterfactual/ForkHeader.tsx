@@ -62,6 +62,7 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase300,
     textDecorationLine: 'underline',
     textUnderlineOffset: '2px',
+    '@media (pointer: coarse)': { minHeight: '44px' },
   },
 });
 

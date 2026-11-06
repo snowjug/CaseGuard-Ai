@@ -160,9 +160,10 @@ svg.lucide {
   transform: translateY(0);
 }
 
-/* Touch targets: a switch is at least 44 px tall on a touch screen (its hit area is its whole box). */
+/* Touch targets: a switch or a checkbox row is at least 44 px tall on a touch screen (its hit area is its whole box). */
 @media (pointer: coarse) {
-  .fui-Switch {
+  .fui-Switch,
+  .fui-Checkbox {
     min-height: 44px;
   }
 }

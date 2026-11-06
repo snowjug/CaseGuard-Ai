@@ -78,6 +78,7 @@ const useStyles = makeStyles({
     color: cg.textLink,
     fontSize: tokens.fontSizeBase200,
     textDecorationLine: 'none',
+    '@media (pointer: coarse)': { minHeight: '44px', minWidth: '44px' },
     ':hover': { textDecorationLine: 'underline' },
   },
   nothing: { margin: 0, color: cg.textSecondary, fontSize: tokens.fontSizeBase300 },
