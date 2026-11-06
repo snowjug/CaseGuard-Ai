@@ -5,6 +5,7 @@ import {
   Badge,
   ButtonLink,
   Card,
+  ProvenanceBadge,
   ScoreRing,
   StatusBadge,
   RelativeTime,
@@ -174,6 +175,7 @@ export function LatestReview({
             <Badge tone="neutral" size="sm">
               {SEVERITY_LABELS[activeCase.severity]}
             </Badge>
+            {activeCase.synthetic ? <ProvenanceBadge kind="synthetic" /> : null}
           </div>
           <p className={styles.title}>{activeCase.title}</p>
           <p className={styles.reason}>
