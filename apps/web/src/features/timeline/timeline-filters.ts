@@ -19,7 +19,7 @@ export type TimelineFlag = (typeof FLAGS)[number];
 export const FLAG_LABELS: Record<TimelineFlag, string> = {
   delay: 'Delays',
   repeat: 'Repeated diagnostics',
-  fork: 'Decision forks',
+  fork: 'Key decisions',
 };
 
 /** A comma-separated URL list restricted to known values, so a hostile or stale address never reaches the API. */

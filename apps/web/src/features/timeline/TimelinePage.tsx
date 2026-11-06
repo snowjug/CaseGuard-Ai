@@ -2,25 +2,22 @@
 
 import { EVENT_TYPE_LABELS, type TimelineEvent } from '@caseguard/schemas';
 import {
+  Badge,
+  BlurFade,
+  Button,
+  Card,
+  Drawer,
   EmptyState,
-  LoadingSkeleton,
-  Notice,
+  IconButton,
   PageHeader,
   ProvenanceBadge,
+  Skeleton,
+  VisuallyHidden,
   cg,
-  useMediaQuery,
 } from '@caseguard/ui';
-import {
-  Button,
-  DrawerBody,
-  OverlayDrawer,
-  makeStyles,
-  mergeClasses,
-  tokens,
-} from '@fluentui/react-components';
-import { ArrowSyncRegular, HistoryRegular } from '@fluentui/react-icons';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { AsOfPanel } from '../../components/case/AsOfPanel';
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { FlaskConicalIcon, HistoryIcon, RefreshCwIcon } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AsOfLimited,
   asOfCall,
@@ -32,15 +29,14 @@ import { caseTimeRange, useCaseDetail } from '../../components/case/case-hooks';
 import { CaseNotFoundState } from '../../components/case/CaseNotFoundState';
 import { NotAnalysedState, isNotAnalysedError } from '../../components/case/NotAnalysedState';
 import { IdentityRequired } from '../../components/common/IdentityRequired';
-import { LinkButton } from '../../components/common/LinkButton';
 import { QueryErrorState } from '../../components/common/QueryErrorState';
 import { keepWithinBoundary } from '../../lib/api/boundary-placeholder';
 import { useApiQuery } from '../../lib/api/hooks';
 import { useApiPages } from '../../lib/api/pages';
 import { useAuth } from '../../lib/auth/context';
-import { caseHref } from '../../lib/deep-links';
 import { useSelectionState, useUrlStates } from '../../lib/url-state';
 import { VirtualRow, useNearEnd, useWindowVirtualizer } from '../../lib/virtual-list';
+import { WhatWasKnownBar } from '../evidence/WhatWasKnownBar';
 import { ConfidenceChart } from './ConfidenceChart';
 import { EventDetail } from './EventDetail';
 import { EventRow, SimulatedRow } from './EventRow';
@@ -59,75 +55,58 @@ import {
 const useStyles = makeStyles({
   page: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
   busy: { opacity: 0.72 },
-  layout: {
-    display: 'grid',
-    gap: cg.space[4],
-    gridTemplateColumns: 'minmax(0, 1fr)',
-    alignItems: 'start',
-    '@media (min-width: 1100px)': {
-      gridTemplateColumns: 'minmax(0, 1fr) 380px',
-      gridTemplateAreas: '"main aside"',
-    },
-  },
-  main: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: cg.space[4],
-    minWidth: 0,
-    '@media (min-width: 1100px)': { gridArea: 'main' },
-  },
-  aside: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: cg.space[4],
-    minWidth: 0,
-    '@media (min-width: 1100px)': {
-      gridArea: 'aside',
-      position: 'sticky',
-      top: 'calc(var(--cg-shell-top, 84px) + 16px)',
-      maxHeight: 'calc(100dvh - var(--cg-shell-top, 84px) - 32px)',
-      overflowY: 'auto',
-      paddingRight: cg.space[1],
-    },
-  },
   list: { margin: 0, padding: 0, listStyle: 'none' },
   more: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[3] },
   text: { margin: 0, color: cg.textSecondary, fontSize: tokens.fontSizeBase300 },
-  actions: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
+  overlay: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: `${cg.space[2]} ${cg.space[3]}`,
+    padding: `${cg.space[2]} ${cg.space[4]}`,
+    borderRadius: cg.radius.md,
+    border: `1px dashed ${cg.tone.simulated.border}`,
+    backgroundColor: cg.tone.simulated.tint,
+    color: cg.textSecondary,
+    fontSize: tokens.fontSizeBase200,
+  },
 });
 
 const PAGE_HELP = (
   <>
     <p>
       Every event in the case in time order, with the pauses between them, repeated diagnostics and
-      decision forks marked. The chart shows how confidence in each competing hypothesis moved as
-      evidence arrived.
+      key decisions marked. The chart shows how confidence in each possible cause moved as evidence
+      arrived.
     </p>
     <p>
-      Use the time cursor to see the case as it stood at an earlier moment: only events recorded by
-      then are shown, later ones are counted but never displayed. Select an event for its full text,
-      the claims and evidence derived from it and its place in the conversation. Filters, zoom, the
-      selected event and the time cursor are all part of the address, so you can share a view.
+      &ldquo;What was known then&rdquo; shows the case as it stood at an earlier moment: only events
+      recorded by then are shown, later ones are counted but never displayed. Open an event for its
+      full text, the claims and evidence derived from it and its place in the conversation. Filters,
+      zoom, the open event and the moment are all part of the address, so you can share a view.
     </p>
   </>
 );
 
 /** Estimated height of an event card before it is measured. */
-const ESTIMATED_ROW = 250;
+const ESTIMATED_ROW = 240;
 
 /**
- * Case Timeline (`/cases/[caseId]/timeline`): a virtualised, filterable, zoomable list of the events with delays and
- * repeated diagnostics highlighted, the hypothesis-confidence overlay, the "what was known" time cursor and a detail
- * panel for the selected event. Nothing after the temporal boundary is requested or shown.
+ * Timeline (`/cases/[caseId]/timeline`): a virtualised, filterable, zoomable list of the events with delays and repeated
+ * diagnostics marked, a compact confidence chart, the "What was known then" cursor and a drawer for the open event.
+ * Nothing after the temporal boundary is requested or shown.
  */
 export function TimelinePage({ caseId }: { caseId: string }) {
   const styles = useStyles();
   const auth = useAuth();
   const ready = auth.status === 'ready';
-  const wide = useMediaQuery('(min-width: 1100px)', true);
   const cursor = useAsOfCursor(caseId);
   const { asOf, setAsOf } = cursor;
   const [selected, select] = useSelectionState();
+  // The drawer keeps showing the event it had while it slides out, instead of emptying first.
+  const [lastSelected, setLastSelected] = useState(selected);
+  if (selected !== null && selected !== lastSelected) setLastSelected(selected);
+  const shownEvent = selected ?? lastSelected;
   const [filters, update] = useUrlStates(TIMELINE_FILTERS);
   const detail = useCaseDetail(caseId);
 
@@ -219,7 +198,7 @@ export function TimelinePage({ caseId }: { caseId: string }) {
         .filter((event) => event.forkIds.length > 0)
         .map((event) => ({
           x: event.timestamp,
-          label: `Decision fork at ${event.title ?? event.actionLabel ?? EVENT_TYPE_LABELS[event.type]}`,
+          label: `Key decision at ${event.title ?? event.actionLabel ?? EVENT_TYPE_LABELS[event.type]}`,
         })),
     [visibleEvents],
   );
@@ -228,15 +207,19 @@ export function TimelinePage({ caseId }: { caseId: string }) {
   const { containerRef, items, totalSize, virtualized, onMeasure, scrollToIndex } =
     useWindowVirtualizer({ count: rows.length, getKey, estimateSize: ESTIMATED_ROW });
 
-  // A shared link may name an event far down the list: bring it into view once, after the rows exist.
+  // A shared link may name an event far down the list: bring it into view once, after the rows exist. A row that is already
+  // in view (the one that was just chosen with the pointer) stays where it is.
   const scrolledTo = useRef<string | null>(null);
   useEffect(() => {
     if (!selected || scrolledTo.current === selected) return;
     const index = rows.findIndex((row) => row.id === selected);
     if (index < 0) return;
     scrolledTo.current = selected;
+    const node = document.getElementById(`event-row-${selected}`);
+    const box = node?.getBoundingClientRect();
+    if (box && box.top >= 0 && box.bottom <= window.innerHeight) return;
     if (virtualized) scrollToIndex(index);
-    else document.getElementById(`event-row-${selected}`)?.scrollIntoView({ block: 'center' });
+    else node?.scrollIntoView({ block: 'center' });
   }, [selected, rows, virtualized, scrollToIndex]);
 
   // Pages are loaded by themselves (the flags below, scrolling near the end) only while nothing has failed. After a failed
@@ -283,28 +266,18 @@ export function TimelinePage({ caseId }: { caseId: string }) {
 
   const header = (
     <PageHeader
-      title="Case Timeline"
-      description={
-        detail.data
-          ? `${detail.data.reference} · ${detail.data.title}`
-          : 'Events, delays and what was known when.'
-      }
+      title="Timeline"
+      description="See what happened and when."
       help={PAGE_HELP}
       meta={detail.data?.synthetic ? <ProvenanceBadge kind="synthetic" /> : null}
       actions={
-        <div className={styles.actions}>
-          <Button
-            appearance="outline"
-            icon={<ArrowSyncRegular />}
-            disabled={!ready || pages.isFetching}
-            onClick={() => void pages.refetch()}
-          >
-            {pages.isFetching && !pages.isPending ? 'Refreshing…' : 'Refresh'}
-          </Button>
-          <LinkButton href={caseHref(caseId)} appearance="outline">
-            Case overview
-          </LinkButton>
-        </div>
+        <IconButton
+          icon={<RefreshCwIcon />}
+          label="Refresh"
+          disabled={!ready}
+          loading={pages.isFetching && !pages.isPending}
+          onClick={() => void pages.refetch()}
+        />
       }
     />
   );
@@ -333,41 +306,20 @@ export function TimelinePage({ caseId }: { caseId: string }) {
     );
   }
 
-  // While the chosen moment loads (or cannot be computed) the cursor and the panel beside it stay where they are, since a
-  // keyboard user is in the middle of the cursor, and the events give way to a skeleton or an explanation. Nothing of
-  // another moment is on screen meanwhile.
+  // While the chosen moment loads (or cannot be computed) the cursor bar stays where it is, since a keyboard user is in the
+  // middle of the cursor, and the events give way to a skeleton or an explanation. Nothing of another moment is on screen
+  // meanwhile.
   const windowPending = pages.isPending;
   const windowFailed = pages.isError && pages.data === undefined;
   const refreshing = !windowPending && (!cursor.ready || (pages.isFetching && !isFetchingNextPage));
 
-  const detailPanel =
-    selected !== null ? (
-      <EventDetail
-        caseId={caseId}
-        eventId={selected}
-        asOf={asOf}
-        onClose={() => select(null)}
-        onSelect={(id) => select(id)}
-        onKnownAsOf={(timestamp) => setAsOf(timestamp)}
-      />
-    ) : (
-      <Notice variant="info" compact title={null}>
-        Select an event to see its full text, the claims and evidence derived from it, and where it
-        sits in the conversation.
-      </Notice>
-    );
-
   return (
     <>
       {header}
-      <div className={mergeClasses(styles.layout, refreshing && styles.busy)}>
-        <aside
-          className={styles.aside}
-          aria-label="What was known, and the selected event"
-          {...(wide ? { tabIndex: 0 } : {})}
-        >
+      <div className={styles.page}>
+        <BlurFade>
           {detail.data ? (
-            <AsOfPanel
+            <WhatWasKnownBar
               caseId={caseId}
               range={range}
               asOf={asOf}
@@ -380,12 +332,17 @@ export function TimelinePage({ caseId }: { caseId: string }) {
               limited={windowFailed && pagesLimited}
               linkTo={['evidence', 'hypotheses']}
             />
-          ) : (
-            <LoadingSkeleton variant="card" label="Loading what was known" />
+          ) : detail.isError ? null : (
+            <div role="status" aria-busy="true" aria-live="polite">
+              <VisuallyHidden>Loading what was known…</VisuallyHidden>
+              <Skeleton height={58} radius="lg" />
+            </div>
           )}
-          {wide ? detailPanel : null}
-        </aside>
-        <div className={styles.main} aria-busy={windowPending || refreshing || undefined}>
+        </BlurFade>
+        <div
+          className={mergeClasses(styles.page, refreshing && styles.busy)}
+          aria-busy={windowPending || refreshing || undefined}
+        >
           {windowPending ? (
             <TimelineSkeleton />
           ) : windowFailed && pages.error ? (
@@ -428,152 +385,170 @@ export function TimelinePage({ caseId }: { caseId: string }) {
                   />
                 )
               ) : null}
-              <ConfidenceChart
-                series={first?.hypothesisSeries ?? []}
-                hypotheses={hypotheses.data?.items}
-                forks={forkMarkers}
-                from={from}
-                to={to}
-                asOf={asOf}
-                cutAt={first?.asOf ?? null}
-                limited={
-                  hypothesesLimited && hypotheses.error ? (
-                    <AsOfLimited
-                      key={hypotheses.errorUpdatedAt}
-                      error={hypotheses.error}
-                      subject="the likely ranges and hypothesis names"
-                      compact
-                      onRetry={() => void hypotheses.refetch()}
-                      retrying={hypotheses.isFetching}
-                    />
-                  ) : null
-                }
-              />
-              {scenario ? (
-                <Notice variant="info" title="Simulated path overlaid">
-                  Simulated steps of one counterfactual scenario are shown between the recorded
-                  events, dashed and labelled Simulated. They are estimates of what could have
-                  happened, not events.{' '}
-                  <Button
-                    appearance="transparent"
-                    size="small"
-                    onClick={() => update({ scenario: null })}
-                  >
-                    Remove the overlay
-                  </Button>
-                </Notice>
-              ) : null}
-              <FilterBar
-                filters={values}
-                onChange={(patch) => update(patch)}
-                onClear={clearFilters}
-                activeCount={activeCount}
-                hypotheses={hypothesisItems}
-                events={loadedEvents}
-                shown={visibleEvents.length}
-                total={first?.total}
-                hasMore={Boolean(hasNextPage)}
-              />
-              {rows.length === 0 ? (
-                <EmptyState
-                  headingLevel={2}
-                  icon={<HistoryRegular />}
-                  title={
-                    activeCount > 0 ? 'No events match these filters' : 'No events at this moment'
-                  }
-                  description={
-                    activeCount > 0
-                      ? 'Loosen or clear the filters to see more of the case.'
-                      : asOf
-                        ? 'Nothing had been recorded by the selected moment. Move the time cursor later.'
-                        : 'This case has no events.'
-                  }
-                  action={
-                    activeCount > 0 ? (
-                      <Button appearance="primary" onClick={clearFilters}>
-                        Clear filters
-                      </Button>
-                    ) : asOf ? (
-                      <Button appearance="primary" onClick={() => setAsOf(null)}>
-                        Show the whole record
-                      </Button>
-                    ) : undefined
+              <BlurFade index={1}>
+                <ConfidenceChart
+                  series={first?.hypothesisSeries ?? []}
+                  hypotheses={hypotheses.data?.items}
+                  forks={forkMarkers}
+                  from={from}
+                  to={to}
+                  asOf={asOf}
+                  cutAt={first?.asOf ?? null}
+                  limited={
+                    hypothesesLimited && hypotheses.error ? (
+                      <AsOfLimited
+                        key={hypotheses.errorUpdatedAt}
+                        error={hypotheses.error}
+                        subject="the likely ranges and the names of the possible causes"
+                        compact
+                        onRetry={() => void hypotheses.refetch()}
+                        retrying={hypotheses.isFetching}
+                      />
+                    ) : null
                   }
                 />
-              ) : (
-                <ul
-                  ref={containerRef}
-                  className={styles.list}
-                  aria-label={`Events, ${rows.length} shown`}
-                  style={virtualized ? { position: 'relative', height: totalSize } : undefined}
-                >
-                  {items.map((item) => {
-                    const row = rows[item.index];
-                    if (!row) return null;
-                    return (
-                      <VirtualRow
-                        key={item.key}
-                        itemKey={item.key}
-                        index={item.index}
-                        count={rows.length}
-                        start={item.start}
-                        virtualized={virtualized}
-                        onMeasure={onMeasure}
-                      >
-                        {row.kind === 'event' ? (
-                          <div id={`event-row-${row.event.id}`}>
-                            <EventRow
-                              caseId={caseId}
-                              event={row.event}
-                              selected={selected === row.event.id}
-                              asOf={asOf}
-                              delayReason={delays.get(row.event.id)}
-                              repeatOf={repeats.get(row.event.id)}
-                              hypothesisName={nameOf}
-                              onSelect={(id) => select(id)}
-                              onKnownAsOf={(event) => setAsOf(event.timestamp)}
-                              onZoom={onZoom}
-                            />
-                          </div>
-                        ) : (
-                          <SimulatedRow step={row.step} />
-                        )}
-                      </VirtualRow>
-                    );
-                  })}
-                </ul>
-              )}
-              <div ref={sentinel} aria-hidden="true" />
-              {hasNextPage ? (
-                <div className={styles.more}>
-                  <Button
-                    appearance="outline"
-                    disabled={isFetchingNextPage}
-                    onClick={() => void fetchNextPage()}
+              </BlurFade>
+              <BlurFade index={2} className={styles.page}>
+                {scenario ? (
+                  <div className={styles.overlay}>
+                    <Badge tone="simulated" dashed icon={<FlaskConicalIcon />}>
+                      Simulated path overlaid
+                    </Badge>
+                    <span>
+                      Simulated steps of one what-if path are shown between the recorded events,
+                      dashed and labelled Simulated. They are estimates of what could have happened,
+                      not events.
+                    </span>
+                    <Button variant="ghost" size="sm" onClick={() => update({ scenario: null })}>
+                      Remove the overlay
+                    </Button>
+                  </div>
+                ) : null}
+                <FilterBar
+                  filters={values}
+                  onChange={(patch) => update(patch)}
+                  onClear={clearFilters}
+                  activeCount={activeCount}
+                  hypotheses={hypothesisItems}
+                  events={loadedEvents}
+                  shown={visibleEvents.length}
+                  total={first?.total}
+                  hasMore={Boolean(hasNextPage)}
+                />
+                {rows.length === 0 ? (
+                  <Card>
+                    <EmptyState
+                      headingLevel={2}
+                      icon={<HistoryIcon />}
+                      title={
+                        activeCount > 0
+                          ? 'No events match these filters'
+                          : 'No events at this moment'
+                      }
+                      description={
+                        activeCount > 0
+                          ? 'Loosen or clear the filters to see more of the case.'
+                          : asOf
+                            ? 'Nothing had been recorded by the selected moment. Move the time cursor later.'
+                            : 'This case has no events.'
+                      }
+                      action={
+                        activeCount > 0 ? (
+                          <Button variant="primary" onClick={clearFilters}>
+                            Clear filters
+                          </Button>
+                        ) : asOf ? (
+                          <Button variant="primary" onClick={() => setAsOf(null)}>
+                            Show the whole record
+                          </Button>
+                        ) : undefined
+                      }
+                    />
+                  </Card>
+                ) : (
+                  <ul
+                    ref={containerRef}
+                    className={styles.list}
+                    aria-label={`Events, ${rows.length} shown`}
+                    style={virtualized ? { position: 'relative', height: totalSize } : undefined}
                   >
-                    {isFetchingNextPage ? 'Loading…' : 'Load more events'}
-                  </Button>
-                  <span className={styles.text}>
-                    {loadedEvents.length} of {first?.total ?? loadedEvents.length} events loaded
-                  </span>
-                </div>
-              ) : null}
+                    {items.map((item) => {
+                      const row = rows[item.index];
+                      if (!row) return null;
+                      const isFirst = item.index === 0;
+                      const isLast = item.index === rows.length - 1;
+                      return (
+                        <VirtualRow
+                          key={item.key}
+                          itemKey={item.key}
+                          index={item.index}
+                          count={rows.length}
+                          start={item.start}
+                          virtualized={virtualized}
+                          onMeasure={onMeasure}
+                        >
+                          {row.kind === 'event' ? (
+                            <div id={`event-row-${row.event.id}`}>
+                              <EventRow
+                                caseId={caseId}
+                                event={row.event}
+                                selected={selected === row.event.id}
+                                asOf={asOf}
+                                delayReason={delays.get(row.event.id)}
+                                repeatOf={repeats.get(row.event.id)}
+                                hypothesisName={nameOf}
+                                onSelect={(id) => select(id)}
+                                onKnownAsOf={(event) => setAsOf(event.timestamp)}
+                                onZoom={onZoom}
+                                first={isFirst}
+                                last={isLast}
+                              />
+                            </div>
+                          ) : (
+                            <SimulatedRow step={row.step} first={isFirst} last={isLast} />
+                          )}
+                        </VirtualRow>
+                      );
+                    })}
+                  </ul>
+                )}
+                <div ref={sentinel} aria-hidden="true" />
+                {hasNextPage ? (
+                  <div className={styles.more}>
+                    <Button
+                      variant="secondary"
+                      loading={isFetchingNextPage}
+                      onClick={() => void fetchNextPage()}
+                    >
+                      {isFetchingNextPage ? 'Loading…' : 'Load more events'}
+                    </Button>
+                    <span className={styles.text}>
+                      {loadedEvents.length} of {first?.total ?? loadedEvents.length} events loaded
+                    </span>
+                  </div>
+                ) : null}
+              </BlurFade>
             </>
           )}
         </div>
-        {!wide ? (
-          <OverlayDrawer
-            open={selected !== null}
-            position="end"
-            size="medium"
-            onOpenChange={(_event, data) => {
-              if (!data.open) select(null);
-            }}
-            aria-label="Event details"
-          >
-            <DrawerBody>{detailPanel}</DrawerBody>
-          </OverlayDrawer>
-        ) : null}
+        <Drawer
+          open={selected !== null}
+          onOpenChange={(open) => {
+            if (!open) select(null);
+          }}
+          title="Event details"
+        >
+          {shownEvent !== null ? (
+            <EventDetail
+              caseId={caseId}
+              eventId={shownEvent}
+              asOf={asOf}
+              onClose={() => select(null)}
+              onSelect={(id) => select(id)}
+              onKnownAsOf={(timestamp) => setAsOf(timestamp)}
+            />
+          ) : null}
+        </Drawer>
       </div>
     </>
   );

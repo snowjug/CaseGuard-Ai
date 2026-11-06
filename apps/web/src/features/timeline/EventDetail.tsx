@@ -6,45 +6,41 @@ import {
   type EventDetail as EventDetailData,
 } from '@caseguard/schemas';
 import {
+  Button,
+  CopyButton,
   EmptyState,
   KeyValueList,
   LoadingSkeleton,
-  Panel,
   ProvenanceBadge,
   StatusBadge,
   UiLink,
   cg,
-  CopyButton,
   formatDateTimeUtc,
   formatNumber,
   formatProbability,
 } from '@caseguard/ui';
-import { Button, Link, makeStyles, tokens } from '@fluentui/react-components';
-import { DismissRegular, HistoryRegular } from '@fluentui/react-icons';
+import { makeStyles, tokens } from '@fluentui/react-components';
+import { CalendarXIcon, HistoryIcon } from 'lucide-react';
 import { AsOfLimited, asOfCall, asOfFresh, isRateLimited } from '../../components/case/as-of';
-import { CategoryBadge } from '../../components/case/CategoryBadge';
 import { ExpandableText } from '../../components/case/ExpandableText';
 import { EFFORT_LABELS, countOf } from '../../components/case/labels';
 import { QueryErrorState } from '../../components/common/QueryErrorState';
 import { useApiQuery } from '../../lib/api/hooks';
 import { useAuth } from '../../lib/auth/context';
 import { evidenceLinkHref } from '../../lib/deep-links';
+import { EvidenceCategoryBadge } from '../evidence/category-meta';
 
 const useStyles = makeStyles({
-  head: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: cg.space[2],
-  },
+  section: { display: 'flex', flexDirection: 'column', gap: cg.space[2], minWidth: 0 },
   title: {
     margin: 0,
     fontSize: tokens.fontSizeBase400,
+    lineHeight: tokens.lineHeightBase400,
     fontWeight: tokens.fontWeightSemibold,
+    letterSpacing: '-0.01em',
     overflowWrap: 'anywhere',
   },
   sub: { margin: 0, color: cg.textSecondary, fontSize: tokens.fontSizeBase300 },
-  section: { display: 'flex', flexDirection: 'column', gap: cg.space[2], minWidth: 0 },
   h4: {
     margin: 0,
     fontSize: tokens.fontSizeBase300,
@@ -54,7 +50,7 @@ const useStyles = makeStyles({
   list: {
     display: 'flex',
     flexDirection: 'column',
-    gap: cg.space[2],
+    gap: cg.space[3],
     margin: 0,
     padding: 0,
     listStyle: 'none',
@@ -63,13 +59,11 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     gap: cg.space[1],
-    padding: cg.space[2],
-    borderRadius: cg.radius.md,
-    border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surfaceSunken,
     minWidth: 0,
+    paddingLeft: cg.space[3],
+    borderLeft: `2px solid ${cg.borderSubtle}`,
   },
-  badges: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[1] },
+  badges: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
   note: {
     margin: 0,
     color: cg.textSecondary,
@@ -85,6 +79,20 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase200,
     textDecorationLine: 'none',
     ':hover': { textDecorationLine: 'underline' },
+    '@media (pointer: coarse)': { minHeight: '44px' },
+  },
+  linkButton: {
+    display: 'inline',
+    padding: 0,
+    border: 0,
+    backgroundColor: 'transparent',
+    color: cg.textLink,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    fontSize: 'inherit',
+    textAlign: 'start',
+    textDecorationLine: 'underline',
+    ':focus-visible': { outline: `2px solid ${cg.focus}`, outlineOffset: '2px' },
   },
   actions: { display: 'flex', flexWrap: 'wrap', gap: cg.space[2] },
 });
@@ -96,8 +104,6 @@ export interface EventDetailProps {
   onClose: () => void;
   onSelect: (eventId: string) => void;
   onKnownAsOf: (timestamp: string) => void;
-  /** Heading level of the panel (2 beside the list, 2 inside a drawer too). */
-  level?: 2 | 3;
 }
 
 function Content({
@@ -202,19 +208,27 @@ function Content({
             {data.inResponseTo ? (
               <li className={styles.note}>
                 In response to{' '}
-                <Link as="button" onClick={() => onSelect(data.inResponseTo?.id ?? '')}>
+                <button
+                  type="button"
+                  className={styles.linkButton}
+                  onClick={() => onSelect(data.inResponseTo?.id ?? '')}
+                >
                   {data.inResponseTo.title ?? EVENT_TYPE_LABELS[data.inResponseTo.type]} (
                   {formatDateTimeUtc(data.inResponseTo.timestamp)})
-                </Link>
+                </button>
               </li>
             ) : null}
             {data.responses.map((response) => (
               <li key={response.id} className={styles.note}>
                 Answered by{' '}
-                <Link as="button" onClick={() => onSelect(response.id)}>
+                <button
+                  type="button"
+                  className={styles.linkButton}
+                  onClick={() => onSelect(response.id)}
+                >
                   {response.title ?? EVENT_TYPE_LABELS[response.type]} (
                   {formatDateTimeUtc(response.timestamp)})
-                </Link>
+                </button>
               </li>
             ))}
           </ul>
@@ -229,14 +243,14 @@ function Content({
             {data.claims.map((claim) => (
               <li key={claim.id} className={styles.item}>
                 <div className={styles.badges}>
-                  <CategoryBadge category={claim.category} />
+                  <EvidenceCategoryBadge category={claim.category} />
                   <span className={styles.note}>
                     Confidence {formatProbability(claim.confidence)} (estimate)
                   </span>
                 </div>
                 <ExpandableText text={claim.text} lines={3} label="claim" />
                 <UiLink href={ledgerHref(claim.id)} className={styles.link}>
-                  Open in the Evidence Ledger
+                  Open in Evidence
                 </UiLink>
               </li>
             ))}
@@ -262,27 +276,27 @@ function Content({
           </ul>
         )}
       </div>
-      <div className={styles.actions}>
-        <Button
-          appearance="primary"
-          icon={<HistoryRegular />}
-          onClick={() => onKnownAsOf(event.timestamp)}
-        >
-          Show what was known as of this event
-        </Button>
-      </div>
       <p className={styles.note}>
         {countOf(data.claims.length, 'claim')} and{' '}
         {countOf(data.evidence.length, 'evidence signal')} on this event.
       </p>
+      <div className={styles.actions}>
+        <Button
+          variant="primary"
+          icon={<HistoryIcon />}
+          onClick={() => onKnownAsOf(event.timestamp)}
+        >
+          Show what was known here
+        </Button>
+      </div>
     </>
   );
 }
 
 /**
- * The selected event (`?sel=`): its full stored text, how it was received, the claims and evidence derived from it with
- * links into the ledger, and its place in the conversation. Read with the page's `asOf`, so an event after the boundary
- * is reported as withheld rather than shown.
+ * The selected event (`?sel=`) for the drawer: its full stored text, how it was received, the claims and evidence derived
+ * from it with links into Evidence, and its place in the conversation. Read with the page's `asOf`, so an event after the
+ * boundary is reported as withheld rather than shown.
  */
 export function EventDetail({
   caseId,
@@ -291,7 +305,6 @@ export function EventDetail({
   onClose,
   onSelect,
   onKnownAsOf,
-  level = 2,
 }: EventDetailProps) {
   const auth = useAuth();
   const query = useApiQuery(
@@ -299,67 +312,57 @@ export function EventDetail({
     { params: { caseId, eventId }, query: asOf ? { asOf } : {}, ...asOfCall(asOf) },
     { enabled: auth.status === 'ready', ...asOfFresh(asOf) },
   );
+  if (query.isPending) return <LoadingSkeleton variant="card" label="Loading the event" />;
+  if (query.isError) {
+    if (asOf !== null && isRateLimited(query.error)) {
+      return (
+        <AsOfLimited
+          key={query.errorUpdatedAt}
+          error={query.error}
+          subject="this event"
+          compact
+          onRetry={() => void query.refetch()}
+          retrying={query.isFetching}
+        />
+      );
+    }
+    if (query.error.isNotFound) {
+      return (
+        <EmptyState
+          compact
+          headingLevel={3}
+          icon={<CalendarXIcon />}
+          title="This event is not in the current view"
+          description={
+            asOf
+              ? 'It may be after the selected moment, so it is withheld, or it no longer exists.'
+              : 'It does not exist in this case.'
+          }
+          action={
+            <Button variant="secondary" onClick={onClose}>
+              Clear the selection
+            </Button>
+          }
+        />
+      );
+    }
+    return (
+      <QueryErrorState
+        compact
+        error={query.error}
+        subject="The event"
+        onRetry={() => void query.refetch()}
+        retrying={query.isFetching}
+      />
+    );
+  }
   return (
-    <Panel
-      title="Event details"
-      level={level}
-      description="The source text and everything derived from it."
-      actions={
-        <Button
-          appearance="subtle"
-          size="small"
-          icon={<DismissRegular />}
-          aria-label="Close event details"
-          onClick={onClose}
-        />
-      }
-    >
-      {query.isPending ? (
-        <LoadingSkeleton variant="card" label="Loading the event" />
-      ) : query.isError ? (
-        asOf !== null && isRateLimited(query.error) ? (
-          <AsOfLimited
-            key={query.errorUpdatedAt}
-            error={query.error}
-            subject="this event"
-            compact
-            onRetry={() => void query.refetch()}
-            retrying={query.isFetching}
-          />
-        ) : query.error.isNotFound ? (
-          <EmptyState
-            compact
-            headingLevel={3}
-            title="This event is not in the current view"
-            description={
-              asOf
-                ? 'It may be after the selected moment, so it is withheld, or it no longer exists.'
-                : 'It does not exist in this case.'
-            }
-            action={
-              <Button appearance="outline" onClick={onClose}>
-                Clear the selection
-              </Button>
-            }
-          />
-        ) : (
-          <QueryErrorState
-            compact
-            error={query.error}
-            subject="The event"
-            onRetry={() => void query.refetch()}
-            retrying={query.isFetching}
-          />
-        )
-      ) : (
-        <Content
-          data={query.data}
-          caseId={caseId}
-          asOf={asOf}
-          onSelect={onSelect}
-          onKnownAsOf={onKnownAsOf}
-        />
-      )}
-    </Panel>
+    <Content
+      data={query.data}
+      caseId={caseId}
+      asOf={asOf}
+      onSelect={onSelect}
+      onKnownAsOf={onKnownAsOf}
+    />
   );
 }
