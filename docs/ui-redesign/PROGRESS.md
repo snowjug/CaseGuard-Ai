@@ -58,3 +58,39 @@ and its sync test, theme toggle, then the kit components with tests, then the ic
 
 - None open from the baseline: the e2e baseline is recorded in `baseline.md` (369 of 375 pass; the 2 failures are an
   artefact of the shared-server run setup, 4 are skipped by design).
+
+## 2026-11-06 - Phase 2: design system
+
+**Done** (commits `f0fe392`, `4a57260`, `4abd764`)
+
+- Tokens: one violet accent plus green/amber/red for status only; dark `#131218 / #1b1b22 / #23232c`, a matching light
+  theme; 8 px grid, radii 8/12/16/24, motion up to 300 ms, Geist (self-hosted, OFL) at 48/30/22/15/13. Single source is
+  `packages/ui/src/tokens`; `globals.css` mirrors the static ones and `test/globals-css.test.ts` checks it (extended).
+  Every pair of `contrast.test.ts` passes in both themes. Fluent theme maps to the same tokens.
+- Kit in `packages/ui/src/kit` (Button/ButtonLink/IconButton, Badge, Card, BentoGrid, StatCard, Tabs/TabNav,
+  SegmentedControl, Accordion, Dialog, Drawer, Tooltip, Field/Input/Select/Textarea, Skeleton, ThemeToggle, Logo) and
+  `src/motion` (BlurFade, NumberTicker, AnimatedList, MotionProvider). 25 kit tests incl. keyboard, aria wiring, reduced
+  motion and axe in both themes.
+- Existing primitives restyled in place with the same APIs (Panel, PageHeader + `tabs` slot, MetricCard, badges,
+  EmptyState, ErrorState, Notice, LoadingSkeleton, DataTable, CopyButton, HelpButton, ConfirmDialog); all of `packages/ui`
+  now uses lucide icons. Kit gallery added to the dev-only design lab and reviewed in dark and light.
+- Tests: `packages/ui` 239 pass; the 12 web tests that broke were label changes only ("Synthetic" is now "Demo data")
+  and were updated with the same strength.
+
+**Next**: Phase 3, shell and navigation (AppShell with five items, top bar, bottom bar, theme toggle, cmdk command
+palette, toasts, page title and favicon), then Phase 4 screens one commit each.
+
+**Decisions**
+
+- Native `Input`/`Select`/`Textarea`/`Field` (not Fluent wrappers); card padding 16/24/32 (20 is not on the grid).
+- "Retry" and "Estimated" keep their wording (plain English, about 260 test assertions use them); "Synthetic" became
+  "Demo data" and "Correlation ID" became "Reference".
+- `BadgeShell` stays as a deprecated wrapper over `Badge` until the screens that use it are redesigned, then it goes.
+- The primary button's glint is one 300 ms pass on hover or focus (never a loop); the skeleton shimmer is the only
+  repeating animation and ends with the request.
+- File changes by script were avoided; edits are made with the edit tools.
+
+**Open issues**
+
+- `@fluentui/react-icons` is still imported by `apps/web` (migrated screen by screen); the dependency goes when the last
+  import does. Fluent `Button` is still used in `apps/web` and moves to the kit `Button` with each screen.
