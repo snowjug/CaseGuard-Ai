@@ -13,6 +13,7 @@ import {
 } from '@fluentui/react-components';
 import { XIcon } from 'lucide-react';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useHydrated } from '../hooks/useHydrated';
 import { cg } from '../tokens/cg';
 import { IconButton } from './Button';
 
@@ -104,7 +105,10 @@ export function Dialog({
 }: DialogProps) {
   const styles = useStyles();
   const descriptionId = useId();
+  const hydrated = useHydrated();
   useReturnFocus(open);
+  // A dialog that a link opens is open on the first render; the server cannot draw it, so it waits for the client.
+  if (open && !hydrated) return null;
   return (
     <FluentDialog
       open={open}

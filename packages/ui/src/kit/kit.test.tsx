@@ -1,6 +1,7 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
+import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { expectNoAxeViolations, renderWithTheme } from '../../test/axe';
 import { AnimatedList, BlurFade, NumberTicker } from '../motion';
@@ -301,6 +302,18 @@ describe('Dialog and Drawer', () => {
     const drawer = await screen.findByRole('dialog', { name: /Evidence/ });
     expect(within(drawer).getByText('Quoted from the chat')).toBeInTheDocument();
     expect(within(drawer).getByText(/appeared after the update/)).toBeInTheDocument();
+  });
+
+  it('draws nothing on the server for a dialog or a drawer that a link opens, so hydration finds the same HTML', () => {
+    const html = renderToString(
+      <>
+        <Dialog open onOpenChange={() => undefined} title="Delete this case" />
+        <Drawer open onOpenChange={() => undefined} title="Evidence">
+          Quoted from the chat
+        </Drawer>
+      </>,
+    );
+    expect(html).toBe('');
   });
 });
 

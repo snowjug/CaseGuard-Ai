@@ -11,6 +11,7 @@ import {
 } from '@fluentui/react-components';
 import { XIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useHydrated } from '../hooks/useHydrated';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { cg } from '../tokens/cg';
 import { layout } from '../tokens/static';
@@ -77,6 +78,9 @@ export function Drawer({
 }: DrawerProps) {
   const styles = useStyles();
   const sheet = useMediaQuery(`(max-width: ${layout.drawerBreakpoint - 1}px)`, false);
+  const hydrated = useHydrated();
+  // A drawer that a link opens (`?sel=`) is open on the first render; the server cannot draw it, so it waits for the client.
+  if (open && !hydrated) return null;
   return (
     <OverlayDrawer
       open={open}

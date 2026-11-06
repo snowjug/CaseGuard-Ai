@@ -10,6 +10,7 @@ import {
   borderColors,
   cg,
   createPersistedStore,
+  useHydrated,
   type PersistedStore,
 } from '@caseguard/ui';
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
@@ -58,11 +59,6 @@ export interface DevPersonaAuthProviderProps {
   writeCookie?: (personaId: string | null) => void;
 }
 
-/** `useSyncExternalStore` source for "has the browser taken over from the server yet": false on the server and while hydrating. */
-const subscribeNever = (): (() => void) => () => undefined;
-const isHydrated = (): boolean => true;
-const isNotHydrated = (): boolean => false;
-
 /**
  * Development identity: the person picks one of the seeded synthetic personas and every API call carries
  * `x-cg-persona`. The API only honours it in local/test environments; production uses Entra ID.
@@ -79,7 +75,7 @@ export function DevPersonaAuthProvider({
   writeCookie = writePersonaCookie,
 }: DevPersonaAuthProviderProps) {
   const personaId = useSyncExternalStore(store.subscribe, store.get, () => null);
-  const hydrated = useSyncExternalStore(subscribeNever, isHydrated, isNotHydrated);
+  const hydrated = useHydrated();
   const [pickerOpen, setPickerOpen] = useOverlayState();
 
   const selectPersona = useCallback(

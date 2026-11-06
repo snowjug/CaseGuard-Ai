@@ -6,6 +6,7 @@ export * from './link-context';
 export * from './a11y/VisuallyHidden';
 export * from './a11y/ScrollRegion';
 export * from './hooks/useMediaQuery';
+export * from './hooks/useHydrated';
 export * from './hooks/useSafeId';
 export * from './hooks/useElementSize';
 export * from './kit';
