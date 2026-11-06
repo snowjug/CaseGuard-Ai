@@ -257,12 +257,14 @@ export function HomePage() {
         }
         actions={
           <>
-            <IconButton
-              icon={<RefreshCwIcon />}
-              label="Refresh"
-              disabled={auth.status !== 'ready' || query.isFetching}
-              onClick={() => void query.refetch()}
-            />
+            {auth.status === 'ready' ? (
+              <IconButton
+                icon={<RefreshCwIcon />}
+                label="Refresh"
+                disabled={query.isFetching}
+                onClick={() => void query.refetch()}
+              />
+            ) : null}
             {hasCases && can('case:ingest') ? (
               <ButtonLink href={ADD_CASE_HREF} variant="primary" icon={<PlusIcon />}>
                 Add a case

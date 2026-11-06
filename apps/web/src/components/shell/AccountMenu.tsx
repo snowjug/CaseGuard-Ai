@@ -141,6 +141,7 @@ export function AccountMenu({ compact = false, railHidesText = false }: AccountM
   const { setShortcutsOpen } = useShellUi();
 
   if (auth.status === 'unauthenticated') {
+    const label = auth.dev ? 'Choose persona' : 'Sign in';
     return (
       <Button
         variant="primary"
@@ -148,7 +149,7 @@ export function AccountMenu({ compact = false, railHidesText = false }: AccountM
         fullWidth={!compact}
         onClick={() => (auth.dev ? auth.dev.openPicker() : void auth.signIn?.())}
       >
-        {auth.dev ? 'Choose persona' : 'Sign in'}
+        <span className={compact ? styles.hidden : undefined}>{label}</span>
       </Button>
     );
   }
