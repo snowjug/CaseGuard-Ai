@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect } from 'react';
+import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoAxeViolations, fakeApi, renderApp } from '../../../test/harness';
 import { persona } from '../../../test/fixtures';
@@ -83,6 +84,22 @@ describe('[AUTH-DEV-01] DevPersonaAuth', () => {
     await act(async () => auth?.signOut());
     expect(screen.getByText(/status:unauthenticated/)).toBeInTheDocument();
     expect(window.localStorage.getItem('cg-persona')).toBeNull();
+  });
+
+  it('renders a returning person signed in on the server, from the persona cookie, and signed out without one', () => {
+    const page = (initialPersonaId?: string | null) =>
+      renderToString(
+        <DevPersonaAuthProvider
+          {...(initialPersonaId === undefined ? {} : { initialPersonaId })}
+          store={createPersonaStore(() => undefined)}
+        >
+          <Capture onAuth={() => undefined} />
+        </DevPersonaAuthProvider>,
+      );
+    expect(page('persona_manager')).toContain('status:<!-- -->ready');
+    expect(page('persona_manager')).toContain('key:<!-- -->dev:persona_manager');
+    expect(page(null)).toContain('status:<!-- -->unauthenticated');
+    expect(page()).toContain('status:<!-- -->unauthenticated');
   });
 
   it('gives each persona its own cache partition key (no data leaks between roles)', () => {

@@ -4,6 +4,7 @@ import type { Metadata, Viewport } from 'next';
 import { cookies } from 'next/headers';
 import type { ReactNode } from 'react';
 import { CASE_COOKIE, parseCaseId } from '../lib/case-cookie';
+import { PERSONA_COOKIE, personaIdFromCookie } from '../lib/auth/persona-id';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
@@ -24,17 +25,23 @@ export const viewport: Viewport = {
 };
 
 /**
- * Root layout (Server Component). It reads the `cg-theme` and `cg-case` cookies so the first paint already has the
- * right theme and remembered case. Reading cookies makes every route dynamic, which the per-request CSP nonce needs anyway.
+ * Root layout (Server Component). It reads the `cg-theme`, `cg-case` and `cg-persona` cookies so the first paint already
+ * has the right theme, remembered case and signed-in state (a returning person never sees the first-visit page flash by).
+ * Reading cookies makes every route dynamic, which the per-request CSP nonce needs anyway.
  */
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const jar = await cookies();
   const themeMode = parseThemeMode(jar.get(THEME_COOKIE)?.value);
   const initialCaseId = parseCaseId(jar.get(CASE_COOKIE)?.value);
+  const initialPersonaId = personaIdFromCookie(jar.get(PERSONA_COOKIE)?.value);
   return (
     <html lang="en" data-cg-theme={themeMode} suppressHydrationWarning>
       <body>
-        <Providers initialThemeMode={themeMode} initialCaseId={initialCaseId}>
+        <Providers
+          initialThemeMode={themeMode}
+          initialCaseId={initialCaseId}
+          initialPersonaId={initialPersonaId}
+        >
           {children}
         </Providers>
       </body>

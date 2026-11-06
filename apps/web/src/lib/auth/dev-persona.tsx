@@ -19,15 +19,9 @@ import { describeError } from '../api/errors';
 import { useApiQuery } from '../api/hooks';
 import { useOverlayState } from '../use-overlay-state';
 import { AuthContext, useAuth, type AuthContextValue } from './context';
+import { PERSONA_COOKIE, PERSONA_STORAGE_KEY, parsePersonaId } from './persona-id';
 
-export const PERSONA_STORAGE_KEY = 'cg-persona';
-export const PERSONA_COOKIE = 'cg-persona';
-const PERSONA_ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,119}$/;
-
-/** Accepts only well-formed persona ids from storage (never trust stored values). */
-export function parsePersonaId(raw: string | null): string | null {
-  return raw !== null && PERSONA_ID.test(raw) ? raw : null;
-}
+export { PERSONA_COOKIE, PERSONA_STORAGE_KEY, parsePersonaId };
 
 /** localStorage-backed selection. Exported as a factory so tests can inject their own storage. */
 export function createPersonaStore(
@@ -53,6 +47,11 @@ function writePersonaCookie(personaId: string | null): void {
 
 export interface DevPersonaAuthProviderProps {
   children: ReactNode;
+  /**
+   * The persona the server knows from the cookie. It is what the first paint and the hydration render use, so a returning
+   * person's page is in its signed-in state from the first byte; the browser's own choice takes over once hydrated.
+   */
+  initialPersonaId?: string | null;
   /** Injected for tests. */
   store?: PersistedStore<string | null>;
   writeCookie?: (personaId: string | null) => void;
@@ -64,10 +63,11 @@ export interface DevPersonaAuthProviderProps {
  */
 export function DevPersonaAuthProvider({
   children,
+  initialPersonaId = null,
   store = defaultStore,
   writeCookie = writePersonaCookie,
 }: DevPersonaAuthProviderProps) {
-  const personaId = useSyncExternalStore(store.subscribe, store.get, () => null);
+  const personaId = useSyncExternalStore(store.subscribe, store.get, () => initialPersonaId);
   const [pickerOpen, setPickerOpen] = useOverlayState();
 
   const selectPersona = useCallback(

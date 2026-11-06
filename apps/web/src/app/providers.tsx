@@ -45,6 +45,8 @@ export interface ProvidersProps {
   initialThemeMode: ThemeMode;
   /** Last case remembered in the `cg-case` cookie. */
   initialCaseId: string | null;
+  /** The development persona remembered in the `cg-persona` cookie (the page renders signed in from the first byte). */
+  initialPersonaId?: string | null;
   children: ReactNode;
 }
 
@@ -52,13 +54,18 @@ export interface ProvidersProps {
  * Every app-wide provider, in dependency order: presentation mode, theme (Fluent + SSR style flush), link adapter,
  * TanStack Query, identity (development persona or Entra), typed API client, toasts, keyboard shortcuts, active case.
  */
-export function Providers({ initialThemeMode, initialCaseId, children }: ProvidersProps) {
+export function Providers({
+  initialThemeMode,
+  initialCaseId,
+  initialPersonaId = null,
+  children,
+}: ProvidersProps) {
   return (
     <PresentationProvider>
       <Themed initialThemeMode={initialThemeMode}>
         <UiLinkProvider component={NextLinkAdapter}>
           <QueryProvider>
-            <AuthProviderRoot>
+            <AuthProviderRoot initialPersonaId={initialPersonaId}>
               <ApiClientProvider>
                 <ToastProvider>
                   <KeyboardShortcutsProvider>
