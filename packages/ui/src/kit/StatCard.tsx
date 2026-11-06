@@ -54,6 +54,7 @@ const useStyles = makeStyles({
 });
 
 export type StatJudgement = 'improving' | 'worsening' | 'steady';
+export type StatDirection = 'up' | 'down' | 'flat';
 
 export interface StatCardProps {
   label: string;
@@ -66,8 +67,11 @@ export interface StatCardProps {
   status?: BadgeStatus;
   /** The status in words; defaults to the status name. */
   statusLabel?: string;
-  /** What changed and against what, in words ("+6 points since the last case"). */
-  delta?: { text: string; judgement: StatJudgement };
+  /**
+   * What changed and against what, in words ("6 points higher than the last case"). The arrow shows which way the number
+   * moved when `direction` is given (so it always agrees with the words), and the colour says whether that is good.
+   */
+  delta?: { text: string; judgement: StatJudgement; direction?: StatDirection };
   /** The definition, shown in a popover; the card itself never needs it to make sense. */
   help?: ReactNode;
   icon?: ReactNode;
@@ -82,6 +86,8 @@ const JUDGEMENT = {
   worsening: { icon: ArrowDownIcon, tone: 'unsupported' },
   steady: { icon: MinusIcon, tone: 'neutral' },
 } as const;
+
+const DIRECTION_ICON = { up: ArrowUpIcon, down: ArrowDownIcon, flat: MinusIcon } as const;
 
 /** A number that matters: a label, the value (it counts up when it appears), its status in words, and what changed. */
 export function StatCard({
@@ -101,7 +107,7 @@ export function StatCard({
   const styles = useStyles();
   const Heading = `h${headingLevel}` as const;
   const judgement = delta ? JUDGEMENT[delta.judgement] : null;
-  const DeltaIcon = judgement?.icon;
+  const DeltaIcon = delta?.direction ? DIRECTION_ICON[delta.direction] : judgement?.icon;
   return (
     <Card className={mergeClasses(styles.root, className)}>
       <div className={styles.top}>

@@ -16,6 +16,7 @@ import {
 import { makeStyles, tokens } from '@fluentui/react-components';
 import { ArrowRightIcon, LoaderIcon } from 'lucide-react';
 import { CaseSelect } from '../../components/common/CaseSelect';
+import { useSession } from '../../lib/auth/session';
 import { caseHref } from '../../lib/deep-links';
 import { ANALYSIS_STATE_BADGES, SEVERITY_LABELS } from '../../lib/labels';
 
@@ -131,6 +132,9 @@ export function LatestReview({
   onChooseCase,
 }: LatestReviewProps) {
   const styles = useStyles();
+  const { can } = useSession();
+  // "Add a case" in the page header is the primary action for people who can add one; for everyone else it is the way in.
+  const way = can('case:ingest') ? 'secondary' : 'primary';
   const analysed = activeCase.analysisState === 'analyzed';
   const running = activeCase.analysisState === 'running' || activeCase.analysisState === 'queued';
   const analysis = ANALYSIS_STATE_BADGES[activeCase.analysisState];
@@ -202,7 +206,7 @@ export function LatestReview({
             {analysed ? (
               <ButtonLink
                 href={caseHref(activeCase.id, 'review')}
-                variant="secondary"
+                variant={way}
                 icon={<ArrowRightIcon />}
                 iconPosition="end"
               >
@@ -211,7 +215,7 @@ export function LatestReview({
             ) : (
               <ButtonLink
                 href={caseHref(activeCase.id)}
-                variant="secondary"
+                variant={way}
                 icon={running ? <LoaderIcon /> : <ArrowRightIcon />}
                 iconPosition="end"
               >

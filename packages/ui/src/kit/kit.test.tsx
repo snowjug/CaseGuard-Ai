@@ -392,6 +392,24 @@ describe('StatCard and motion', () => {
     expect(screen.getByText('No value available')).toBeInTheDocument();
   });
 
+  it('points the delta arrow the way the number moved, and colours it by whether that is good', () => {
+    const { container } = renderWithTheme(
+      <StatCard
+        label="Time that could have been saved"
+        value={12}
+        unit="%"
+        delta={{
+          text: '4 points lower than the last case',
+          judgement: 'improving',
+          direction: 'down',
+        }}
+      />,
+    );
+    expect(container.querySelector('.lucide-arrow-down')).not.toBeNull();
+    expect(container.querySelector('.lucide-arrow-up')).toBeNull();
+    expect(screen.getByText('(improving)')).toBeInTheDocument();
+  });
+
   it('counts up to its value and ends exactly on it', async () => {
     renderWithTheme(<NumberTicker value={72} />);
     await waitFor(() => expect(screen.getByText('72')).toBeInTheDocument(), { timeout: 2000 });

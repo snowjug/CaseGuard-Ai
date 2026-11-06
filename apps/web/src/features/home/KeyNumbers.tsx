@@ -51,7 +51,7 @@ function judgement(metric: MetricCard, lowerIsBetter: boolean): StatJudgement {
   return better ? 'improving' : 'worsening';
 }
 
-/** "58.3 points higher than the previous analysed case", in words (no sign, so the arrow and the words never disagree). */
+/** "58.3 points higher than the previous analysed case", in words; the arrow beside it follows the same direction. */
 function deltaText(metric: MetricCard): string | null {
   const trend = metric.trend;
   if (!trend) return null;
@@ -80,8 +80,14 @@ export function KeyNumbers({ metrics }: { metrics: readonly MetricCard[] }) {
                 unit={pick.unit}
                 status={status.status}
                 statusLabel={status.label}
-                {...(text
-                  ? { delta: { text, judgement: judgement(metric, pick.lowerIsBetter ?? false) } }
+                {...(text && metric.trend
+                  ? {
+                      delta: {
+                        text,
+                        judgement: judgement(metric, pick.lowerIsBetter ?? false),
+                        direction: metric.trend.direction,
+                      },
+                    }
                   : {})}
                 help={metric.definition}
                 footer={
