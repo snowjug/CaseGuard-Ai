@@ -90,17 +90,39 @@ const safeId = (value: string): string => value.replace(/[^a-zA-Z0-9_-]/g, '_');
 
 /**
  * On a narrow screen the tab strip scrolls sideways; when the selected tab is not fully in view it is centred, inside
- * the strip only (the page itself never scrolls because of it).
+ * the strip only (the page itself never scrolls because of it). The strip says which ends have more to scroll to, so
+ * it can fade there.
  */
 function useSelectedTabInView(list: RefObject<HTMLElement | null>, selected: string): void {
   useEffect(() => {
     const strip = list.current;
-    const tab = strip?.querySelector<HTMLElement>('[aria-selected="true"], [aria-current="page"]');
-    if (!strip || !tab) return;
-    const start = tab.offsetLeft;
-    const end = start + tab.offsetWidth;
-    if (start >= strip.scrollLeft && end <= strip.scrollLeft + strip.clientWidth) return;
-    strip.scrollLeft = start - (strip.clientWidth - tab.offsetWidth) / 2;
+    if (!strip) return undefined;
+    const mark = (): void => {
+      strip.setAttribute('data-fade-start', String(strip.scrollLeft > 1));
+      strip.setAttribute(
+        'data-fade-end',
+        String(strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 1),
+      );
+    };
+    const tab = strip.querySelector<HTMLElement>('[aria-selected="true"], [aria-current="page"]');
+    if (tab) {
+      const start = tab.offsetLeft;
+      const end = start + tab.offsetWidth;
+      if (start < strip.scrollLeft || end > strip.scrollLeft + strip.clientWidth) {
+        strip.scrollTo({
+          left: start - (strip.clientWidth - tab.offsetWidth) / 2,
+          behavior: 'instant',
+        });
+      }
+    }
+    mark();
+    strip.addEventListener('scroll', mark, { passive: true });
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(mark);
+    observer?.observe(strip);
+    return () => {
+      strip.removeEventListener('scroll', mark);
+      observer?.disconnect();
+    };
   }, [list, selected]);
 }
 
@@ -182,7 +204,7 @@ export function Tabs({
         ref={list}
         role="tablist"
         aria-label={ariaLabel}
-        className={mergeClasses(styles.list, className)}
+        className={mergeClasses(styles.list, 'cg-tab-strip', className)}
         onKeyDown={onKeyDown}
       >
         {items.map((item) => {
@@ -267,7 +289,7 @@ export function TabNav({ items, 'aria-label': ariaLabel, className }: TabNavProp
   useSelectedTabInView(list, items.find((item) => item.active)?.href ?? '');
   return (
     <nav aria-label={ariaLabel} className={styles.nav}>
-      <ul ref={list} className={mergeClasses(styles.list, className)}>
+      <ul ref={list} className={mergeClasses(styles.list, 'cg-tab-strip', className)}>
         {items.map((item) => (
           <li key={item.href} className={styles.item}>
             <UiLink

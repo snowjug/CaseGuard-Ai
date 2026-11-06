@@ -33,7 +33,7 @@ const useStyles = makeStyles({
   },
   toggle: {
     display: 'flex',
-    flex: '1 1 280px',
+    flex: '1 1 200px',
     minWidth: 0,
     alignItems: 'center',
     gap: cg.space[3],

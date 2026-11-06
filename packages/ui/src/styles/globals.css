@@ -167,6 +167,34 @@ svg.lucide {
   }
 }
 
+/* A tab strip that scrolls sideways fades at the end that has more to see, so a tab cut by the edge reads as "more this way". */
+.cg-tab-strip[data-fade-start='true'] {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, black 24px);
+  mask-image: linear-gradient(to right, transparent 0, black 24px);
+}
+
+.cg-tab-strip[data-fade-end='true'] {
+  -webkit-mask-image: linear-gradient(to left, transparent 0, black 24px);
+  mask-image: linear-gradient(to left, transparent 0, black 24px);
+}
+
+.cg-tab-strip[data-fade-start='true'][data-fade-end='true'] {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 24px,
+    black calc(100% - 24px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 24px,
+    black calc(100% - 24px),
+    transparent 100%
+  );
+}
+
 /*
  * Motion. Components opt in with `cg-motion-safe`; every transition and animation is suppressed when the OS asks for
  * reduced motion, unless the user explicitly allowed motion in settings (`data-cg-reduced-motion="false"`),

@@ -23,6 +23,8 @@ const useStyles = makeStyles({
     display: 'inline-flex',
     alignItems: 'center',
     gap: cg.space[1],
+    minWidth: 0,
+    maxWidth: '100%',
     color: cg.textSecondary,
     minHeight: '24px',
   },
@@ -38,7 +40,14 @@ const useStyles = makeStyles({
       minWidth: '44px',
     },
   },
-  current: { color: cg.text, fontWeight: tokens.fontWeightMedium, overflowWrap: 'anywhere' },
+  current: {
+    color: cg.text,
+    fontWeight: tokens.fontWeightMedium,
+    maxWidth: 'min(56ch, 100%)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
   sep: { display: 'inline-flex', color: cg.textMuted },
 });
 
@@ -64,7 +73,11 @@ export function Breadcrumbs() {
                   {crumb.label}
                 </UiLink>
               ) : (
-                <span aria-current={last ? 'page' : undefined} className={styles.current}>
+                <span
+                  aria-current={last ? 'page' : undefined}
+                  title={crumb.label}
+                  className={styles.current}
+                >
                   {crumb.label}
                 </span>
               )}
