@@ -10,16 +10,16 @@ import {
   type TemporalFinding,
   type TemporalRule,
 } from '@caseguard/schemas';
-import { Notice, Panel, StatusBadge, cg, formatDateTimeUtc } from '@caseguard/ui';
 import {
   Accordion,
-  AccordionHeader,
   AccordionItem,
-  AccordionPanel,
   Button,
-  makeStyles,
-  tokens,
-} from '@fluentui/react-components';
+  StatusBadge,
+  cg,
+  formatDateTimeUtc,
+} from '@caseguard/ui';
+import { makeStyles, tokens } from '@fluentui/react-components';
+import { InfoIcon, ScanSearchIcon } from 'lucide-react';
 import { asOfCall, asOfFresh, isRateLimited } from '../../components/case/as-of';
 import { isNotAnalysedError } from '../../components/case/NotAnalysedState';
 import { countOf } from '../../components/case/labels';
@@ -27,10 +27,11 @@ import { keepWithinBoundary } from '../../lib/api/boundary-placeholder';
 import { useApiQuery } from '../../lib/api/hooks';
 
 const useStyles = makeStyles({
+  stack: { display: 'flex', flexDirection: 'column', gap: cg.space[3], minWidth: 0 },
   list: {
     display: 'flex',
     flexDirection: 'column',
-    gap: cg.space[2],
+    gap: cg.space[3],
     margin: 0,
     padding: 0,
     listStyle: 'none',
@@ -39,11 +40,9 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     gap: cg.space[1],
-    padding: cg.space[3],
-    borderRadius: cg.radius.md,
-    border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surfaceSunken,
     minWidth: 0,
+    paddingLeft: cg.space[3],
+    borderLeft: `2px solid ${cg.borderSubtle}`,
   },
   head: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
   title: {
@@ -64,10 +63,10 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase200,
     overflowWrap: 'anywhere',
   },
-  intro: { margin: 0, color: cg.textSecondary, fontSize: tokens.fontSizeBase300 },
+  intro: { margin: 0, color: cg.textSecondary, fontSize: tokens.fontSizeBase200 },
   sides: {
     display: 'grid',
-    gap: cg.space[2],
+    gap: cg.space[3],
     gridTemplateColumns: 'repeat(auto-fit, minmax(14rem, 1fr))',
     margin: 0,
     padding: 0,
@@ -82,6 +81,16 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase300,
     overflowWrap: 'anywhere',
   },
+  notice: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: `${cg.space[1]} ${cg.space[2]}`,
+    padding: `${cg.space[3]} ${cg.space[1]}`,
+    color: cg.textSecondary,
+    fontSize: tokens.fontSizeBase300,
+  },
+  noticeIcon: { display: 'inline-flex', color: cg.textMuted },
 });
 
 /** What each rule that needs more than one event says, in the words a reviewer reads. */
@@ -107,7 +116,7 @@ function ConflictItem({ conflict }: { conflict: Conflict }) {
           size="small"
           label={CONFLICT_CLASS_LABELS[conflict.class]}
         />
-        <h4 className={styles.title}>{conflict.subject}</h4>
+        <h5 className={styles.title}>{conflict.subject}</h5>
       </div>
       <ul className={styles.sides} aria-label={`The two statements about ${conflict.subject}`}>
         {conflict.sides.map((side) => (
@@ -160,7 +169,7 @@ function SetAsideItem({ note }: { note: SetAsideObservation }) {
           size="small"
           label={STATEMENT_MODALITY_LABELS[note.modality]}
         />
-        <h4 className={styles.title}>{note.signalLabel}</h4>
+        <h5 className={styles.title}>{note.signalLabel}</h5>
       </div>
       <blockquote className={styles.quote}>“{note.excerpt}”</blockquote>
       <p className={styles.note}>
@@ -180,37 +189,42 @@ export interface RecordFindingsPanelProps {
  * What the record shows on its own, read with fixed rules and no model: statements of the case that cannot both stand,
  * patterns that need more than one event, and the sentences a detector read and did not count (a denial, a guess, a plan,
  * a request). The last list is the usual reason an expected signal is missing. Everything here is computed from the events
- * of the selected moment, so nothing recorded after it is named.
+ * of the selected moment, so nothing recorded after it is named. One collapsed row of the coverage card.
  */
 export function RecordFindingsPanel({ findings, asOf }: RecordFindingsPanelProps) {
   const styles = useStyles();
   const { conflicts, sequenceFindings, setAside, setAsideTotal } = findings;
   const nothing = conflicts.length === 0 && sequenceFindings.length === 0 && setAsideTotal === 0;
   return (
-    <Panel
+    <AccordionItem
       title="What the record itself shows"
-      level={2}
-      description={
+      subtitle={
         asOf
           ? 'Read without a model from the events up to the selected moment.'
           : 'Read without a model from the events of the whole record.'
       }
-      help="Found by reading the wording of the events with fixed rules, not by a model. They can miss what the knowledge pack does not model, and they can be wrong: each one quotes the record so that you can check it."
+      icon={<ScanSearchIcon />}
+      headingLevel={3}
     >
-      {nothing ? (
+      <div className={styles.stack}>
         <p className={styles.intro}>
-          No two statements contradict each other, no pattern needs more than one event, and no
-          sentence was read and set aside.
+          Found by reading the wording of the events with fixed rules, not by a model. They can miss
+          what the knowledge pack does not model, and they can be wrong: each one quotes the record
+          so that you can check it.
         </p>
-      ) : (
-        <Accordion collapsible multiple>
-          <AccordionItem value="conflicts">
-            <AccordionHeader as="h3" expandIconPosition="end">
-              Statements that disagree ({conflicts.length})
-            </AccordionHeader>
-            <AccordionPanel>
+        {nothing ? (
+          <p className={styles.text}>
+            No two statements contradict each other, no pattern needs more than one event, and no
+            sentence was read and set aside.
+          </p>
+        ) : (
+          <Accordion>
+            <AccordionItem
+              title={`Statements that disagree (${conflicts.length})`}
+              headingLevel={4}
+            >
               {conflicts.length === 0 ? (
-                <p className={styles.intro}>
+                <p className={styles.text}>
                   No two statements of this case contradict each other, as far as the rules can
                   tell.
                 </p>
@@ -221,15 +235,13 @@ export function RecordFindingsPanel({ findings, asOf }: RecordFindingsPanelProps
                   ))}
                 </ul>
               )}
-            </AccordionPanel>
-          </AccordionItem>
-          <AccordionItem value="sequence">
-            <AccordionHeader as="h3" expandIconPosition="end">
-              Patterns across events ({sequenceFindings.length})
-            </AccordionHeader>
-            <AccordionPanel>
+            </AccordionItem>
+            <AccordionItem
+              title={`Patterns across events (${sequenceFindings.length})`}
+              headingLevel={4}
+            >
               {sequenceFindings.length === 0 ? (
-                <p className={styles.intro}>No pattern that needs more than one event was found.</p>
+                <p className={styles.text}>No pattern that needs more than one event was found.</p>
               ) : (
                 <ul className={styles.list} aria-label="Patterns across events">
                   {sequenceFindings.map((finding) => (
@@ -237,18 +249,17 @@ export function RecordFindingsPanel({ findings, asOf }: RecordFindingsPanelProps
                   ))}
                 </ul>
               )}
-            </AccordionPanel>
-          </AccordionItem>
-          <AccordionItem value="set-aside">
-            <AccordionHeader as="h3" expandIconPosition="end">
-              Read but not counted ({setAside.length}
-              {setAsideTotal > setAside.length ? ` of ${setAsideTotal}` : ''})
-            </AccordionHeader>
-            <AccordionPanel>
+            </AccordionItem>
+            <AccordionItem
+              title={`Read but not counted (${setAside.length}${
+                setAsideTotal > setAside.length ? ` of ${setAsideTotal}` : ''
+              })`}
+              headingLevel={4}
+            >
               {setAside.length === 0 ? (
-                <p className={styles.intro}>No sentence was read and set aside.</p>
+                <p className={styles.text}>No sentence was read and set aside.</p>
               ) : (
-                <>
+                <div className={styles.stack}>
                   <p className={styles.intro}>
                     Words a detector found and did not count, because the sentence does not state
                     the fact. This is often why an expected signal is missing.
@@ -258,13 +269,13 @@ export function RecordFindingsPanel({ findings, asOf }: RecordFindingsPanelProps
                       <SetAsideItem key={`${note.eventId}:${note.signalId}:${index}`} note={note} />
                     ))}
                   </ul>
-                </>
+                </div>
               )}
-            </AccordionPanel>
-          </AccordionItem>
-        </Accordion>
-      )}
-    </Panel>
+            </AccordionItem>
+          </Accordion>
+        )}
+      </div>
+    </AccordionItem>
   );
 }
 
@@ -277,6 +288,7 @@ export interface RecordFindingsSectionProps {
 
 /** Fetches what the record shows for the selected moment and renders it; a failure never takes the page down. */
 export function RecordFindingsSection({ caseId, asOf, enabled }: RecordFindingsSectionProps) {
+  const styles = useStyles();
   const request = { params: { caseId }, query: asOf ? { asOf } : {} };
   const findings = useApiQuery(
     'recordFindings.get',
@@ -286,13 +298,18 @@ export function RecordFindingsSection({ caseId, asOf, enabled }: RecordFindingsS
   if (findings.data) return <RecordFindingsPanel findings={findings.data} asOf={asOf} />;
   if (!findings.isError || isNotAnalysedError(findings.error)) return null;
   return (
-    <Notice variant="info" compact title={null}>
-      {isRateLimited(findings.error)
-        ? 'What the record itself shows is not shown for now: the budget for recomputing earlier moments is used up. '
-        : 'What the record itself shows could not be loaded. '}
-      <Button appearance="subtle" size="small" onClick={() => void findings.refetch()}>
+    <p className={styles.notice}>
+      <span aria-hidden="true" className={styles.noticeIcon}>
+        <InfoIcon size={16} />
+      </span>
+      <span>
+        {isRateLimited(findings.error)
+          ? 'What the record itself shows is not shown for now: the budget for recomputing earlier moments is used up.'
+          : 'What the record itself shows could not be loaded.'}
+      </span>
+      <Button variant="ghost" size="sm" onClick={() => void findings.refetch()}>
         Try again
       </Button>
-    </Notice>
+    </p>
   );
 }
