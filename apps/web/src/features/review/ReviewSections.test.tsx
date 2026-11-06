@@ -149,6 +149,19 @@ describe('[REV-CHR-01] the chronology', () => {
     const list = await screen.findByRole('list', { name: /Key events and waits/ });
     expect(screen.queryByRole('img', { name: /^Chronology strip\./ })).toBeNull();
     expect(within(list).getAllByText(/ lane · /).length).toBe(14);
+    expect(screen.queryByRole('button', { name: /List the key events and waits/ })).toBeNull();
+  });
+
+  it('keeps the list one click away under the strip, so the review stays short', async () => {
+    installMatchMedia();
+    renderSection(<ChronologySection caseId={CASE_ID} />);
+    const toggle = await screen.findByRole('button', { name: /List the key events and waits/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      screen.getByRole('list', { name: 'Key events and waits, 14 key events' }),
+    ).toBeInTheDocument();
   });
 
   it('keeps the chronology when the decision points cannot be read, and says they are not marked', async () => {

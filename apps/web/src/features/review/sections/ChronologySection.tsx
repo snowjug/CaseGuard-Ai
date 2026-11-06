@@ -1,6 +1,8 @@
 'use client';
 
 import {
+  Accordion,
+  AccordionItem,
   EmptyState,
   Notice,
   StatusBadge,
@@ -20,7 +22,9 @@ import {
   LANES,
   chronologyRows,
   deriveChronology,
+  type Chronology,
   type ChronologyEvent,
+  type ChronologyRow,
   type KeyReason,
 } from '../model/chronology';
 import { methodNotes } from '../model/method';
@@ -162,10 +166,64 @@ function EventCard({ caseId, event }: { caseId: string; event: ChronologyEvent }
   );
 }
 
+/** The key events and meaningful waits in words, in time order: the text alternative of the picture. */
+function EventList({
+  caseId,
+  chronology,
+  rows,
+}: {
+  caseId: string;
+  chronology: Chronology;
+  rows: readonly ChronologyRow[];
+}) {
+  const styles = useStyles();
+  return (
+    <ol
+      className={styles.list}
+      aria-label={`Key events and waits, ${plural(chronology.events.length, 'key event')}`}
+    >
+      <li aria-hidden="true" className={mergeClasses(styles.row, styles.head)}>
+        <span>Time (UTC)</span>
+        {LANES.map((lane) => (
+          <span key={lane.id}>{lane.label}</span>
+        ))}
+      </li>
+      {rows.map((row) =>
+        row.kind === 'event' ? (
+          <li key={`event-${row.event.id}`} className={styles.row}>
+            <p className={styles.time}>{formatDateTimeUtc(row.event.at)}</p>
+            <div
+              className={
+                [styles.lane0, styles.lane1, styles.lane2][
+                  LANES.findIndex((lane) => lane.id === row.event.lane)
+                ]
+              }
+            >
+              <EventCard caseId={caseId} event={row.event} />
+            </div>
+          </li>
+        ) : (
+          <li key={`wait-${row.wait.fromEventId}-${row.wait.toEventId}`} className={styles.row}>
+            <p className={styles.time}>{formatDateTimeUtc(row.wait.fromAt)}</p>
+            <p className={styles.wait}>
+              <HourglassIcon aria-hidden="true" size={14} />
+              <span>
+                <strong>{row.wait.text}</strong> After “{row.wait.fromTitle}”, before “
+                {row.wait.toTitle}”.
+              </span>
+            </p>
+          </li>
+        ),
+      )}
+    </ol>
+  );
+}
+
 /**
  * The chronology: a picture of the case with a row per side, the decision points and the meaningful waits, and under it
- * the list that is its text alternative (the same key events and waits in words, in time order). Below 640 px the picture
- * gives way to the list alone, which is laid out as one column with the side named on each event.
+ * the list that is its text alternative (the same key events and waits in words, in time order), one click away so the
+ * review stays short. Below 640 px the picture gives way to the list alone, which is open and laid out as one column
+ * with the side named on each event.
  */
 export function ChronologySection({ caseId }: { caseId: string }) {
   const styles = useStyles();
@@ -221,47 +279,20 @@ export function ChronologySection({ caseId }: { caseId: string }) {
             </Notice>
           ) : null}
           {narrow ? null : <ChronologyStrip chronology={chronology} />}
-          <ol
-            className={styles.list}
-            aria-label={`Key events and waits, ${plural(chronology.events.length, 'key event')}`}
-          >
-            <li aria-hidden="true" className={mergeClasses(styles.row, styles.head)}>
-              <span>Time (UTC)</span>
-              {LANES.map((lane) => (
-                <span key={lane.id}>{lane.label}</span>
-              ))}
-            </li>
-            {rows.map((row) =>
-              row.kind === 'event' ? (
-                <li key={`event-${row.event.id}`} className={styles.row}>
-                  <p className={styles.time}>{formatDateTimeUtc(row.event.at)}</p>
-                  <div
-                    className={
-                      [styles.lane0, styles.lane1, styles.lane2][
-                        LANES.findIndex((lane) => lane.id === row.event.lane)
-                      ]
-                    }
-                  >
-                    <EventCard caseId={caseId} event={row.event} />
-                  </div>
-                </li>
-              ) : (
-                <li
-                  key={`wait-${row.wait.fromEventId}-${row.wait.toEventId}`}
-                  className={styles.row}
-                >
-                  <p className={styles.time}>{formatDateTimeUtc(row.wait.fromAt)}</p>
-                  <p className={styles.wait}>
-                    <HourglassIcon aria-hidden="true" size={14} />
-                    <span>
-                      <strong>{row.wait.text}</strong> After “{row.wait.fromTitle}”, before “
-                      {row.wait.toTitle}”.
-                    </span>
-                  </p>
-                </li>
-              ),
-            )}
-          </ol>
+          {narrow ? (
+            <EventList caseId={caseId} chronology={chronology} rows={rows} />
+          ) : (
+            <Accordion>
+              <AccordionItem
+                title="List the key events and waits"
+                subtitle={`${plural(chronology.events.length, 'key event')}, in words`}
+                headingLevel={3}
+                lazy={false}
+              >
+                <EventList caseId={caseId} chronology={chronology} rows={rows} />
+              </AccordionItem>
+            </Accordion>
+          )}
           <div className={styles.actions}>
             <LinkButton
               href={caseHref(caseId, 'timeline')}

@@ -140,6 +140,11 @@ test.describe('[FR-REV-01] the review reads the case from the verdict to what to
     const chronology = section(page, 'What happened');
     await expect(chronology.getByRole('img', { name: /^Chronology strip\./ })).toBeVisible();
     const list = chronology.getByRole('list', { name: /^Key events and waits/ });
+    // The list is the strip's text alternative and is one click away, so the review stays short.
+    const toggle = chronology.getByRole('button', { name: /^List the key events and waits/ });
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await expect(list).toBeVisible();
     await expect(list.getByText(/^The (customer|engineer) waited .+ for /).first()).toBeVisible();
     await expect(list.getByRole('link', { name: /^Show in timeline:/ }).first()).toHaveAttribute(
@@ -371,9 +376,9 @@ test.describe('[FR-REV-03] a section the role may not read degrades on its own',
     await expect(
       verdict.getByRole('heading', { level: 3, name: 'Earliest missed moment' }),
     ).toBeVisible();
-    await expect(
-      section(page, 'What happened').getByRole('list', { name: /^Key events and waits/ }),
-    ).toBeVisible();
+    const chronology = section(page, 'What happened');
+    await chronology.getByRole('button', { name: /^List the key events and waits/ }).click();
+    await expect(chronology.getByRole('list', { name: /^Key events and waits/ })).toBeVisible();
     await expect(
       (await openSection(page, 'What to learn')).getByText(/This resembles/),
     ).toBeVisible();
