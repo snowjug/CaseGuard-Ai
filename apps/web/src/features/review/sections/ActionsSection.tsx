@@ -1,49 +1,52 @@
 'use client';
 
-import type { ActionExecutor, Permission } from '@caseguard/schemas';
-import { EmptyState, Notice, ProvenanceBadge, StatusBadge, cg } from '@caseguard/ui';
-import { Button, makeStyles, tokens } from '@fluentui/react-components';
-import { CheckmarkCircleRegular, InfoRegular } from '@fluentui/react-icons';
-import { useId, useMemo, useState } from 'react';
+import type { Permission } from '@caseguard/schemas';
+import {
+  AnimatedList,
+  Button,
+  EmptyState,
+  IconButton,
+  LoadingSkeleton,
+  ProvenanceBadge,
+  StatusBadge,
+  cg,
+  copyText,
+} from '@caseguard/ui';
+import { makeStyles, tokens } from '@fluentui/react-components';
+import { ChevronDownIcon, CircleCheckIcon, CopyIcon, InfoIcon } from 'lucide-react';
+import { useId, useState } from 'react';
 import { QueryErrorState } from '../../../components/common/QueryErrorState';
+import { useToast } from '../../../lib/toast';
 import { ClampedText } from '../../quality/ClampedText';
 import { EvidenceChips } from '../evidence/EvidenceChips';
 import { useLinkTitles } from '../evidence/useProvenance';
-import {
-  useCoachingHandle,
-  useQualityHandle,
-  useRankingHandle,
-  useRunHandle,
-  useScenariosHandle,
-  useWarningsHandle,
-  type Handle,
-} from '../hooks';
-import { GENERAL_GUIDANCE, deriveNextActions, type NextAction } from '../model/actions';
+import type { Handle } from '../hooks';
+import { GENERAL_GUIDANCE, fixText, type NextAction } from '../model/actions';
 import { methodNotes } from '../model/method';
 import { joinWords, plural } from '../model/words';
+import { useRunHandle } from '../hooks';
+import { useNextActions } from '../use-next-actions';
 import { PermissionPart, SectionFrame } from './shared';
 
-/** How many recommendations are listed before the rest are offered on request. */
-const FIRST_SHOWN = 5;
+/** How many fixes are listed before the rest are offered on request. */
+const FIRST_SHOWN = 3;
 
 const useStyles = makeStyles({
-  stack: { display: 'flex', flexDirection: 'column', gap: cg.space[3], minWidth: 0 },
-  list: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: cg.space[3],
-    margin: 0,
-    padding: 0,
-    listStyle: 'none',
-  },
+  stack: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
+  list: { display: 'flex', flexDirection: 'column', gap: cg.space[3] },
   item: {
     display: 'grid',
-    gridTemplateColumns: '32px minmax(0, 1fr)',
-    gap: `${cg.space[2]} ${cg.space[3]}`,
-    padding: cg.space[3],
-    borderRadius: cg.radius.md,
-    border: `1px solid ${cg.borderSubtle}`,
+    gridTemplateColumns: '28px minmax(0, 1fr) auto',
+    alignItems: 'start',
+    columnGap: cg.space[3],
+    padding: cg.space[4],
+    borderRadius: cg.radius.lg,
     backgroundColor: cg.surfaceSunken,
+    transitionProperty: 'background-color, transform',
+    transitionDuration: cg.motion.fast,
+    transitionTimingFunction: cg.motion.easing,
+    ':hover': { backgroundColor: cg.surfaceRaised },
+    '@media (max-width: 639px)': { padding: cg.space[3], columnGap: cg.space[2] },
   },
   rank: {
     display: 'inline-flex',
@@ -52,10 +55,11 @@ const useStyles = makeStyles({
     width: '28px',
     height: '28px',
     borderRadius: cg.radius.pill,
-    backgroundColor: cg.tone.brand.solid,
-    color: cg.tone.brand.onSolid,
+    backgroundColor: cg.tone.brand.tint,
+    color: cg.tone.brand.fg,
     fontWeight: tokens.fontWeightSemibold,
-    fontSize: tokens.fontSizeBase300,
+    fontSize: tokens.fontSizeBase200,
+    fontVariantNumeric: 'tabular-nums',
   },
   body: { display: 'flex', flexDirection: 'column', gap: cg.space[2], minWidth: 0 },
   badges: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
@@ -64,6 +68,7 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase400,
     lineHeight: tokens.lineHeightBase400,
     fontWeight: tokens.fontWeightSemibold,
+    letterSpacing: '-0.01em',
     color: cg.text,
     overflowWrap: 'anywhere',
   },
@@ -81,13 +86,14 @@ const useStyles = makeStyles({
     alignItems: 'center',
     gap: cg.space[1],
     margin: 0,
-    fontSize: tokens.fontSizeBase300,
-    color: cg.textSecondary,
+    fontSize: tokens.fontSizeBase200,
+    color: cg.textMuted,
   },
-  source: { fontSize: tokens.fontSizeBase200, color: cg.textSecondary },
+  source: { fontSize: tokens.fontSizeBase200, color: cg.textMuted },
+  more: { alignSelf: 'flex-start' },
 });
 
-function ActionCard({
+function FixItem({
   index,
   action,
   titles,
@@ -97,9 +103,16 @@ function ActionCard({
   titles: ReadonlyMap<string, string>;
 }) {
   const styles = useStyles();
+  const toast = useToast();
   const headingId = useId();
+  const copy = async (): Promise<void> => {
+    const ok = await copyText(fixText(action));
+    if (ok) toast.success('Fix copied', { body: 'It is on your clipboard.' });
+    else
+      toast.error('The fix could not be copied', { body: 'Select the text and copy it instead.' });
+  };
   return (
-    <li className={styles.item}>
+    <div className={styles.item}>
       <span className={styles.rank} aria-hidden="true">
         {index + 1}
       </span>
@@ -131,14 +144,20 @@ function ActionCard({
           </p>
         ) : null}
         {action.hasEvidence ? (
-          <EvidenceChips links={action.links} subject={action.title} titles={titles} />
+          <EvidenceChips links={action.links} subject={action.title} titles={titles} max={2} />
         ) : (
           <p className={styles.general}>
-            <InfoRegular aria-hidden="true" /> {GENERAL_GUIDANCE}
+            <InfoIcon aria-hidden="true" size={14} /> {GENERAL_GUIDANCE}
           </p>
         )}
       </article>
-    </li>
+      <IconButton
+        icon={<CopyIcon />}
+        label={`Copy fix: ${action.title}`}
+        size="sm"
+        onClick={() => void copy()}
+      />
+    </div>
   );
 }
 
@@ -186,52 +205,24 @@ function Unread({ parts }: { parts: readonly UnreadPart[] }) {
 }
 
 /**
- * Next actions: the highest-value recommendations in one ranked list, from the quality improvements, the warnings still
- * open, the coach's recommended next action and the best-ranked diagnostic steps. Each has its reason, a priority, an owner
- * where the data says who, the expected gain where there is one, and its evidence as chips; a recommendation with no
- * evidence says so. A source the role may not read, or that failed, is named, and the rest of the list stands.
+ * Fix first: the highest-value recommendations in one ranked list, from the quality improvements, the warnings still
+ * open, the coach's recommended next action and the best-ranked diagnostic steps. The first three are shown with their
+ * reason, a priority, an owner where the data says who, the expected gain where there is one, their evidence as chips
+ * and a button that copies the fix; a recommendation with no evidence says so. A source the role may not read, or that
+ * failed, is named, and the rest of the list stands.
  */
 export function ActionsSection({ caseId }: { caseId: string }) {
   const styles = useStyles();
-  const quality = useQualityHandle(caseId);
-  const coaching = useCoachingHandle(caseId);
-  const warnings = useWarningsHandle(caseId);
-  const ranking = useRankingHandle(caseId);
-  const scenarios = useScenariosHandle(caseId);
+  const { model, handles, loading, warningsRead } = useNextActions(caseId);
   const run = useRunHandle(caseId);
   const [expanded, setExpanded] = useState(false);
   const listId = useId();
 
-  const qualityData = quality.source.kind === 'ready' ? quality.source.data : null;
-  const coachingData = coaching.source.kind === 'ready' ? coaching.source.data : null;
-  const warningData = warnings.source.kind === 'ready' ? warnings.source.data : null;
-  const rankingData = ranking.source.kind === 'ready' ? ranking.source.data : null;
-  const scenarioData = scenarios.source.kind === 'ready' ? scenarios.source.data : null;
-  const executors = useMemo(() => {
-    const map = new Map<string, ActionExecutor>();
-    for (const scenario of scenarioData ?? [])
-      for (const step of scenario.steps)
-        if (!map.has(step.actionKey)) map.set(step.actionKey, step.executor);
-    return map;
-  }, [scenarioData]);
-  const model = useMemo(
-    () =>
-      deriveNextActions({
-        quality: qualityData,
-        warnings: warningData,
-        coaching: coachingData,
-        ranking: rankingData,
-        executors,
-      }),
-    [qualityData, warningData, coachingData, rankingData, executors],
-  );
   const shown = expanded ? model.items : model.items.slice(0, FIRST_SHOWN);
   const titles = useLinkTitles(
     caseId,
     shown.flatMap((item) => item.links),
   );
-  const handles = [quality, coaching, warnings, ranking];
-  const loadingNow = handles.some((handle) => handle.source.kind === 'loading');
   const notes = methodNotes('actions', {
     run: run.source.kind === 'ready' ? run.source.data : null,
     quality: null,
@@ -243,55 +234,62 @@ export function ActionsSection({ caseId }: { caseId: string }) {
   return (
     <SectionFrame
       id="next-actions"
-      title="Next actions"
-      description="What to do next, most urgent first."
+      title="Fix first"
+      description="The changes that would help most, most urgent first."
       badges={<ProvenanceBadge kind="estimated" />}
       method={notes}
     >
       <div className={styles.stack}>
         <Unread
           parts={[
-            { handle: quality, what: 'the quality improvements' },
-            { handle: coaching, what: 'the coach’s suggestion' },
-            { handle: warnings, what: 'the warnings' },
-            { handle: ranking, what: 'the ranked diagnostic steps' },
+            { handle: handles.quality, what: 'the quality improvements' },
+            { handle: handles.coaching, what: 'the coach’s suggestion' },
+            { handle: handles.warnings, what: 'the warnings' },
+            { handle: handles.ranking, what: 'the ranked diagnostic steps' },
           ]}
         />
-        {loadingNow && model.items.length === 0 ? (
-          <p className={styles.meta} role="status">
-            Loading the recommendations…
-          </p>
+        {loading && model.items.length === 0 ? (
+          <LoadingSkeleton variant="card" count={3} label="Loading the fixes" />
         ) : model.items.length === 0 ? (
           <EmptyState
             compact
-            icon={<CheckmarkCircleRegular />}
-            title="Nothing to do next"
+            icon={<CircleCheckIcon />}
+            title="Nothing to fix"
             description="The analysis has no recommendation for this case. That is a good sign, not an error."
           />
         ) : (
           <>
-            <ol id={listId} className={styles.list} aria-label="Ranked recommendations">
-              {shown.map((action, index) => (
-                <ActionCard key={action.id} index={index} action={action} titles={titles} />
-              ))}
-            </ol>
+            <div id={listId}>
+              <AnimatedList
+                as="ol"
+                aria-label="Ranked recommendations"
+                className={styles.list}
+                items={shown}
+                getKey={(action) => action.id}
+                renderItem={(action, index) => (
+                  <FixItem index={index} action={action} titles={titles} />
+                )}
+              />
+            </div>
             {model.items.length > FIRST_SHOWN ? (
-              <div>
-                <Button
-                  appearance="outline"
-                  aria-expanded={expanded}
-                  aria-controls={listId}
-                  onClick={() => setExpanded((value) => !value)}
-                >
-                  {expanded
-                    ? `Show only the first ${FIRST_SHOWN}`
-                    : `Show ${plural(rest, 'more recommendation')}`}
-                </Button>
-              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={styles.more}
+                aria-expanded={expanded}
+                aria-controls={listId}
+                icon={<ChevronDownIcon />}
+                iconPosition="end"
+                onClick={() => setExpanded((value) => !value)}
+              >
+                {expanded
+                  ? `Show only the first ${FIRST_SHOWN}`
+                  : `Show ${plural(rest, 'more fix', 'more fixes')}`}
+              </Button>
             ) : null}
           </>
         )}
-        {warningData ? (
+        {warningsRead ? (
           <p className={styles.meta}>
             Warnings: {model.warnings.open} open, {model.warnings.resolved} resolved,{' '}
             {model.warnings.dismissed} dismissed.
@@ -301,9 +299,9 @@ export function ActionsSection({ caseId }: { caseId: string }) {
           </p>
         ) : null}
         {model.noDiagnosticNote ? <p className={styles.meta}>{model.noDiagnosticNote}</p> : null}
-        <Notice variant="info" compact title="About these recommendations">
-          They are about the case and the process, never about a person. Gains are estimates.
-        </Notice>
+        <p className={styles.meta}>
+          Fixes are about the case and the process, never about a person. Gains are estimates.
+        </p>
       </div>
     </SectionFrame>
   );

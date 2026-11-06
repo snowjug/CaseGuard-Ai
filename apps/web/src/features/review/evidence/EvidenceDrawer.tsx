@@ -1,9 +1,8 @@
 'use client';
 
 import type { EvidenceLink } from '@caseguard/schemas';
-import { CopyButton, LoadingSkeleton, Notice, StatusBadge, cg } from '@caseguard/ui';
+import { CopyButton, IconButton, LoadingSkeleton, Notice, StatusBadge, cg } from '@caseguard/ui';
 import {
-  Button,
   DrawerBody,
   DrawerHeader,
   DrawerHeaderTitle,
@@ -12,7 +11,7 @@ import {
   tokens,
   useId,
 } from '@fluentui/react-components';
-import { DismissRegular, HistoryRegular, OpenRegular } from '@fluentui/react-icons';
+import { ExternalLinkIcon, HistoryIcon, XIcon } from 'lucide-react';
 import { LinkButton } from '../../../components/common/LinkButton';
 import { QueryErrorState } from '../../../components/common/QueryErrorState';
 import { evidenceLinkHref } from '../../../lib/deep-links';
@@ -44,10 +43,9 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     gap: cg.space[2],
     minWidth: 0,
-    padding: cg.space[3],
-    borderRadius: cg.radius.md,
-    border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surface,
+    padding: cg.space[4],
+    borderRadius: cg.radius.lg,
+    backgroundColor: cg.surfaceSunken,
   },
   head: { display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: cg.space[2] },
   title: {
@@ -107,14 +105,14 @@ const useStyles = makeStyles({
 
 /** The page that owns each kind of link, by the name of its destination in the navigation. */
 const PAGE_FOR_LINK: Record<EvidenceLink['type'], string> = {
-  event: 'Case Timeline',
-  action: 'Case Timeline',
-  claim: 'Evidence Ledger',
-  evidence: 'Evidence Ledger',
-  requirement: 'Evidence Ledger',
-  hypothesis: 'Hypothesis Arena',
-  fork: 'Counterfactual Lab',
-  scenario: 'Counterfactual Lab',
+  event: 'Timeline',
+  action: 'Timeline',
+  claim: 'Evidence',
+  evidence: 'Evidence',
+  requirement: 'Evidence',
+  hypothesis: 'Possible causes',
+  fork: 'What if',
+  scenario: 'What if',
 };
 
 function Item({ caseId, view }: { caseId: string; view: ItemView }) {
@@ -170,7 +168,7 @@ function Item({ caseId, view }: { caseId: string; view: ItemView }) {
             href={evidenceLinkHref(caseId, { type: 'event', id: view.eventId })}
             appearance="outline"
             size="small"
-            icon={<HistoryRegular />}
+            icon={<HistoryIcon />}
           >
             Show in timeline
           </LinkButton>
@@ -179,7 +177,7 @@ function Item({ caseId, view }: { caseId: string; view: ItemView }) {
             href={evidenceLinkHref(caseId, view.link)}
             appearance="outline"
             size="small"
-            icon={<OpenRegular />}
+            icon={<ExternalLinkIcon />}
           >
             Open in {PAGE_FOR_LINK[view.link.type]}
           </LinkButton>
@@ -330,10 +328,10 @@ export function EvidenceDrawer({
       <DrawerHeader>
         <DrawerHeaderTitle
           action={
-            <Button
-              appearance="subtle"
-              aria-label="Close the evidence"
-              icon={<DismissRegular />}
+            <IconButton
+              label="Close the evidence"
+              tooltip={false}
+              icon={<XIcon />}
               onClick={onClose}
             />
           }

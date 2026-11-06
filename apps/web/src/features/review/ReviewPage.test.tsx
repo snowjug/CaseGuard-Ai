@@ -1,6 +1,6 @@
 import { configure, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { expectNoAxeViolations, renderApp } from '../../../test/harness';
 import { installMatchMedia } from '../../../test/media';
 import { CASE_ONE, CASE_TWO } from '../../../test/review-fixtures';
@@ -10,11 +10,24 @@ import { ReviewPage } from './ReviewPage';
 
 const SECTIONS = [
   'Verdict',
-  'Chronology',
+  'Fix first',
+  'Evidence',
+  'What would have changed the outcome',
+  'What happened',
   'What went wrong',
-  'What should have happened',
-  'Next actions',
-  'Learning',
+  'What to learn',
+  'Share',
+] as const;
+
+/** What the section navigation calls each section (the full title is the link's tooltip). */
+const NAV_LABELS = [
+  'Verdict',
+  'Fix first',
+  'Evidence',
+  'What if',
+  'What happened',
+  'What went wrong',
+  'What to learn',
   'Share',
 ] as const;
 
@@ -29,21 +42,29 @@ function renderReview(options: ReviewApiOptions = {}) {
 
 const region = (name: string) => screen.findByRole('region', { name });
 
+/** Opens a section that starts closed, the way a person does: with the button that is its heading. */
+async function openSection(name: string) {
+  const user = userEvent.setup();
+  const section = within(await region(name));
+  const toggle = section.getByRole('button', { name });
+  if (toggle.getAttribute('aria-expanded') === 'false') await user.click(toggle);
+  await waitFor(() => expect(toggle).toHaveAttribute('aria-expanded', 'true'));
+  return section;
+}
+
 describe('[REV-PAGE-01] one page of sections', () => {
-  it('shows the seven sections in the order a person decides, each a named region, and no axe violations', async () => {
+  it('shows the sections in the order a person decides, each a named region, and no axe violations', async () => {
     installMatchMedia();
     const { container } = renderReview();
-    expect(await screen.findByRole('heading', { level: 1, name: 'Guided review' })).toBeVisible();
-    expect(
-      await screen.findByText(`${CASE_ONE.detail.reference} · ${CASE_ONE.detail.title}`),
-    ).toBeVisible();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Review' })).toBeVisible();
+    expect(await screen.findByText('Demo data')).toBeVisible();
 
-    const nav = await screen.findByRole('navigation', { name: 'Sections of the guided review' });
+    const nav = await screen.findByRole('navigation', { name: 'Sections of the review' });
     expect(
       within(nav)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual([...SECTIONS]);
+    ).toEqual([...NAV_LABELS]);
     for (const name of SECTIONS) {
       expect(await region(name)).toBeVisible();
     }
@@ -54,9 +75,20 @@ describe('[REV-PAGE-01] one page of sections', () => {
 
     // The page says what kind of figures it shows.
     expect(screen.getAllByText('Estimated').length).toBeGreaterThan(0);
-    expect(screen.getByText('Demo data')).toBeVisible();
     await screen.findByText(/about 36 out of 100/);
     await expectNoAxeViolations(container);
+  });
+
+  it('keeps the detail on demand: what went wrong and what to learn start closed, the rest is open', async () => {
+    installMatchMedia();
+    renderReview();
+    for (const name of ['What went wrong', 'What to learn']) {
+      const toggle = within(await region(name)).getByRole('button', { name });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    }
+    for (const name of ['Verdict', 'Fix first', 'Evidence', 'What happened', 'Share']) {
+      expect(within(await region(name)).queryByRole('button', { name })).toBeNull();
+    }
   });
 
   it('has a "How this was calculated" disclosure in every section and one for the whole review', async () => {
@@ -64,19 +96,21 @@ describe('[REV-PAGE-01] one page of sections', () => {
     renderReview();
     for (const name of [
       'Verdict',
-      'Chronology',
-      'What went wrong',
-      'What should have happened',
-      'Next actions',
-      'Learning',
+      'What happened',
+      'What would have changed the outcome',
+      'Fix first',
     ]) {
       const section = within(await region(name));
+      expect(section.getByText('How this was calculated')).toBeVisible();
+    }
+    for (const name of ['What went wrong', 'What to learn']) {
+      const section = await openSection(name);
       expect(section.getByText('How this was calculated')).toBeVisible();
     }
     expect(screen.getByText('How this whole review was calculated')).toBeVisible();
   });
 
-  it('opens the report from the header and from the share section', async () => {
+  it('opens the report from the share section', async () => {
     installMatchMedia();
     renderReview();
     const share = within(await region('Share'));
@@ -84,10 +118,23 @@ describe('[REV-PAGE-01] one page of sections', () => {
       'href',
       `/cases/${CASE_ONE.detail.id}/report`,
     );
-    expect(screen.getByRole('link', { name: 'Report' })).toHaveAttribute(
-      'href',
-      `/cases/${CASE_ONE.detail.id}/report`,
+  });
+
+  it('has one primary action, the fix list, and copies it as plain text with the ranked fixes', async () => {
+    installMatchMedia();
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    renderReview();
+    await region('Fix first');
+    await user.click(await screen.findByRole('button', { name: 'Copy fix list' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const text = String(writeText.mock.calls[0]?.[0]);
+    expect(text.split('\n')[0]).toBe(
+      `CaseGuard fix list: ${CASE_ONE.detail.reference}, ${CASE_ONE.detail.title}`,
     );
+    expect(text).toContain('1. Write causes as hypotheses until evidence supports them (critical)');
+    expect(await screen.findByText('Fix list copied')).toBeVisible();
   });
 });
 
@@ -109,13 +156,31 @@ describe('[REV-PAGE-02] the verdict', () => {
     ).toBeVisible();
     expect(verdict.getAllByText('Poor').length).toBeGreaterThanOrEqual(2);
     expect(verdict.queryByText('Needs attention')).toBeNull();
-    expect(verdict.getAllByText('The earliest important missed moment')[0]).toBeVisible();
+    expect(
+      verdict.getByText('Many steps were not well supported by what was on record.'),
+    ).toBeVisible();
+    expect(verdict.getByText('Earliest missed moment')).toBeVisible();
     expect(
       verdict.getByText('Heavy customer request when a lighter ask was available'),
     ).toBeVisible();
     expect(verdict.getByText('What was done')).toBeVisible();
     expect(verdict.getByText('What was already known')).toBeVisible();
-    expect(verdict.getByText(/Avoidable support effort:/)).toBeVisible();
+    expect(verdict.getByText(/Time that could have been saved:/)).toBeVisible();
+  });
+
+  it('keeps the score’s detail one click away: the range, how certain it is and what the coach said', async () => {
+    installMatchMedia();
+    const user = userEvent.setup();
+    renderReview();
+    const verdict = within(await region('Verdict'));
+    const toggle = await verdict.findByRole('button', { name: 'About this score' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await user.click(toggle);
+    expect(await verdict.findByText('How certain is this?')).toBeVisible();
+    expect(verdict.getByText('In the coach’s words')).toBeVisible();
+    expect(
+      verdict.getByText(/The case is resolved, so this reviews the whole record/),
+    ).toBeVisible();
   });
 
   it('reads a strong case with no decision point as good news, not as missing data', async () => {
@@ -150,9 +215,9 @@ describe('[REV-PAGE-03] a part that cannot be read does not take the page with i
     expect(
       await verdict.findByText('Heavy customer request when a lighter ask was available'),
     ).toBeVisible();
-    const learning = within(await region('Learning'));
+    const learning = await openSection('What to learn');
     expect(await learning.findByText(/This resembles/)).toBeVisible();
-    const chronology = within(await region('Chronology'));
+    const chronology = within(await region('What happened'));
     expect(await chronology.findByRole('list', { name: /Key events and waits/ })).toBeVisible();
 
     const routes = calledRoutes(api);
@@ -187,7 +252,7 @@ describe('[REV-PAGE-03] a part that cannot be read does not take the page with i
     expect(
       await verdict.findByText('Heavy customer request when a lighter ask was available'),
     ).toBeVisible();
-    const actions = within(await region('Next actions'));
+    const actions = within(await region('Fix first'));
     expect(await actions.findByRole('list', { name: 'Ranked recommendations' })).toBeVisible();
 
     await user.click(verdict.getByRole('button', { name: /Retry/ }));
@@ -195,7 +260,7 @@ describe('[REV-PAGE-03] a part that cannot be read does not take the page with i
     expect(attempts).toBe(2);
   });
 
-  it('shows the not-analysed state instead of seven empty sections', async () => {
+  it('shows the not-analysed state instead of empty sections', async () => {
     installMatchMedia();
     renderReview({
       fixture: {
@@ -205,7 +270,8 @@ describe('[REV-PAGE-03] a part that cannot be read does not take the page with i
     });
     expect(await screen.findByText('This case has not been analysed yet')).toBeVisible();
     expect(screen.queryByRole('region', { name: 'Verdict' })).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Guided review' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Copy fix list' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Review' })).toBeVisible();
   });
 
   it('says the case was not found when it does not exist', async () => {
@@ -227,15 +293,23 @@ describe('[REV-PAGE-03] a part that cannot be read does not take the page with i
 });
 
 describe('[REV-PAGE-04] the section navigation', () => {
-  it('moves keyboard focus to the section it links to', async () => {
+  it('moves keyboard focus to the section it links to, and opens it when it starts closed', async () => {
     installMatchMedia();
     const user = userEvent.setup();
     renderReview();
-    await region('Learning');
-    const nav = screen.getByRole('navigation', { name: 'Sections of the guided review' });
-    await user.click(within(nav).getByRole('link', { name: 'Learning' }));
-    await waitFor(() => expect(screen.getByRole('region', { name: 'Learning' })).toHaveFocus());
-    expect(within(nav).getByRole('link', { name: 'Learning' })).toHaveAttribute(
+    await region('What to learn');
+    const nav = screen.getByRole('navigation', { name: 'Sections of the review' });
+    const toggle = within(screen.getByRole('region', { name: 'What to learn' })).getByRole(
+      'button',
+      { name: 'What to learn' },
+    );
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await user.click(within(nav).getByRole('link', { name: 'What to learn' }));
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'What to learn' })).toHaveFocus(),
+    );
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(within(nav).getByRole('link', { name: 'What to learn' })).toHaveAttribute(
       'aria-current',
       'location',
     );

@@ -1,8 +1,13 @@
-import { COUNTERFACTUAL_STRATEGIES, type Job, type SkillMatch } from '@caseguard/schemas';
+import {
+  COUNTERFACTUAL_STRATEGIES,
+  type Job,
+  type MetricEstimate,
+  type SkillMatch,
+} from '@caseguard/schemas';
 import { configure, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { job } from '../../../test/case-fixtures';
 import { expectNoAxeViolations, renderApp } from '../../../test/harness';
 import { installMatchMedia } from '../../../test/media';
@@ -13,6 +18,7 @@ import { EvidenceProvider } from './evidence/EvidenceProvider';
 import { ActionsSection } from './sections/ActionsSection';
 import { ChronologySection } from './sections/ChronologySection';
 import { DecisionsSection } from './sections/DecisionsSection';
+import { EvidenceSection } from './sections/EvidenceSection';
 import { LearningSection } from './sections/LearningSection';
 import { PathsSection } from './sections/PathsSection';
 
@@ -36,11 +42,25 @@ const MATCH = CASE_ONE.matches[0] as SkillMatch;
 const running = (kind: Job['kind'], id: string): Job =>
   job({ id, kind, caseId: CASE_ID, status: 'running' });
 
+/** Opens a section that starts closed, the way a person does: with the button that is its heading. */
+async function openSection(name: string): Promise<void> {
+  const user = userEvent.setup();
+  const toggle = await screen.findByRole('button', { name });
+  if (toggle.getAttribute('aria-expanded') === 'false') await user.click(toggle);
+  await waitFor(() => expect(toggle).toHaveAttribute('aria-expanded', 'true'));
+}
+
 describe('[REV-DEC-01] what went wrong', () => {
   it('explains the first decision points with what was known, not yet known, done and better, and the rest on request', async () => {
     installMatchMedia();
     const user = userEvent.setup();
     const { container } = renderSection(<DecisionsSection caseId={CASE_ID} />);
+    expect(await screen.findByRole('button', { name: 'What went wrong' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(screen.queryByRole('list', { name: 'Decision points' })).toBeNull();
+    await openSection('What went wrong');
     const list = await screen.findByRole('list', { name: 'Decision points' });
     expect(within(list).getAllByRole('article')).toHaveLength(3);
     const first = within(within(list).getAllByRole('article')[0] as HTMLElement);
@@ -77,6 +97,7 @@ describe('[REV-DEC-01] what went wrong', () => {
     installMatchMedia();
     const user = userEvent.setup();
     renderSection(<DecisionsSection caseId={CASE_ID} />);
+    await openSection('What went wrong');
     const list = await screen.findByRole('list', { name: 'Decision points' });
     const chip = (await within(list).findAllByRole('button', { name: /^Message or event:/ }))[0];
     expect(chip).toBeDefined();
@@ -92,6 +113,7 @@ describe('[REV-DEC-01] what went wrong', () => {
   it('says that a case with no decision point is in good shape', async () => {
     installMatchMedia();
     renderSection(<DecisionsSection caseId={CASE_TWO.detail.id} />, { fixture: CASE_TWO });
+    await openSection('What went wrong');
     expect(await screen.findByText('No decision point stood out')).toBeVisible();
   });
 });
@@ -143,7 +165,7 @@ describe('[REV-CHR-01] the chronology', () => {
   });
 });
 
-describe('[REV-PATH-03] what should have happened', () => {
+describe('[REV-PATH-03] what would have changed the outcome', () => {
   it('sets the recorded path beside the simulated one, labelled as a simulated estimate, with confidence and assumptions', async () => {
     installMatchMedia();
     const { container } = renderSection(<PathsSection caseId={CASE_ID} />);
@@ -165,7 +187,7 @@ describe('[REV-PATH-03] what should have happened', () => {
     expect(screen.getByText('Used only what was known then')).toBeVisible();
     expect(screen.getByText('Accepted')).toBeVisible();
     expect(screen.getByText('Assumptions (5)')).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Open in the Counterfactual Lab' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Open in What if' })).toHaveAttribute(
       'href',
       expect.stringContaining(`/cases/${CASE_ID}/counterfactual?sel=scn_`),
     );
@@ -223,14 +245,14 @@ describe('[REV-PATH-03] what should have happened', () => {
   });
 });
 
-describe('[REV-ACT-01] next actions', () => {
-  it('lists the most urgent recommendations first with their evidence, and the rest on request', async () => {
+describe('[REV-ACT-01] fix first', () => {
+  it('lists the three most urgent fixes first with their evidence, and the rest on request', async () => {
     installMatchMedia();
     const user = userEvent.setup();
     const { container } = renderSection(<ActionsSection caseId={CASE_ID} />);
     const list = await screen.findByRole('list', { name: 'Ranked recommendations' });
     const items = within(list).getAllByRole('article');
-    expect(items).toHaveLength(5);
+    expect(items).toHaveLength(3);
     expect(
       within(items[0] as HTMLElement).getByRole('heading', {
         level: 3,
@@ -245,9 +267,32 @@ describe('[REV-ACT-01] next actions', () => {
       }).length,
     ).toBeGreaterThan(0);
     expect(screen.getByText(/Warnings: 0 open, 14 resolved, 0 dismissed\./)).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Show 3 more recommendations' }));
+    await user.click(screen.getByRole('button', { name: 'Show 5 more fixes' }));
     expect(within(list).getAllByRole('article')).toHaveLength(8);
+    expect(screen.getByRole('button', { name: 'Show only the first 3' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
     await expectNoAxeViolations(container);
+  });
+
+  it('copies one fix as plain text, with its reason and its honesty label', async () => {
+    installMatchMedia();
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    renderSection(<ActionsSection caseId={CASE_ID} />);
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Copy fix: Write causes as hypotheses until evidence supports them',
+      }),
+    );
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const text = String(writeText.mock.calls[0]?.[0]);
+    expect(text.split('\n')[0]).toBe('Write causes as hypotheses until evidence supports them');
+    expect(text).toContain('Why: ');
+    expect(text).toContain('Expected gain: About +8 points of case quality (estimate)');
+    expect(await screen.findByText('Fix copied')).toBeVisible();
   });
 
   it('goes from a recommendation to the checked source passage in two interactions', async () => {
@@ -299,10 +344,67 @@ describe('[REV-ACT-01] next actions', () => {
   });
 });
 
-describe('[REV-LRN-01] learning', () => {
+describe('[REV-EVID-01] evidence', () => {
+  const withEvidence = () => ({
+    items: [
+      ...CASE_ONE.metrics,
+      {
+        ...(CASE_ONE.metrics[0] as MetricEstimate),
+        key: 'evidence_integrity' as const,
+        label: 'Evidence Integrity',
+        value: 23.2,
+        display: '23 / 100',
+        low: 18,
+        high: 29,
+        status: 'poor' as const,
+      },
+    ],
+  });
+
+  it('shows how well the case is backed by evidence, with its range, and the way into the evidence', async () => {
+    installMatchMedia();
+    const { container } = renderSection(<EvidenceSection caseId={CASE_ID} />, {
+      handlers: { 'metrics.get': withEvidence },
+    });
+    expect(await screen.findByText('Poor')).toBeVisible();
+    expect(screen.getByText('out of 100')).toBeVisible();
+    expect(
+      screen.getByRole('img', {
+        name: 'Evidence integrity: estimate 23, range 18 to 29, scale 0 to 100',
+      }),
+    ).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Open evidence' })).toHaveAttribute(
+      'href',
+      `/cases/${CASE_ID}/evidence`,
+    );
+    await expectNoAxeViolations(container);
+  });
+
+  it('still points to the evidence when the case has no figure for it', async () => {
+    installMatchMedia();
+    renderSection(<EvidenceSection caseId={CASE_ID} />);
+    expect(await screen.findByText(/has no figure for this case yet/)).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Open evidence' })).toHaveAttribute(
+      'href',
+      `/cases/${CASE_ID}/evidence`,
+    );
+  });
+
+  it('keeps the evidence out of reach of a role that may not read it, and says why', async () => {
+    installMatchMedia();
+    const { api } = renderSection(<EvidenceSection caseId={CASE_ID} />, {
+      role: 'skill_curator',
+    });
+    expect(await screen.findByText('Not shown')).toBeVisible();
+    expect(calledRoutes(api)).not.toContain('metrics.get');
+  });
+});
+
+describe('[REV-LRN-01] what to learn', () => {
   it('shows the skill match with the server’s recorded and with-skill figures exactly as given', async () => {
     installMatchMedia();
     const { container } = renderSection(<LearningSection caseId={CASE_ID} />);
+    await openSection('What to learn');
     expect(
       await screen.findByRole('heading', {
         level: 3,
@@ -338,6 +440,7 @@ describe('[REV-LRN-01] learning', () => {
         }),
       },
     });
+    await openSection('What to learn');
     await user.click(await screen.findByRole('button', { name: /^Adopt this plan:/ }));
     const dialog = await screen.findByRole('alertdialog', {
       name: 'Adopt this plan for the case?',
@@ -355,6 +458,7 @@ describe('[REV-LRN-01] learning', () => {
   it('shows an applied plan as applied, with how closely it was followed, and offers nothing to adopt', async () => {
     installMatchMedia();
     renderSection(<LearningSection caseId={CASE_TWO.detail.id} />, { fixture: CASE_TWO });
+    await openSection('What to learn');
     expect(await screen.findByText(/This resembles/)).toBeVisible();
     expect(screen.getByText(/Plan adopted/)).toBeVisible();
     expect(screen.getByText(/4 of 4 steps followed/)).toBeVisible();
@@ -366,6 +470,7 @@ describe('[REV-LRN-01] learning', () => {
     const { container } = renderSection(<LearningSection caseId={CASE_TWO.detail.id} />, {
       fixture: CASE_TWO,
     });
+    await openSection('What to learn');
     const table = await screen.findByRole('table', {
       name: /^What the skill saved on the case it came from/,
     });
@@ -393,6 +498,7 @@ describe('[REV-LRN-01] learning', () => {
         'jobs.get': () => running('skill_extraction', 'job_extract'),
       },
     });
+    await openSection('What to learn');
     expect(
       await screen.findByRole('heading', {
         level: 3,
@@ -412,6 +518,7 @@ describe('[REV-LRN-01] learning', () => {
   it('keeps a manager from adopting or extracting, and says why', async () => {
     installMatchMedia();
     renderSection(<LearningSection caseId={CASE_ID} />, { role: 'manager' });
+    await openSection('What to learn');
     const adopt = await screen.findByRole('button', { name: /^Adopt this plan:/ });
     expect(adopt).toHaveAttribute('aria-disabled', 'true');
     expect(

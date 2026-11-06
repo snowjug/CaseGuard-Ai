@@ -6,6 +6,7 @@ import {
   type DecisionFork,
 } from '@caseguard/schemas';
 import {
+  Button,
   ConfirmDialog,
   EmptyState,
   Notice,
@@ -17,8 +18,8 @@ import {
   formatDateTimeUtc,
   useRestoreFocusTarget,
 } from '@caseguard/ui';
-import { Button, makeStyles, tokens } from '@fluentui/react-components';
-import { BeakerRegular, CheckmarkCircleRegular } from '@fluentui/react-icons';
+import { makeStyles, tokens } from '@fluentui/react-components';
+import { CircleCheckIcon, FlaskConicalIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { JobProgress } from '../../../components/common/JobProgress';
 import { LinkButton } from '../../../components/common/LinkButton';
@@ -277,16 +278,16 @@ function PathView({
           {path.others
             .map((other) => `${other.label} (${other.reviewLabel.toLowerCase()})`)
             .join(', ')}
-          . Compare them in the Counterfactual Lab.
+          . Compare them in What if.
         </p>
       ) : null}
       <div className={styles.actions}>
         <LinkButton
           href={`${caseHref(caseId, 'counterfactual')}?sel=${encodeURIComponent(path.scenarioId)}`}
           appearance="outline"
-          icon={<BeakerRegular />}
+          icon={<FlaskConicalIcon />}
         >
-          Open in the Counterfactual Lab
+          Open in What if
         </LinkButton>
       </div>
     </div>
@@ -318,14 +319,14 @@ function Simulate({
     <div className={styles.stack}>
       <EmptyState
         compact
-        icon={<BeakerRegular />}
+        icon={<FlaskConicalIcon />}
         title="No better-supported path has been simulated yet"
         description={`Nobody has simulated what a better-supported path would have looked like at decision point ${decision.number}: ${decision.title}. A simulation replays that moment using only what was known then, and is always an estimate.`}
         action={
           <GatedAction permission="counterfactual:run">
             <Button
-              appearance="primary"
-              icon={<BeakerRegular />}
+              variant="secondary"
+              icon={<FlaskConicalIcon />}
               disabled={!eligible || jobId !== null}
               onClick={() => setOpen(true)}
               {...restoreFocus}
@@ -433,8 +434,8 @@ export function PathsSection({ caseId }: { caseId: string }) {
   return (
     <SectionFrame
       id="should-have"
-      title="What should have happened"
-      description="The recorded path beside a better-supported path, as a simulated estimate."
+      title="What would have changed the outcome"
+      description="The recorded path beside a better-supported one. A simulated estimate, using only what was known at the time."
       badges={
         <>
           <ProvenanceBadge kind="simulated" />
@@ -448,7 +449,7 @@ export function PathsSection({ caseId }: { caseId: string }) {
       ) : !view ? null : view.kind === 'no-decision-points' ? (
         <EmptyState
           compact
-          icon={<CheckmarkCircleRegular />}
+          icon={<CircleCheckIcon />}
           title="Nothing to compare"
           description="No decision point stood out, so there was no better-supported path to simulate. That is a good sign for this case, not an error."
         />

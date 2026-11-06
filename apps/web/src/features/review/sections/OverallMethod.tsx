@@ -8,11 +8,12 @@ import { MethodDisclosure } from './shared';
 
 const useStyles = makeStyles({
   frame: {
-    padding: cg.space[4],
+    padding: `${cg.space[3]} ${cg.space[6]}`,
     borderRadius: cg.radius.lg,
-    border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surface,
+    border: `1px solid ${cg.glassBorder}`,
+    backgroundColor: cg.glass,
     minWidth: 0,
+    '@media (max-width: 639px)': { paddingInline: cg.space[4] },
   },
   plain: { borderTopStyle: 'none', paddingTop: 0 },
 });

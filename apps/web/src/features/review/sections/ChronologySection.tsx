@@ -10,7 +10,7 @@ import {
   useMediaQuery,
 } from '@caseguard/ui';
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
-import { HistoryRegular, HourglassRegular } from '@fluentui/react-icons';
+import { HistoryIcon, HourglassIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { LinkButton } from '../../../components/common/LinkButton';
 import { caseHref, evidenceLinkHref } from '../../../lib/deep-links';
@@ -190,8 +190,8 @@ export function ChronologySection({ caseId }: { caseId: string }) {
   return (
     <SectionFrame
       id="chronology"
-      title="Chronology"
-      description="What happened, who was waiting for whom, and where the decisions were taken."
+      title="What happened"
+      description="Who was waiting for whom, and where the decisions were taken."
       method={notes}
     >
       {timeline.source.kind !== 'ready' ? (
@@ -199,7 +199,7 @@ export function ChronologySection({ caseId }: { caseId: string }) {
       ) : !chronology || chronology.total === 0 ? (
         <EmptyState
           compact
-          icon={<HistoryRegular />}
+          icon={<HistoryIcon />}
           title="No events were recorded"
           description="There is nothing to draw for this case."
         />
@@ -249,7 +249,7 @@ export function ChronologySection({ caseId }: { caseId: string }) {
                 >
                   <p className={styles.time}>{formatDateTimeUtc(row.wait.fromAt)}</p>
                   <p className={styles.wait}>
-                    <HourglassRegular aria-hidden="true" />
+                    <HourglassIcon aria-hidden="true" size={14} />
                     <span>
                       <strong>{row.wait.text}</strong> After “{row.wait.fromTitle}”, before “
                       {row.wait.toTitle}”.
@@ -263,7 +263,7 @@ export function ChronologySection({ caseId }: { caseId: string }) {
             <LinkButton
               href={caseHref(caseId, 'timeline')}
               appearance="outline"
-              icon={<HistoryRegular />}
+              icon={<HistoryIcon />}
             >
               Open the full timeline
             </LinkButton>
