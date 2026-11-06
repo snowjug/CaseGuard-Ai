@@ -15,7 +15,12 @@ const useStyles = makeStyles({
     whiteSpace: 'pre-wrap',
   },
   clamped: { display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' },
-  toggle: { alignSelf: 'flex-start', minHeight: '24px', paddingInline: cg.space[1] },
+  toggle: {
+    alignSelf: 'flex-start',
+    minHeight: '24px',
+    paddingInline: cg.space[1],
+    '@media (pointer: coarse)': { minHeight: '44px', minWidth: '44px' },
+  },
 });
 
 export interface ExpandableTextProps {

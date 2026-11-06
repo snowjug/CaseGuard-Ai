@@ -148,7 +148,7 @@ describe('[UX-SHELL-02] top bar controls', () => {
   it('opens the command palette from the search button and with Ctrl+K', async () => {
     const user = userEvent.setup();
     mount();
-    await user.click(screen.getByRole('button', { name: 'Search or jump to' }));
+    await user.click(screen.getByRole('button', { name: /^Search or jump to/ }));
     expect(await screen.findByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
     await user.keyboard('{Escape}');
     await waitFor(() =>

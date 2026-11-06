@@ -31,6 +31,12 @@ const useStyles = makeStyles({
     textDecorationLine: 'none',
     fontWeight: tokens.fontWeightMedium,
     ':hover': { color: cg.text, textDecorationLine: 'underline' },
+    '@media (pointer: coarse)': {
+      display: 'inline-flex',
+      alignItems: 'center',
+      minHeight: '44px',
+      minWidth: '44px',
+    },
   },
   current: { color: cg.text, fontWeight: tokens.fontWeightMedium, overflowWrap: 'anywhere' },
   sep: { display: 'inline-flex', color: cg.textMuted },

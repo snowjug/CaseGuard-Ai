@@ -44,7 +44,17 @@ const useStyles = makeStyles({
     paddingInline: cg.space[8],
     [phone]: { paddingInline: cg.space[4] },
   },
-  brand: { display: 'none', textDecorationLine: 'none', [phone]: { display: 'inline-flex' } },
+  brand: {
+    display: 'none',
+    textDecorationLine: 'none',
+    [phone]: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: '44px',
+      minHeight: '44px',
+    },
+  },
   search: {
     display: 'flex',
     alignItems: 'center',
@@ -107,8 +117,7 @@ export function TopBar() {
         <button
           type="button"
           className={styles.search}
-          aria-label="Search or jump to"
-          title="Search or jump to (Ctrl K)"
+          aria-keyshortcuts="Control+K Meta+K"
           onClick={() => setPaletteOpen(true)}
         >
           <SearchIcon aria-hidden="true" />

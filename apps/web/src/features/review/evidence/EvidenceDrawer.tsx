@@ -90,7 +90,12 @@ const useStyles = makeStyles({
   },
   actions: { display: 'flex', flexWrap: 'wrap', gap: cg.space[2] },
   details: { fontSize: tokens.fontSizeBase200, color: cg.textSecondary },
-  summary: { cursor: 'pointer', color: cg.textLink, minHeight: '24px' },
+  summary: {
+    cursor: 'pointer',
+    color: cg.textLink,
+    minHeight: '24px',
+    '@media (pointer: coarse)': { minHeight: '44px', paddingBlock: cg.space[3] },
+  },
   facts: {
     display: 'grid',
     gridTemplateColumns: 'max-content minmax(0, 1fr)',

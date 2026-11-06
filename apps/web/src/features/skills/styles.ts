@@ -112,6 +112,7 @@ export const useSkillStyles = makeStyles({
     maxWidth: '100%',
     overflowWrap: 'anywhere',
     whiteSpace: 'normal',
+    '@media (pointer: coarse)': { minHeight: '44px' },
     ':hover': { textDecorationLine: 'underline' },
     ':focus-visible': { outline: `2px solid ${cg.focus}`, outlineOffset: '2px' },
   },

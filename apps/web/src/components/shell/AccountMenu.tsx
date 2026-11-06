@@ -29,7 +29,13 @@ const useStyles = makeStyles({
     paddingInline: cg.space[2],
     textAlign: 'start',
   },
-  triggerCompact: { width: 'auto', minHeight: '40px', paddingInline: cg.space[1] },
+  triggerCompact: {
+    width: 'auto',
+    minWidth: '44px',
+    minHeight: '40px',
+    paddingInline: cg.space[1],
+    justifyContent: 'center',
+  },
   persona: { display: 'inline-flex', alignItems: 'center', gap: cg.space[2], minWidth: 0 },
   initials: {
     display: 'inline-flex',

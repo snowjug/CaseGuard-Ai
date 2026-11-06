@@ -143,7 +143,11 @@ svg.lucide {
   top: 8px;
   left: 8px;
   z-index: 1000;
-  padding: 8px 16px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0 16px;
   border-radius: var(--cg-radius-md);
   background: var(--cgToneBrandSolid, #5b46d6);
   color: var(--cgToneBrandOnSolid, #ffffff);
@@ -154,6 +158,13 @@ svg.lucide {
 
 .cg-skip-link:focus {
   transform: translateY(0);
+}
+
+/* Touch targets: a switch is at least 44 px tall on a touch screen (its hit area is its whole box). */
+@media (pointer: coarse) {
+  .fui-Switch {
+    min-height: 44px;
+  }
 }
 
 /*

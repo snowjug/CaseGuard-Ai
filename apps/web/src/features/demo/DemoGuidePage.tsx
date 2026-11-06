@@ -109,7 +109,12 @@ const useStyles = makeStyles({
     lineHeight: tokens.lineHeightBase300,
     color: cg.textSecondary,
   },
-  link: { color: cg.textLink },
+  link: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    color: cg.textLink,
+    '@media (pointer: coarse)': { minHeight: '44px' },
+  },
 });
 
 const PAGE_HELP = (

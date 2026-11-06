@@ -53,6 +53,7 @@ const useStyles = makeStyles({
   disabled: { opacity: 0.55, cursor: 'not-allowed' },
   native: {
     flex: '1 1 auto',
+    alignSelf: 'stretch',
     minWidth: 0,
     padding: 0,
     border: 0,

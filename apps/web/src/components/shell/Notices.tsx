@@ -27,6 +27,11 @@ const useStyles = makeStyles({
     borderRadius: cg.radius.pill,
     backgroundColor: 'transparent',
     cursor: 'pointer',
+    '@media (pointer: coarse)': {
+      minHeight: '44px',
+      minWidth: '44px',
+      justifyContent: 'center',
+    },
     ':focus-visible': { outline: `2px solid ${cg.focus}`, outlineOffset: '2px' },
   },
   surface: {

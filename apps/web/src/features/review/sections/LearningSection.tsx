@@ -150,14 +150,18 @@ const useStyles = makeStyles({
     color: cg.textLink,
     fontWeight: tokens.fontWeightSemibold,
     minHeight: '24px',
+    '@media (pointer: coarse)': { minHeight: '44px', paddingBlock: cg.space[3] },
   },
   actions: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
   link: {
+    display: 'inline-flex',
+    alignItems: 'center',
     color: cg.textLink,
     textDecorationLine: 'underline',
     textUnderlineOffset: '2px',
     fontSize: tokens.fontSizeBase300,
     minHeight: '24px',
+    '@media (pointer: coarse)': { minHeight: '44px' },
   },
 });
 

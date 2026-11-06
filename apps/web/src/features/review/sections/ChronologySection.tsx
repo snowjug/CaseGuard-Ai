@@ -94,12 +94,15 @@ const useStyles = makeStyles({
   meta: { margin: 0, fontSize: tokens.fontSizeBase200, color: cg.textMuted },
   badges: { display: 'flex', flexWrap: 'wrap', gap: cg.space[1] },
   link: {
+    display: 'inline-flex',
+    alignItems: 'center',
     fontSize: tokens.fontSizeBase200,
     color: cg.textLink,
     textDecorationLine: 'underline',
     textUnderlineOffset: '2px',
     alignSelf: 'flex-start',
     minHeight: '24px',
+    '@media (pointer: coarse)': { minHeight: '44px' },
   },
   wait: {
     display: 'flex',
