@@ -27,6 +27,18 @@ const SECTIONS = [
 
 const panelOf = (page: Page, label: string): Locator => page.getByRole('tabpanel', { name: label });
 
+/**
+ * Opens a collapsed group of a section (an accordion) from its heading button and returns its content region. A closed
+ * group keeps its content mounted but clipped, so Playwright would call it visible: what proves it is open is
+ * `aria-expanded`.
+ */
+async function openGroup(scope: Locator, name: RegExp): Promise<Locator> {
+  const trigger = scope.getByRole('heading', { name }).getByRole('button');
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  return scope.getByRole('region', { name });
+}
+
 /** A retention write straight to the API, the way a second administrator's browser would make it. */
 async function writeRetention(
   api: Api,
@@ -42,15 +54,15 @@ async function writeRetention(
   return orFail(response, 'PUT /governance/settings/retention').retention;
 }
 
-test.describe('[FR-GOV-01] Governance: eleven sections in the URL, each saying whether anything enforces it', () => {
+test.describe('[FR-GOV-01] Settings and audit: eleven sections in the URL, each saying whether anything enforces it', () => {
   test.use({ persona: 'admin' });
 
   test('the sections are a vertical tab list; each opens its own panel and writes itself to the URL', async ({
     page,
   }) => {
     await openPage(page, '/governance');
-    await expect(page.getByRole('heading', { level: 1, name: 'Governance' })).toBeVisible();
-    const sections = page.getByRole('tablist', { name: 'Governance sections' });
+    await expect(page.getByRole('heading', { level: 1, name: 'Settings and audit' })).toBeVisible();
+    const sections = page.getByRole('tablist', { name: 'Settings and audit sections' });
     await expect(sections.getByRole('tab')).toHaveCount(SECTIONS.length);
     await expect(sections.getByRole('tab', { name: 'Model' })).toHaveAttribute(
       'aria-selected',
@@ -74,7 +86,7 @@ test.describe('[FR-GOV-01] Governance: eleven sections in the URL, each saying w
     page,
   }) => {
     await openPage(page, '/governance?tab=redaction');
-    const sections = page.getByRole('tablist', { name: 'Governance sections' });
+    const sections = page.getByRole('tablist', { name: 'Settings and audit sections' });
     await expect(sections.getByRole('tab', { name: 'Redaction' })).toHaveAttribute(
       'aria-selected',
       'true',
@@ -101,17 +113,21 @@ test.describe('[FR-GOV-01] Governance: eleven sections in the URL, each saying w
   test('every configuration section says plainly whether anything enforces it or it is recorded only', async ({
     page,
   }) => {
-    const expectations: readonly (readonly [string, string, RegExp])[] = [
-      ['model', 'Model', /Enforced/],
-      ['scoring', 'Scoring', /Enforced/],
-      ['retention', 'Retention', /Recorded only/],
-      ['redaction', 'Redaction', /Enforced/],
-      ['flags', 'Feature flags', /Recorded only/],
-      ['export', 'Export', /Enforced/],
+    // The statement is a badge at the top of the section ("Enforced" or "Recorded only"), followed by one plain sentence.
+    const expectations: readonly (readonly [string, string, string])[] = [
+      ['model', 'Model', 'Enforced'],
+      ['scoring', 'Scoring', 'Enforced'],
+      ['retention', 'Retention', 'Recorded only'],
+      ['redaction', 'Redaction', 'Enforced'],
+      ['flags', 'Feature flags', 'Recorded only'],
+      ['export', 'Export', 'Enforced'],
     ];
     for (const [id, label, effect] of expectations) {
       await openPage(page, `/governance?tab=${id}`);
-      await expect(panelOf(page, label).getByRole('note').first(), label).toContainText(effect);
+      await expect(
+        panelOf(page, label).getByText(effect, { exact: true }).first(),
+        label,
+      ).toBeVisible();
     }
     await openPage(page, '/governance?tab=retention');
     await expect(panelOf(page, 'Retention')).toContainText(
@@ -130,24 +146,24 @@ test.describe('[FR-GOV-01] Governance: eleven sections in the URL, each saying w
     const listed = await api('admin').getOk<{ items: unknown[] }>('/governance/prompts');
     await openPage(page, '/governance?tab=prompts');
     const panel = panelOf(page, 'Prompts');
-    await expect(panel.getByRole('note').first()).toContainText(
-      'Prompt versions are defined in the application',
-    );
-    const prompts = panel.getByRole('list', { name: 'Prompt versions' });
-    expect(listed.items.length).toBeGreaterThanOrEqual(9);
-    await expect(prompts.getByRole('heading', { level: 2, name: /prompt$/ })).toHaveCount(
-      listed.items.length,
-    );
     await expect(
-      prompts.getByRole('button', { name: /^Copy the full hash of the Timeline Analyzer prompt/ }),
+      panel.getByText('Prompt versions are defined in the application').first(),
     ).toBeVisible();
-    await prompts
+    // Every prompt is a section of its own (its heading is a button that opens it); the first one is open.
+    const prompts = panel.getByRole('heading', { level: 3, name: / prompt /i });
+    expect(listed.items.length).toBeGreaterThanOrEqual(9);
+    await expect(prompts).toHaveCount(listed.items.length);
+    await expect(
+      panel.getByRole('heading', { name: /^Timeline Analyzer prompt/ }).getByRole('button'),
+    ).toHaveAttribute('aria-expanded', 'true');
+    await expect(
+      panel.getByRole('button', { name: /^Copy the full hash of the Timeline Analyzer prompt/ }),
+    ).toBeVisible();
+    await panel
       .getByRole('button', { name: /^Show all [\d,]+ characters/ })
       .first()
       .click();
-    await expect(
-      prompts.getByRole('button', { name: /^Show less|^Collapse/ }).first(),
-    ).toBeVisible();
+    await expect(panel.getByRole('button', { name: /^Show less|^Collapse/ }).first()).toBeVisible();
   });
 
   test("redaction: credentials are always on and cannot be switched off; the personal-data choices are the administrator's", async ({
@@ -155,20 +171,20 @@ test.describe('[FR-GOV-01] Governance: eleven sections in the URL, each saying w
   }) => {
     await openPage(page, '/governance?tab=redaction');
     const panel = panelOf(page, 'Redaction');
-    const credentials = panel.getByRole('group', { name: 'Credentials (always redacted)' });
+    const credentials = await openGroup(panel, /^Credentials \(always redacted\)/);
     const switches = credentials.getByRole('switch');
     await expect(switches).toHaveCount(8);
     for (const toggle of await switches.all()) {
       await expect(toggle).toBeChecked();
       await expect(toggle).toBeDisabled();
     }
-    const personal = panel.getByRole('group', { name: 'Personal data (your choice)' });
+    const personal = await openGroup(panel, /^Personal data \(your choice\)/);
     for (const name of ['Email addresses', 'IPv4 addresses', 'Phone numbers']) {
       await expect(personal.getByRole('switch', { name }), name).toBeEnabled();
     }
-    await expect(
-      panel.getByRole('group', { name: 'Custom patterns' }).getByRole('note'),
-    ).toContainText('Custom patterns can be refused');
+    await expect(await openGroup(panel, /^Custom patterns/)).toContainText(
+      'Custom patterns can be refused',
+    );
     await expect(panel.getByRole('button', { name: 'Save changes' })).toBeDisabled();
   });
 
@@ -234,20 +250,21 @@ test.describe('[FR-GOV-01] Governance: eleven sections in the URL, each saying w
     const provider = page.getByRole('group', { name: 'AI provider' });
     await expect(provider).toContainText('Deterministic provider');
     await expect(provider).toContainText('Simulated');
-    await expect(provider.getByRole('note')).toContainText('Validation note');
-    await expect(provider.getByRole('note')).toContainText('fully offline, reproducible');
+    const note = provider.locator('p').filter({ hasText: 'Validation note' });
+    await expect(note).toBeVisible();
+    await expect(note).toContainText('fully offline, reproducible');
     await expect(provider.getByRole('term').filter({ hasText: 'Max input tokens' })).toBeVisible();
     await provider.getByRole('button', { name: 'Check again' }).click();
     await settle(page);
 
-    const reset = page.getByRole('group', { name: 'Synthetic-data reset' });
+    const reset = page.getByRole('group', { name: 'Demo data reset' });
     await reset.getByRole('button', { name: 'Reset demo data' }).click();
     await expect(
       confirmDialog(page).getByRole('heading', { name: 'Reset the demo data?' }),
     ).toBeVisible();
     await confirmDialog(page).getByRole('button', { name: 'Cancel' }).click();
     await expect(confirmDialog(page)).toBeHidden();
-    await expect(reset.getByRole('link', { name: 'Open the Demo Guide' })).toHaveAttribute(
+    await expect(reset.getByRole('link', { name: 'Open the Guided demo' })).toHaveAttribute(
       'href',
       '/demo',
     );
@@ -391,7 +408,7 @@ test.describe('[FR-GOV-03] the audit log, its hash chain and the export of it', 
   test.use({ persona: 'admin' });
   test.setTimeout(240_000);
 
-  test('the hash chain verifies, and the newest events are listed first with their hashes and correlation ids', async ({
+  test('the audit log check verifies the chain, and the newest events are listed first with their hashes and references', async ({
     page,
     api,
   }) => {
@@ -399,7 +416,8 @@ test.describe('[FR-GOV-03] the audit log, its hash chain and the export of it', 
       query: { limit: 1 },
     });
     await openPage(page, '/governance?tab=audit');
-    const verification = page.getByRole('group', { name: 'Hash-chain verification' });
+    // The check sits in the summary at the top of the page, so it is there on every section.
+    const verification = page.getByRole('group', { name: 'Audit log check' });
     await expect(verification.getByRole('status')).toContainText('Chain intact');
     await expect(verification.getByRole('status')).toContainText(
       /Verified \d+ audit events; the hash chain is intact/,
@@ -418,7 +436,7 @@ test.describe('[FR-GOV-03] the audit log, its hash chain and the export of it', 
     await expect(first).toContainText(/Success|Failure/);
     await expect(first.getByRole('button', { name: /^Copy the hash of event \d+/ })).toBeVisible();
     await expect(
-      first.getByRole('button', { name: /^Copy the correlation id of event \d+/ }),
+      first.getByRole('button', { name: /^Copy the reference of event \d+/ }),
     ).toBeVisible();
     const sequences = await events
       .getByRole('article')
@@ -521,11 +539,11 @@ test.describe('[FR-GOV-03] the audit log, its hash chain and the export of it', 
       'href',
       /^\/cases\/case_[^/]+\/counterfactual\?sel=scn_/,
     );
-    await expect(panel.getByRole('note').first()).toContainText('Skill approvals');
+    await expect(panel.getByText('Skill approvals')).toBeVisible();
   });
 });
 
-test.describe('[FR-GOV-04] Governance is for administrators, and reviewers read the audit log', () => {
+test.describe('[FR-GOV-04] Settings and audit is for administrators, and reviewers read the audit log', () => {
   test.describe('as an engineer', () => {
     test.use({ persona: 'engineer' });
     test('the page says which permission is missing and who has it, and loads no configuration', async ({
@@ -539,7 +557,10 @@ test.describe('[FR-GOV-04] Governance is for administrators, and reviewers read 
       });
       await openPage(page, '/governance');
       await expect(
-        page.getByRole('heading', { level: 2, name: 'You do not have access to Governance' }),
+        page.getByRole('heading', {
+          level: 2,
+          name: 'You do not have access to Settings and audit',
+        }),
       ).toBeVisible();
       await expect(
         page.getByText('Administrators, and reviewers for the audit log can open it.'),
@@ -554,12 +575,12 @@ test.describe('[FR-GOV-04] Governance is for administrators, and reviewers read 
       page,
     }) => {
       await openPage(page, '/governance');
-      const sections = page.getByRole('tablist', { name: 'Governance sections' });
+      const sections = page.getByRole('tablist', { name: 'Settings and audit sections' });
       await expect(sections.getByRole('tab', { name: 'Audit log' })).toHaveAttribute(
         'aria-selected',
         'true',
       );
-      await expect(page.getByRole('group', { name: 'Hash-chain verification' })).toBeVisible();
+      await expect(page.getByRole('group', { name: 'Audit log check' })).toBeVisible();
       await sections.getByRole('tab', { name: 'Model' }).click();
       await expect(
         page.getByRole('heading', { level: 2, name: 'You do not have access to Model' }),
