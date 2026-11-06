@@ -505,7 +505,10 @@ describe('[FR-CASES-03] deleting a case (administrator)', () => {
       ),
     );
     await waitFor(() => expect(screen.queryByRole('link', { name: 'CG-SYN-1001' })).toBeNull());
-    expect(screen.getByRole('link', { name: 'CG-SYN-1002' })).toBeInTheDocument();
+    // While the dialog is open the page behind it is hidden from the accessibility tree, so the check above can pass
+    // before the list is back: wait for the remaining case, then check again that the deleted one is gone.
+    expect(await screen.findByRole('link', { name: 'CG-SYN-1002' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'CG-SYN-1001' })).toBeNull();
   });
 
   it('explains the refusal while a job still runs (reason job_active) inside the dialog and keeps the case', async () => {
