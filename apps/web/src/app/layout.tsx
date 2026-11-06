@@ -9,7 +9,7 @@ import { Providers } from './providers';
 export const metadata: Metadata = {
   title: { default: 'CaseGuard AI', template: '%s · CaseGuard AI' },
   description:
-    'Evidence-first analysis of support investigations: what was known, what was tried, and what could have been faster. Synthetic demo data.',
+    'Review support cases in minutes: see how a case went, what to fix first, and what would have changed the outcome. Demo data only.',
   applicationName: 'CaseGuard AI',
   robots: { index: false, follow: false },
 };

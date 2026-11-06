@@ -36,13 +36,15 @@ function mount(mode: 'light' | 'dark' = 'light') {
   );
 }
 
-const searchBox = () => screen.getByRole('combobox', { name: /Search cases/ });
+const paletteDialog = () => screen.queryByRole('dialog', { name: 'Command palette' });
 
 // Only the palette's own options. The header's native case <select> has <option>s too, and whether
 // they are still exposed while the modal palette opens is a matter of timing, so a document-wide
 // query for options is fragile.
 const paletteOptions = () =>
-  within(screen.getByRole('listbox', { name: 'Commands' })).getAllByRole('option');
+  within(screen.getByRole('listbox', { name: 'Commands and search results' })).getAllByRole(
+    'option',
+  );
 
 async function openHelpFromTheFooter(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Keyboard shortcuts' }));
@@ -91,7 +93,7 @@ describe('[UX-KEYS-04] single-key shortcuts can be turned off (WCAG 2.1.4)', () 
     await user.keyboard('gc');
     expect(router.push).not.toHaveBeenCalled();
     await user.keyboard('/');
-    expect(searchBox()).not.toHaveFocus();
+    expect(paletteDialog()).toBeNull();
     await user.keyboard('?');
     expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).toBeNull();
     // A shortcut with a modifier is not a character key shortcut: it keeps working.
@@ -114,7 +116,7 @@ describe('[UX-KEYS-04] single-key shortcuts can be turned off (WCAG 2.1.4)', () 
     await user.keyboard('gc');
     expect(router.push).toHaveBeenCalledWith('/cases');
     await user.keyboard('/');
-    expect(searchBox()).toHaveFocus();
+    expect(await screen.findByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
   });
 
   it('is remembered: a page that starts with it off has no single-key shortcuts', async () => {
@@ -125,7 +127,7 @@ describe('[UX-KEYS-04] single-key shortcuts can be turned off (WCAG 2.1.4)', () 
     await user.keyboard('/');
     await user.keyboard('?');
     expect(router.push).not.toHaveBeenCalled();
-    expect(searchBox()).not.toHaveFocus();
+    expect(paletteDialog()).toBeNull();
     expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).toBeNull();
     const help = await openHelpFromTheFooter(user);
     expect(within(help).getByRole('switch', { name: 'Single-key shortcuts' })).not.toBeChecked();
@@ -138,7 +140,9 @@ describe('[UX-KEYS-04] single-key shortcuts can be turned off (WCAG 2.1.4)', () 
     let input = await screen.findByRole('combobox', { name: 'Search commands' });
     expect(screen.getByRole('option', { name: /Go to Cases\s*G then C/ })).toBeInTheDocument();
     await user.type(input, 'single-key');
-    expect(paletteOptions()[0]).toHaveAccessibleName(/^Turn single-key shortcuts off/);
+    await waitFor(() =>
+      expect(paletteOptions()[0]).toHaveAccessibleName(/^Turn single-key shortcuts off/),
+    );
     await user.keyboard('{Enter}');
     await expectToast('Single-key shortcuts are off');
     expect(window.localStorage.getItem(SINGLE_KEY_STORAGE_KEY)).toBe('off');
@@ -151,21 +155,24 @@ describe('[UX-KEYS-04] single-key shortcuts can be turned off (WCAG 2.1.4)', () 
     // The hints of the shortcuts that no longer work are gone.
     expect(screen.getByRole('option', { name: 'Go to Cases' })).toBeInTheDocument();
     await user.type(input, 'single-key');
-    expect(paletteOptions()[0]).toHaveAccessibleName(/^Turn single-key shortcuts on/);
+    await waitFor(() =>
+      expect(paletteOptions()[0]).toHaveAccessibleName(/^Turn single-key shortcuts on/),
+    );
     await user.keyboard('{Enter}');
     await expectToast('Single-key shortcuts are on');
     expect(window.localStorage.getItem(SINGLE_KEY_STORAGE_KEY)).toBe('on');
   });
 
-  it('follows a change made in another tab, including the "/" hint of the search box', async () => {
+  it('follows a change made in another tab', async () => {
     const user = userEvent.setup();
-    const { container } = mount();
-    expect(within(container).getByText('/', { selector: 'kbd' })).toBeInTheDocument();
+    mount();
+    await user.keyboard('gc');
+    expect(router.push).toHaveBeenCalledTimes(1);
+    router.push.mockClear();
     act(() => {
       window.localStorage.setItem(SINGLE_KEY_STORAGE_KEY, 'off');
       window.dispatchEvent(new StorageEvent('storage', { key: SINGLE_KEY_STORAGE_KEY }));
     });
-    await waitFor(() => expect(within(container).queryByText('/', { selector: 'kbd' })).toBeNull());
     await user.keyboard('gc');
     expect(router.push).not.toHaveBeenCalled();
   });

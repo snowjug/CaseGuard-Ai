@@ -1,12 +1,13 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { caseSummary, persona, session } from '../../../test/fixtures';
-import { fakeApi, renderApp } from '../../../test/harness';
-import { router } from '../../../test/next-navigation';
+import { fakeApi, renderApp, type FakeHandlers } from '../../../test/harness';
+import { navigateTo, router } from '../../../test/next-navigation';
 import { ShellUiProvider } from '../shell-ui';
 import { CommandPalette } from './CommandPalette';
 import { fuzzyMatch, rankByQuery } from './fuzzy';
+import { groupResults } from './use-palette-search';
 
 describe('[UX-PALETTE-01] fuzzy matching', () => {
   it('prefers a contiguous match over a scattered one and reports the matched characters', () => {
@@ -32,9 +33,20 @@ describe('[UX-PALETTE-01] fuzzy matching', () => {
     expect(rankByQuery('appearance', items)[0]?.item.label).toBe('Appearance settings');
     expect(rankByQuery('appearance', items)).toHaveLength(2);
   });
+
+  it('drops scattered matches, so a short query does not match nearly every command', () => {
+    const items = [
+      { label: 'Settings and audit: reviewer decisions' },
+      { label: 'DNS failures' },
+      { label: 'Add a case', keywords: 'upload paste import' },
+    ];
+    expect(rankByQuery('dns', items).map((r) => r.item.label)).toEqual(['DNS failures']);
+    // A compact subsequence still counts: a typo-free abbreviation of a word.
+    expect(rankByQuery('addcase', items).map((r) => r.item.label)).toEqual(['Add a case']);
+  });
 });
 
-const api = () =>
+const api = (overrides: FakeHandlers = {}) =>
   fakeApi({
     'session.me': () => session('engineer'),
     'cases.list': () => ({
@@ -52,14 +64,16 @@ const api = () =>
         persona('persona_engineer', 'engineer', 'Eli Engineer'),
       ],
     }),
+    'search.global': () => ({ items: [], query: 'x' }),
+    ...overrides,
   });
 
-function mount() {
+function mount(overrides: FakeHandlers = {}) {
   return renderApp(
     <ShellUiProvider>
       <CommandPalette />
     </ShellUiProvider>,
-    { api: api() },
+    { api: api(overrides) },
   );
 }
 
@@ -68,16 +82,26 @@ async function openPalette(user: ReturnType<typeof userEvent.setup>) {
   return screen.findByRole('combobox', { name: 'Search commands' });
 }
 
+const options = () =>
+  within(screen.getByRole('listbox', { name: 'Commands and search results' })).getAllByRole(
+    'option',
+  );
+
 describe('[UX-PALETTE-02] command palette keyboard flow', () => {
-  it('opens with Ctrl+K, shows the search box and lists commands in groups', async () => {
+  it('opens with Ctrl+K and lists a short grouped list', async () => {
     const user = userEvent.setup();
     mount();
     await openPalette(user);
     expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
-    const list = screen.getByRole('listbox', { name: 'Commands' });
-    expect(within(list).getByRole('option', { name: /Go to Command Center/ })).toBeInTheDocument();
-    expect(within(list).getAllByRole('option').length).toBeGreaterThan(12);
-    expect(within(list).getByRole('group', { name: 'Navigate' })).toBeInTheDocument();
+    const list = within(screen.getByRole('listbox', { name: 'Commands and search results' }));
+    expect(list.getByRole('option', { name: /Add a case/ })).toBeInTheDocument();
+    expect(list.getByRole('option', { name: /Try a sample case/ })).toBeInTheDocument();
+    expect(list.getByRole('option', { name: /Go to Home/ })).toBeInTheDocument();
+    for (const group of ['Actions', 'Go to', 'Preferences', 'Advanced'])
+      expect(list.getByRole('group', { name: group })).toBeInTheDocument();
+    // The short list leaves out what only a search should find: sections of Settings and audit, personas.
+    expect(list.queryByRole('option', { name: /Settings and audit: audit log/ })).toBeNull();
+    expect(list.queryByRole('option', { name: /Switch persona to/ })).toBeNull();
   });
 
   it('filters as you type, moves with the arrow keys and runs the active command with Enter', async () => {
@@ -85,13 +109,13 @@ describe('[UX-PALETTE-02] command palette keyboard flow', () => {
     mount();
     const input = await openPalette(user);
     await user.type(input, 'go to cases');
-    const options = within(screen.getByRole('listbox')).getAllByRole('option');
-    expect(options[0]).toHaveAccessibleName(/Go to Cases/);
-    expect(input).toHaveAttribute('aria-activedescendant', options[0]?.id);
+    await waitFor(() => expect(options()[0]).toHaveAccessibleName(/Go to Cases/));
+    const list = options();
+    await waitFor(() => expect(input).toHaveAttribute('aria-activedescendant', list[0]?.id));
     await user.keyboard('{ArrowDown}');
-    expect(input).toHaveAttribute('aria-activedescendant', options[1]?.id);
+    await waitFor(() => expect(input).toHaveAttribute('aria-activedescendant', list[1]?.id));
     await user.keyboard('{ArrowUp}');
-    expect(input).toHaveAttribute('aria-activedescendant', options[0]?.id);
+    await waitFor(() => expect(input).toHaveAttribute('aria-activedescendant', list[0]?.id));
     await user.keyboard('{Enter}');
     expect(router.push).toHaveBeenCalledWith('/cases');
     await waitFor(() =>
@@ -104,11 +128,13 @@ describe('[UX-PALETTE-02] command palette keyboard flow', () => {
     mount();
     const input = await openPalette(user);
     await user.type(input, 'go to');
-    const options = within(screen.getByRole('listbox')).getAllByRole('option');
+    await waitFor(() => expect(options().length).toBeGreaterThan(3));
+    const list = options();
+    await waitFor(() => expect(input).toHaveAttribute('aria-activedescendant', list[0]?.id));
     await user.keyboard('{ArrowUp}');
-    expect(input).toHaveAttribute('aria-activedescendant', options.at(-1)?.id);
+    await waitFor(() => expect(input).toHaveAttribute('aria-activedescendant', list.at(-1)?.id));
     await user.keyboard('{ArrowDown}');
-    expect(input).toHaveAttribute('aria-activedescendant', options[0]?.id);
+    await waitFor(() => expect(input).toHaveAttribute('aria-activedescendant', list[0]?.id));
   });
 
   it('closes with Escape and starts fresh next time', async () => {
@@ -129,7 +155,9 @@ describe('[UX-PALETTE-02] command palette keyboard flow', () => {
     mount();
     const input = await openPalette(user);
     await user.type(input, 'qqqqqq');
-    expect(screen.getByRole('status')).toHaveTextContent('No commands match');
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('No results for “qqqqqq”.'),
+    );
     await user.keyboard('{Enter}');
     expect(router.push).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
@@ -140,20 +168,42 @@ describe('[UX-PALETTE-02] command palette keyboard flow', () => {
     mount();
     const input = await openPalette(user);
     await user.type(input, 'dark theme');
+    await waitFor(() => expect(options()[0]).toHaveAccessibleName(/Switch to dark theme/));
     await user.keyboard('{Enter}');
     await waitFor(() => expect(document.cookie).toContain('cg-theme=dark'));
   });
 
-  it('lists the cases from cases.list and opens the chosen one', async () => {
+  it('lists the cases from cases.list and opens the chosen one on its review', async () => {
     const user = userEvent.setup();
     mount();
     const input = await openPalette(user);
     await user.type(input, 'SAMPLE-002');
-    const option = await screen.findByRole('option', { name: /Switch to SAMPLE-002/ });
-    expect(option).toBeInTheDocument();
+    expect(await screen.findByRole('option', { name: /Open SAMPLE-002/ })).toBeInTheDocument();
+    await waitFor(() => expect(options()[0]).toHaveAccessibleName(/Open SAMPLE-002/));
     await user.keyboard('{Enter}');
-    expect(router.push).toHaveBeenCalledWith('/cases/case_2');
+    expect(router.push).toHaveBeenCalledWith('/cases/case_2/review');
     expect(document.cookie).toContain('cg-case=case_2');
+  });
+
+  it('keeps the open section when another case is chosen on a case page', async () => {
+    const user = userEvent.setup();
+    navigateTo('/cases/case_1/evidence');
+    mount();
+    const input = await openPalette(user);
+    await user.type(input, 'SAMPLE-002');
+    await waitFor(() => expect(options()[0]).toHaveAccessibleName(/Open SAMPLE-002/));
+    await user.keyboard('{Enter}');
+    expect(router.push).toHaveBeenCalledWith('/cases/case_2/evidence');
+  });
+
+  it('says to add a case, not to choose one, on the case destinations when there are no cases yet', async () => {
+    const user = userEvent.setup();
+    mount({ 'cases.list': () => ({ items: [], nextCursor: null }) });
+    const input = await openPalette(user);
+    await user.type(input, 'go to timeline');
+    expect(
+      await screen.findByRole('option', { name: /Go to Timeline\s*Go to · add a case first/ }),
+    ).toBeInTheDocument();
   });
 
   it('offers development personas and switches the identity (sent as x-cg-persona)', async () => {
@@ -162,6 +212,7 @@ describe('[UX-PALETTE-02] command palette keyboard flow', () => {
     const input = await openPalette(user);
     await user.type(input, 'Rae Reviewer');
     await screen.findByRole('option', { name: /Switch persona to Rae Reviewer/ });
+    await waitFor(() => expect(options()[0]).toHaveAccessibleName(/Rae Reviewer/));
     await user.keyboard('{Enter}');
     await waitFor(() => expect(window.localStorage.getItem('cg-persona')).toBe('persona_reviewer'));
   });
@@ -171,6 +222,7 @@ describe('[UX-PALETTE-02] command palette keyboard flow', () => {
     mount();
     const input = await openPalette(user);
     await user.type(input, 'presentation');
+    await waitFor(() => expect(options()[0]).toHaveAccessibleName(/presentation mode/));
     await user.keyboard('{Enter}');
     await waitFor(() => expect(window.sessionStorage.getItem('cg-present')).toBe('1'));
   });
@@ -180,8 +232,111 @@ describe('[UX-PALETTE-02] command palette keyboard flow', () => {
     mount();
     await openPalette(user);
     await act(async () => {
-      await user.click(screen.getByRole('option', { name: /Go to Governance/ }));
+      await user.click(await screen.findByRole('option', { name: /Go to Settings and audit/ }));
     });
     expect(router.push).toHaveBeenCalledWith('/governance');
+  });
+
+  it('starts a new case or the sample case', async () => {
+    const user = userEvent.setup();
+    mount();
+    let input = await openPalette(user);
+    await user.type(input, 'add a case');
+    await waitFor(() => expect(options()[0]).toHaveAccessibleName(/Add a case/));
+    await user.keyboard('{Enter}');
+    expect(router.push).toHaveBeenCalledWith('/cases/new');
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Command palette' })).toBeNull(),
+    );
+    input = await openPalette(user);
+    await user.type(input, 'sample case');
+    await waitFor(() => expect(options()[0]).toHaveAccessibleName(/Try a sample case/));
+    await user.keyboard('{Enter}');
+    expect(router.push).toHaveBeenLastCalledWith('/cases/new?mode=sample');
+  });
+});
+
+describe('[UX-PALETTE-05] search results in the palette', () => {
+  const results = () => ({
+    query: 'dns',
+    items: [
+      {
+        type: 'case' as const,
+        id: 'case_9',
+        caseId: 'case_9',
+        title: 'DNS failures after the failover',
+        snippet: 'Resolver timeouts across two zones',
+        href: '/cases/case_9/review',
+        score: 3,
+      },
+      {
+        type: 'skill' as const,
+        id: 'skill_4',
+        caseId: null,
+        title: 'Check the resolver chain',
+        snippet: '',
+        href: '/skills/skill_4',
+        score: 2,
+      },
+      {
+        type: 'claim' as const,
+        id: 'claim_7',
+        caseId: 'case_9',
+        title: 'Phishing link',
+        snippet: 'Leaves the app',
+        href: 'https://evil.example/claim',
+        score: 1,
+      },
+    ],
+  });
+
+  it('searches from two characters on, groups the results and opens one on Enter or click', async () => {
+    const user = userEvent.setup();
+    const search = vi.fn(() => results());
+    mount({ 'search.global': search });
+    const input = await openPalette(user);
+    await user.type(input, 'd');
+    expect(search).not.toHaveBeenCalled();
+    await user.type(input, 'ns');
+    const list = within(screen.getByRole('listbox', { name: 'Commands and search results' }));
+    const found = await list.findByRole('option', { name: /DNS failures after the failover/ });
+    expect(found).toHaveTextContent('Resolver timeouts across two zones');
+    expect(list.getByRole('group', { name: 'Cases' })).toContainElement(found);
+    expect(list.getByRole('group', { name: 'Skills' })).toBeInTheDocument();
+    await act(async () => {
+      await user.click(found);
+    });
+    expect(router.push).toHaveBeenCalledWith('/cases/case_9/review');
+  });
+
+  it('never offers a result that leaves the app', async () => {
+    const user = userEvent.setup();
+    mount({ 'search.global': () => results() });
+    const input = await openPalette(user);
+    await user.type(input, 'dns');
+    await screen.findByRole('option', { name: /DNS failures after the failover/ });
+    expect(screen.queryByRole('option', { name: /Phishing link/ })).toBeNull();
+  });
+
+  it('says why when the search fails, while commands still work', async () => {
+    const user = userEvent.setup();
+    mount({
+      'search.global': () => {
+        throw new Error('boom');
+      },
+    });
+    const input = await openPalette(user);
+    await user.type(input, 'go to cases');
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Search failed.'));
+    expect(screen.getByRole('option', { name: /Go to Cases/ })).toBeInTheDocument();
+  });
+
+  it('groups results in a fixed order and drops links that are not app paths', () => {
+    const groups = groupResults([
+      ...results().items,
+      { ...results().items[1], id: 'skill_5', href: '//evil.example' } as never,
+    ]);
+    expect(groups.map((group) => group.type)).toEqual(['case', 'skill']);
+    expect(groups[1]?.items).toHaveLength(1);
   });
 });

@@ -3,10 +3,10 @@
 import {
   CaseGuardThemeProvider,
   UiLinkProvider,
+  createCaseGuardRenderer,
   createStyleFlusher,
   type ThemeMode,
 } from '@caseguard/ui';
-import { createDOMRenderer } from '@fluentui/react-components';
 import { useServerInsertedHTML } from 'next/navigation';
 import { useMemo, useState, type ReactNode } from 'react';
 import { ActiveCaseProvider } from '../lib/active-case';
@@ -26,7 +26,7 @@ function Themed({
 }) {
   const { enabled } = usePresentation();
   // The same Griffel renderer serves the provider and the server style flush, so server-rendered rules reach the HTML.
-  const [renderer] = useState(() => createDOMRenderer());
+  const [renderer] = useState(() => createCaseGuardRenderer());
   const flush = useMemo(() => createStyleFlusher(renderer), [renderer]);
   useServerInsertedHTML(flush);
   return (

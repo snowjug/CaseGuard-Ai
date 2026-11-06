@@ -1,25 +1,23 @@
 'use client';
 
 import { ROLE_LABELS } from '@caseguard/schemas';
-import { ConfirmDialog, UiLink, cg, useElementSize } from '@caseguard/ui';
+import { Button, ButtonLink, ConfirmDialog, cg, layout, useElementSize } from '@caseguard/ui';
 import {
-  Button,
   Popover,
   PopoverSurface,
   PopoverTrigger,
   ProgressBar,
   Tooltip,
   makeStyles,
-  mergeClasses,
   tokens,
 } from '@fluentui/react-components';
 import {
-  ArrowResetRegular,
-  ArrowRightRegular,
-  DismissRegular,
-  NotepadRegular,
-  PersonSwapRegular,
-} from '@fluentui/react-icons';
+  ArrowRightIcon,
+  NotebookPenIcon,
+  RotateCcwIcon,
+  UserRoundCogIcon,
+  XIcon,
+} from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -37,21 +35,28 @@ import { useToast } from '../../lib/toast';
 
 export { PRESENTER_HEIGHT_VAR };
 
+const phone = `@media (max-width: ${layout.drawerBreakpoint - 1}px)`;
+const gap = 16;
+
 const useStyles = makeStyles({
   strip: {
     position: 'fixed',
-    insetInline: 0,
-    bottom: 0,
+    insetInline: `${gap}px`,
+    bottom: `${gap}px`,
     zIndex: 20,
     display: 'flex',
     alignItems: 'center',
     flexWrap: 'wrap',
     gap: `${cg.space[2]} ${cg.space[4]}`,
-    padding: `${cg.space[2]} ${cg.space[4]}`,
+    padding: `${cg.space[3]} ${cg.space[4]}`,
     backgroundColor: cg.surfaceRaised,
-    borderTop: `3px solid ${cg.tone.brand.solid}`,
-    boxShadow: cg.shadowHigh,
+    border: `1px solid ${cg.glassBorder}`,
+    borderRadius: cg.radius.xl,
+    boxShadow: `inset 0 1px 0 ${cg.highlight}, 0 24px 80px -28px ${cg.glow}, ${cg.shadowHigh}`,
     color: cg.text,
+    [phone]: {
+      bottom: `calc(${layout.bottomBarHeight}px + env(safe-area-inset-bottom) + ${cg.space[2]})`,
+    },
   },
   progress: {
     display: 'flex',
@@ -66,33 +71,27 @@ const useStyles = makeStyles({
     fontWeight: tokens.fontWeightSemibold,
   },
   step: { display: 'flex', flexDirection: 'column', flex: '1 1 280px', minWidth: 0 },
-  stepTitle: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase400 },
+  stepTitle: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300 },
   stepText: {
-    fontSize: tokens.fontSizeBase300,
+    fontSize: tokens.fontSizeBase200,
     color: cg.textSecondary,
     [`@media (max-width: 719px)`]: { display: 'none' },
   },
   actions: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: cg.space[2] },
-  go: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: cg.space[2],
-    minHeight: '36px',
-    padding: `0 ${cg.space[4]}`,
-    borderRadius: cg.radius.md,
-    backgroundColor: cg.tone.brand.solid,
-    color: cg.tone.brand.onSolid,
-    fontWeight: tokens.fontWeightSemibold,
-    textDecorationLine: 'none',
-    ':hover': { filter: 'brightness(1.08)' },
-  },
-  goDisabled: { backgroundColor: cg.surfaceSunken, color: cg.textMuted, pointerEvents: 'none' },
   notes: {
     maxWidth: '420px',
     margin: 0,
     fontSize: tokens.fontSizeBase300,
     lineHeight: tokens.lineHeightBase300,
     whiteSpace: 'pre-wrap',
+  },
+  notesSurface: {
+    padding: cg.space[4],
+    color: cg.text,
+    backgroundColor: cg.surfaceRaised,
+    border: `1px solid ${cg.glassBorder}`,
+    borderRadius: cg.radius.md,
+    boxShadow: cg.shadowHigh,
   },
   persona: { fontSize: tokens.fontSizeBase200, color: cg.textSecondary },
   status: {
@@ -107,7 +106,7 @@ const useStyles = makeStyles({
  * Presenter strip (presentation mode only): where the guided demo is, what to do next, the role to present as, the
  * presenter notes, and a guarded reset. It reads `demo.state`, which the API derives from stored data; nothing is
  * invented here. The next action is outlined with the pulsing (reduced-motion safe) presenter outline, a persona of the
- * right role is one click away, and after a reset the presenter lands on the Demo Guide because every case page is gone.
+ * right role is one click away, and after a reset the presenter lands on the guided demo because every case page is gone.
  */
 export function PresenterStrip() {
   const styles = useStyles();
@@ -122,10 +121,10 @@ export function PresenterStrip() {
   const reset = useApiMutation('demo.reset');
   const [measure, size] = useElementSize<HTMLElement>({ width: 0, height: 104 });
 
-  // The strip is fixed to the bottom, so tell the page how tall it is (content padding and toasts follow).
+  // The strip floats above the bottom edge, so tell the page how much room it takes (content padding and toasts follow).
   useEffect(() => {
     if (!enabled) return undefined;
-    document.documentElement.style.setProperty(PRESENTER_HEIGHT_VAR, `${size.height + 3}px`);
+    document.documentElement.style.setProperty(PRESENTER_HEIGHT_VAR, `${size.height + 2 * gap}px`);
     return () => {
       document.documentElement.style.removeProperty(PRESENTER_HEIGHT_VAR);
     };
@@ -140,7 +139,7 @@ export function PresenterStrip() {
   const href = current ? safeInternalHref(current.route) : null;
 
   const resetButton = (
-    <Button appearance="subtle" size="small" icon={<ArrowResetRegular />}>
+    <Button variant="ghost" size="sm" icon={<RotateCcwIcon />}>
       Reset demo
     </Button>
   );
@@ -149,19 +148,19 @@ export function PresenterStrip() {
     <section ref={measure} className={styles.strip} aria-label="Presenter strip">
       {query.isError ? (
         <p className={styles.status} role="status">
-          The demo guide could not be loaded: {describeError(query.error)}
+          The guided demo could not be loaded: {describeError(query.error)}
         </p>
       ) : total === 0 ? (
         <p className={styles.status} role="status">
           {query.isPending
-            ? 'Loading the demo guide…'
-            : 'No demo steps are available yet. Load the synthetic sample from Cases to begin.'}
+            ? 'Loading the guided demo…'
+            : 'No demo steps are available yet. Add the sample case from Cases to begin.'}
         </p>
       ) : (
         <>
           <div className={styles.progress}>
             <span className={styles.progressLabel}>
-              Demo guide · {completed} of {total} done
+              Guided demo · {completed} of {total} done
             </span>
             <ProgressBar
               value={completed}
@@ -182,13 +181,13 @@ export function PresenterStrip() {
               <div className={styles.actions}>
                 {needsSwitch && auth.dev ? (
                   <Tooltip
-                    content={`This step is shown as ${role}. Switch the synthetic persona to match.`}
+                    content={`This step is shown as ${role}. Switch the demo persona to match.`}
                     relationship="description"
                     withArrow
                   >
                     <Button
-                      appearance="outline"
-                      icon={<PersonSwapRegular />}
+                      variant="secondary"
+                      icon={<UserRoundCogIcon />}
                       {...(persona ? { 'aria-label': `Switch to ${persona.displayName}` } : {})}
                       onClick={() =>
                         persona ? roleSwitch.switchTo(persona) : auth.dev?.openPicker()
@@ -201,22 +200,30 @@ export function PresenterStrip() {
                   </Tooltip>
                 ) : null}
                 {href ? (
-                  <UiLink href={href} className={mergeClasses(styles.go, 'cg-presenter-target')}>
+                  <ButtonLink
+                    href={href}
+                    variant="primary"
+                    icon={<ArrowRightIcon />}
+                    iconPosition="end"
+                    className="cg-presenter-target"
+                  >
                     {current.actionLabel}
-                    <ArrowRightRegular aria-hidden="true" />
-                  </UiLink>
+                  </ButtonLink>
                 ) : (
-                  <span className={mergeClasses(styles.go, styles.goDisabled)}>
+                  <Button variant="primary" disabledFocusable>
                     {current.actionLabel}
-                  </span>
+                  </Button>
                 )}
                 <Popover positioning="above-end" withArrow>
                   <PopoverTrigger disableButtonEnhancement>
-                    <Button appearance="outline" icon={<NotepadRegular />}>
+                    <Button variant="secondary" icon={<NotebookPenIcon />}>
                       Presenter notes
                     </Button>
                   </PopoverTrigger>
-                  <PopoverSurface aria-label={`Presenter notes: ${current.title}`}>
+                  <PopoverSurface
+                    className={styles.notesSurface}
+                    aria-label={`Presenter notes: ${current.title}`}
+                  >
                     <p className={styles.notes}>{current.presenterNotes}</p>
                   </PopoverSurface>
                 </Popover>
@@ -248,18 +255,13 @@ export function PresenterStrip() {
               router.push('/demo');
             }}
           >
-            This erases the cases, analysis results and skills of the synthetic demo tenant and
-            clears demo progress. Users, settings and the audit trail are kept.
+            This erases the cases, analysis results and skills of the demo tenant and clears demo
+            progress. Users, settings and the audit trail are kept.
           </ConfirmDialog>
         ) : (
           <GatedAction permission="demo:manage">{resetButton}</GatedAction>
         )}
-        <Button
-          appearance="subtle"
-          size="small"
-          icon={<DismissRegular />}
-          onClick={() => setEnabled(false)}
-        >
+        <Button variant="ghost" size="sm" icon={<XIcon />} onClick={() => setEnabled(false)}>
           Exit presentation
         </Button>
       </div>

@@ -20,6 +20,20 @@ Object.assign(Element.prototype, {
   scrollIntoView: vi.fn(),
 });
 
+// jsdom has no ResizeObserver, and cmdk (the command palette) observes its list with one. No layout ever happens in
+// jsdom, so an observer that never fires is faithful; tests that need a firing one stub it themselves.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  Object.defineProperty(globalThis, 'ResizeObserver', {
+    configurable: true,
+    writable: true,
+    value: class {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    },
+  });
+}
+
 function clearCookies(): void {
   for (const part of document.cookie.split(';')) {
     const name = part.split('=')[0]?.trim();
