@@ -1,4 +1,5 @@
 import { screen, waitFor, within } from '@testing-library/react';
+import type { CaseDetail } from '@caseguard/schemas';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { CASE_ID, caseDetail } from '../../../test/case-fixtures';
@@ -8,7 +9,7 @@ import { navigateTo, router } from '../../../test/next-navigation';
 import { ApiError } from '../../lib/api/errors';
 import { CaseChrome } from './CaseChrome';
 
-function mount(path: string, detail: () => unknown = () => caseDetail()) {
+function mount(path: string, detail: () => CaseDetail = () => caseDetail()) {
   navigateTo(path);
   return renderApp(
     <CaseChrome caseId={CASE_ID}>
@@ -17,7 +18,7 @@ function mount(path: string, detail: () => unknown = () => caseDetail()) {
     {
       api: fakeApi({
         'session.me': () => session('engineer', ['case:read']),
-        'cases.get': detail as () => never,
+        'cases.get': detail,
       }),
     },
   );

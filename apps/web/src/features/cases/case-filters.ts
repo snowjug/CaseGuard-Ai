@@ -33,8 +33,8 @@ export const STATUS_FILTER_LABELS: Record<(typeof STATUS_FILTERS)[number], strin
 };
 export const DATA_FILTER_LABELS: Record<(typeof DATA_FILTERS)[number], string> = {
   all: 'Any data label',
-  synthetic: 'Synthetic only',
-  not_synthetic: 'Not synthetic',
+  synthetic: 'Demo data only',
+  not_synthetic: 'Not demo data',
 };
 
 export const SORT_COLUMNS = [
@@ -50,8 +50,8 @@ export type SortColumn = (typeof SORT_COLUMNS)[number];
 export const SORT_COLUMN_LABELS: Record<SortColumn, string> = {
   opened: 'Opened',
   reference: 'Reference',
-  quality: 'Quality',
-  effort: 'Avoidable effort',
+  quality: 'Score',
+  effort: 'Time that could be saved',
   events: 'Events',
   warnings: 'Open warnings',
 };
@@ -174,9 +174,9 @@ export function sortOptionLabel(column: SortColumn, direction: SortState['direct
     case 'reference':
       return asc ? 'Reference: A to Z' : 'Reference: Z to A';
     case 'quality':
-      return asc ? 'Quality: lowest first' : 'Quality: highest first';
+      return asc ? 'Score: lowest first' : 'Score: highest first';
     case 'effort':
-      return asc ? 'Avoidable effort: lowest first' : 'Avoidable effort: highest first';
+      return asc ? 'Time that could be saved: least first' : 'Time that could be saved: most first';
     case 'events':
       return asc ? 'Events: fewest first' : 'Events: most first';
     case 'warnings':
