@@ -136,7 +136,7 @@ export function LeadingCause({ hypothesis, onOpen, onShowRanking }: LeadingCause
               icon={<ChevronRightIcon />}
               iconPosition="end"
               aria-haspopup="dialog"
-              aria-label={`See the evidence for ${hypothesis.name}`}
+              aria-label={`See evidence for ${hypothesis.name}`}
               onClick={onOpen}
             >
               See evidence

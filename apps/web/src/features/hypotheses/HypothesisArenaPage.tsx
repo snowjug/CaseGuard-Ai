@@ -83,6 +83,9 @@ const useStyles = makeStyles({
     textAlign: 'start',
     lineHeight: tokens.lineHeightBase200,
     paddingBlock: cg.space[2],
+    maxWidth: '100%',
+    minWidth: 0,
+    flexShrink: 1,
   },
 });
 

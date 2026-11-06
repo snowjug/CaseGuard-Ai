@@ -86,6 +86,7 @@ const useStyles = makeStyles({
   // A person's name can be long ("Switch to Morgan Manager (synthetic)"): the label wraps instead of leaving the card.
   wrapLabel: {
     maxWidth: '100%',
+    minWidth: 0,
     flexShrink: 1,
     paddingBlock: cg.space[2],
     whiteSpace: 'normal',

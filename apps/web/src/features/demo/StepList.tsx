@@ -127,6 +127,16 @@ const useStyles = makeStyles({
     gap: cg.space[2],
     marginTop: cg.space[1],
   },
+  // A person's name can be long ("Switch to Morgan Manager (synthetic)"): the label wraps instead of leaving the card.
+  wrapLabel: {
+    maxWidth: '100%',
+    minWidth: 0,
+    flexShrink: 1,
+    paddingBlock: cg.space[1],
+    whiteSpace: 'normal',
+    textAlign: 'start',
+    lineHeight: tokens.lineHeightBase200,
+  },
   notes: {
     margin: 0,
     padding: `${cg.space[1]} ${cg.space[3]}`,
@@ -268,6 +278,7 @@ function StepCard({
               variant="ghost"
               size="sm"
               icon={<UserCogIcon />}
+              className={styles.wrapLabel}
               onClick={() => onSwitch(persona)}
             >
               {`Switch to ${persona.displayName}`}

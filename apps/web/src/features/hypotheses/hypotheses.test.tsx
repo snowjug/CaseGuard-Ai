@@ -110,7 +110,8 @@ describe('[FR-HY-01] Possible causes', () => {
     expect(rows).toHaveLength(2);
     const hero = within(await heroOf('DNS resolution failure for sign-in endpoints'));
     expect(hero.getByText('Most likely cause')).toBeInTheDocument();
-    expect(await hero.findByText('73%')).toBeInTheDocument();
+    // The confidence is the big figure of the hero, and again the caption of its range bar.
+    await waitFor(() => expect(hero.getAllByText('73%').length).toBeGreaterThan(0));
     expect(hero.getByText('Estimated')).toBeInTheDocument();
     expect(hero.getByRole('img', { name: /estimate 73%, range 55% to 84%/ })).toBeInTheDocument();
     expect(hero.getByText(/Rose from 18% to 73%/)).toBeInTheDocument();
@@ -183,7 +184,7 @@ describe('[FR-HY-01] Possible causes', () => {
     await list();
     await user.click(
       await screen.findByRole('button', {
-        name: 'See the evidence for DNS resolution failure for sign-in endpoints',
+        name: 'See evidence for DNS resolution failure for sign-in endpoints',
       }),
     );
     await waitFor(() => expect(window.location.search).toBe('?sel=hyp_dns'));
