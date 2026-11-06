@@ -57,7 +57,6 @@ const useStyles = makeStyles({
     alignItems: 'flex-end',
     gap: cg.space[1],
     maxWidth: '100%',
-    overflowX: 'auto',
     borderBottom: `1px solid ${cg.borderSubtle}`,
     '@media print': { display: 'none' },
   },

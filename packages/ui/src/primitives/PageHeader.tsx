@@ -16,7 +16,7 @@ const useStyles = makeStyles({
   },
   titleBlock: {
     minWidth: 0,
-    flex: '1 1 320px',
+    flex: '1 1 240px',
     display: 'flex',
     flexDirection: 'column',
     gap: cg.space[2],

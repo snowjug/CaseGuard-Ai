@@ -5,10 +5,12 @@ import { motion as m } from 'motion/react';
 import {
   createContext,
   useContext,
+  useEffect,
   useId,
   useRef,
   type KeyboardEvent,
   type ReactNode,
+  type RefObject,
 } from 'react';
 import { UiLink } from '../link-context';
 import { useMotionEnabled } from '../motion/useMotionEnabled';
@@ -16,6 +18,7 @@ import { cg } from '../tokens/cg';
 import { motion } from '../tokens/static';
 
 const useStyles = makeStyles({
+  nav: { minWidth: 0 },
   list: {
     position: 'relative',
     display: 'flex',
@@ -85,6 +88,22 @@ function Indicator({ layoutId }: { layoutId: string }) {
 
 const safeId = (value: string): string => value.replace(/[^a-zA-Z0-9_-]/g, '_');
 
+/**
+ * On a narrow screen the tab strip scrolls sideways; when the selected tab is not fully in view it is centred, inside
+ * the strip only (the page itself never scrolls because of it).
+ */
+function useSelectedTabInView(list: RefObject<HTMLElement | null>, selected: string): void {
+  useEffect(() => {
+    const strip = list.current;
+    const tab = strip?.querySelector<HTMLElement>('[aria-selected="true"], [aria-current="page"]');
+    if (!strip || !tab) return;
+    const start = tab.offsetLeft;
+    const end = start + tab.offsetWidth;
+    if (start >= strip.scrollLeft && end <= strip.scrollLeft + strip.clientWidth) return;
+    strip.scrollLeft = start - (strip.clientWidth - tab.offsetWidth) / 2;
+  }, [list, selected]);
+}
+
 interface TabsContextValue {
   value: string;
   baseId: string;
@@ -125,6 +144,8 @@ export function Tabs({
   const styles = useStyles();
   const baseId = useId();
   const nodes = useRef(new Map<string, HTMLButtonElement>());
+  const list = useRef<HTMLDivElement>(null);
+  useSelectedTabInView(list, value);
   const enabledItems = items.filter((item) => !item.disabled);
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
@@ -158,6 +179,7 @@ export function Tabs({
       {/* The key handling belongs to the tab list as a whole (roving focus), as the ARIA tabs pattern specifies. */}
       {/* eslint-disable-next-line jsx-a11y/interactive-supports-focus */}
       <div
+        ref={list}
         role="tablist"
         aria-label={ariaLabel}
         className={mergeClasses(styles.list, className)}
@@ -241,9 +263,11 @@ export interface TabNavProps {
 export function TabNav({ items, 'aria-label': ariaLabel, className }: TabNavProps) {
   const styles = useStyles();
   const layoutId = useId();
+  const list = useRef<HTMLUListElement>(null);
+  useSelectedTabInView(list, items.find((item) => item.active)?.href ?? '');
   return (
-    <nav aria-label={ariaLabel}>
-      <ul className={mergeClasses(styles.list, className)}>
+    <nav aria-label={ariaLabel} className={styles.nav}>
+      <ul ref={list} className={mergeClasses(styles.list, className)}>
         {items.map((item) => (
           <li key={item.href} className={styles.item}>
             <UiLink
