@@ -19,7 +19,7 @@ Branch `ui/caseguard-redesign`, created from `build/intelligence-wave-2` @ `46a1
 - Five read-only audits of the shell, intake, review/quality, analysis pages and admin screens were done; their
   findings are the inventory in `DESIGN.md`.
 
-**Next**: Phase 1, `DESIGN.md` (inventory, confusion list, IA, blueprints, jargon table, tokens, motion, components).
+**Next**: Phase 1 (done below), then Phase 2.
 
 **Decisions**
 
@@ -32,3 +32,28 @@ Branch `ui/caseguard-redesign`, created from `build/intelligence-wave-2` @ `46a1
 **Open issues**
 
 - The e2e baseline (desktop + mobile projects) is still running; its result is appended to `baseline.md`.
+
+## 2026-11-06 - Phase 1: audit and design spec
+
+**Done**
+
+- `DESIGN.md` written and committed before any UI code: stack adaptation, inventory of 19 screens plus global chrome,
+  the 13 confusions seen in the BEFORE screenshots, the new IA, blueprints for every screen, plain-language table, token,
+  motion and component tables, quality gates and the list of ideas that need backend work.
+- Palette candidates were checked with the repo's own contrast functions before being written down: every pair of the
+  existing `contrast.test.ts` rules passes in both themes (three solid/onSolid pairs needed a small adjustment).
+
+**Next**: Phase 2, design system: deps (`motion`, `lucide-react`, `cmdk`, Geist), tokens and Fluent theme, `globals.css`
+and its sync test, theme toggle, then the kit components with tests, then the icon and Button migrations.
+
+**Decisions**
+
+- Flow: Add a case -> See the review -> Fix what matters. Nav: Home, Cases, Quality, Skills, Advanced (+ `/advanced` hub).
+- Case workspace tabs are real links: Review, Score, Evidence, What if, Timeline, More (Possible causes, Case details,
+  Report). Routes are unchanged.
+- The twelve tone names stay and are remapped to accent, neutrals and green/amber/red so call sites keep compiling.
+- Honest labelling stays, but as badges with tooltips and one footer caption instead of stacked banners.
+
+**Open issues**
+
+- Baseline e2e result still pending (appended to `baseline.md`).
