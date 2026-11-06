@@ -9,25 +9,25 @@ import {
   type TwinSection,
 } from '@caseguard/schemas';
 import {
+  Accordion,
+  AccordionItem,
+  Badge,
+  Card,
   EmptyState,
-  Notice,
   Panel,
+  ProvenanceBadge,
+  RelativeTime,
+  Skeleton,
   StatusBadge,
   UiLink,
+  VisuallyHidden,
   cg,
   formatDateTimeUtc,
   formatNumber,
   formatProbability,
 } from '@caseguard/ui';
-import {
-  Accordion,
-  AccordionHeader,
-  AccordionItem,
-  AccordionPanel,
-  makeStyles,
-  tokens,
-} from '@fluentui/react-components';
-import { DocumentBulletListRegular } from '@fluentui/react-icons';
+import { makeStyles, tokens } from '@fluentui/react-components';
+import { FileTextIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { ExpandableText } from '../../components/case/ExpandableText';
 import { LaterDecisionsNote } from '../../components/case/as-of';
@@ -35,29 +35,21 @@ import { METHOD_LABELS, REVIEW_STATE_LABELS, countOf } from '../../components/ca
 import { caseHref } from '../../lib/deep-links';
 
 const useStyles = makeStyles({
-  list: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: cg.space[3],
-    margin: 0,
-    padding: 0,
-    listStyle: 'none',
-  },
+  list: { display: 'flex', flexDirection: 'column', margin: 0, padding: 0, listStyle: 'none' },
   field: {
     display: 'flex',
     flexDirection: 'column',
     gap: cg.space[1],
-    padding: cg.space[3],
-    borderRadius: cg.radius.md,
-    border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surfaceSunken,
     minWidth: 0,
+    padding: `${cg.space[3]} 0`,
+    borderTop: `1px solid ${cg.borderSubtle}`,
+    ':first-child': { borderTop: 0, paddingTop: 0 },
   },
   label: {
     margin: 0,
     color: cg.textMuted,
     fontSize: tokens.fontSizeBase200,
-    fontWeight: tokens.fontWeightSemibold,
+    fontWeight: tokens.fontWeightMedium,
   },
   meta: {
     display: 'flex',
@@ -88,16 +80,29 @@ const useStyles = makeStyles({
     textDecorationLine: 'none',
     ':hover': { textDecorationLine: 'underline' },
   },
-  count: { color: cg.textMuted, fontWeight: tokens.fontWeightRegular, marginLeft: cg.space[2] },
   nothing: { margin: 0, color: cg.textSecondary, fontSize: tokens.fontSizeBase300 },
   person: { margin: 0, color: cg.text, fontSize: tokens.fontSizeBase300 },
   intro: { margin: 0, color: cg.textSecondary, fontSize: tokens.fontSizeBase300 },
+  estimates: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: cg.space[2],
+    margin: 0,
+    color: cg.textMuted,
+    fontSize: tokens.fontSizeBase200,
+  },
+  skeleton: { gap: cg.space[4] },
+  skeletonRow: { display: 'flex', flexDirection: 'column', gap: cg.space[2] },
 });
 
 /** Sections opened when the panel first shows: the problem and its impact are what a reader needs first. */
 const OPEN_BY_DEFAULT: readonly TwinSection[] = ['problem_statement', 'customer_impact'];
 
 const MAX_SOURCES = 3;
+
+const HELP =
+  'The case structure (technically the digital twin) turns the raw events into sections such as the problem statement, scope, observations and decisions. Each value keeps its source reference, an estimated confidence, how it was extracted, the time it became known and its review status. Nothing here is typed in by hand.';
 
 function sourceHref(caseId: string, eventId: string, asOf: string | null): string {
   const query = `?sel=${encodeURIComponent(eventId)}${asOf ? `&asOf=${encodeURIComponent(asOf)}` : ''}`;
@@ -125,7 +130,11 @@ function FieldRow({
       <p className={styles.meta}>
         <span>Confidence {formatProbability(field.confidence)} (estimate)</span>
         <span>{METHOD_LABELS[field.method]}</span>
-        {field.observedAt ? <span>Observed {formatDateTimeUtc(field.observedAt)}</span> : null}
+        {field.observedAt ? (
+          <span>
+            Observed <RelativeTime value={field.observedAt} />
+          </span>
+        ) : null}
         <StatusBadge status={review.status} label={review.label} size="small" />
       </p>
       {events.length > 0 ? (
@@ -166,7 +175,9 @@ function ParticipantList({ twin }: { twin: DigitalTwin }) {
           <p className={styles.meta}>
             <span>{countOf(person.eventCount, 'event')}</span>
             {person.firstSeenAt ? (
-              <span>First seen {formatDateTimeUtc(person.firstSeenAt)}</span>
+              <span>
+                First seen <RelativeTime value={person.firstSeenAt} />
+              </span>
             ) : null}
           </p>
         </li>
@@ -175,10 +186,29 @@ function ParticipantList({ twin }: { twin: DigitalTwin }) {
   );
 }
 
+/** The loading state of the case structure: the same card, with its rows to come. */
+export function TwinSkeleton() {
+  const styles = useStyles();
+  return (
+    <div role="status" aria-busy="true" aria-live="polite">
+      <VisuallyHidden>Loading the case structure…</VisuallyHidden>
+      <Card aria-hidden="true" className={styles.skeleton}>
+        <div className={styles.skeletonRow}>
+          <Skeleton width="30%" height={20} />
+          <Skeleton width="64%" height={14} />
+        </div>
+        {[0, 1, 2, 3, 4].map((row) => (
+          <Skeleton key={row} height={28} radius="md" />
+        ))}
+      </Card>
+    </div>
+  );
+}
+
 /**
- * The digital twin: the case as structured sections (problem, impact, scope, observations, actions, decisions, ...).
- * Every value shows its confidence (an estimate), how it was extracted, when it became known, its review status and the
- * source events it came from. With a time cursor set the API returns only what was known then.
+ * The case structure (the digital twin): the case as structured sections (problem, impact, scope, observations, actions,
+ * decisions, ...). Every value shows its confidence (an estimate), how it was extracted, when it became known, its review
+ * status and the source events it came from. With an earlier moment shown, the API returns only what was known then.
  */
 export function TwinPanel({ caseId, twin, asOf }: TwinPanelProps) {
   const styles = useStyles();
@@ -198,7 +228,7 @@ export function TwinPanel({ caseId, twin, asOf }: TwinPanelProps) {
 
   return (
     <Panel
-      title="Digital twin"
+      title="Case structure"
       level={2}
       description={
         asOf
@@ -207,15 +237,15 @@ export function TwinPanel({ caseId, twin, asOf }: TwinPanelProps) {
             : 'The case as structured from what was known at the moment you chose.'
           : 'The case as structured sections, each value traced to its source.'
       }
-      help="The digital twin turns the raw events into sections such as the problem statement, scope, observations and decisions. Each value keeps its source reference, an estimated confidence, how it was extracted, the time it became known and its review status. Nothing here is typed in by hand."
+      help={HELP}
     >
       {twin.fields.length === 0 && twin.participants.length === 0 ? (
         <EmptyState
           compact
           headingLevel={3}
-          icon={<DocumentBulletListRegular />}
+          icon={<FileTextIcon />}
           title="Nothing was known yet"
-          description="No fields had been extracted by this moment. Move the time cursor later."
+          description="No fields had been extracted by this moment. Choose a later moment under “What was known then”."
         />
       ) : (
         <>
@@ -226,42 +256,42 @@ export function TwinPanel({ caseId, twin, asOf }: TwinPanelProps) {
               : '.'}
           </p>
           {asOf ? <LaterDecisionsNote /> : null}
-          <Accordion
-            multiple
-            collapsible
-            defaultOpenItems={OPEN_BY_DEFAULT.filter((section) => bySection.has(section))}
-          >
+          <Accordion>
             {sections.map((section) => {
               const fields = bySection.get(section) ?? [];
               return (
-                <AccordionItem key={section} value={section}>
-                  <AccordionHeader as="h3" expandIconPosition="end">
-                    {TWIN_SECTION_LABELS[section]}
-                    <span className={styles.count}>{formatNumber(countOfSection(section))}</span>
-                  </AccordionHeader>
-                  <AccordionPanel>
-                    {section === 'participants' ? (
-                      <ParticipantList twin={twin} />
-                    ) : fields.length === 0 ? (
-                      <p className={styles.nothing}>
-                        No values were extracted for this section from the case text.
-                      </p>
-                    ) : (
-                      <ul className={styles.list} aria-label={TWIN_SECTION_LABELS[section]}>
-                        {fields.map((field) => (
-                          <FieldRow key={field.id} field={field} caseId={caseId} asOf={asOf} />
-                        ))}
-                      </ul>
-                    )}
-                  </AccordionPanel>
+                <AccordionItem
+                  key={section}
+                  title={TWIN_SECTION_LABELS[section]}
+                  badge={
+                    <Badge tone="neutral" size="sm">
+                      {formatNumber(countOfSection(section))}
+                    </Badge>
+                  }
+                  defaultOpen={OPEN_BY_DEFAULT.includes(section) && bySection.has(section)}
+                >
+                  {section === 'participants' ? (
+                    <ParticipantList twin={twin} />
+                  ) : fields.length === 0 ? (
+                    <p className={styles.nothing}>
+                      No values were extracted for this section from the case text.
+                    </p>
+                  ) : (
+                    <ul className={styles.list} aria-label={TWIN_SECTION_LABELS[section]}>
+                      {fields.map((field) => (
+                        <FieldRow key={field.id} field={field} caseId={caseId} asOf={asOf} />
+                      ))}
+                    </ul>
+                  )}
                 </AccordionItem>
               );
             })}
           </Accordion>
-          <Notice variant="model-estimate" compact title="Estimates">
+          <p className={styles.estimates}>
+            <ProvenanceBadge kind="estimated" />
             Confidence values are model estimates from rules and patterns over the case text. They
             are not statistical truth.
-          </Notice>
+          </p>
         </>
       )}
     </Panel>
