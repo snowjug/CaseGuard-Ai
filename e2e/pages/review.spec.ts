@@ -4,7 +4,7 @@ import type { Page } from '@playwright/test';
 import { listCases } from '../support/api';
 import { expect, test, type ThemeMode } from '../support/fixtures';
 import { toast } from '../support/flows';
-import { mainRegion, navLink, openPage, primaryNav, settle } from '../support/ui';
+import { mainRegion, openPage, primaryNav, settle } from '../support/ui';
 
 /**
  * The guided review (`/cases/[caseId]/review`) and the report (`/cases/[caseId]/report`): one journey from the verdict to
@@ -27,13 +27,29 @@ interface Quality {
 
 const SECTIONS = [
   'Verdict',
-  'Chronology',
+  'Fix first',
+  'Evidence',
+  'What would have changed the outcome',
+  'What happened',
   'What went wrong',
-  'What should have happened',
-  'Next actions',
-  'Learning',
+  'What to learn',
   'Share',
 ] as const;
+
+/** What the section navigation calls each section (the full title is the link's tooltip). */
+const NAV_LABELS = [
+  'Verdict',
+  'Fix first',
+  'Evidence',
+  'What if',
+  'What happened',
+  'What went wrong',
+  'What to learn',
+  'Share',
+] as const;
+
+/** The sections that start closed: detail on demand. */
+const CLOSED_SECTIONS = ['What went wrong', 'What to learn'] as const;
 
 const REPORT_SECTIONS = [
   'Verdict',
@@ -48,26 +64,43 @@ const REPORT_SECTIONS = [
 ] as const;
 
 const section = (page: Page, name: string | RegExp) =>
-  // A string name is a substring match by default, and "Chronology" is also part of "Chronology strip, scrollable".
+  // A string name is a substring match by default, and "What happened" is also part of "Chronology strip, scrollable".
   page.getByRole('region', typeof name === 'string' ? { name, exact: true } : { name });
 
-test.describe('[FR-REV-01] the guided review reads the case from the verdict to what to do next', () => {
-  test('has seven named sections in reading order, with a section navigation that moves focus', async ({
+/** Opens a section that starts closed, the way a person does: with the button that is its heading. */
+async function openSection(page: Page, name: string) {
+  const toggle = section(page, name).getByRole('button', { name, exact: true });
+  if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  return section(page, name);
+}
+
+test.describe('[FR-REV-01] the review reads the case from the verdict to what to do next', () => {
+  test('has eight named sections in reading order, with a section navigation that moves focus and opens a closed section', async ({
     page,
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/review`);
-    await expect(page.getByRole('heading', { level: 1, name: 'Guided review' })).toBeVisible();
-    const nav = page.getByRole('navigation', { name: 'Sections of the guided review' });
-    await expect(nav.getByRole('link')).toHaveText([...SECTIONS]);
+    await expect(page.getByRole('heading', { level: 1, name: 'Review' })).toBeVisible();
+    const nav = page.getByRole('navigation', { name: 'Sections of the review' });
+    await expect(nav.getByRole('link')).toHaveText([...NAV_LABELS]);
     for (const name of SECTIONS) {
       await expect(section(page, name), name).toBeVisible();
     }
     await expect(mainRegion(page).getByRole('heading', { level: 2 })).toHaveText([...SECTIONS]);
+    for (const name of CLOSED_SECTIONS) {
+      await expect(section(page, name).getByRole('button', { name })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+    }
 
-    await nav.getByRole('link', { name: 'Learning' }).click();
-    await expect(section(page, 'Learning')).toBeFocused();
-    await expect(nav.getByRole('link', { name: 'Learning' })).toHaveAttribute(
+    await nav.getByRole('link', { name: 'What to learn' }).click();
+    await expect(section(page, 'What to learn')).toBeFocused();
+    await expect(
+      section(page, 'What to learn').getByRole('button', { name: 'What to learn' }),
+    ).toHaveAttribute('aria-expanded', 'true');
+    await expect(nav.getByRole('link', { name: 'What to learn' })).toHaveAttribute(
       'aria-current',
       'location',
     );
@@ -92,7 +125,7 @@ test.describe('[FR-REV-01] the guided review reads the case from the verdict to 
     await expect(verdict).toContainText('This is an estimate.');
     await expect(verdict.getByText('Estimated').first()).toBeVisible();
     await expect(
-      verdict.getByRole('heading', { level: 3, name: 'The earliest important missed moment' }),
+      verdict.getByRole('heading', { level: 3, name: 'Earliest missed moment' }),
     ).toBeVisible();
     await expect(verdict).toContainText(earliest!.title);
     await expect(verdict).toContainText('What was done');
@@ -104,7 +137,7 @@ test.describe('[FR-REV-01] the guided review reads the case from the verdict to 
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/review`);
-    const chronology = section(page, 'Chronology');
+    const chronology = section(page, 'What happened');
     await expect(chronology.getByRole('img', { name: /^Chronology strip\./ })).toBeVisible();
     const list = chronology.getByRole('list', { name: /^Key events and waits/ });
     await expect(list).toBeVisible();
@@ -123,7 +156,7 @@ test.describe('[FR-REV-01] the guided review reads the case from the verdict to 
   }) => {
     const forks = await api('engineer').getOk<{ items: Fork[] }>(`/cases/${demo.caseOneId}/forks`);
     await openPage(page, `/cases/${demo.caseOneId}/review`);
-    const wrong = section(page, 'What went wrong');
+    const wrong = await openSection(page, 'What went wrong');
     const list = wrong.getByRole('list', { name: 'Decision points' });
     await expect(list.getByRole('article')).toHaveCount(3);
     const first = list.getByRole('article').first();
@@ -140,12 +173,12 @@ test.describe('[FR-REV-01] the guided review reads the case from the verdict to 
     await expect(list.getByRole('article')).toHaveCount(forks.items.length);
   });
 
-  test('what should have happened is labelled a simulated estimate, with ranges, confidence and assumptions', async ({
+  test('what would have changed the outcome is labelled a simulated estimate, with ranges, confidence and assumptions', async ({
     page,
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/review`);
-    const paths = section(page, 'What should have happened');
+    const paths = section(page, 'What would have changed the outcome');
     await expect(paths.getByText('Simulated estimate').first()).toBeVisible();
     await expect(
       paths.getByRole('table', {
@@ -154,22 +187,49 @@ test.describe('[FR-REV-01] the guided review reads the case from the verdict to 
     ).toBeVisible();
     await expect(paths).toContainText(/(Low|Medium|High) confidence/);
     await expect(paths.getByText(/^Assumptions \(\d+\)$/)).toBeVisible();
-    await expect(paths.getByRole('link', { name: 'Open in the Counterfactual Lab' })).toBeVisible();
+    await expect(paths.getByRole('link', { name: 'Open in What if' })).toBeVisible();
   });
 
-  test('next actions are one ranked list, each with its reason and either evidence or the general-guidance label', async ({
+  test('fix first is one ranked list of three, each with its reason and either evidence or the general-guidance label, and the rest on request', async ({
     page,
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/review`);
-    const actions = section(page, 'Next actions');
+    const actions = section(page, 'Fix first');
     const list = actions.getByRole('list', { name: 'Ranked recommendations' });
-    await expect(list.getByRole('article').first()).toBeVisible();
+    await expect(list.getByRole('article')).toHaveCount(3);
     await expect(list.getByRole('heading', { level: 3 }).first()).toBeVisible();
     await expect(
       list.getByRole('button', { name: /^(Statement|Message or event):/ }).first(),
     ).toBeVisible();
     await expect(actions).toContainText(/Warnings: \d+ open, \d+ resolved, \d+ dismissed\./);
+    await actions.getByRole('button', { name: /^Show \d+ more fixes?$/ }).click();
+    expect(await list.getByRole('article').count()).toBeGreaterThan(3);
+  });
+
+  test('a fix is copied as plain text in one click, and so is the whole fix list from the header', async ({
+    page,
+    context,
+    demo,
+  }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await openPage(page, `/cases/${demo.caseOneId}/review`);
+    const first = section(page, 'Fix first')
+      .getByRole('list', { name: 'Ranked recommendations' })
+      .getByRole('article')
+      .first();
+    const title = (await first.getByRole('heading', { level: 3 }).textContent()) ?? '';
+    await section(page, 'Fix first')
+      .getByRole('button', { name: `Copy fix: ${title}` })
+      .click();
+    await expect(toast(page, 'Fix copied')).toBeVisible();
+    expect((await page.evaluate(() => navigator.clipboard.readText())).split('\n')[0]).toBe(title);
+
+    await page.getByRole('button', { name: 'Copy fix list' }).click();
+    await expect(toast(page, 'Fix list copied')).toBeVisible();
+    const list = await page.evaluate(() => navigator.clipboard.readText());
+    expect(list.split('\n')[0]).toMatch(/^CaseGuard fix list: CG-SYN-1001, /);
+    expect(list).toMatch(/\n1\. .+ \((critical|high priority|medium priority|low priority)\)/);
   });
 
   test('case two says "General guidance" where there is no case-specific evidence, and that no decision point stood out', async ({
@@ -177,19 +237,22 @@ test.describe('[FR-REV-01] the guided review reads the case from the verdict to 
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseTwoId}/review`);
+    await openSection(page, 'What went wrong');
     await expect(section(page, 'What went wrong')).toContainText('No decision point stood out');
-    await expect(section(page, 'What should have happened')).toContainText('Nothing to compare');
-    await expect(section(page, 'Next actions')).toContainText(
+    await expect(section(page, 'What would have changed the outcome')).toContainText(
+      'Nothing to compare',
+    );
+    await expect(section(page, 'Fix first')).toContainText(
       'General guidance — no case-specific evidence',
     );
   });
 
-  test('learning shows the matching skill with the recorded and with-skill figures, and says skills stay drafts', async ({
+  test('what to learn shows the matching skill with the recorded and with-skill figures, and says skills stay drafts', async ({
     page,
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/review`);
-    const learning = section(page, 'Learning');
+    const learning = await openSection(page, 'What to learn');
     await expect(
       learning.getByRole('heading', { level: 3, name: /^This resembles / }),
     ).toBeVisible();
@@ -206,7 +269,8 @@ test.describe('[FR-REV-01] the guided review reads the case from the verdict to 
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/review`);
-    for (const name of SECTIONS.filter((item) => item !== 'Share')) {
+    for (const name of CLOSED_SECTIONS) await openSection(page, name);
+    for (const name of SECTIONS.filter((item) => item !== 'Share' && item !== 'Evidence')) {
       await expect(section(page, name).getByText('How this was calculated'), name).toBeVisible();
     }
     const overall = page.getByText('How this whole review was calculated');
@@ -228,7 +292,7 @@ test.describe('[FR-REV-02] evidence is one interaction away, and checked against
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/review`);
-    const chip = section(page, 'Next actions')
+    const chip = section(page, 'Fix first')
       .getByRole('list', { name: 'Ranked recommendations' })
       .getByRole('button', { name: /^Statement:/ })
       .first();
@@ -251,7 +315,7 @@ test.describe('[FR-REV-02] evidence is one interaction away, and checked against
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/review`);
-    await section(page, 'Next actions')
+    await section(page, 'Fix first')
       .getByRole('button', { name: /^Statement:/ })
       .first()
       .click();
@@ -305,14 +369,16 @@ test.describe('[FR-REV-03] a section the role may not read degrades on its own',
     await expect(verdict.getByText('Not shown').first()).toBeVisible();
     await expect(verdict).toContainText('does not include the “quality:read” permission');
     await expect(
-      verdict.getByRole('heading', { level: 3, name: 'The earliest important missed moment' }),
+      verdict.getByRole('heading', { level: 3, name: 'Earliest missed moment' }),
     ).toBeVisible();
     await expect(
-      section(page, 'Chronology').getByRole('list', { name: /^Key events and waits/ }),
+      section(page, 'What happened').getByRole('list', { name: /^Key events and waits/ }),
     ).toBeVisible();
-    await expect(section(page, 'Learning')).toContainText('This resembles');
+    await expect(
+      (await openSection(page, 'What to learn')).getByText(/This resembles/),
+    ).toBeVisible();
     // The role is told what it lacks; the page does not provoke a refusal to find out.
-    // The side navigation prefetches the Quality Review page, so only the API's own paths count here.
+    // The side navigation prefetches the Quality page, so only the API's own paths count here.
     expect(
       requested.filter((path) => /^\/api\/.+\/(quality|coaching|metrics)$/.test(path)),
     ).toEqual([]);
@@ -333,39 +399,44 @@ test.describe('[FR-REV-03] a section the role may not read degrades on its own',
   });
 });
 
-test.describe('[FR-REV-04] the case overview has one primary action, and the specialist pages stay one click away', () => {
-  test('opens the guided review from the overview and lights the navigation item', async ({
-    page,
-    demo,
-  }) => {
+test.describe('[FR-REV-04] the case workspace has one set of tabs, and the specialist pages stay one click away', () => {
+  test('opens the review from the case tabs and lights the Review tab', async ({ page, demo }) => {
     await openPage(page, `/cases/${demo.caseOneId}`);
-    await expect(page.getByRole('link', { name: /Open guided review/ })).toHaveCount(1);
-    await expect(page.getByRole('link', { name: /Open the timeline/ })).toHaveCount(1);
-    await page.getByRole('link', { name: /Open guided review/ }).click();
+    const tabs = page.getByRole('navigation', { name: 'Case sections' });
+    await expect(tabs.getByRole('link')).toHaveText([
+      'Review',
+      'Score',
+      'Evidence',
+      'What if',
+      'Timeline',
+    ]);
+    await tabs.getByRole('link', { name: 'Review' }).click();
     await expect(page).toHaveURL(new RegExp(`/cases/${demo.caseOneId}/review$`));
-    await expect(page.getByRole('heading', { level: 1, name: 'Guided review' })).toBeVisible();
-    await expect(navLink(page, 'Guided Review')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('heading', { level: 1, name: 'Review' })).toBeVisible();
+    await expect(tabs.getByRole('link', { name: 'Review' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
   });
 
-  test('lists the guided review first among the case pages, keeps the specialist pages, and has a shortcut', async ({
+  test('keeps the other case pages one click away (the tabs and More), and has a shortcut to the review', async ({
     page,
     demo,
   }) => {
-    await openPage(page, `/cases/${demo.caseOneId}`);
-    const investigate = primaryNav(page).getByRole('list', { name: 'Investigate' });
-    await expect(investigate.getByRole('link')).toHaveText([
-      /^Cases/,
-      /^Guided Review/,
-      /^Case Timeline/,
-      /^Evidence Ledger/,
-      /^Hypothesis Arena/,
-      /^Counterfactual Lab/,
-    ]);
+    await openPage(page, `/cases/${demo.caseOneId}/review`);
+    const tabs = page.getByRole('navigation', { name: 'Case sections' });
+    await page.keyboard.press('g');
+    await page.keyboard.press('t');
+    await expect(page).toHaveURL(new RegExp(`/cases/${demo.caseOneId}/timeline$`));
     await page.keyboard.press('g');
     await page.keyboard.press('r');
     await expect(page).toHaveURL(new RegExp(`/cases/${demo.caseOneId}/review$`));
-    await navLink(page, 'Case Timeline').click();
+    await tabs.getByRole('link', { name: 'Timeline' }).click();
     await expect(page).toHaveURL(new RegExp(`/cases/${demo.caseOneId}/timeline$`));
+    await page.getByRole('button', { name: 'More', exact: true }).click();
+    for (const name of ['Possible causes', 'Case details', 'Report']) {
+      await expect(page.getByRole('menuitem', { name }), name).toBeVisible();
+    }
   });
 });
 
@@ -381,12 +452,10 @@ test.describe('[FR-REV-05] the review on a phone', () => {
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow, 'the page is not wider than the screen').toBeLessThanOrEqual(1);
-    const chronology = section(page, 'Chronology');
+    const chronology = section(page, 'What happened');
     await expect(chronology.getByRole('img', { name: /^Chronology strip\./ })).toHaveCount(0);
     await expect(chronology.getByRole('list', { name: /^Key events and waits/ })).toBeVisible();
-    await expect(
-      page.getByRole('navigation', { name: 'Sections of the guided review' }),
-    ).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Sections of the review' })).toBeVisible();
   });
 });
 
@@ -571,7 +640,7 @@ test.describe('[NFR-A11Y-01] the evidence drawer', () => {
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/review`);
-    await section(page, 'Next actions')
+    await section(page, 'Fix first')
       .getByRole('button', { name: /^Statement:/ })
       .first()
       .click();
@@ -600,7 +669,7 @@ test.describe('[FR-REV-07] a manager reads the review and the report but cannot 
     api,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/review`);
-    const learning = section(page, 'Learning');
+    const learning = await openSection(page, 'What to learn');
     await expect(learning.getByRole('button', { name: /^Adopt this plan:/ })).toHaveAttribute(
       'aria-disabled',
       'true',

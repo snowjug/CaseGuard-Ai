@@ -3,11 +3,8 @@ import { asPersona, listCases, waitForJob, type Job } from '../support/api';
 import { mainRegion, openPage, settle } from '../support/ui';
 import { confirmDialog, toast } from '../support/flows';
 
-const roundedScore = (value: number | null): string =>
-  value === null ? '' : `${Math.round(value)} / 100`;
-
 test.describe('[FR-ING-01] Cases: the list of the workspace', () => {
-  test('lists both synthetic cases with the figures of the API, labelled as estimates, newest first', async ({
+  test('lists both demo cases with the figures of the API, labelled as estimates, newest first', async ({
     page,
     api,
   }) => {
@@ -15,25 +12,22 @@ test.describe('[FR-ING-01] Cases: the list of the workspace', () => {
     await openPage(page, '/cases');
     await expect(page.getByRole('heading', { level: 1, name: 'Cases' })).toBeVisible();
     await expect(page.getByText('Showing 2 cases.')).toBeVisible();
-    await expect(
-      page.getByText(/Quality, avoidable effort and hypothesis confidence are estimates/),
-    ).toBeVisible();
 
     const table = page.getByRole('table', { name: 'Cases' });
+    await expect(table.getByRole('columnheader', { name: /Score \(est\.\)/ })).toBeVisible();
     const rows = table.getByRole('row').filter({ has: page.getByRole('rowheader') });
     await expect(rows).toHaveCount(2);
     await expect(rows.first()).toContainText('CG-SYN-1002');
     await expect(rows.nth(1)).toContainText('CG-SYN-1001');
     for (const item of cases) {
       const row = rows.filter({ hasText: item.reference });
-      await expect(row).toContainText(roundedScore(item.qualityIndex));
+      await expect(row).toContainText(`${Math.round(item.qualityIndex ?? 0)}`);
       await expect(row).toContainText(`${Math.round(item.avoidableEffortPct ?? 0)}%`);
-      await expect(row).toContainText('Synthetic');
+      await expect(row).toContainText('Demo data');
       await expect(row).toContainText('Analysed');
-      await expect(row).toContainText('(estimate)');
       await expect(row.getByRole('link', { name: item.reference })).toHaveAttribute(
         'href',
-        `/cases/${item.id}`,
+        `/cases/${item.id}/review`,
       );
     }
   });
@@ -57,15 +51,21 @@ test.describe('[FR-ING-01] Cases: the list of the workspace', () => {
     await filters.getByRole('button', { name: 'Clear filters' }).click();
     await expect(rows).toHaveCount(2);
 
-    await filters.getByRole('combobox', { name: 'Sort by' }).selectOption('Quality: lowest first');
+    await filters.getByRole('combobox', { name: 'Sort by' }).selectOption('Score: lowest first');
     await expect(rows.first()).toContainText('CG-SYN-1001');
-    await filters.getByRole('combobox', { name: 'Analysis state' }).selectOption('Not analysed');
+
+    // The other filters sit in one popover, and the button says how many are set.
+    await filters.getByRole('button', { name: /^Filters/ }).click();
+    await page.getByRole('combobox', { name: 'Analysis state' }).selectOption('Not analysed');
+    await expect(filters.getByRole('button', { name: /^Filters/ })).toContainText('1');
+    await page.keyboard.press('Escape');
     await expect(page.getByRole('heading', { name: /No cases match|No cases/ })).toBeVisible();
 
     // A shared link restores the same view.
     const shared = page.url();
     await page.goto('about:blank');
     await page.goto(shared);
+    await filters.getByRole('button', { name: /^Filters/ }).click();
     await expect(page.getByRole('combobox', { name: 'Analysis state' })).toHaveValue(
       /not_analy[sz]ed/i,
     );
@@ -80,13 +80,13 @@ test.describe('[FR-ING-01] Cases: the list of the workspace', () => {
       .getByRole('row')
       .filter({ has: page.getByRole('rowheader') });
     await page
-      .getByRole('columnheader', { name: /Quality \(est\.\)/ })
+      .getByRole('columnheader', { name: /Score \(est\.\)/ })
       .getByRole('button')
       .click();
     await settle(page);
     const first = await rows.first().textContent();
     await page
-      .getByRole('columnheader', { name: /Quality \(est\.\)/ })
+      .getByRole('columnheader', { name: /Score \(est\.\)/ })
       .getByRole('button')
       .click();
     await settle(page);
@@ -148,37 +148,34 @@ test.describe('[FR-ING-01] a case is deleted only by an administrator, after a c
   });
 });
 
-test.describe('[FR-TWIN-01] Case overview: the digital twin and the links to every case page', () => {
-  test('shows the case facts, five case pages with their counts, 13 twin sections, the time cursor and the analysis run', async ({
+test.describe('[FR-TWIN-01] Case details: the key facts, the case structure and the links to every case page', () => {
+  test('shows the key facts, five case pages with their counts, the 13 sections of the case structure and the review that made them', async ({
     page,
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}`);
-    await expect(
-      page.getByRole('heading', {
-        level: 1,
-        name: 'Intermittent Teams sign-in failures for about 140 branch users (Pune and Leeds)',
-      }),
-    ).toBeVisible();
-    await expect(mainRegion(page)).toContainText(
-      'CG-SYN-1001 · Microsoft Teams · teams-authentication · Severity A · Resolved',
-    );
+    // One h1, the screen's own name: the case header above every case page already says which case this is.
+    await expect(page.getByRole('heading', { level: 1, name: 'Case details' })).toBeVisible();
+    const facts = page.getByRole('group', { name: 'Key facts' });
+    await expect(facts).toContainText('CG-SYN-1001');
+    await expect(facts).toContainText('Microsoft Teams');
+    await expect(facts).toContainText('teams-authentication');
+    await expect(facts).toContainText('Severity A');
+    await expect(facts).toContainText('Resolved');
     const pages = page.getByRole('list', { name: 'Case pages' });
     await expect(pages.getByRole('listitem')).toHaveCount(5);
-    await expect(pages.getByRole('link', { name: /^Case Timeline/ })).toContainText('31 events');
-    await expect(pages.getByRole('link', { name: /^Evidence Ledger/ })).toContainText('59 claims');
-    await expect(pages.getByRole('link', { name: /^Hypothesis Arena/ })).toContainText(
-      '9 hypotheses',
+    await expect(pages.getByRole('link', { name: /^Timeline/ })).toContainText('31 events');
+    await expect(pages.getByRole('link', { name: /^Evidence/ })).toContainText('59 claims');
+    await expect(pages.getByRole('link', { name: /^Possible causes/ })).toContainText(
+      '9 possible causes',
     );
-    await expect(pages.getByRole('link', { name: /^Counterfactual Lab/ })).toContainText(
-      '9 decision forks',
-    );
-    await expect(pages.getByRole('link', { name: /^Quality Review/ })).toHaveAttribute(
+    await expect(pages.getByRole('link', { name: /^What if/ })).toContainText('9 key decisions');
+    await expect(pages.getByRole('link', { name: /^Score/ })).toHaveAttribute(
       'href',
       `/cases/${demo.caseOneId}/quality`,
     );
 
-    const twin = page.getByRole('group', { name: 'Digital twin' });
+    const twin = page.getByRole('group', { name: 'Case structure' });
     await expect(twin).toContainText(
       'The case as structured sections, each value traced to its source.',
     );
@@ -191,10 +188,17 @@ test.describe('[FR-TWIN-01] Case overview: the digital twin and the links to eve
       new RegExp(`/cases/${demo.caseOneId}/timeline\\?sel=e01`),
     );
 
-    const analysis = page.getByRole('group', { name: 'Analysis' });
+    // How the review was made is folded away; its closed line already says how it ended and that it is simulated.
+    const toggle = page.getByRole('button', { name: /^How the review was made/ });
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle).toContainText('Succeeded');
+    await expect(toggle).toContainText('Deterministic provider');
+    await expect(toggle.getByText('Simulated').first()).toBeVisible();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const analysis = page.getByRole('region', { name: /^How the review was made/ });
     await expect(analysis).toContainText('Succeeded');
     await expect(analysis).toContainText('Deterministic provider');
-    await expect(analysis.getByText('Simulated').first()).toBeVisible();
   });
 
   test('the time cursor moves to an earlier event, says what was known, and offers the same moment in other views', async ({
@@ -202,6 +206,11 @@ test.describe('[FR-TWIN-01] Case overview: the digital twin and the links to eve
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}`);
+    // "What was known then" is folded away for the whole record; its bar opens it.
+    const bar = page.getByRole('button', { name: /^What was known then/ });
+    await expect(bar).toHaveAttribute('aria-expanded', 'false');
+    await bar.click();
+    await expect(bar).toHaveAttribute('aria-expanded', 'true');
     const known = page.getByRole('group', { name: 'What was known' });
     await expect(known.getByRole('status')).toContainText(
       'Showing everything up to 12 Mar 2026, 10:20 UTC',
@@ -213,7 +222,7 @@ test.describe('[FR-TWIN-01] Case overview: the digital twin and the links to eve
     await expect(
       known
         .getByRole('list', { name: 'Open this moment in another view' })
-        .getByRole('link', { name: 'Case Timeline' }),
+        .getByRole('link', { name: 'Timeline' }),
     ).toHaveAttribute('href', /asOf=/);
     await known.getByRole('button', { name: 'Latest' }).click();
     await expect(page).not.toHaveURL(/asOf=/);
