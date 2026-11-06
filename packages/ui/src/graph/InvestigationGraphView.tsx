@@ -9,13 +9,7 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import type { InvestigationGraph } from '@caseguard/schemas';
-import {
-  ArrowMaximizeRegular,
-  ZoomFitRegular,
-  ZoomInRegular,
-  ZoomOutRegular,
-  TargetRegular,
-} from '@fluentui/react-icons';
+import { MaximizeIcon, Maximize2Icon, TargetIcon, ZoomInIcon, ZoomOutIcon } from 'lucide-react';
 import {
   useEffect,
   useMemo,
@@ -364,7 +358,7 @@ export function InvestigationGraphView({
       <div className={styles.toolbar}>
         <Toolbar aria-label="Graph controls" size="small">
           <ToolbarButton
-            icon={<ZoomOutRegular />}
+            icon={<ZoomOutIcon />}
             aria-label="Zoom out"
             title="Zoom out (−)"
             onClick={() => zoom(1 / ZOOM_STEP)}
@@ -373,26 +367,26 @@ export function InvestigationGraphView({
             {zoomPercent}
           </span>
           <ToolbarButton
-            icon={<ZoomInRegular />}
+            icon={<ZoomInIcon />}
             aria-label="Zoom in"
             title="Zoom in (+)"
             onClick={() => zoom(ZOOM_STEP)}
           />
           <ToolbarDivider />
           <ToolbarButton
-            icon={<ZoomFitRegular />}
+            icon={<MaximizeIcon />}
             aria-label="Fit whole graph"
             title="Fit whole graph (0)"
             onClick={fit}
           />
           <ToolbarButton
-            icon={<TargetRegular />}
+            icon={<TargetIcon />}
             aria-label="Focus the selected node"
             title="Focus the selected node"
             onClick={focusSelection}
           />
           <ToolbarButton
-            icon={<ArrowMaximizeRegular />}
+            icon={<Maximize2Icon />}
             aria-label="Reset view"
             title="Reset view"
             onClick={() => setManual(null)}

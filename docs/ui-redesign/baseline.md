@@ -42,8 +42,17 @@ Fluent UI styles are generated at runtime (Griffel) and are therefore not part o
 
 ## End-to-end suite (Playwright `desktop` and `mobile` projects)
 
-Run against the baseline production build (standalone server) and the seeded API. The result is appended to this file
-under "E2E baseline result" when that run finishes.
+Run against the baseline production build (standalone server) and the seeded API, one worker, bundled Chromium:
+
+```
+PW_CHANNEL= PW_REUSE_SERVER=1 pnpm exec playwright test --project=desktop --project=mobile
+```
+
+**375 tests: 369 passed, 2 failed, 4 skipped (19 min).** Both failures are caused by how this run was set up, not by the
+product: `resilience.spec.ts` (a web server whose API is down) and `security-http.spec.ts` (client address forwarding)
+each start their own web server from `apps/web/.next-e2e`, which was not built because the shared server used
+`.next` (`CG_NEXT_DIST_DIR=.next`). They are listed as pre-existing; a run that exports the same `CG_NEXT_DIST_DIR` for
+Playwright and the servers finds the build.
 
 ## Screenshots
 

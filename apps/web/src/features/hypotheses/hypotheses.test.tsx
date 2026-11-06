@@ -100,7 +100,7 @@ describe('[FR-HY-01] Hypothesis Arena', () => {
     expect(within(rows[2] as HTMLElement).getByText('Ruled out')).toBeInTheDocument();
     expect(screen.getAllByText(/not statistical truth/).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Model estimates').length).toBeGreaterThan(0);
-    expect(await screen.findByText('Synthetic')).toBeInTheDocument();
+    expect(await screen.findByText('Demo data')).toBeInTheDocument();
   });
 
   it('draws the confidence chart with a text alternative and the actions and forks as numbered markers', async () => {

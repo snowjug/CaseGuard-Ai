@@ -1,15 +1,15 @@
 'use client';
 
 import {
-  Button,
   Popover,
   PopoverSurface,
   PopoverTrigger,
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
-import { QuestionCircleRegular } from '@fluentui/react-icons';
+import { CircleHelpIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { IconButton } from '../kit/Button';
 import { cg } from '../tokens/cg';
 
 const useStyles = makeStyles({
@@ -20,6 +20,8 @@ const useStyles = makeStyles({
     lineHeight: tokens.lineHeightBase300,
     color: cg.text,
     backgroundColor: cg.surfaceRaised,
+    border: `1px solid ${cg.glassBorder}`,
+    borderRadius: cg.radius.md,
     boxShadow: cg.shadowHigh,
   },
   title: {
@@ -70,11 +72,11 @@ export function HelpButton({ label, title, children, size = 'small' }: HelpButto
   return (
     <Popover positioning="below-start" withArrow>
       <PopoverTrigger disableButtonEnhancement>
-        <Button
-          appearance="subtle"
-          size={size}
-          icon={<QuestionCircleRegular />}
-          aria-label={label}
+        <IconButton
+          icon={<CircleHelpIcon />}
+          label={label}
+          size={size === 'small' ? 'sm' : 'md'}
+          tooltip={false}
           title={label}
         />
       </PopoverTrigger>
@@ -110,11 +112,11 @@ export function DefinitionPopover({
   return (
     <Popover positioning="below-start" withArrow>
       <PopoverTrigger disableButtonEnhancement>
-        <Button
-          appearance="subtle"
-          size={size}
-          icon={<QuestionCircleRegular />}
-          aria-label={`What is ${term}?`}
+        <IconButton
+          icon={<CircleHelpIcon />}
+          label={`What is ${term}?`}
+          size={size === 'small' ? 'sm' : 'md'}
+          tooltip={false}
           title={`What is ${term}?`}
         />
       </PopoverTrigger>

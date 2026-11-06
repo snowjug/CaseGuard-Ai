@@ -61,7 +61,7 @@ describe('[FR-CASE-01] Case overview', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: TITLE })).toBeInTheDocument();
     expect(screen.getAllByText('Analysed').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Synthetic').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Demo data').length).toBeGreaterThan(0);
 
     const facts = await group('Key facts');
     expect(facts.getByText('CG-SYN-1001')).toBeInTheDocument();

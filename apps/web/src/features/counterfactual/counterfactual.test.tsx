@@ -125,7 +125,7 @@ describe('[FR-CF-01] Counterfactual Lab: fork selector', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Simulation, not history')).toBeInTheDocument();
     expect(screen.getAllByText('Simulated').length).toBeGreaterThan(0);
-    expect(await screen.findByText('Synthetic')).toBeInTheDocument();
+    expect(await screen.findByText('Demo data')).toBeInTheDocument();
     expect(await screen.findByText('CG-SYN-1001')).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: /See the hypotheses just before this decision/ }),

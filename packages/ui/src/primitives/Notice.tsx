@@ -1,12 +1,7 @@
 'use client';
 
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
-import {
-  CalculatorRegular,
-  InfoRegular,
-  WarningRegular,
-  type FluentIcon,
-} from '@fluentui/react-icons';
+import { CalculatorIcon, InfoIcon, TriangleAlertIcon, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { VisuallyHidden } from '../a11y/VisuallyHidden';
 import { cg } from '../tokens/cg';
@@ -14,19 +9,11 @@ import type { ToneName } from '../tokens/palette';
 
 export type NoticeVariant = 'info' | 'warning' | 'synthetic' | 'model-estimate';
 
-const VARIANTS: Record<
-  NoticeVariant,
-  { tone: ToneName; icon: FluentIcon; title: string; dashed: boolean }
-> = {
-  info: { tone: 'evidence', icon: InfoRegular, title: 'Information', dashed: false },
-  warning: { tone: 'uncertain', icon: WarningRegular, title: 'Warning', dashed: false },
-  synthetic: { tone: 'neutral', icon: InfoRegular, title: 'Synthetic data', dashed: true },
-  'model-estimate': {
-    tone: 'brand',
-    icon: CalculatorRegular,
-    title: 'Model estimate',
-    dashed: true,
-  },
+const VARIANTS: Record<NoticeVariant, { tone: ToneName; icon: LucideIcon; title: string }> = {
+  info: { tone: 'neutral', icon: InfoIcon, title: 'Information' },
+  warning: { tone: 'uncertain', icon: TriangleAlertIcon, title: 'Warning' },
+  synthetic: { tone: 'neutral', icon: InfoIcon, title: 'Demo data' },
+  'model-estimate': { tone: 'brand', icon: CalculatorIcon, title: 'Model estimate' },
 };
 
 const useStyles = makeStyles({
@@ -54,7 +41,7 @@ const useStyles = makeStyles({
 export interface NoticeProps {
   /**
    * `info` and `warning` are general callouts. `synthetic` marks demo data and `model-estimate` marks values that
-   * are estimates; both use a dashed border so they read differently from a real alert.
+   * are estimates. Use at most one notice per screen, and only when it changes what the person should do.
    */
   variant?: NoticeVariant;
   /** Bold lead-in. Defaults to a variant-specific title; pass `null` to omit. */
@@ -68,8 +55,8 @@ export interface NoticeProps {
 }
 
 /**
- * Callout for honesty and guidance messages. It is a static `note` (not an alert), always carries an icon and a
- * text title in addition to colour.
+ * Callout for guidance messages. It is a static `note` (not an alert), always carries an icon and a text title in
+ * addition to colour.
  */
 export function Notice({
   variant = 'info',
@@ -91,7 +78,7 @@ export function Notice({
       className={mergeClasses(styles.root, compact && styles.compact, className)}
       style={{
         backgroundColor: t.tint,
-        border: `1px ${meta.dashed ? 'dashed' : 'solid'} ${t.border}`,
+        border: `1px solid color-mix(in srgb, ${t.border} 35%, transparent)`,
       }}
     >
       <span aria-hidden="true" className={styles.icon} style={{ color: t.fg }}>

@@ -2,23 +2,13 @@
 
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
 import { useId, type CSSProperties, type ReactNode } from 'react';
+import { Card } from '../kit/Card';
 import { cg } from '../tokens/cg';
 import type { ToneName } from '../tokens/palette';
 import { HelpButton } from './HelpButton';
 
 const useStyles = makeStyles({
-  root: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: cg.space[3],
-    minWidth: 0,
-    padding: cg.space[4],
-    borderRadius: cg.radius.lg,
-    backgroundColor: cg.surface,
-    border: `1px solid ${cg.borderSubtle}`,
-    boxShadow: cg.shadowLow,
-    color: cg.text,
-  },
+  root: { gap: cg.space[4] },
   head: {
     display: 'flex',
     alignItems: 'flex-start',
@@ -39,6 +29,7 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase400,
     lineHeight: tokens.lineHeightBase400,
     fontWeight: tokens.fontWeightSemibold,
+    letterSpacing: '-0.01em',
   },
   description: {
     margin: 0,
@@ -50,7 +41,7 @@ const useStyles = makeStyles({
   body: { display: 'flex', flexDirection: 'column', gap: cg.space[3], minWidth: 0 },
   footer: {
     marginTop: 'auto',
-    paddingTop: cg.space[3],
+    paddingTop: cg.space[4],
     borderTop: `1px solid ${cg.borderSubtle}`,
     display: 'flex',
     flexWrap: 'wrap',
@@ -81,8 +72,8 @@ export interface PanelProps {
 }
 
 /**
- * Content panel: a labelled `group` with a heading, optional help, actions and footer. Use it for every card-like
- * section of a page so spacing, headings and the help popover are consistent.
+ * Content panel: a glass card that is a labelled `group` with a heading, optional help, actions and footer. Use it for
+ * every card-like section of a page so spacing, headings and the help popover are consistent.
  */
 export function Panel({
   title,
@@ -100,10 +91,12 @@ export function Panel({
   const headingId = useId();
   const Heading = level === 2 ? 'h2' : 'h3';
   const style: CSSProperties | undefined = accent
-    ? { boxShadow: `inset 4px 0 0 ${cg.tone[accent].solid}, ${cg.shadowLow}` }
+    ? {
+        boxShadow: `inset 3px 0 0 ${cg.tone[accent].solid}, inset 0 1px 0 ${cg.highlight}, ${cg.shadowLow}`,
+      }
     : undefined;
   return (
-    <div
+    <Card
       role="group"
       aria-labelledby={headingId}
       className={mergeClasses(styles.root, className)}
@@ -127,6 +120,6 @@ export function Panel({
       </div>
       <div className={mergeClasses(styles.body, bodyClassName)}>{children}</div>
       {footer ? <div className={styles.footer}>{footer}</div> : null}
-    </div>
+    </Card>
   );
 }

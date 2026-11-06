@@ -19,7 +19,7 @@ seconds, and it looks like a funded product.
 | Framework     | Keep Next.js 16 (App Router), React 19, TanStack Query, react-hook-form. No framework migration. Routes do not change (deep links, e2e and docs depend on them); `/advanced` is the only new route.                                                                                                             |
 | Styling       | Keep Fluent UI v9 + Griffel `makeStyles` and the `@caseguard/ui` package. **No Tailwind, shadcn or Radix**: they are not in use, and a second styling system would fork the tokens. So `class-variance-authority`, `clsx` and `tailwind-merge` are not added either (Griffel `mergeClasses` covers variants).   |
 | Tokens        | One TypeScript palette (`packages/ui/src/tokens`) -> CSS variables (`--cg*`) and the Fluent theme. Components use typed `cg.*` refs and Fluent `tokens.*`; nothing hard-codes a colour, radius or space. `globals.css` only holds static tokens and the pre-hydration canvas, kept in sync by an existing test. |
-| Fluent's role | Behaviour layer for overlays and form controls (Dialog, Drawer, Popover, Tooltip, Menu, Field, Input, Select, Textarea, Checkbox, Radio, Switch): accessible by construction, restyled by the theme and thin kit wrappers. Everything the user sees as "the product" is a kit component.                        |
+| Fluent's role | Behaviour layer for overlays and the few controls the kit does not replace (Dialog, Drawer, Popover, Tooltip, Menu, Checkbox, Radio, Switch): accessible by construction, restyled by the theme and thin kit wrappers. Everything the user sees as "the product" is a kit component.                            |
 | New deps      | `motion` (MIT), `lucide-react` (ISC), `cmdk` (MIT), `@fontsource-variable/geist` and `geist-mono` (OFL-1.1). Nothing else.                                                                                                                                                                                      |
 | Font          | **Geist** variable, self-hosted. General Sans is not used: the Fontshare licence is not clearly compatible with committing the font files to a repository.                                                                                                                                                      |
 | Icons         | **lucide only**, stroke 1.75, sizes 16 / 20 / 24, through one `Icon` helper. All `@fluentui/react-icons` imports are migrated (102 icon components, 311 import sites).                                                                                                                                          |
@@ -155,7 +155,7 @@ Shared state patterns (a screen only lists what differs):
 
 - **Loading:** skeletons shaped like the final layout (hero, cards, rows), region `aria-busy`, no page-level spinner.
 - **Empty:** icon in a soft glow, what is empty, one line on why and what next, one primary action.
-- **Error:** plain sentence (what happened), what to do, `Try again` (primary) and a way out; reference id folded in "Details".
+- **Error:** plain sentence (what happened), what to do, `Retry` (primary when the error is the whole screen) and a way out; reference id folded in "Details".
   Permission errors say which role grants access.
 - **Success:** a toast of at most five seconds for background results (copied, saved, created); an inline success view
   when a flow finishes (analysis done: `Open review`).
@@ -326,7 +326,7 @@ The twelve existing tone names stay (call sites keep compiling) but are remapped
 | Group  | Tokens                                                                                                                                                                                 |
 | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Type   | Geist Variable, Geist Mono. Display 48/1.05, h1 30/1.15, h2 22/1.25, h3 18/1.3, body 15/1.55, caption 13/1.4. Headings tracking -0.02em; scores `tabular-nums`.                        |
-| Space  | 8 px grid: 4 (half step), 8, 12 (half step), 16, 24, 32, 40, 48, 64. Page padding 32 desktop, 16 phone. Card padding 24 hero, 20 default, 16 compact.                                  |
+| Space  | 8 px grid: 4 (half step), 8, 12 (half step), 16, 24, 32, 40, 48, 64. Page padding 32 desktop, 16 phone. Card padding 32 hero, 24 default, 16 compact.                                  |
 | Radius | 8 (chips, small controls), 12 (buttons, inputs), 16 (cards), 24 (hero, dialogs); pill only for badges and avatars.                                                                     |
 | Depth  | Glass cards (translucent surface, 1 px subtle border, 12 px blur, 1 px inner top highlight), a soft accent glow behind the hero and the key result; no heavy shadow; no table borders. |
 | Layout | Sidebar 208, rail 72, bottom bar 64 (+ safe area), top bar 56, content max 1200, bento 12 columns, gap 16 (24 on wide).                                                                |
@@ -366,7 +366,7 @@ Reduced motion (OS setting or the in-app override) removes every item and shows 
 | CommandPalette                                         | `web/lib/command-palette`  | cmdk in a Dialog                                  | keeps the existing command registry and tests' intent.                              |
 | AnimatedList, BlurFade, NumberTicker                   | `ui/motion`                | Motion, CSS                                       | reduced-motion aware.                                                               |
 | DataTable                                              | `ui/primitives`            | Fluent Table                                      | borderless, sticky header, row hover; API kept.                                     |
-| Input, Select, Textarea, Field                         | `ui/kit`                   | Fluent wrappers                                   | radius 12, 44 px on coarse pointers.                                                |
+| Input, Select, Textarea, Field                         | `ui/kit`                   | native elements in one frame                      | radius 12, 44 px on coarse pointers; `Field` wires label, hint and error.           |
 | ThemeToggle, Logo                                      | `ui/kit`                   | `useThemeMode`, SVG                               | light, dark, system; persisted cookie, no flash (existing mechanism).               |
 | AppShell, Sidebar, BottomBar, TopBar                   | `web/components/shell`     | kit parts                                         | five items; skip link and landmarks kept.                                           |
 | PageHeader                                             | `ui/primitives`            | kit parts                                         | title, one-line purpose, one primary action, breadcrumb only where depth exists.    |

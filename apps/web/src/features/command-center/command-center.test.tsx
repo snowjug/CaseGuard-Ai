@@ -130,7 +130,7 @@ describe('[FR-CC-01] Command Center page', () => {
 
   it('labels synthetic data wherever it appears', async () => {
     renderApp(<CommandCenterPage />, { api: api() });
-    expect((await screen.findAllByText('Synthetic')).length).toBeGreaterThan(2);
+    expect((await screen.findAllByText('Demo data')).length).toBeGreaterThan(2);
     expect(
       screen.getByText(/All case data, people and organisations in this environment are synthetic/),
     ).toBeInTheDocument();

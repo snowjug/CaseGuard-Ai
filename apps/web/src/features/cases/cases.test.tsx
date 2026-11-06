@@ -73,7 +73,7 @@ describe('[FR-CASES-01] Cases list', () => {
     expect(within(first).getByText('57%')).toBeInTheDocument();
     expect(within(first).getByText('DNS resolution failure')).toBeInTheDocument();
     expect(within(first).getByText(/93% confidence \(estimate\)/)).toBeInTheDocument();
-    expect(within(first).getByText('Synthetic')).toBeInTheDocument();
+    expect(within(first).getByText('Demo data')).toBeInTheDocument();
     expect(within(first).getByText('Analysed')).toBeInTheDocument();
     // Honest labelling of the estimates.
     expect(screen.getByText(/are estimates from the analysis of each case/)).toBeInTheDocument();

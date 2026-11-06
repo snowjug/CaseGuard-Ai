@@ -102,7 +102,7 @@ describe('[FR-QA-02] Portfolio analytics page', () => {
     expect(within(table).getByText('93.9% faster')).toBeInTheDocument();
     expect(within(table).getByText('vs the case it came from')).toBeInTheDocument();
     expect(within(table).getByText('Estimated')).toBeInTheDocument();
-    expect(within(table).getByText('Synthetic')).toBeInTheDocument();
+    expect(within(table).getByText('Demo data')).toBeInTheDocument();
     expect(within(skills).getByText(SYNTHETIC_EFFECTIVENESS_NOTICE)).toBeInTheDocument();
   });
 
@@ -157,7 +157,7 @@ describe('[FR-QA-02] Portfolio analytics page', () => {
     expect(within(earlier).getByText('93.9% faster')).toBeInTheDocument();
     expect(within(earlier).getByText('vs the case it came from')).toBeInTheDocument();
     expect(within(earlier).getByText('Estimated')).toBeInTheDocument();
-    expect(within(earlier).getByText('Synthetic')).toBeInTheDocument();
+    expect(within(earlier).getByText('Demo data')).toBeInTheDocument();
 
     const simulated = rowOf('Check the client trace first');
     expect(within(simulated).getByText('49.6% slower')).toBeInTheDocument();
@@ -168,7 +168,7 @@ describe('[FR-QA-02] Portfolio analytics page', () => {
     expect(within(missing).getByText('Not enough data')).toBeInTheDocument();
     expect(within(missing).queryByText(/^vs /)).toBeNull();
     expect(within(missing).queryByText('Estimated')).toBeNull();
-    expect(within(missing).getByText('Synthetic')).toBeInTheDocument();
+    expect(within(missing).getByText('Demo data')).toBeInTheDocument();
 
     // The labels sit with the figure they qualify: a column of badges alone is cut to a few pixels on a phone.
     expect(within(table).queryByRole('columnheader', { name: 'Data' })).toBeNull();

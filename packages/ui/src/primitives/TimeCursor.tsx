@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Slider, makeStyles, tokens } from '@fluentui/react-components';
-import { ArrowNextRegular, ArrowPreviousRegular, HistoryRegular } from '@fluentui/react-icons';
+import { ArrowLeftIcon, ArrowRightIcon, HistoryIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { VisuallyHidden } from '../a11y/VisuallyHidden';
 import { formatDateTimeUtc } from '../format';
@@ -203,7 +203,7 @@ export function TimeCursor({
           <Button
             size="small"
             appearance="subtle"
-            icon={<ArrowPreviousRegular />}
+            icon={<ArrowLeftIcon />}
             aria-label="Previous event"
             title="Previous event"
             disabled={disabled || previous === undefined}
@@ -246,7 +246,7 @@ export function TimeCursor({
           <Button
             size="small"
             appearance="subtle"
-            icon={<ArrowNextRegular />}
+            icon={<ArrowRightIcon />}
             aria-label="Next event"
             title="Next event"
             disabled={disabled || next === undefined}
@@ -256,7 +256,7 @@ export function TimeCursor({
         <Button
           size="small"
           appearance="outline"
-          icon={<HistoryRegular />}
+          icon={<HistoryIcon />}
           disabled={disabled || value === null}
           onClick={() => {
             if (timer.current) clearTimeout(timer.current);

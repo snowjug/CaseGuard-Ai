@@ -54,7 +54,7 @@ describe('[REV-PAGE-01] one page of sections', () => {
 
     // The page says what kind of figures it shows.
     expect(screen.getAllByText('Estimated').length).toBeGreaterThan(0);
-    expect(screen.getByText('Synthetic')).toBeVisible();
+    expect(screen.getByText('Demo data')).toBeVisible();
     await screen.findByText(/about 36 out of 100/);
     await expectNoAxeViolations(container);
   });

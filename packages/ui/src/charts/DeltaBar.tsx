@@ -1,7 +1,7 @@
 'use client';
 
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
-import { ArrowDownRegular, ArrowUpRegular, SubtractRegular } from '@fluentui/react-icons';
+import { ArrowDownIcon, ArrowUpIcon, MinusIcon } from 'lucide-react';
 import { formatNumber } from '../format';
 import { useSafeId } from '../hooks/useSafeId';
 import { ProvenanceBadge } from '../primitives/ProvenanceBadge';
@@ -115,7 +115,7 @@ export function DeltaBar({
   const height = rowH * 2 + gap + 4;
 
   const { delta, percent, verdict } = computeDelta(actual, counterfactual, better);
-  const DeltaIcon = delta === 0 ? SubtractRegular : delta < 0 ? ArrowDownRegular : ArrowUpRegular;
+  const DeltaIcon = delta === 0 ? MinusIcon : delta < 0 ? ArrowDownIcon : ArrowUpIcon;
   const verdictTone =
     verdict === 'better'
       ? cg.tone.productive.fg

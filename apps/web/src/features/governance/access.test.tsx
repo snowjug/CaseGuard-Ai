@@ -44,7 +44,7 @@ describe('[FR-GOV-30] roles', () => {
     const table = await screen.findByRole('table', { name: 'Users and their roles' });
     expect(within(table).getAllByRole('row')).toHaveLength(4);
     expect(within(table).getByText('Riley Reviewer (synthetic)')).toBeInTheDocument();
-    expect(within(table).getAllByText('Synthetic').length).toBeGreaterThan(0);
+    expect(within(table).getAllByText('Demo data').length).toBeGreaterThan(0);
 
     await user.click(
       screen.getByRole('button', { name: 'Change roles for Riley Reviewer (synthetic)' }),

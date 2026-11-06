@@ -56,4 +56,5 @@ and its sync test, theme toggle, then the kit components with tests, then the ic
 
 **Open issues**
 
-- Baseline e2e result still pending (appended to `baseline.md`).
+- None open from the baseline: the e2e baseline is recorded in `baseline.md` (369 of 375 pass; the 2 failures are an
+  artefact of the shared-server run setup, 4 are skipped by design).

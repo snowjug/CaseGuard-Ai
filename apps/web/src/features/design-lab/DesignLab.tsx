@@ -72,6 +72,7 @@ import {
   type SampleCaseRow,
 } from './samples';
 import { SAMPLE_GRAPH } from './sample-graph';
+import { KitGallery } from './KitGallery';
 
 const useStyles = makeStyles({
   page: {
@@ -450,6 +451,7 @@ export function DesignLab() {
   const [asOf, setAsOf] = useState<string | null>(null);
   const [dialogResult, setDialogResult] = useState('No action taken yet.');
   const sections = [
+    ['kit', 'Kit'],
     ['tokens', 'Tokens'],
     ['badges', 'Badges'],
     ['notices', 'Notices'],
@@ -485,6 +487,10 @@ export function DesignLab() {
           ))}
         </ul>
       </nav>
+
+      <section id="kit" aria-labelledby="kit-title">
+        <KitGallery />
+      </section>
 
       <Section
         id="tokens"

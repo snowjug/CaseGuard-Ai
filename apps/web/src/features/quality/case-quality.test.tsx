@@ -746,7 +746,7 @@ describe('[FR-QR-05] Case Quality Review: Avoidable Support Effort', () => {
     const ase = await screen.findByRole('group', { name: 'Avoidable Support Effort' });
     expect(within(ase).getByText('Estimated')).toBeInTheDocument();
     expect(within(ase).getAllByText('Simulated').length).toBeGreaterThan(0);
-    expect(within(ase).getByText('Synthetic')).toBeInTheDocument();
+    expect(within(ase).getByText('Demo data')).toBeInTheDocument();
     expect(
       within(ase).getByText(/About 55% of the effort could plausibly have been avoided/),
     ).toBeInTheDocument();

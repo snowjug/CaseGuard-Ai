@@ -6,15 +6,21 @@ import { cg } from '../tokens/cg';
 import { HelpButton } from './HelpButton';
 
 const useStyles = makeStyles({
-  page: { display: 'flex', flexDirection: 'column', gap: cg.space[2], marginBottom: cg.space[4] },
+  page: { display: 'flex', flexDirection: 'column', gap: cg.space[3], marginBottom: cg.space[6] },
   row: {
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: `${cg.space[2]} ${cg.space[4]}`,
+    gap: `${cg.space[3]} ${cg.space[6]}`,
   },
-  titleBlock: { minWidth: 0, display: 'flex', flexDirection: 'column', gap: cg.space[1] },
+  titleBlock: {
+    minWidth: 0,
+    flex: '1 1 320px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[2],
+  },
   titleLine: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: cg.space[2] },
   h1: {
     margin: 0,
@@ -22,13 +28,19 @@ const useStyles = makeStyles({
     lineHeight: tokens.lineHeightHero700,
     fontWeight: tokens.fontWeightSemibold,
     color: cg.text,
-    letterSpacing: '-0.01em',
+    letterSpacing: '-0.02em',
+    overflowWrap: 'anywhere',
+    '@media (max-width: 640px)': {
+      fontSize: tokens.fontSizeBase600,
+      lineHeight: tokens.lineHeightBase600,
+    },
   },
   h2: {
     margin: 0,
     fontSize: tokens.fontSizeBase500,
     lineHeight: tokens.lineHeightBase500,
     fontWeight: tokens.fontWeightSemibold,
+    letterSpacing: '-0.015em',
     color: cg.text,
   },
   h3: {
@@ -36,11 +48,12 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase400,
     lineHeight: tokens.lineHeightBase400,
     fontWeight: tokens.fontWeightSemibold,
+    letterSpacing: '-0.01em',
     color: cg.text,
   },
   description: {
     margin: 0,
-    maxWidth: '72ch',
+    maxWidth: '68ch',
     fontSize: tokens.fontSizeBase300,
     lineHeight: tokens.lineHeightBase300,
     color: cg.textSecondary,
@@ -56,20 +69,23 @@ const useStyles = makeStyles({
 });
 
 export interface PageHeaderProps {
-  /** The one `h1` of the page. */
+  /** The one `h1` of the page: short, one to three words. */
   title: string;
+  /** One line that says what the page is for. */
   description?: ReactNode;
-  /** Breadcrumb trail rendered above the title (the shell passes its `<Breadcrumbs>`). */
+  /** Breadcrumb trail above the title; only where the page has depth (a case, a skill, an Advanced view). */
   breadcrumbs?: ReactNode;
-  /** Primary and secondary page actions (right aligned, wraps on small screens). */
+  /** The page's actions, right aligned: at most one primary button, the rest secondary or ghost. */
   actions?: ReactNode;
   /** Contextual help: content of the `?` popover explaining the page and its definitions. */
   help?: ReactNode;
-  /** Badges next to the description (Synthetic, Estimated...). */
+  /** Badges next to the description (Demo data, Estimated...). */
   meta?: ReactNode;
+  /** Page navigation under the title (the case workspace's `TabNav`). */
+  tabs?: ReactNode;
 }
 
-/** Page title block: breadcrumbs slot, `h1`, description, badges, actions and a contextual-help popover. */
+/** Page title block: breadcrumbs slot, `h1`, one-line purpose, badges, actions, tabs and a contextual-help popover. */
 export function PageHeader({
   title,
   description,
@@ -77,6 +93,7 @@ export function PageHeader({
   actions,
   help,
   meta,
+  tabs,
 }: PageHeaderProps) {
   const styles = useStyles();
   return (
@@ -97,6 +114,7 @@ export function PageHeader({
         </div>
         {actions ? <div className={styles.actions}>{actions}</div> : null}
       </div>
+      {tabs}
     </header>
   );
 }

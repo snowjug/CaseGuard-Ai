@@ -1,7 +1,7 @@
 'use client';
 
-import { BeakerRegular, CalculatorRegular, InfoRegular } from '@fluentui/react-icons';
-import { BadgeShell } from './BadgeShell';
+import { CalculatorIcon, FlaskConicalIcon, InfoIcon } from 'lucide-react';
+import { Badge } from '../kit/Badge';
 
 export type ProvenanceKind = 'synthetic' | 'estimated' | 'simulated';
 
@@ -11,7 +11,7 @@ export interface ProvenanceBadgeProps {
    * `simulated`: a counterfactual / what-if result.
    */
   kind: ProvenanceKind;
-  /** Overrides the default text ("Synthetic", "Estimated", "Simulated"). */
+  /** Overrides the default text ("Demo data", "Estimated", "Simulated"). */
   label?: string;
   size?: 'small' | 'medium';
   className?: string;
@@ -19,12 +19,12 @@ export interface ProvenanceBadgeProps {
 
 const META: Record<ProvenanceKind, { label: string; description: string }> = {
   synthetic: {
-    label: 'Synthetic',
+    label: 'Demo data',
     description: 'Synthetic data: generated for demonstration, never real customer data',
   },
   estimated: {
     label: 'Estimated',
-    description: 'Estimated value: a model estimate, not a measured fact',
+    description: 'Estimated value: a model estimate with a range, not a measured fact',
   },
   simulated: {
     label: 'Simulated',
@@ -33,40 +33,34 @@ const META: Record<ProvenanceKind, { label: string; description: string }> = {
 };
 
 /**
- * Honesty badge. Synthetic = outlined with an info icon; Estimated = dotted underline with a calculator icon;
- * Simulated = dashed outline with a hatch chip and a beaker icon.
+ * Honesty badge. Demo data = outlined with an info icon; Estimated = dotted underline with a calculator icon;
+ * Simulated = dashed accent outline with a flask icon. The full sentence is the tooltip, never a banner.
  */
 export function ProvenanceBadge({ kind, label, size = 'small', className }: ProvenanceBadgeProps) {
   const meta = META[kind];
   const common = {
-    label: label ?? meta.label,
-    size,
+    size: size === 'small' ? ('sm' as const) : ('md' as const),
     title: meta.description,
     ...(className ? { className } : {}),
   };
+  const text = label ?? meta.label;
   if (kind === 'synthetic') {
     return (
-      <BadgeShell {...common} tone="neutral" pattern="outline" icon={<InfoRegular />} outlined />
+      <Badge {...common} tone="neutral" icon={<InfoIcon />} outlined>
+        {text}
+      </Badge>
     );
   }
   if (kind === 'estimated') {
     return (
-      <BadgeShell
-        {...common}
-        tone="neutral"
-        pattern="dots"
-        icon={<CalculatorRegular />}
-        dottedLabel
-      />
+      <Badge {...common} tone="neutral" icon={<CalculatorIcon />} dotted>
+        {text}
+      </Badge>
     );
   }
   return (
-    <BadgeShell
-      {...common}
-      tone="simulated"
-      pattern="hatch"
-      icon={<BeakerRegular />}
-      borderStyle="dashed"
-    />
+    <Badge {...common} tone="simulated" icon={<FlaskConicalIcon />} dashed>
+      {text}
+    </Badge>
   );
 }

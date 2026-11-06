@@ -324,7 +324,7 @@ describe('[FR-SK-02] SkillDNA Library', () => {
     );
     expect(within(card).getByText('Published')).toBeInTheDocument();
     expect(within(card).getByText('Change proposed')).toBeInTheDocument();
-    expect(within(card).getByText('Synthetic')).toBeInTheDocument();
+    expect(within(card).getByText('Demo data')).toBeInTheDocument();
     expect(within(card).getByText('version 1.0.0')).toBeInTheDocument();
     expect(within(card).getByText('Confidence (estimate)')).toBeInTheDocument();
     expect(within(card).getByText('60%')).toBeInTheDocument();
@@ -1464,7 +1464,7 @@ describe('[FR-SK-07] Skill detail: cases, effectiveness and applying a skill', (
     renderApp(<SkillDetailPage skillId={SKILL_ID} />, { api: api() });
     const panel = await screen.findByRole('group', { name: 'Effectiveness' });
     expect(within(panel).getAllByText('Estimated').length).toBeGreaterThan(0);
-    expect(within(panel).getByText('Synthetic')).toBeInTheDocument();
+    expect(within(panel).getAllByText('Demo data').length).toBeGreaterThan(0);
     const tiles = within(panel).getByRole('list', { name: 'Effectiveness' });
     expect(tiles).toHaveTextContent('Applications1');
     expect(tiles).toHaveTextContent('Plan followed (average)100%');

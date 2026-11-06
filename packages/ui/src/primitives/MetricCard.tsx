@@ -1,16 +1,12 @@
 'use client';
 
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
-import {
-  ArrowDownRegular,
-  ArrowRightRegular,
-  ArrowUpRegular,
-  SubtractRegular,
-} from '@fluentui/react-icons';
+import { ArrowDownIcon, ArrowRightIcon, ArrowUpIcon, MinusIcon } from 'lucide-react';
 import { METRIC_DEFINITIONS, type MetricCard as MetricCardModel } from '@caseguard/schemas';
 import { useId } from 'react';
 import { VisuallyHidden } from '../a11y/VisuallyHidden';
 import { formatMetricValue, formatNumber, NOT_AVAILABLE } from '../format';
+import { Card } from '../kit/Card';
 import { UiLink } from '../link-context';
 import { cg } from '../tokens/cg';
 import { DefinitionPopover } from './HelpButton';
@@ -20,24 +16,13 @@ import { StatusBadge } from './StatusBadge';
 import type { BadgeStatus } from './status-meta';
 
 const useStyles = makeStyles({
-  root: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: cg.space[2],
-    minWidth: 0,
-    padding: cg.space[4],
-    borderRadius: cg.radius.lg,
-    backgroundColor: cg.surface,
-    border: `1px solid ${cg.borderSubtle}`,
-    boxShadow: cg.shadowLow,
-    color: cg.text,
-  },
+  root: { gap: cg.space[3] },
   top: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: cg.space[2] },
   label: {
     margin: 0,
     fontSize: tokens.fontSizeBase300,
     lineHeight: tokens.lineHeightBase300,
-    fontWeight: tokens.fontWeightSemibold,
+    fontWeight: tokens.fontWeightMedium,
     color: cg.textSecondary,
   },
   valueRow: {
@@ -47,16 +32,16 @@ const useStyles = makeStyles({
     gap: `${cg.space[1]} ${cg.space[3]}`,
   },
   value: {
-    fontSize: tokens.fontSizeHero800,
-    lineHeight: tokens.lineHeightHero800,
+    fontSize: tokens.fontSizeHero700,
+    lineHeight: tokens.lineHeightHero700,
     fontWeight: tokens.fontWeightSemibold,
-    letterSpacing: '-0.01em',
+    letterSpacing: '-0.02em',
     fontVariantNumeric: 'tabular-nums',
     overflowWrap: 'anywhere',
   },
   // Long displays such as "7.4 bits/1k tokens" step down a size so they stay on one or two lines.
-  valueMedium: { fontSize: tokens.fontSizeHero700, lineHeight: tokens.lineHeightHero700 },
-  valueSmall: { fontSize: tokens.fontSizeBase600, lineHeight: tokens.lineHeightBase600 },
+  valueMedium: { fontSize: tokens.fontSizeBase600, lineHeight: tokens.lineHeightBase600 },
+  valueSmall: { fontSize: tokens.fontSizeBase500, lineHeight: tokens.lineHeightBase500 },
   trend: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -156,13 +141,13 @@ export function MetricCard({ metric, headingLevel = 3, className }: MetricCardPr
         : cg.textSecondary;
   const TrendIcon =
     metric.trend?.direction === 'up'
-      ? ArrowUpRegular
+      ? ArrowUpIcon
       : metric.trend?.direction === 'down'
-        ? ArrowDownRegular
-        : SubtractRegular;
+        ? ArrowDownIcon
+        : MinusIcon;
 
   return (
-    <div
+    <Card
       role="group"
       aria-labelledby={headingId}
       className={mergeClasses(styles.root, className)}
@@ -236,9 +221,9 @@ export function MetricCard({ metric, headingLevel = 3, className }: MetricCardPr
       {metric.evidenceLink ? (
         <UiLink href={metric.evidenceLink.href} className={styles.link}>
           {metric.evidenceLink.label}
-          <ArrowRightRegular aria-hidden="true" />
+          <ArrowRightIcon aria-hidden="true" />
         </UiLink>
       ) : null}
-    </div>
+    </Card>
   );
 }
