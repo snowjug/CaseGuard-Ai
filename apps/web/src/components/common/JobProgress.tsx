@@ -2,6 +2,7 @@
 
 import type { Job, JobKind, JobStage, Permission } from '@caseguard/schemas';
 import {
+  Button,
   ConfirmDialog,
   ErrorState,
   Notice,
@@ -12,13 +13,8 @@ import {
   formatTimeUtc,
   type BadgeStatus,
 } from '@caseguard/ui';
-import { Button, ProgressBar, Spinner, makeStyles, tokens } from '@fluentui/react-components';
-import {
-  CheckmarkCircleRegular,
-  CircleRegular,
-  DismissCircleRegular,
-  SubtractCircleRegular,
-} from '@fluentui/react-icons';
+import { ProgressBar, Spinner, makeStyles, tokens } from '@fluentui/react-components';
+import { CircleCheckIcon, CircleIcon, CircleMinusIcon, CircleXIcon } from 'lucide-react';
 import { describeError } from '../../lib/api/errors';
 import { useApiMutation, useJob } from '../../lib/api/hooks';
 import { GatedAction, useSession } from '../../lib/auth/session';
@@ -90,13 +86,13 @@ function StageIcon({ status }: { status: JobStage['status'] }) {
     case 'running':
       return <Spinner size="extra-tiny" />;
     case 'done':
-      return <CheckmarkCircleRegular className={styles.done} />;
+      return <CircleCheckIcon aria-hidden="true" size={18} className={styles.done} />;
     case 'failed':
-      return <DismissCircleRegular className={styles.failed} />;
+      return <CircleXIcon aria-hidden="true" size={18} className={styles.failed} />;
     case 'skipped':
-      return <SubtractCircleRegular className={styles.muted} />;
+      return <CircleMinusIcon aria-hidden="true" size={18} className={styles.muted} />;
     default:
-      return <CircleRegular className={styles.muted} />;
+      return <CircleIcon aria-hidden="true" size={18} className={styles.muted} />;
   }
 }
 
@@ -160,7 +156,7 @@ export function JobProgress({
     ? `${title}: ${meta.label.toLowerCase()}.`
     : `${title}: ${current ? current.label : stage}, ${doneCount} of ${stages.length} steps done.`;
   const permission = CANCEL_PERMISSION[job.kind];
-  const cancelButton = <Button appearance="outline">Cancel</Button>;
+  const cancelButton = <Button variant="secondary">Cancel</Button>;
 
   return (
     <Panel

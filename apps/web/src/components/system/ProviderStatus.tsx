@@ -2,6 +2,7 @@
 
 import type { ProviderStatus } from '@caseguard/schemas';
 import {
+  Button,
   KeyValueList,
   LoadingSkeleton,
   Notice,
@@ -12,8 +13,8 @@ import {
   formatDateTimeUtc,
   formatNumber,
 } from '@caseguard/ui';
-import { Button, makeStyles, tokens } from '@fluentui/react-components';
-import { ArrowSyncRegular } from '@fluentui/react-icons';
+import { makeStyles, tokens } from '@fluentui/react-components';
+import { RefreshCwIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useApiQuery } from '../../lib/api/hooks';
 import { useAuth } from '../../lib/auth/context';
@@ -121,9 +122,9 @@ export function ProviderStatusSection({ enabled = true }: { enabled?: boolean })
       provider={query.data}
       actions={
         <Button
-          appearance="subtle"
-          size="small"
-          icon={<ArrowSyncRegular />}
+          variant="ghost"
+          size="sm"
+          icon={<RefreshCwIcon />}
           disabled={query.isFetching}
           onClick={() => void query.refetch()}
         >

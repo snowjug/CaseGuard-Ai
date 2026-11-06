@@ -1,12 +1,13 @@
 'use client';
 
-import { ErrorState, cg } from '@caseguard/ui';
-import { Button, makeStyles } from '@fluentui/react-components';
-import { HomeRegular } from '@fluentui/react-icons';
+import { ErrorState, cg, useButtonClassName } from '@caseguard/ui';
+import { makeStyles } from '@fluentui/react-components';
+import { HomeIcon } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
 const useStyles = makeStyles({
   standalone: { maxWidth: '720px', marginInline: 'auto', padding: `${cg.space[8]} ${cg.space[4]}` },
+  focus: { outlineStyle: 'none' },
 });
 
 export interface RouteErrorProps {
@@ -21,23 +22,25 @@ export interface RouteErrorProps {
 export function RouteError({ error, reset, standalone = false }: RouteErrorProps) {
   const styles = useStyles();
   const heading = useRef<HTMLDivElement | null>(null);
+  const homeClass = useButtonClassName({ variant: 'secondary' });
 
   useEffect(() => {
     heading.current?.focus();
   }, []);
 
   const body = (
-    <div ref={heading} tabIndex={-1} style={{ outline: 'none' }}>
+    <div ref={heading} tabIndex={-1} className={styles.focus}>
       <ErrorState
         title="This page hit an unexpected problem"
-        description="Nothing was lost or changed. You can try again, or start over from the Command Center."
+        description="Nothing was lost or changed. You can try again, or start over from Home."
         error={{ code: 'render_error', ...(error.digest ? { correlationId: error.digest } : {}) }}
         onRetry={reset}
         actions={
           // A full page load on purpose: it clears whatever state caused the crash.
-          <Button as="a" href="/" appearance="outline" icon={<HomeRegular />}>
-            Go to the Command Center
-          </Button>
+          <a href="/" className={homeClass}>
+            <HomeIcon aria-hidden="true" />
+            Go home
+          </a>
         }
       />
     </div>

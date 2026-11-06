@@ -179,6 +179,60 @@ const initialsOf = (name: string): string =>
     .map((part) => part.charAt(0).toUpperCase())
     .join('') || '?';
 
+/** The seeded personas as selectable rows: name and role, a line about what they can do, and a check on the chosen one. */
+export function PersonaList({
+  personas,
+  chosenId,
+  onSelect,
+  showTenant = true,
+  className,
+}: {
+  personas: readonly Persona[];
+  chosenId: string | null;
+  onSelect: (personaId: string) => void;
+  showTenant?: boolean;
+  className?: string;
+}) {
+  const styles = useStyles();
+  return (
+    <ul className={mergeClasses(styles.list, className)} aria-label="Personas">
+      {personas.map((persona) => {
+        const chosen = persona.id === chosenId;
+        return (
+          <li key={persona.id}>
+            <button
+              type="button"
+              className={mergeClasses(styles.option, chosen && styles.chosen)}
+              aria-pressed={chosen}
+              onClick={() => onSelect(persona.id)}
+            >
+              <span
+                className={styles.avatar}
+                aria-hidden="true"
+                data-initials={initialsOf(persona.displayName)}
+              />
+              <span className={styles.text}>
+                <span className={styles.name}>
+                  {persona.displayName} · {ROLE_LABELS[persona.role]}
+                </span>
+                <span className={styles.meta}>{persona.description}</span>
+                {showTenant ? (
+                  <span className={styles.meta}>Tenant: {persona.tenantId}</span>
+                ) : null}
+              </span>
+              {chosen ? (
+                <span className={styles.check} aria-hidden="true">
+                  <CheckIcon />
+                </span>
+              ) : null}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 /** Dialog that lists the seeded personas (`dev.personas`) and switches the identity. Render it once in the shell. */
 export function PersonaPickerDialog() {
   const auth = useAuth();
@@ -226,39 +280,11 @@ export function PersonaPickerDialog() {
         {personas.data?.enabled ? (
           <>
             {personas.data.notice ? <p className={styles.note}>{personas.data.notice}</p> : null}
-            <ul className={styles.list} aria-label="Personas">
-              {personas.data.items.map((persona: Persona) => {
-                const chosen = persona.id === dev.personaId;
-                return (
-                  <li key={persona.id}>
-                    <button
-                      type="button"
-                      className={mergeClasses(styles.option, chosen && styles.chosen)}
-                      aria-pressed={chosen}
-                      onClick={() => dev.selectPersona(persona.id)}
-                    >
-                      <span
-                        className={styles.avatar}
-                        aria-hidden="true"
-                        data-initials={initialsOf(persona.displayName)}
-                      />
-                      <span className={styles.text}>
-                        <span className={styles.name}>
-                          {persona.displayName} · {ROLE_LABELS[persona.role]}
-                        </span>
-                        <span className={styles.meta}>{persona.description}</span>
-                        <span className={styles.meta}>Tenant: {persona.tenantId}</span>
-                      </span>
-                      {chosen ? (
-                        <span className={styles.check} aria-hidden="true">
-                          <CheckIcon />
-                        </span>
-                      ) : null}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            <PersonaList
+              personas={personas.data.items}
+              chosenId={dev.personaId}
+              onSelect={dev.selectPersona}
+            />
           </>
         ) : null}
       </div>

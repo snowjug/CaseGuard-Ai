@@ -1,7 +1,7 @@
 'use client';
 
 import { EmptyState, PageHeader } from '@caseguard/ui';
-import { FolderRegular } from '@fluentui/react-icons';
+import { FolderSearchIcon } from 'lucide-react';
 import { LinkButton } from '../common/LinkButton';
 
 /**
@@ -15,7 +15,7 @@ export function CaseNotFoundState() {
       <PageHeader title="Case not found" description="This case does not exist or was deleted." />
       <EmptyState
         headingLevel={2}
-        icon={<FolderRegular />}
+        icon={<FolderSearchIcon />}
         title="We could not find that case"
         description="It may have been deleted, or the address may be mistyped."
         action={
