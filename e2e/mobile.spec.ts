@@ -5,17 +5,18 @@ import { PERSONAS, type PersonaKey } from './support/personas';
 import { mainRegion, openPage, settle } from './support/ui';
 
 /**
- * Key mobile layout behaviour (the `mobile` project: 390x844, touch): no horizontal page scroll on any page, a bottom bar
- * with the five places, tables that scroll inside a labelled region instead of squeezing, and primary actions that can be
- * reached and are big enough to touch.
+ * Key mobile layout behaviour (the `mobile` project: 390x844, touch): no horizontal page scroll on any page (also at the
+ * 320 px of WCAG 1.4.10), a bottom bar with the five places, tables that scroll inside a labelled region instead of
+ * squeezing, and primary actions that can be reached and are big enough to touch.
  */
 interface PageSpec {
   readonly name: string;
   readonly path: (ids: DemoIds) => string;
-  readonly persona: PersonaKey;
+  readonly persona: PersonaKey | null;
 }
 
 const PAGES: readonly PageSpec[] = [
+  { name: 'First visit', path: () => '/', persona: null },
   { name: 'Home', path: () => '/', persona: 'manager' },
   { name: 'Cases', path: () => '/cases', persona: 'engineer' },
   { name: 'Add a case', path: () => '/cases/new', persona: 'engineer' },
@@ -102,6 +103,26 @@ test.describe('[FR-UX-02] no page scrolls sideways at 390x844', () => {
     test.describe(spec.name, () => {
       test.use({ persona: spec.persona });
       test('fits the width of a phone', async ({ page, demo }) => {
+        await openPage(page, spec.path(demo));
+        const result = await overflow(page);
+        expect(
+          result.page,
+          `the page is ${result.page}px wider than the screen; wide elements: ${result.offenders.join(', ')}`,
+        ).toBe(0);
+      });
+    });
+  }
+});
+
+test.describe('[NFR-A11Y-01] reflow at 320 CSS px: no page scrolls sideways (WCAG 1.4.10)', () => {
+  for (const spec of PAGES) {
+    test.describe(spec.name, () => {
+      test.use({ persona: spec.persona });
+      test('fits the width of the narrowest phone, with touch-sized controls', async ({
+        page,
+        demo,
+      }) => {
+        await page.setViewportSize({ width: 320, height: 640 });
         await openPage(page, spec.path(demo));
         const result = await overflow(page);
         expect(
