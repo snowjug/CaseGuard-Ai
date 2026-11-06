@@ -408,7 +408,7 @@ describe('[FR-QA-02] Quality page', () => {
     expect(screen.getByRole('link', { name: 'Add a case' })).toHaveAttribute('href', '/cases/new');
     expect(screen.getByRole('link', { name: 'Try a sample case' })).toHaveAttribute(
       'href',
-      '/cases/new?mode=sample',
+      '/cases/new?source=sample',
     );
   });
 

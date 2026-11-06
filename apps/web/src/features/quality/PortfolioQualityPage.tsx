@@ -28,6 +28,7 @@ import { useApiQuery } from '../../lib/api/hooks';
 import { useAuth } from '../../lib/auth/context';
 import { useSession } from '../../lib/auth/session';
 import { caseHref } from '../../lib/deep-links';
+import { ADD_CASE_HREF, SAMPLE_CASE_HREF } from '../../lib/nav';
 import { useLook } from './look';
 import { KeyFigures, TrendCard } from './PortfolioHero';
 import {
@@ -222,12 +223,12 @@ function PortfolioContent({
           title="No analysed cases yet"
           description="Quality trends appear after cases have been analysed. Add a case, or try a sample case, and the analysis fills this page."
           action={
-            <ButtonLink href="/cases/new" variant="primary">
+            <ButtonLink href={ADD_CASE_HREF} variant="primary">
               Add a case
             </ButtonLink>
           }
           secondaryAction={
-            <ButtonLink href="/cases/new?mode=sample" variant="secondary">
+            <ButtonLink href={SAMPLE_CASE_HREF} variant="secondary">
               Try a sample case
             </ButtonLink>
           }
