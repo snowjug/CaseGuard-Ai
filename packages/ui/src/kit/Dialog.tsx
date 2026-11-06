@@ -12,7 +12,7 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import { XIcon } from 'lucide-react';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { cg } from '../tokens/cg';
 import { IconButton } from './Button';
 
@@ -103,6 +103,7 @@ export function Dialog({
   modalType = 'modal',
 }: DialogProps) {
   const styles = useStyles();
+  const descriptionId = useId();
   useReturnFocus(open);
   return (
     <FluentDialog
@@ -113,6 +114,8 @@ export function Dialog({
       <DialogSurface
         className={mergeClasses(styles.surface, styles[size])}
         backdrop={{ className: styles.backdrop }}
+        // Only the short description describes the dialog; a long body (a list, a form) is not read out as one blob.
+        aria-describedby={description ? descriptionId : undefined}
       >
         <DialogBody className={styles.body}>
           <DialogTitle
@@ -133,7 +136,11 @@ export function Dialog({
           </DialogTitle>
           {description || children ? (
             <DialogContent className={styles.content}>
-              {description ? <p className={styles.description}>{description}</p> : null}
+              {description ? (
+                <p id={descriptionId} className={styles.description}>
+                  {description}
+                </p>
+              ) : null}
               {children}
             </DialogContent>
           ) : null}
