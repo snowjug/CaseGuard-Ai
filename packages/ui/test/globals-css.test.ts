@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { motion, palettes, radius, space } from '../src/tokens';
+import { motion, palettes, radius, space, typography } from '../src/tokens';
 
 // `fileURLToPath` on the string avoids jsdom's global URL class, which `readFileSync` rejects.
 const css = readFileSync(
@@ -19,22 +19,31 @@ const section = (selector: string): string => {
 };
 
 describe('globals.css stays in sync with the design tokens', () => {
-  it('declares the 4-pt spacing scale and radii', () => {
+  it('declares the 8-pt spacing scale and radii', () => {
     for (const [step, value] of Object.entries(space)) {
       expect(declared(`--cg-space-${step}`)).toBe(`${value}px`);
     }
+    expect(declared('--cg-radius-xl')).toBe(`${radius.xl}px`);
     expect(declared('--cg-radius-lg')).toBe(`${radius.lg}px`);
     expect(declared('--cg-radius-md')).toBe(`${radius.md}px`);
     expect(declared('--cg-radius-sm')).toBe(`${radius.sm}px`);
   });
 
-  it('declares the motion durations and easing (150-250 ms, ease-out)', () => {
+  it('declares the motion durations and easing (150-250 ms, 300 ms at most, ease-out)', () => {
     expect(declared('--cg-motion-fast')).toBe(`${motion.fast}ms`);
     expect(declared('--cg-motion-base')).toBe(`${motion.base}ms`);
     expect(declared('--cg-motion-slow')).toBe(`${motion.slow}ms`);
+    expect(declared('--cg-motion-max')).toBe(`${motion.max}ms`);
+    expect(motion.max).toBeLessThanOrEqual(300);
     expect(declared('--cg-motion-easing')).toBe(motion.easing);
     expect(motion.fast).toBeGreaterThanOrEqual(150);
     expect(motion.slow).toBeLessThanOrEqual(250);
+  });
+
+  it('declares the font stacks of the type tokens', () => {
+    const squash = (value: string | undefined): string | undefined => value?.replace(/\s+/g, ' ');
+    expect(squash(declared('--cg-font-base'))).toBe(squash(typography.family.base));
+    expect(squash(declared('--cg-font-mono'))).toBe(squash(typography.family.mono));
   });
 
   it('paints the page canvas from the palette in both themes and for system mode', () => {

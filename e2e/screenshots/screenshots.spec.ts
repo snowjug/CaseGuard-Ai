@@ -69,7 +69,7 @@ const SHOTS: readonly Shot[] = [
     path: (ids) => `/cases/${ids.caseOneId}/hypotheses`,
     prepare: async (page) => {
       // The ranking of the nine explanations and the detail of the leading one, not the time cursor above them.
-      await atTop(page.getByRole('list', { name: 'Hypotheses ranked by confidence' }));
+      await atTop(page.getByRole('list', { name: 'Possible causes ranked by confidence' }));
     },
   },
   {
@@ -78,7 +78,7 @@ const SHOTS: readonly Shot[] = [
     path: (ids) => `/cases/${ids.caseOneId}/counterfactual`,
     prepare: async (page) => {
       // The actual and the simulated path, diverging from the decision moment: the signature view.
-      await atTop(page.getByRole('tablist', { name: 'Simulated path strategies' }));
+      await atTop(page.getByRole('radiogroup', { name: 'Simulated path strategies' }));
     },
   },
   { name: 'quality-review', persona: 'manager', path: (ids) => `/cases/${ids.caseOneId}/quality` },

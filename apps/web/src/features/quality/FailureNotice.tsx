@@ -1,8 +1,7 @@
 'use client';
 
-import { Notice } from '@caseguard/ui';
-import { Button } from '@fluentui/react-components';
-import { ArrowSyncRegular } from '@fluentui/react-icons';
+import { Button, Notice } from '@caseguard/ui';
+import { RotateCwIcon } from 'lucide-react';
 import type { ExplainedFailure } from './failure';
 
 export interface FailureNoticeProps {
@@ -27,9 +26,10 @@ export function FailureNotice({ failure, onRetry, retrying = false }: FailureNot
         action={
           onRetry && retryable ? (
             <Button
-              appearance="outline"
-              icon={<ArrowSyncRegular />}
+              variant="secondary"
+              icon={<RotateCwIcon />}
               disabled={retrying}
+              loading={retrying}
               onClick={onRetry}
             >
               Try again

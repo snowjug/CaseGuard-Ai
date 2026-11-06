@@ -12,7 +12,6 @@ export {
   formatNumber,
   formatPercent,
   formatProbability,
-  formatRelativeTime,
   formatTimeUtc,
 } from '@caseguard/ui';
 

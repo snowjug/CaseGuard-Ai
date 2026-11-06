@@ -100,7 +100,7 @@ export function describeRedactionRefusal(labels: readonly string[]): string {
 }
 
 export const REDACTION_REFUSAL_ADVICE =
-  'Ask an administrator to fix the pattern in Governance > Redaction, then validate again.';
+  'Ask an administrator to fix the pattern in Governance > Redaction, then check again.';
 
 /** What to do about a reference that is taken, which depends on whether the person wrote the payload. */
 function referenceAdvice(source: SourceChoice | undefined): string {
@@ -228,7 +228,7 @@ export function explainIngestError(error: unknown, source?: SourceChoice): Inges
       kind: 'invalid',
       title: 'The payload is not valid',
       message: error.message,
-      advice: 'Fix the fields listed below, then validate again.',
+      advice: 'Fix the fields listed below, then check again.',
       retryAfterSeconds: null,
       retryable: false,
     };
@@ -311,7 +311,7 @@ export function explainIngestError(error: unknown, source?: SourceChoice): Inges
       kind: 'forbidden',
       title: 'Your role cannot do this',
       message: error.message,
-      advice: 'Ingesting cases needs the Engineer or Administrator role.',
+      advice: 'Adding cases needs the Engineer or Administrator role.',
       retryAfterSeconds: null,
       retryable: false,
     };

@@ -1,35 +1,46 @@
 'use client';
 
 import {
+  Badge,
+  Button,
   EmptyState,
   ErrorState,
-  Notice,
+  Field,
+  IconButton,
+  Input,
   PageHeader,
-  useMediaQuery,
+  Select,
   cg,
+  useMediaQuery,
   type SortState,
 } from '@caseguard/ui';
 import {
-  Button,
-  Field,
-  Input,
-  Select,
+  Popover,
+  PopoverSurface,
+  PopoverTrigger,
   makeStyles,
   mergeClasses,
   tokens,
 } from '@fluentui/react-components';
-import { AddRegular, ArrowSyncRegular, FolderRegular, SearchRegular } from '@fluentui/react-icons';
 import { keepPreviousData } from '@tanstack/react-query';
+import {
+  FolderPlusIcon,
+  RefreshCwIcon,
+  SearchIcon,
+  SlidersHorizontalIcon,
+  SparklesIcon,
+} from 'lucide-react';
 import { useMemo } from 'react';
-import { LinkButton } from '../../components/common/LinkButton';
 import { QueryBoundary } from '../../components/common/QueryBoundary';
 import { describeError } from '../../lib/api/errors';
 import { useApiQuery } from '../../lib/api/hooks';
 import { pagedBoundary, useApiPages } from '../../lib/api/pages';
 import { useAuth } from '../../lib/auth/context';
-import { GatedAction, useSession } from '../../lib/auth/session';
+import { useSession } from '../../lib/auth/session';
+import { SAMPLE_CASE_HREF } from '../../lib/nav';
 import { useDebouncedValue } from '../../lib/use-debounced-value';
 import { useUrlStates, useUrlTextState } from '../../lib/url-state';
+import { AddCaseAction } from './AddCaseAction';
 import {
   CASE_FILTERS,
   DATA_FILTERS,
@@ -43,7 +54,6 @@ import {
   hasActiveFilters,
   matchesDataFilter,
   serverQuery,
-  sortColumnLabel,
   sortKey,
   sortOptionLabel,
 } from './case-filters';
@@ -53,40 +63,35 @@ import { CasesSkeleton } from './Skeletons';
 const useStyles = makeStyles({
   page: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
   busy: { opacity: 0.72 },
-  toolbar: {
+  toolbar: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[3] },
+  search: { flex: '1 1 280px', minWidth: 0 },
+  sort: { flex: '0 1 240px', minWidth: 0 },
+  filterBody: {
     display: 'flex',
-    flexWrap: 'wrap',
-    alignItems: 'flex-end',
+    flexDirection: 'column',
     gap: cg.space[3],
-    padding: cg.space[3],
+    width: 'min(320px, 80vw)',
+  },
+  filterCaption: { margin: 0, color: cg.textMuted, fontSize: tokens.fontSizeBase200 },
+  surface: {
+    padding: cg.space[4],
+    color: cg.text,
+    backgroundColor: cg.surfaceRaised,
+    border: `1px solid ${cg.glassBorder}`,
     borderRadius: cg.radius.lg,
-    border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surface,
+    boxShadow: cg.shadowHigh,
   },
-  field: { flex: '1 1 160px', minWidth: 0, '& .fui-Select': { width: '100%', minWidth: 0 } },
-  search: { flex: '2 1 260px', minWidth: 0 },
-  summary: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: cg.space[2],
-    color: cg.textSecondary,
-    fontSize: tokens.fontSizeBase300,
-  },
-  more: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[3] },
-  actions: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
+  summary: { color: cg.textSecondary, fontSize: tokens.fontSizeBase300 },
+  more: { display: 'flex', justifyContent: 'center' },
 });
 
 const PAGE_HELP = (
   <>
+    <p>Every case in this workspace, newest first. Open one to see how it went and what to fix.</p>
     <p>
-      Every case ingested into this workspace, newest first. The analysis state says whether
-      CaseGuard has reconstructed the timeline and weighed the hypotheses yet.
-    </p>
-    <p>
-      Quality, avoidable effort and the leading hypothesis are estimates produced by the analysis of
-      each case. They help compare cases and are never a judgement of the people who worked on them.
+      The score, the time that could have been saved and the likeliest cause are estimates from the
+      analysis of each case. They help compare cases and are never a judgement of the people who
+      worked on them.
     </p>
     <p>
       Search, analysis state, case status and workload are applied by the server. The data label
@@ -107,38 +112,33 @@ const SORT_OPTIONS = SORT_COLUMNS.flatMap((column) =>
 
 function NoCases() {
   const { can } = useSession();
+  const canAdd = can('case:ingest');
   return (
     <EmptyState
       headingLevel={2}
-      icon={<FolderRegular />}
+      icon={<FolderPlusIcon />}
       title="No cases yet"
       description={
-        can('case:ingest')
-          ? 'Ingest a case to see CaseGuard rebuild its timeline, separate facts from assumptions and weigh competing hypotheses. A built-in synthetic sample is the quickest way to start.'
-          : 'There are no cases in this workspace yet. Someone with the Engineer or Administrator role can ingest one, for example a built-in synthetic sample.'
+        canAdd
+          ? 'Add a case to get a score, the reason for it and the top fixes. A sample case is the quickest way to start.'
+          : 'There are no cases in this workspace yet. Someone with the Engineer or Administrator role can add one.'
       }
-      action={
-        <GatedAction permission="case:ingest">
-          <LinkButton href="/cases/new" appearance="primary" icon={<AddRegular />}>
-            Ingest a case
-          </LinkButton>
-        </GatedAction>
-      }
+      action={canAdd ? <AddCaseAction /> : undefined}
       secondaryAction={
-        <GatedAction permission="case:ingest">
-          <LinkButton href="/cases/new?source=sample" appearance="outline">
-            Use a sample
-          </LinkButton>
-        </GatedAction>
+        canAdd ? (
+          <AddCaseAction variant="secondary" href={SAMPLE_CASE_HREF} icon={<SparklesIcon />}>
+            Try a sample case
+          </AddCaseAction>
+        ) : undefined
       }
     />
   );
 }
 
 /**
- * Cases (`/cases`): every ingested case with its analysis summary. Filters, sort and the data-label filter live in the
- * URL. Search, analysis state, status and workload are server filters (`cases.list`); results are loaded page by page
- * with an explicit "Load more" so nothing is fetched that is not asked for.
+ * Cases (`/cases`): every case with its analysis summary. Filters, sort and the data-label filter live in the URL.
+ * Search, analysis state, status and workload are server filters (`cases.list`); results are loaded page by page with
+ * an explicit "Load more" so nothing is fetched that is not asked for.
  */
 export function CasesPage() {
   const styles = useStyles();
@@ -159,7 +159,7 @@ export function CasesPage() {
     { query: params },
     { enabled: auth.status === 'ready', placeholderData: keepPreviousData },
   );
-  // The same request the header's case switcher makes, so the options cost nothing extra.
+  // The same request Home and the palette make, so the workload options cost nothing extra.
   const everyCase = useApiQuery(
     'cases.list',
     { query: { limit: 100 } },
@@ -174,6 +174,13 @@ export function CasesPage() {
   const active = hasActiveFilters({ q, state, status, workload, data: dataFilter });
   // What the answer on screen was asked for: the search text is sent after a pause, the other filters at once.
   const asked = hasActiveFilters({ q: search, state, status, workload, data: dataFilter });
+  // The filters in the popover (the search box is always visible, so it is not counted).
+  const filterCount = [
+    state !== 'all',
+    status !== 'all',
+    workload !== '',
+    dataFilter !== 'all',
+  ].filter(Boolean).length;
   const loaded = useMemo(() => pages.data?.pages.flatMap((page) => page.items) ?? [], [pages.data]);
   const visible = useMemo(
     () => loaded.filter((item) => matchesDataFilter(item, dataFilter)),
@@ -190,24 +197,18 @@ export function CasesPage() {
     <>
       <PageHeader
         title="Cases"
-        description="Browse the support cases in this workspace and open one to investigate it."
+        description="Find a case and open its review."
         help={PAGE_HELP}
         actions={
-          <div className={styles.actions}>
-            <Button
-              appearance="outline"
-              icon={<ArrowSyncRegular />}
+          <>
+            <IconButton
+              icon={<RefreshCwIcon />}
+              label="Refresh"
               disabled={auth.status !== 'ready' || pages.isFetching}
               onClick={() => void pages.refetch()}
-            >
-              {pages.isFetching && !pages.isPending ? 'Refreshing…' : 'Refresh'}
-            </Button>
-            <GatedAction permission="case:ingest">
-              <LinkButton href="/cases/new" appearance="primary" icon={<AddRegular />}>
-                Ingest a case
-              </LinkButton>
-            </GatedAction>
-          </div>
+            />
+            <AddCaseAction />
+          </>
         }
       />
       <QueryBoundary
@@ -229,116 +230,127 @@ export function CasesPage() {
               className={styles.toolbar}
               onSubmit={(event) => event.preventDefault()}
             >
-              <Field label="Search" className={styles.search}>
-                <Input
-                  {...searchField.inputProps}
-                  type="search"
-                  placeholder="Reference, title, product or customer"
-                  contentBefore={<SearchRegular aria-hidden="true" />}
-                  maxLength={200}
-                />
-              </Field>
-              <Field label="Analysis state" className={styles.field}>
-                <Select
-                  value={state}
-                  onChange={(_event, next) =>
-                    update({ state: next.value as (typeof STATE_FILTERS)[number] })
-                  }
-                >
-                  {STATE_FILTERS.map((value) => (
-                    <option key={value} value={value}>
-                      {STATE_FILTER_LABELS[value]}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Case status" className={styles.field}>
-                <Select
-                  value={status}
-                  onChange={(_event, next) =>
-                    update({ status: next.value as (typeof STATUS_FILTERS)[number] })
-                  }
-                >
-                  {STATUS_FILTERS.map((value) => (
-                    <option key={value} value={value}>
-                      {STATUS_FILTER_LABELS[value]}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Workload" className={styles.field}>
-                <Select
-                  value={workload}
-                  onChange={(_event, next) => update({ workload: next.value })}
-                >
-                  <option value="">Any workload</option>
-                  {workloads.map((value) => (
-                    <option key={value} value={value}>
-                      {value}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Data label" className={styles.field}>
-                <Select
-                  value={dataFilter}
-                  onChange={(_event, next) =>
-                    update({ data: next.value as (typeof DATA_FILTERS)[number] })
-                  }
-                >
-                  {DATA_FILTERS.map((value) => (
-                    <option key={value} value={value}>
-                      {DATA_FILTER_LABELS[value]}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Sort by" className={styles.field}>
-                <Select
-                  value={sortKey(sort)}
-                  onChange={(_event, next) => {
-                    const option = SORT_OPTIONS.find((candidate) => candidate.value === next.value);
-                    if (option)
-                      update({ sort: { columnId: option.column, direction: option.direction } });
-                  }}
-                >
-                  {SORT_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Button appearance="subtle" disabled={!active} onClick={clearFilters}>
+              <Input
+                {...searchField.inputProps}
+                type="search"
+                aria-label="Search"
+                placeholder="Search by reference, title, product or customer"
+                startIcon={<SearchIcon />}
+                maxLength={200}
+                wrapperClassName={styles.search}
+              />
+              <Popover positioning="below-start">
+                <PopoverTrigger disableButtonEnhancement>
+                  <Button variant="secondary" icon={<SlidersHorizontalIcon />}>
+                    Filters
+                    {filterCount > 0 ? (
+                      <Badge tone="brand" size="sm">
+                        <span className="cg-sr-only">Active: </span>
+                        {filterCount}
+                      </Badge>
+                    ) : null}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverSurface className={styles.surface} aria-label="Filters">
+                  <div className={styles.filterBody}>
+                    <Field label="Analysis state">
+                      <Select
+                        value={state}
+                        onChange={(event) =>
+                          update({ state: event.target.value as (typeof STATE_FILTERS)[number] })
+                        }
+                      >
+                        {STATE_FILTERS.map((value) => (
+                          <option key={value} value={value}>
+                            {STATE_FILTER_LABELS[value]}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <Field label="Case status">
+                      <Select
+                        value={status}
+                        onChange={(event) =>
+                          update({ status: event.target.value as (typeof STATUS_FILTERS)[number] })
+                        }
+                      >
+                        {STATUS_FILTERS.map((value) => (
+                          <option key={value} value={value}>
+                            {STATUS_FILTER_LABELS[value]}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <Field label="Workload">
+                      <Select
+                        value={workload}
+                        onChange={(event) => update({ workload: event.target.value })}
+                      >
+                        <option value="">Any workload</option>
+                        {workloads.map((value) => (
+                          <option key={value} value={value}>
+                            {value}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <Field label="Data label">
+                      <Select
+                        value={dataFilter}
+                        onChange={(event) =>
+                          update({ data: event.target.value as (typeof DATA_FILTERS)[number] })
+                        }
+                      >
+                        {DATA_FILTERS.map((value) => (
+                          <option key={value} value={value}>
+                            {DATA_FILTER_LABELS[value]}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <p className={styles.filterCaption}>
+                      The data label filter and the sort apply to the cases loaded so far.
+                    </p>
+                  </div>
+                </PopoverSurface>
+              </Popover>
+              <Select
+                aria-label="Sort by"
+                wrapperClassName={styles.sort}
+                value={sortKey(sort)}
+                onChange={(event) => {
+                  const option = SORT_OPTIONS.find(
+                    (candidate) => candidate.value === event.target.value,
+                  );
+                  if (option)
+                    update({ sort: { columnId: option.column, direction: option.direction } });
+                }}
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+              <Button variant="ghost" disabled={!active} onClick={clearFilters}>
                 Clear filters
               </Button>
             </form>
 
-            <Notice variant="model-estimate" compact title="Estimates">
-              Quality, avoidable effort and hypothesis confidence are estimates from the analysis of
-              each case. They compare cases and processes; they are not a rating of any person.
-            </Notice>
-
-            <div className={styles.summary}>
-              <span role="status" aria-live="polite">
-                {visible.length === 0
-                  ? 'No loaded case matches.'
-                  : `Showing ${visible.length} ${visible.length === 1 ? 'case' : 'cases'}${
-                      dataFilter !== 'all' && visible.length !== loaded.length
-                        ? ` of the ${loaded.length} loaded`
-                        : ''
-                    }${pages.hasNextPage ? '. More are available.' : '.'}`}
-              </span>
-              <span>
-                Sorted by {sortColumnLabel(sort).toLowerCase()}. The data label filter and the sort
-                apply to the cases loaded so far.
-              </span>
-            </div>
+            <span className={styles.summary} role="status" aria-live="polite">
+              {visible.length === 0
+                ? 'No loaded case matches.'
+                : `Showing ${visible.length} ${visible.length === 1 ? 'case' : 'cases'}${
+                    dataFilter !== 'all' && visible.length !== loaded.length
+                      ? ` of the ${loaded.length} loaded`
+                      : ''
+                  }${pages.hasNextPage ? '. More are available.' : '.'}`}
+            </span>
 
             {visible.length === 0 ? (
               <EmptyState
                 headingLevel={2}
-                icon={<SearchRegular />}
+                icon={<SearchIcon />}
                 title={active ? 'No cases match these filters' : 'No cases to show'}
                 description={
                   pages.hasNextPage
@@ -346,7 +358,7 @@ export function CasesPage() {
                     : 'Loosen or clear the filters to see more cases.'
                 }
                 action={
-                  <Button appearance="primary" onClick={clearFilters} disabled={!active}>
+                  <Button variant="secondary" onClick={clearFilters} disabled={!active}>
                     Clear filters
                   </Button>
                 }
@@ -367,7 +379,7 @@ export function CasesPage() {
             {pages.hasNextPage ? (
               <div className={styles.more}>
                 <Button
-                  appearance="outline"
+                  variant="secondary"
                   disabled={pages.isFetchingNextPage}
                   onClick={() => void pages.fetchNextPage()}
                 >

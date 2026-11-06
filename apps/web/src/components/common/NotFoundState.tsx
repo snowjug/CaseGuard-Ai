@@ -1,44 +1,38 @@
 'use client';
 
-import { EmptyState, cg } from '@caseguard/ui';
-import { Button, makeStyles } from '@fluentui/react-components';
-import {
-  FolderRegular,
-  HomeRegular,
-  PlayCircleRegular,
-  SearchRegular,
-} from '@fluentui/react-icons';
+import { Button, ButtonLink, EmptyState, cg } from '@caseguard/ui';
+import { makeStyles } from '@fluentui/react-components';
+import { FolderIcon, HouseIcon, PlayIcon, SearchIcon } from 'lucide-react';
 import { useShellUi } from '../../lib/shell-ui';
-import { LinkButton } from './LinkButton';
 
 const useStyles = makeStyles({
   actions: { display: 'flex', flexWrap: 'wrap', gap: cg.space[2], justifyContent: 'center' },
 });
 
-/** 404 content: says what happened and offers four ways forward. Needs the shell (it uses the search focus). */
+/** 404 content: says what happened and offers four ways forward. Needs the shell (the search button opens the palette). */
 export function NotFoundState() {
   const styles = useStyles();
-  const { focusSearch } = useShellUi();
+  const { openSearch } = useShellUi();
   return (
     <EmptyState
       headingLevel={1}
-      icon={<SearchRegular />}
-      title="We could not find that page"
-      description="The address may be mistyped, or the case or skill it pointed to no longer exists. Resetting the demo data removes the synthetic cases and skills, so links to them stop working; the Demo Guide starts the story again."
+      icon={<SearchIcon />}
+      title="We couldn't find that page"
+      description="The address may be mistyped, or the case or skill it pointed to no longer exists. Resetting the demo data removes the demo cases and skills, so links to them stop working."
       action={
         <div className={styles.actions}>
-          <LinkButton href="/" appearance="primary" icon={<HomeRegular />}>
-            Command Center
-          </LinkButton>
-          <LinkButton href="/cases" appearance="outline" icon={<FolderRegular />}>
+          <ButtonLink href="/" variant="primary" icon={<HouseIcon />}>
+            Home
+          </ButtonLink>
+          <ButtonLink href="/cases" variant="secondary" icon={<FolderIcon />}>
             Browse cases
-          </LinkButton>
-          <LinkButton href="/demo" appearance="outline" icon={<PlayCircleRegular />}>
-            Demo Guide
-          </LinkButton>
-          <Button appearance="outline" icon={<SearchRegular />} onClick={focusSearch}>
+          </ButtonLink>
+          <Button variant="secondary" icon={<SearchIcon />} onClick={openSearch}>
             Search
           </Button>
+          <ButtonLink href="/demo" variant="ghost" icon={<PlayIcon />}>
+            Guided demo
+          </ButtonLink>
         </div>
       }
     />

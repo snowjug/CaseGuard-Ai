@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { installMatchMedia } from '../../test/media';
 import { renderWithTheme, expectNoAxeViolations } from '../../test/axe';
-import { createStyleFlusher } from './ssr';
+import { compareMediaQueries, createStyleFlusher } from './ssr';
 import {
   createReducedMotionStore,
   parseReducedMotionPreference,
@@ -189,6 +189,23 @@ describe('unnamed spinners', () => {
     expect(screen.getByRole('progressbar', { name: 'Loading cases' })).toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'Saving' })).toBeInTheDocument();
     await expectNoAxeViolations(container);
+  });
+});
+
+describe('media query order', () => {
+  it('sorts min-width rules small to large, then max-width rules large to small, so the narrowest match wins', () => {
+    const queries = [
+      '(max-width: 767px)',
+      '(min-width: 1024px)',
+      '(max-width: 1023px)',
+      '(min-width: 640px)',
+    ];
+    expect([...queries].sort(compareMediaQueries)).toEqual([
+      '(min-width: 640px)',
+      '(min-width: 1024px)',
+      '(max-width: 1023px)',
+      '(max-width: 767px)',
+    ]);
   });
 });
 

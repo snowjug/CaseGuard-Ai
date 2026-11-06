@@ -1,14 +1,15 @@
 'use client';
 
-import { VisuallyHidden, cg } from '@caseguard/ui';
+import { VisuallyHidden, borderColors, cg } from '@caseguard/ui';
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
-import { CheckmarkRegular } from '@fluentui/react-icons';
+import { CheckIcon } from 'lucide-react';
+import type { ReactNode, Ref } from 'react';
 
 const useStyles = makeStyles({
   list: {
     display: 'flex',
-    flexWrap: 'wrap',
-    gap: `${cg.space[2]} ${cg.space[4]}`,
+    alignItems: 'center',
+    gap: cg.space[3],
     margin: 0,
     padding: 0,
     listStyle: 'none',
@@ -16,11 +17,14 @@ const useStyles = makeStyles({
   step: {
     display: 'flex',
     alignItems: 'center',
-    gap: cg.space[2],
+    gap: cg.space[3],
     minWidth: 0,
-    color: cg.textSecondary,
+    color: cg.textMuted,
     fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightMedium,
   },
+  // Every step but the last stretches, so the connector between two steps fills the row.
+  grow: { flex: '1 1 0' },
   badge: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -30,33 +34,41 @@ const useStyles = makeStyles({
     height: '28px',
     borderRadius: cg.radius.pill,
     border: `1px solid ${cg.borderControl}`,
-    backgroundColor: cg.surface,
+    backgroundColor: cg.surfaceSunken,
     color: cg.textSecondary,
+    fontSize: tokens.fontSizeBase200,
     fontWeight: tokens.fontWeightSemibold,
     fontVariantNumeric: 'tabular-nums',
   },
   badgeCurrent: {
+    ...borderColors(cg.tone.brand.solid),
     backgroundColor: cg.tone.brand.solid,
-    borderTopColor: cg.tone.brand.solid,
-    borderRightColor: cg.tone.brand.solid,
-    borderBottomColor: cg.tone.brand.solid,
-    borderLeftColor: cg.tone.brand.solid,
     color: cg.tone.brand.onSolid,
+    boxShadow: `0 0 0 4px color-mix(in srgb, ${cg.tone.brand.solid} 24%, transparent)`,
   },
   badgeDone: {
-    backgroundColor: cg.tone.productive.tint,
-    borderTopColor: cg.tone.productive.border,
-    borderRightColor: cg.tone.productive.border,
-    borderBottomColor: cg.tone.productive.border,
-    borderLeftColor: cg.tone.productive.border,
-    color: cg.tone.productive.fg,
+    ...borderColors(cg.tone.brand.border),
+    backgroundColor: cg.tone.brand.tint,
+    color: cg.tone.brand.fg,
   },
   labelCurrent: { color: cg.text, fontWeight: tokens.fontWeightSemibold },
+  labelDone: { color: cg.textSecondary },
   line: {
-    height: '1px',
-    width: '24px',
-    backgroundColor: cg.borderControl,
-    '@media (max-width: 639px)': { display: 'none' },
+    flex: '1 1 auto',
+    minWidth: cg.space[4],
+    height: '2px',
+    borderRadius: cg.radius.pill,
+    backgroundColor: cg.borderSubtle,
+  },
+  lineDone: { backgroundColor: `color-mix(in srgb, ${cg.tone.brand.solid} 60%, transparent)` },
+  heading: {
+    margin: 0,
+    color: cg.text,
+    fontSize: tokens.fontSizeBase500,
+    lineHeight: tokens.lineHeightBase500,
+    fontWeight: tokens.fontWeightSemibold,
+    letterSpacing: '-0.015em',
+    outlineStyle: 'none',
   },
 });
 
@@ -80,10 +92,11 @@ export function Stepper({ steps, current, label = 'Steps' }: StepperProps) {
       {steps.map((step, index) => {
         const done = index < current;
         const active = index === current;
+        const last = index === steps.length - 1;
         return (
           <li
             key={step.id}
-            className={styles.step}
+            className={mergeClasses(styles.step, !last && styles.grow)}
             {...(active ? { 'aria-current': 'step' as const } : {})}
           >
             <span
@@ -94,16 +107,38 @@ export function Stepper({ steps, current, label = 'Steps' }: StepperProps) {
                 done && styles.badgeDone,
               )}
             >
-              {done ? <CheckmarkRegular /> : index + 1}
+              {done ? <CheckIcon /> : index + 1}
             </span>
-            <span className={active ? styles.labelCurrent : undefined}>
+            <span className={mergeClasses(active && styles.labelCurrent, done && styles.labelDone)}>
               <VisuallyHidden>{`Step ${index + 1} of ${steps.length}, ${done ? 'completed' : active ? 'current' : 'upcoming'}: `}</VisuallyHidden>
               {step.label}
             </span>
-            {index < steps.length - 1 ? <span aria-hidden="true" className={styles.line} /> : null}
+            {last ? null : (
+              <span
+                aria-hidden="true"
+                className={mergeClasses(styles.line, done && styles.lineDone)}
+              />
+            )}
           </li>
         );
       })}
     </ol>
+  );
+}
+
+export interface StepHeadingProps {
+  /** The page moves focus here when the step changes, so keyboard and screen-reader users start at the right place. */
+  ref?: Ref<HTMLHeadingElement>;
+  className?: string;
+  children: ReactNode;
+}
+
+/** The `h2` of the current step: a short plain title, focusable by script only. */
+export function StepHeading({ ref, className, children }: StepHeadingProps) {
+  const styles = useStyles();
+  return (
+    <h2 ref={ref} tabIndex={-1} className={mergeClasses(styles.heading, className)}>
+      {children}
+    </h2>
   );
 }

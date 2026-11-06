@@ -12,7 +12,7 @@ import type {
 } from '@caseguard/schemas';
 import type { LineChartEvent, LineSeries } from '@caseguard/ui';
 
-/** Pure view-model helpers for the Hypothesis Arena (no React, no fetching), so they can be unit-tested. */
+/** Pure view-model helpers for the Possible causes page (no React, no fetching), so they can be unit-tested. */
 
 /** A hypothesis whose confidence ever reached this share is a serious contender and is always charted. */
 export const CONTENDER_THRESHOLD = 0.1;
@@ -84,7 +84,7 @@ export function chartMarkers(
       const at = new Date(instant).toISOString();
       const parts = [
         ...entry.actions.map((a) => `Action: ${a.label}`),
-        ...entry.forks.map((f) => `Decision fork: ${f.title}`),
+        ...entry.forks.map((f) => `Key decision: ${f.title}`),
       ];
       const kind: ChartMarker['kind'] =
         entry.actions.length > 0 && entry.forks.length > 0
@@ -178,6 +178,15 @@ export function statusChanges(timeline: readonly HypothesisPoint[]): StatusChang
 /** The newest point of the series (the state at the boundary). */
 export const latestPoint = (hypothesis: Hypothesis): HypothesisPoint | null =>
   hypothesis.timeline[hypothesis.timeline.length - 1] ?? null;
+
+/**
+ * Why a cause stands where it does: the reason of its latest update that moved it. An update that changed nothing ("No
+ * material change") says nothing about the position, so it is skipped; when none ever moved it, the newest reason is used.
+ */
+export function standingReason(hypothesis: Hypothesis): string | null {
+  const moved = [...hypothesis.timeline].reverse().find((point) => Math.abs(point.delta) >= 0.0005);
+  return (moved ?? latestPoint(hypothesis))?.reason ?? null;
+}
 
 /** Matches `?sel=` against a hypothesis record id or its knowledge-pack key (`hyp.dns-resolution`). */
 export function findHypothesis(

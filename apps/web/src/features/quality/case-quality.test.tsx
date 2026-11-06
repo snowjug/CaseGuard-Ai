@@ -43,7 +43,9 @@ const eventsAt = (instants: readonly string[]) =>
   );
 
 // A busy machine can take several seconds to settle a chain of requests; assertions stay exact, only the wait is longer.
-configure({ asyncUtilTimeout: 5000 });
+// The page renders the score and a tab side by side, so a test that clicks through it needs more room than one that only reads.
+configure({ asyncUtilTimeout: 15_000 });
+vi.setConfig({ testTimeout: 120_000 });
 const AXE_TIMEOUT = 120_000;
 
 const ENGINEER = [
@@ -102,6 +104,18 @@ async function openTab(name: string): Promise<void> {
   await userEvent.click(await screen.findByRole('tab', { name }));
 }
 
+// The time cursor sits in the "What was known then" bar, which starts closed unless the address already names a moment.
+async function openCursor(): Promise<void> {
+  const toggle = await screen.findByRole('button', { name: /What was known then/ });
+  if (toggle.getAttribute('aria-expanded') !== 'true') await userEvent.click(toggle);
+}
+
+// A row of the six areas opens to its checks.
+async function openDimension(name: RegExp): Promise<void> {
+  const group = await screen.findByRole('group', { name: 'How the score was built' });
+  await userEvent.click(within(group).getByRole('button', { name }));
+}
+
 describe('[FR-QR-01] Quality review model helpers', () => {
   it('recognises the neutral placeholder the API sends when nothing can be assessed', () => {
     const placeholder = qualityAssessment({
@@ -117,12 +131,10 @@ describe('[FR-QR-01] Quality review model helpers', () => {
   });
 });
 
-describe('[FR-QR-02] Case Quality Review: quality index', () => {
-  it('shows a skeleton, then the index with its range, dimensions, penalties and improvements', async () => {
+describe('[FR-QR-02] Score: the result, its six areas, what lowered it and what would raise it', () => {
+  it('shows a skeleton, then the score with its range, areas, penalties and improvements', async () => {
     renderApp(<CaseQualityPage caseId="case_1" />, { api: api() });
-    expect(
-      screen.getByRole('heading', { level: 1, name: 'Case Quality Review' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Score' })).toBeInTheDocument();
     expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
 
     const hero = await screen.findByRole('group', { name: 'Case Quality Index' });
@@ -130,13 +142,13 @@ describe('[FR-QR-02] Case Quality Review: quality index', () => {
       within(hero).getByRole('img', { name: /Case Quality Index: 36 out of 100/ }),
     ).toBeInTheDocument();
     expect(within(hero).getAllByText('Estimated').length).toBeGreaterThan(0);
-    expect(within(hero).getByText(/plausible range of 32 to 39/)).toBeInTheDocument();
+    expect(within(hero).getByText(/plausible range is 32 to 39/)).toBeInTheDocument();
     expect(within(hero).getByText(/never a verdict about a person/)).toBeInTheDocument();
 
-    const dimensions = screen.getByRole('group', { name: 'Dimensions' });
+    const dimensions = screen.getByRole('group', { name: 'How the score was built' });
     expect(within(dimensions).getAllByRole('heading', { level: 3 })).toHaveLength(6);
 
-    const penalties = screen.getByRole('group', { name: 'Applied penalties' });
+    const penalties = screen.getByRole('group', { name: 'What lowered the score' });
     expect(
       within(penalties).getByRole('heading', { name: 'Unsupported root-cause claim' }),
     ).toBeInTheDocument();
@@ -144,7 +156,7 @@ describe('[FR-QR-02] Case Quality Review: quality index', () => {
       within(penalties).getByRole('link', { name: 'Resolver change was the cause' }),
     ).toHaveAttribute('href', '/cases/case_1/evidence?sel=clm_1');
 
-    const improvements = screen.getByRole('group', { name: 'Recommended improvements' });
+    const improvements = screen.getByRole('group', { name: 'What would raise it' });
     expect(
       within(improvements).getByRole('heading', {
         name: 'Write causes as hypotheses until evidence supports them',
@@ -152,23 +164,63 @@ describe('[FR-QR-02] Case Quality Review: quality index', () => {
     ).toBeInTheDocument();
     expect(within(improvements).getByText('Critical')).toBeInTheDocument();
     expect(
-      within(improvements).getByRole('link', { name: 'Open the decision fork behind this' }),
+      within(improvements).getByRole('link', { name: 'Open the key decision behind this' }),
     ).toHaveAttribute('href', '/cases/case_1/counterfactual?sel=fork_1');
 
     const after = screen.getByRole('group', { name: 'If every improvement were applied' });
     expect(after).toHaveTextContent(/68 out of 100 \(estimated\)/);
-    // The panel's own description and the method the API sends both say it.
+    expect(after).toHaveTextContent(/Range 52 to 76/);
+    // The method and what it assumes sit one click away, in the help beside the figure.
+    await userEvent.click(
+      within(after).getByRole('button', { name: 'About the estimate after improvements' }),
+    );
     expect(
-      within(after).getAllByText(/An estimate for planning, not a prediction/).length,
+      (await screen.findAllByText(/An estimate for planning, not a prediction/)).length,
     ).toBeGreaterThan(0);
   });
 
-  it('opens the checks behind a dimension, marking checks that could not be decided', async () => {
+  it('says the band in words and gives one line of reason, with the scale of the six areas in plain names', async () => {
     renderApp(<CaseQualityPage caseId="case_1" />, { api: api() });
-    const dimensions = await screen.findByRole('group', { name: 'Dimensions' });
-    const first = within(dimensions).getAllByText(/2 checks behind this score/)[0];
-    expect(first).toBeDefined();
+    const hero = await screen.findByRole('group', { name: 'Case Quality Index' });
+    expect(within(hero).getByRole('img', { name: /out of 100, Poor,/ })).toBeInTheDocument();
+    expect(
+      within(hero).getByText('Many steps were not well supported by what was on record.'),
+    ).toBeInTheDocument();
+
+    const dimensions = screen.getByRole('group', { name: 'How the score was built' });
+    for (const name of [
+      'Claims backed by evidence',
+      'Sound decisions',
+      'Problem scoped well',
+      'Customer kept informed',
+      'Diagnosis confirmed',
+      'Effort kept proportionate',
+    ]) {
+      expect(
+        within(dimensions).getByRole('heading', { level: 3, name: new RegExp(name) }),
+        name,
+      ).toBeInTheDocument();
+    }
+    // The technical name is not a label of the screen; the score and its weight are readable without the bar.
+    expect(within(dimensions).queryByText('Evidence integrity')).toBeNull();
+    const first = within(dimensions).getByRole('button', { name: /Claims backed by evidence/ });
+    expect(first).toHaveTextContent(/Counts for 25% of the score/);
+    expect(first).toHaveTextContent(/plausible range 19 to 27/);
+    expect(first).toHaveAccessibleName(/23 out of 100/);
+  });
+
+  it('opens the checks behind an area, with its technical name, marking checks that could not be decided', async () => {
+    renderApp(<CaseQualityPage caseId="case_1" />, { api: api() });
+    await screen.findByRole('group', { name: 'How the score was built' });
+    await openDimension(/Claims backed by evidence/);
+    const dimensions = screen.getByRole('group', { name: 'How the score was built' });
+    expect(within(dimensions).getAllByText(/2 checks behind this score/)).toHaveLength(1);
     expect(within(dimensions).getAllByText('Could not be decided').length).toBeGreaterThan(0);
+    // The technical definition lives here, where a person who wants it will look.
+    expect(within(dimensions).getByText(/Evidence integrity:/)).toBeInTheDocument();
+    expect(
+      within(dimensions).getByRole('link', { name: 'Resolver change was the cause' }),
+    ).toHaveAttribute('href', '/cases/case_1/evidence?sel=clm_1');
   });
 
   it('never shows the neutral placeholder as a score', async () => {
@@ -188,7 +240,7 @@ describe('[FR-QR-02] Case Quality Review: quality index', () => {
     expect(screen.queryByRole('group', { name: 'If every improvement were applied' })).toBeNull();
   });
 
-  it('shows an error with Retry when the index cannot be loaded', async () => {
+  it('shows an error with Retry when the score cannot be loaded, and the tabs below still answer', async () => {
     let attempts = 0;
     renderApp(<CaseQualityPage caseId="case_1" />, {
       api: api({
@@ -205,9 +257,11 @@ describe('[FR-QR-02] Case Quality Review: quality index', () => {
         },
       }),
     });
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'The quality index could not be loaded',
-    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('The score could not be loaded');
+    // One failing panel does not break the others.
+    expect(
+      await screen.findByRole('group', { name: 'Time that could have been saved' }),
+    ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByRole('group', { name: 'Case Quality Index' })).toBeInTheDocument();
   });
@@ -216,7 +270,7 @@ describe('[FR-QR-02] Case Quality Review: quality index', () => {
     const fake = api({ 'cases.get': () => caseDetail({ analysisState: 'not_analyzed' }) });
     renderApp(<CaseQualityPage caseId="case_1" />, { api: fake });
     expect(await screen.findByText('This case has not been analysed yet')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open the case' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Open case details' })).toHaveAttribute(
       'href',
       '/cases/case_1',
     );
@@ -242,15 +296,57 @@ describe('[FR-QR-02] Case Quality Review: quality index', () => {
   it('explains a role without quality access and asks for nothing', async () => {
     const fake = api({}, ['case:read', 'skill:read']);
     renderApp(<CaseQualityPage caseId="case_1" />, { api: fake });
-    expect(
-      await screen.findByText('You do not have access to the case quality review'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('You do not have access to the case score')).toBeInTheDocument();
     expect(screen.getByText(/does not include the "quality:read" permission/)).toBeInTheDocument();
     expect(inputsOf(fake, 'quality.get')).toHaveLength(0);
   });
+
+  it('does not repeat what the case header above already says: no second title, case picker or breadcrumbs', async () => {
+    renderApp(<CaseQualityPage caseId="case_1" />, { api: api() });
+    await screen.findByRole('group', { name: 'Case Quality Index' });
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.queryByText(/Intermittent Teams sign-in failures/)).toBeNull();
+    expect(screen.queryByRole('navigation', { name: /breadcrumb/i })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: /case/i })).toBeNull();
+    // It links back to the review, quietly: the page has no primary action of its own.
+    expect(screen.getByRole('link', { name: 'Back to review' })).toHaveAttribute(
+      'href',
+      '/cases/case_1/review',
+    );
+  });
+
+  it('keeps the long lists short: three items, then every one on request', async () => {
+    const many = Array.from({ length: 5 }, (_, index) => ({
+      id: `pen_${index + 1}`,
+      key: 'unsupported_root_cause' as const,
+      label: 'Unsupported root-cause claim',
+      points: 2 + index,
+      dimension: null,
+      evidence: [],
+      rationale: `Reason number ${index + 1}.`,
+    }));
+    renderApp(<CaseQualityPage caseId="case_1" />, {
+      api: api({
+        'quality.get': () =>
+          qualityAssessment({ penalties: many, totalPenaltyPoints: 20, penaltyCapApplied: true }),
+      }),
+    });
+    const penalties = await screen.findByRole('group', { name: 'What lowered the score' });
+    expect(penalties).toHaveTextContent(/5 penalties took off 20 points in total/);
+    expect(penalties).toHaveTextContent(/A cap applies/);
+    expect(within(penalties).getAllByRole('heading', { level: 3 })).toHaveLength(3);
+    await userEvent.click(within(penalties).getByRole('button', { name: 'Show all 5' }));
+    await waitFor(() =>
+      expect(within(penalties).getAllByRole('heading', { level: 3 })).toHaveLength(5),
+    );
+    await userEvent.click(within(penalties).getByRole('button', { name: 'Show fewer' }));
+    await waitFor(() =>
+      expect(within(penalties).getAllByRole('heading', { level: 3 })).toHaveLength(3),
+    );
+  });
 });
 
-describe('[FR-QR-03] Case Quality Review: the time cursor (decision-time view)', () => {
+describe('[FR-QR-03] Score: the time cursor (decision-time view)', () => {
   it('asks for nothing later than the cursor and says how many later events are withheld', async () => {
     navigateTo(`/cases/case_1/quality?asOf=${AS_OF}`);
     const fake = api();
@@ -302,12 +398,12 @@ describe('[FR-QR-03] Case Quality Review: the time cursor (decision-time view)',
     ).toBeInTheDocument();
   });
 
-  it('leaves out a dimension that cannot be assessed yet instead of scoring it', async () => {
+  it('leaves out an area that cannot be assessed yet instead of scoring it', async () => {
     navigateTo(`/cases/case_1/quality?asOf=${AS_OF}`);
     renderApp(<CaseQualityPage caseId="case_1" />, { api: api() });
-    const dimensions = await screen.findByRole('group', { name: 'Dimensions' });
+    const dimensions = await screen.findByRole('group', { name: 'How the score was built' });
     expect(within(dimensions).getByText('Not yet assessable')).toBeInTheDocument();
-    expect(within(dimensions).getByText(/Left out of the composite/)).toBeInTheDocument();
+    expect(within(dimensions).getByText(/Left out of the score/)).toBeInTheDocument();
   });
 
   it('shows the boundary exactly: seconds are kept when the instant has some', async () => {
@@ -327,7 +423,43 @@ describe('[FR-QR-03] Case Quality Review: the time cursor (decision-time view)',
     await userEvent.click(screen.getByRole('button', { name: 'Latest' }));
     await waitFor(() => expect(window.location.search).toBe(''));
     await waitFor(() => expect(inputsOf(fake, 'quality.get').at(-1)?.query.asOf).toBeUndefined());
-    expect(await screen.findByText(/Showing the whole record/)).toBeInTheDocument();
+    expect(
+      await screen.findByText('Showing the whole record, up to the last event.'),
+    ).toBeInTheDocument();
+  });
+
+  it('is a slim bar that says which view the page shows, and opens to the cursor on request', async () => {
+    const fake = api();
+    renderApp(<CaseQualityPage caseId="case_1" />, { api: fake });
+    await screen.findByRole('group', { name: 'Case Quality Index' });
+    const bar = screen.getByRole('group', { name: 'What was known then' });
+    const toggle = within(bar).getByRole('button', { name: /What was known then/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveTextContent('Showing the whole record');
+    // Closed, it holds nothing to tab to or to read; the explanation is one click away.
+    expect(within(bar).queryByRole('button', { name: 'Previous event' })).toBeNull();
+    expect(
+      within(bar).getByRole('button', { name: 'About what was known then' }),
+    ).toBeInTheDocument();
+    expect(inputsOf(fake, 'quality.get').every((input) => input.query.asOf === undefined)).toBe(
+      true,
+    );
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(await within(bar).findByRole('button', { name: 'Previous event' })).toBeInTheDocument();
+    expect(within(bar).getByRole('group', { name: 'Time cursor' })).toBeInTheDocument();
+  });
+
+  it('opens by itself when the address names a moment, and the summary says which one', async () => {
+    navigateTo(`/cases/case_1/quality?asOf=${AS_OF}`);
+    renderApp(<CaseQualityPage caseId="case_1" />, { api: api() });
+    const bar = await screen.findByRole('group', { name: 'What was known then' });
+    const toggle = within(bar).getByRole('button', { name: /What was known then/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle).toHaveTextContent('Earlier view');
+    expect(toggle).toHaveTextContent('As of 9 Mar 2026, 12:30 UTC');
+    expect(await within(bar).findByRole('group', { name: 'Time cursor' })).toBeInTheDocument();
   });
 
   it('keeps hindsight apart: coaching ignores the cursor and says so', async () => {
@@ -345,7 +477,7 @@ describe('[FR-QR-03] Case Quality Review: the time cursor (decision-time view)',
   });
 });
 
-describe('[FR-QR-10] Case Quality Review: the shared protocol of the case pages for earlier views', () => {
+describe('[FR-QR-10] Score: the shared protocol of the case pages for earlier views', () => {
   it('lands the cursor on an event, and asks for the earlier view only once the instants are known', async () => {
     // An arbitrary minute between two events, as a shared address may carry.
     navigateTo('/cases/case_1/quality?asOf=2026-03-09T11:00:00Z');
@@ -374,6 +506,7 @@ describe('[FR-QR-10] Case Quality Review: the shared protocol of the case pages 
     const fake = api();
     renderApp(<CaseQualityPage caseId="case_1" />, { api: fake });
     await screen.findByRole('group', { name: 'Case Quality Index' });
+    await openCursor();
     await userEvent.click(await screen.findByRole('button', { name: 'Previous event' }));
     await waitFor(() =>
       expect(new URLSearchParams(window.location.search).get('asOf')).toBe(LAST_EVENT),
@@ -441,7 +574,7 @@ describe('[FR-QR-10] Case Quality Review: the shared protocol of the case pages 
     expect(await screen.findByText('Earlier views are limited')).toBeInTheDocument();
     expect(
       screen.getByText(
-        /Computing earlier views is limited to keep the service responsive, so the quality index could not be computed for this moment just now\. Views you already opened stay available\./,
+        /Computing earlier views is limited to keep the service responsive, so the score could not be computed for this moment just now\. Views you already opened stay available\./,
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText('Too many requests right now')).toBeNull();
@@ -591,15 +724,16 @@ describe('[FR-QR-10] Case Quality Review: the shared protocol of the case pages 
   });
 });
 
-describe('[FR-QR-11] Case Quality Review: nothing of another moment while the chosen one loads', () => {
+describe('[FR-QR-11] Score: nothing of another moment while the chosen one loads', () => {
   const NEVER = (): Promise<never> => new Promise<never>(() => undefined);
 
-  // Each tab, the read behind it, what it shows for the whole record, and the skeleton that replaces it.
+  // Each part of the page, the read behind it, what it shows for the whole record, and the skeleton that replaces it.
+  // The first row also covers an address that still carries the old `?tab=index`: it opens the default tab.
   const TABS_UNDER_TEST = [
     {
       tab: 'index',
       route: 'quality.get',
-      loading: 'Loading the quality index…',
+      loading: 'Loading the score…',
       answer: () => qualityAssessment(),
       content: () => screen.queryByRole('group', { name: 'Case Quality Index' }),
     },
@@ -608,7 +742,7 @@ describe('[FR-QR-11] Case Quality Review: nothing of another moment while the ch
       route: 'metrics.get',
       loading: 'Loading the metrics…',
       answer: () => ({ items: metricEstimates() }),
-      content: () => screen.queryByRole('group', { name: 'Avoidable Support Effort' }),
+      content: () => screen.queryByRole('group', { name: 'Time that could have been saved' }),
     },
     {
       tab: 'warnings',
@@ -638,6 +772,7 @@ describe('[FR-QR-11] Case Quality Review: nothing of another moment while the ch
       renderApp(<CaseQualityPage caseId="case_1" />, { api: api(handlers) });
       await waitFor(() => expect(content()).not.toBeNull());
 
+      await openCursor();
       await userEvent.click(await screen.findByRole('button', { name: 'Previous event' }));
       await waitFor(() =>
         expect(new URLSearchParams(window.location.search).get('asOf')).toBe(LAST_EVENT),
@@ -671,7 +806,7 @@ describe('[FR-QR-11] Case Quality Review: nothing of another moment while the ch
       expect(screen.queryByText(/Scored as of 9 Mar 2026, 12:30:45 UTC/)).toBeNull(),
     );
     expect(screen.queryByRole('group', { name: 'Case Quality Index' })).toBeNull();
-    expect(await screen.findByText('Loading the quality index…')).toBeInTheDocument();
+    expect(await screen.findByText('Loading the score…')).toBeInTheDocument();
   });
 
   it('shows no counts of another moment in the cursor panel either', async () => {
@@ -717,51 +852,98 @@ describe('[FR-QR-11] Case Quality Review: nothing of another moment while the ch
   });
 });
 
-describe('[FR-QR-04] Case Quality Review: tabs in the URL', () => {
+describe('[FR-QR-04] Score: tabs in the URL', () => {
   it('opens the tab named in the address and writes the tab back when it changes', async () => {
     navigateTo('/cases/case_1/quality?tab=effort');
     const fake = api();
     renderApp(<CaseQualityPage caseId="case_1" />, { api: fake });
     expect(
-      await screen.findByRole('group', { name: 'Avoidable Support Effort' }),
+      await screen.findByRole('group', { name: 'Time that could have been saved' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Effort and metrics' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
-    // Only what is visible is requested.
-    expect(inputsOf(fake, 'quality.get')).toHaveLength(0);
-    expect(inputsOf(fake, 'coaching.get')).toHaveLength(0);
+    // The score is always shown, so it is always asked for; of the tabs, only the one that is open is.
+    expect(inputsOf(fake, 'quality.get').length).toBeGreaterThan(0);
+    for (const route of [
+      'warnings.list',
+      'coaching.get',
+      'skillMatches.list',
+      'compare.cases',
+    ] as const) {
+      expect(inputsOf(fake, route), route).toHaveLength(0);
+    }
 
-    await openTab('Live warnings');
+    await openTab('Warnings');
     await waitFor(() => expect(window.location.search).toContain('tab=warnings'));
     expect(await screen.findByRole('group', { name: 'Warnings' })).toBeInTheDocument();
   });
+
+  it('lists the five other views as tabs under the result, and opens Effort and metrics when no tab is named', async () => {
+    renderApp(<CaseQualityPage caseId="case_1" />, { api: api() });
+    const tabs = await screen.findByRole('tablist', { name: 'Score details' });
+    expect(
+      within(tabs)
+        .getAllByRole('tab')
+        .map((tab) => tab.textContent),
+    ).toEqual(['Effort and metrics', 'Warnings', 'Skills', 'Coaching', 'Compare']);
+    expect(within(tabs).getByRole('tab', { name: 'Effort and metrics' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(await screen.findByRole('tabpanel', { name: 'Effort and metrics' })).toBeInTheDocument();
+  });
+
+  it('scrolls to the tabs when the address names one, once the score is in', async () => {
+    navigateTo('/cases/case_1/quality?tab=coaching');
+    const scroll = vi.mocked(Element.prototype.scrollIntoView);
+    scroll.mockClear();
+    renderApp(<CaseQualityPage caseId="case_1" />, { api: api() });
+    await screen.findByRole('group', { name: 'Case Quality Index' });
+    await waitFor(() => expect(scroll).toHaveBeenCalled());
+    expect(scroll.mock.contexts).toContain(
+      screen.getByRole('region', { name: 'More about this score' }),
+    );
+  });
 });
 
-describe('[FR-QR-05] Case Quality Review: Avoidable Support Effort', () => {
+describe('[FR-QR-05] Score: the time that could have been saved (effort and metrics)', () => {
   it('shows the estimate with its range, contributors, assumptions and method, labelled', async () => {
     navigateTo('/cases/case_1/quality?tab=effort');
     renderApp(<CaseQualityPage caseId="case_1" />, { api: api() });
-    const ase = await screen.findByRole('group', { name: 'Avoidable Support Effort' });
+    const ase = await screen.findByRole('group', { name: 'Time that could have been saved' });
     expect(within(ase).getByText('Estimated')).toBeInTheDocument();
     expect(within(ase).getAllByText('Simulated').length).toBeGreaterThan(0);
-    expect(within(ase).getByText('Synthetic')).toBeInTheDocument();
+    expect(within(ase).getByText('Demo data')).toBeInTheDocument();
     expect(
       within(ase).getByText(/About 55% of the effort could plausibly have been avoided/),
     ).toBeInTheDocument();
     expect(within(ase).getByText(/range of 44% to 83%/)).toBeInTheDocument();
 
-    const method = screen.getByRole('group', { name: 'How the estimate was calculated' });
-    expect(within(method).getByText(/ASE = sum\(weight x avoidable share\)/)).toBeInTheDocument();
+    // The method is folded under the figure, with its assumptions.
+    await userEvent.click(
+      within(ase).getByRole('button', { name: /How the estimate was calculated/ }),
+    );
     expect(
-      within(method).getByText(/Outcome probabilities come from knowledge-pack likelihoods/),
+      await within(ase).findByText(/ASE = sum\(weight x avoidable share\)/),
+    ).toBeInTheDocument();
+    expect(
+      within(ase).getByText(/Outcome probabilities come from knowledge-pack likelihoods/),
     ).toBeInTheDocument();
 
-    const breakdown = screen.getByRole('group', { name: 'Contributors and components' });
-    const contributors = within(breakdown).getByRole('list', { name: 'Main contributors' });
+    const breakdown = screen.getByRole('group', { name: 'What the estimate is made of' });
+    await userEvent.click(
+      within(breakdown).getByRole('button', { name: /Show what each part rests on/ }),
+    );
+    const contributors = await within(breakdown).findByRole('list', { name: 'Main contributors' });
     expect(within(contributors).getByText('Waiting time to diagnosis')).toBeInTheDocument();
-    expect(within(breakdown).getByRole('table', { name: 'Effort components' })).toBeInTheDocument();
+    await userEvent.click(
+      within(breakdown).getByRole('button', { name: /Show every effort component/ }),
+    );
+    expect(
+      await within(breakdown).findByRole('table', { name: 'Effort components' }),
+    ).toBeInTheDocument();
   });
 
   it('shows the other estimates as cards with how each was calculated', async () => {
@@ -773,26 +955,23 @@ describe('[FR-QR-05] Case Quality Review: Avoidable Support Effort', () => {
     expect(screen.getAllByText('How this is calculated').length).toBeGreaterThan(0);
   });
 
-  it('says Avoidable Support Effort cannot be estimated inside a time window', async () => {
+  it('says the time that could have been saved cannot be estimated inside a time window', async () => {
     navigateTo(`/cases/case_1/quality?tab=effort&asOf=${AS_OF}`);
     renderApp(<CaseQualityPage caseId="case_1" />, { api: api() });
-    const ase = await screen.findByRole('group', { name: 'Avoidable Support Effort' });
+    const ase = await screen.findByRole('group', { name: 'Time that could have been saved' });
     expect(within(ase).getByText('Not estimated here')).toBeInTheDocument();
     expect(within(ase).getByText(/not estimated inside a time window/)).toBeInTheDocument();
     expect(within(ase).queryByText(/About .*% of the effort/)).toBeNull();
   });
 });
 
-describe('[FR-QR-06] Case Quality Review: live warnings and dismissal', () => {
+describe('[FR-QR-06] Score: warnings and dismissal', () => {
   it('lists open warnings first, with counts, evidence and the next step', async () => {
     navigateTo('/cases/case_1/quality?tab=warnings');
     renderApp(<CaseQualityPage caseId="case_1" />, { api: api() });
     const panel = await screen.findByRole('group', { name: 'Warnings' });
-    expect(within(panel).getByRole('button', { name: 'Open (2)' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    expect(within(panel).getByRole('button', { name: 'Resolved (1)' })).toBeInTheDocument();
+    expect(within(panel).getByRole('radio', { name: 'Open (2)' })).toBeChecked();
+    expect(within(panel).getByRole('radio', { name: 'Resolved (1)' })).not.toBeChecked();
     expect(
       within(panel).getByText('Disruptive change made before the cause was established'),
     ).toBeInTheDocument();
@@ -803,8 +982,9 @@ describe('[FR-QR-06] Case Quality Review: live warnings and dismissal', () => {
       '/cases/case_1/timeline?sel=e09',
     );
 
-    await userEvent.click(within(panel).getByRole('button', { name: 'Resolved (1)' }));
+    await userEvent.click(within(panel).getByRole('radio', { name: 'Resolved (1)' }));
     await waitFor(() => expect(window.location.search).toContain('wstate=resolved'));
+    expect(within(panel).getByRole('radio', { name: 'Resolved (1)' })).toBeChecked();
     expect(
       await within(panel).findByText('The customer is waiting for a reply'),
     ).toBeInTheDocument();
@@ -924,7 +1104,7 @@ describe('[FR-QR-06] Case Quality Review: live warnings and dismissal', () => {
   });
 });
 
-describe('[FR-QR-07] Case Quality Review: SkillDNA matches', () => {
+describe('[FR-QR-07] Score: skill matches', () => {
   it('shows how well a skill fits, with the evidence, and applies it only after confirmation', async () => {
     navigateTo('/cases/case_1/quality?tab=skills');
     const fake = api({
@@ -1026,12 +1206,12 @@ const withMissingCase: FakeHandlers = {
 };
 const MISSING_HEADING = 'The case to compare with was not found';
 
-describe('[FR-QR-08] Case Quality Review: coaching and comparison', () => {
+describe('[FR-QR-08] Score: coaching and comparison', () => {
   it('shows a constructive, retrospective coaching report with its limits', async () => {
     navigateTo('/cases/case_1/quality?tab=coaching');
     renderApp(<CaseQualityPage caseId="case_1" />, { api: api() });
     const frame = await screen.findByRole('group', { name: 'Retrospective review' });
-    expect(within(frame).getByText('Hindsight (not used to generate)')).toBeInTheDocument();
+    expect(within(frame).getByText('Known only later')).toBeInTheDocument();
     expect(
       within(frame).getByText(/uses the whole record, including the outcome/),
     ).toBeInTheDocument();
@@ -1067,7 +1247,7 @@ describe('[FR-QR-08] Case Quality Review: coaching and comparison', () => {
     expect(screen.getByText(/do not show cause and effect/)).toBeInTheDocument();
     expect(inputsOf(fake, 'compare.cases')[0]?.query.caseIds).toBe('case_1,case_2');
     const frame = screen.getByRole('group', { name: 'Retrospective comparison' });
-    expect(within(frame).getByText('Hindsight (not used to generate)')).toBeInTheDocument();
+    expect(within(frame).getByText('Known only later')).toBeInTheDocument();
   });
 
   it('keeps the other case in the address', async () => {
@@ -1154,10 +1334,13 @@ describe('[FR-QR-08] Case Quality Review: coaching and comparison', () => {
   });
 });
 
-describe('[FR-QR-09] Case Quality Review accessibility', () => {
+describe('[FR-QR-09] Score accessibility', () => {
+  // The result is checked on its own (the tab under it is the lightest one, a refusal for this role); every tab is checked
+  // below with the result above it, so the whole default page is covered too without one very large document.
   it(
-    'has no axe violations on the quality index in light mode',
+    'has no axe violations on the score in light mode',
     async () => {
+      navigateTo('/cases/case_1/quality?tab=compare');
       const { container } = renderApp(<CaseQualityPage caseId="case_1" />, { api: api() });
       await screen.findByRole('group', { name: 'Case Quality Index' });
       await expectNoAxeViolations(container);
@@ -1166,9 +1349,26 @@ describe('[FR-QR-09] Case Quality Review accessibility', () => {
   );
 
   it(
-    'has no axe violations on the quality index in dark mode inside a time window',
+    'has no axe violations with the time bar and an area opened, in dark mode',
     async () => {
-      navigateTo(`/cases/case_1/quality?asOf=${AS_OF}`);
+      navigateTo('/cases/case_1/quality?tab=compare');
+      const { container } = renderApp(<CaseQualityPage caseId="case_1" />, {
+        api: api(),
+        mode: 'dark',
+      });
+      await screen.findByRole('group', { name: 'Case Quality Index' });
+      await openCursor();
+      await openDimension(/Claims backed by evidence/);
+      await screen.findByText(/2 checks behind this score/);
+      await expectNoAxeViolations(container);
+    },
+    AXE_TIMEOUT,
+  );
+
+  it(
+    'has no axe violations on the score in dark mode inside a time window',
+    async () => {
+      navigateTo(`/cases/case_1/quality?tab=compare&asOf=${AS_OF}`);
       const { container } = renderApp(<CaseQualityPage caseId="case_1" />, {
         api: api(),
         mode: 'dark',

@@ -1,9 +1,8 @@
 'use client';
 
 import { ROLE_LABELS, type Permission } from '@caseguard/schemas';
-import { EmptyState } from '@caseguard/ui';
-import { Button } from '@fluentui/react-components';
-import { HomeRegular, LockClosedRegular, PersonSwapRegular } from '@fluentui/react-icons';
+import { Button, EmptyState } from '@caseguard/ui';
+import { HomeIcon, LockIcon, UserRoundCogIcon } from 'lucide-react';
 import { useAuth } from '../../lib/auth/context';
 import { useSession } from '../../lib/auth/session';
 import { LinkButton } from './LinkButton';
@@ -31,22 +30,22 @@ export function PermissionNeeded({ subject, permission, grantedTo }: PermissionN
   return (
     <EmptyState
       headingLevel={2}
-      icon={<LockClosedRegular />}
+      icon={<LockIcon />}
       title={`You do not have access to ${subject}`}
       description={`Your role (${roleText}) does not include the ${missing} permission. ${grantedTo} can open it.`}
       action={
         <>
           {auth.dev ? (
             <Button
-              appearance="primary"
-              icon={<PersonSwapRegular />}
+              variant="primary"
+              icon={<UserRoundCogIcon />}
               onClick={() => auth.dev?.openPicker()}
             >
               Choose a development persona
             </Button>
           ) : null}
-          <LinkButton href="/" appearance={auth.dev ? 'outline' : 'primary'} icon={<HomeRegular />}>
-            Command Center
+          <LinkButton href="/" appearance={auth.dev ? 'outline' : 'primary'} icon={<HomeIcon />}>
+            Home
           </LinkButton>
         </>
       }

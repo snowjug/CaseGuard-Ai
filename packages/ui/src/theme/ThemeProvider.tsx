@@ -4,7 +4,6 @@ import {
   FluentProvider,
   RendererProvider,
   SSRProvider,
-  createDOMRenderer,
   type GriffelRenderer,
   type SpinnerState,
 } from '@fluentui/react-components';
@@ -19,9 +18,11 @@ import {
   type ReactNode,
 } from 'react';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { MotionProvider } from '../motion/MotionProvider';
 import type { ThemeName } from '../tokens/palette';
 import { getCaseGuardTheme, createSystemThemeCss } from '../tokens/themes';
 import { useReducedMotionPreference, type ReducedMotionPreference } from './motion';
+import { createCaseGuardRenderer } from './ssr';
 import { resolveThemeMode, writeThemeCookie, type ThemeMode } from './theme-mode';
 
 export interface ThemeModeContextValue {
@@ -97,7 +98,7 @@ export function CaseGuardThemeProvider({
   paintCanvas = true,
   children,
 }: CaseGuardThemeProviderProps) {
-  const [ownRenderer] = useState(() => renderer ?? createDOMRenderer());
+  const [ownRenderer] = useState(() => renderer ?? createCaseGuardRenderer());
   const activeRenderer = renderer ?? ownRenderer;
   const [mode, setModeState] = useState<ThemeMode>(initialMode);
   const systemDark = useMediaQuery(prefersDark, false);
@@ -144,7 +145,7 @@ export function CaseGuardThemeProvider({
             }
           >
             {systemCss ? <style data-cg-system-theme="">{systemCss}</style> : null}
-            {children}
+            <MotionProvider>{children}</MotionProvider>
           </FluentProvider>
         </ThemeModeContext.Provider>
       </SSRProvider>

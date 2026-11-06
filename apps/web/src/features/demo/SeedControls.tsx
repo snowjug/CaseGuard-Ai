@@ -1,8 +1,8 @@
 'use client';
 
-import { ConfirmDialog, Panel, cg } from '@caseguard/ui';
-import { Button, ProgressBar, makeStyles, tokens } from '@fluentui/react-components';
-import { ArrowResetRegular, DatabaseRegular, PlayRegular } from '@fluentui/react-icons';
+import { Button, ConfirmDialog, HelpButton, cg } from '@caseguard/ui';
+import { ProgressBar, makeStyles, tokens } from '@fluentui/react-components';
+import { DatabaseIcon, PlayIcon, RotateCcwIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ReactElement, ReactNode } from 'react';
 import { useApiMutation, useApiQuery } from '../../lib/api/hooks';
@@ -13,35 +13,50 @@ import { explainDemoError } from '../../lib/presentation/demo-errors';
 import { useToast } from '../../lib/toast';
 
 const useStyles = makeStyles({
-  grid: {
-    display: 'grid',
-    gap: cg.space[3],
-    gridTemplateColumns: 'minmax(0, 1fr)',
-    '@media (min-width: 1100px)': { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' },
+  stack: { display: 'flex', flexDirection: 'column', gap: cg.space[3], minWidth: 0 },
+  intro: { display: 'flex', alignItems: 'center', gap: cg.space[1] },
+  introText: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase300,
+    color: cg.textSecondary,
   },
-  card: {
+  rows: { display: 'flex', flexDirection: 'column' },
+  row: {
     display: 'flex',
     flexDirection: 'column',
-    gap: cg.space[2],
-    padding: cg.space[3],
-    borderRadius: cg.radius.md,
-    border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surfaceSunken,
+    gap: cg.space[3],
+    padding: `${cg.space[3]} 0`,
+    borderTop: `1px solid ${cg.borderSubtle}`,
+    ':first-child': { borderTop: 0 },
+    '@media (min-width: 640px)': {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: cg.space[6],
+    },
+  },
+  text: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[1],
     minWidth: 0,
+    maxWidth: '64ch',
   },
   title: {
     margin: 0,
     fontSize: tokens.fontSizeBase300,
     lineHeight: tokens.lineHeightBase300,
     fontWeight: tokens.fontWeightSemibold,
+    color: cg.text,
   },
-  text: {
+  description: {
     margin: 0,
-    flexGrow: 1,
-    fontSize: tokens.fontSizeBase300,
-    lineHeight: tokens.lineHeightBase300,
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
     color: cg.textSecondary,
   },
+  action: { flexShrink: 0 },
   progress: { display: 'flex', flexDirection: 'column', gap: cg.space[1], marginTop: cg.space[3] },
   dialogText: { margin: 0 },
   note: { margin: 0, fontSize: tokens.fontSizeBase200, color: cg.textMuted },
@@ -49,6 +64,9 @@ const useStyles = makeStyles({
 
 /** Explains a refusal by the API's stable reason (not a synthetic demo tenant, a job is running, personas missing). */
 const explain = explainDemoError;
+
+const HELP =
+  'Seeding plays the story through the real services as the synthetic personas, so permissions, four-eyes approval and the audit trail apply exactly as they do over HTTP. Progress on this page is derived from what is stored, so it moves only when the data does. The API refuses these actions outside a synthetic demo tenant.';
 
 interface ControlProps {
   title: string;
@@ -76,10 +94,12 @@ function Control({
 }: ControlProps) {
   const styles = useStyles();
   return (
-    <div className={styles.card} role="group" aria-label={title}>
-      <h3 className={styles.title}>{title}</h3>
-      <p className={styles.text}>{description}</p>
-      <div>
+    <div className={styles.row} role="group" aria-label={title}>
+      <div className={styles.text}>
+        <h3 className={styles.title}>{title}</h3>
+        <p className={styles.description}>{description}</p>
+      </div>
+      <div className={styles.action}>
         {allowed ? (
           <ConfirmDialog
             title={dialogTitle}
@@ -158,18 +178,22 @@ export function SeedControls() {
   ) : null;
 
   return (
-    <Panel
-      title="Demo data"
-      description="Seed or reset the synthetic story in this tenant. Administrators only."
-      help="Seeding plays the story through the real services as the synthetic personas, so permissions, four-eyes approval and the audit trail apply exactly as they do over HTTP. Progress on this page is derived from what is stored, so it moves only when the data does. The API refuses these actions outside a synthetic demo tenant."
-    >
-      <div className={styles.grid} aria-busy={busy}>
+    <div className={styles.stack} aria-busy={busy}>
+      <div className={styles.intro}>
+        <p className={styles.introText}>
+          Seed or reset the synthetic story in this tenant. Administrators only.
+        </p>
+        <HelpButton label="About seeding and resetting" title="Seed and reset">
+          {HELP}
+        </HelpButton>
+      </div>
+      <div className={styles.rows}>
         <Control
           title="Play the whole story"
           description="Imports both cases, analyses them, accepts the better path, walks the skill through governed approval and applies it to Case Two. Steps already done are skipped, so it is safe to repeat."
           allowed={allowed}
           button={
-            <Button appearance="primary" icon={<PlayRegular />} disabled={busy}>
+            <Button variant="secondary" icon={<PlayIcon />} disabled={busy}>
               Play the whole story
             </Button>
           }
@@ -188,7 +212,7 @@ export function SeedControls() {
           description="Erases case data and leaves the story at step 1, ready for a live walk-through. Users, settings and the audit trail stay."
           allowed={allowed}
           button={
-            <Button appearance="outline" icon={<DatabaseRegular />} disabled={busy}>
+            <Button variant="secondary" icon={<DatabaseIcon />} disabled={busy}>
               Start from step 1
             </Button>
           }
@@ -199,7 +223,7 @@ export function SeedControls() {
         >
           <p className={styles.dialogText}>
             All cases, analysis results, skills and jobs in this synthetic tenant are erased. Users,
-            governance settings and the audit trail are kept.
+            settings and the audit trail are kept.
           </p>
           {progress}
         </Control>
@@ -208,7 +232,7 @@ export function SeedControls() {
           description="Erases case data and clears demo progress, so every step is incomplete again."
           allowed={allowed}
           button={
-            <Button appearance="outline" icon={<ArrowResetRegular />} disabled={busy}>
+            <Button variant="secondary" icon={<RotateCcwIcon />} disabled={busy}>
               Reset demo data
             </Button>
           }
@@ -221,6 +245,6 @@ export function SeedControls() {
           clears demo progress. It cannot be undone; the audit trail records that it happened.
         </Control>
       </div>
-    </Panel>
+    </div>
   );
 }

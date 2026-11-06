@@ -64,7 +64,23 @@ export interface RankedItem<T> {
   indices: number[];
 }
 
-/** Filters and ranks items by label (and, with a lower weight, keywords). An empty query keeps the original order. */
+/**
+ * A scattered match (the letters of "dns" found one by one across a whole sentence) is noise, not a result. A match must
+ * fit in a window of three times the query, or the query plus six letters, whichever is larger.
+ */
+function isCompact(query: string, match: FuzzyResult | null): match is FuzzyResult {
+  if (!match) return false;
+  const length = query.trim().length;
+  const first = match.indices[0];
+  const last = match.indices.at(-1);
+  if (first === undefined || last === undefined) return true;
+  return last - first + 1 <= Math.max(length * 3, length + 6);
+}
+
+/**
+ * Filters and ranks items by label (and, with a lower weight, keywords). An empty query keeps the original order.
+ * Only a contiguous or compact match counts, so a short query does not match nearly everything.
+ */
 export function rankByQuery<T extends Searchable>(
   query: string,
   items: readonly T[],
@@ -73,12 +89,13 @@ export function rankByQuery<T extends Searchable>(
   const ranked: RankedItem<T>[] = [];
   for (const item of items) {
     const byLabel = fuzzyMatch(query, item.label);
-    if (byLabel) {
+    if (isCompact(query, byLabel)) {
       ranked.push({ item, score: byLabel.score, indices: byLabel.indices });
       continue;
     }
     const byKeywords = item.keywords ? fuzzyMatch(query, item.keywords) : null;
-    if (byKeywords) ranked.push({ item, score: byKeywords.score * 0.5, indices: [] });
+    if (isCompact(query, byKeywords))
+      ranked.push({ item, score: byKeywords.score * 0.5, indices: [] });
   }
   return ranked.sort((a, b) => b.score - a.score || a.item.label.localeCompare(b.item.label));
 }

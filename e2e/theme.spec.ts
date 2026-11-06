@@ -153,8 +153,8 @@ test.describe('[FR-UX-05] theme: light, dark and system, remembered, without a f
     await openPage(page, '/');
     await page.getByRole('button', { name: THEME_BUTTON }).click();
     await page.getByRole('menuitemradio', { name: 'Dark' }).click();
-    await navLink(page, 'SkillDNA Library').click();
-    await expect(page.getByRole('heading', { level: 1, name: 'SkillDNA Library' })).toBeVisible();
+    await navLink(page, 'Skills').click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Skills' })).toBeVisible();
     expect(await paintedLuminance(page)).toBeLessThan(0.1);
     await expect(accountButton(page, PERSONAS.engineer)).toBeVisible();
   });

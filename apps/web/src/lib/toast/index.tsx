@@ -1,5 +1,6 @@
 'use client';
 
+import { cg, layout, useMediaQuery } from '@caseguard/ui';
 import {
   Link,
   Toast,
@@ -7,6 +8,8 @@ import {
   ToastTitle,
   ToastTrigger,
   Toaster,
+  makeStyles,
+  tokens,
   useId,
   useToastController,
   type ToastIntent,
@@ -22,6 +25,17 @@ import {
 } from 'react';
 import { usePresentation } from '../presentation';
 import { usePresenterHeight } from '../presentation/presenter-height';
+
+const useStyles = makeStyles({
+  toast: {
+    border: `1px solid ${cg.glassBorder}`,
+    borderRadius: cg.radius.md,
+    backgroundColor: cg.surfaceRaised,
+    color: cg.text,
+    boxShadow: `inset 0 1px 0 ${cg.highlight}, ${cg.shadowHigh}`,
+    fontSize: tokens.fontSizeBase300,
+  },
+});
 
 export interface ToastOptions {
   /** Secondary line under the title. */
@@ -54,16 +68,18 @@ const ToastContext = createContext<ToastApi | null>(null);
  * outside every landmark, which axe reports (`region`) while one is on screen.
  */
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const styles = useStyles();
   const toasterId = useId('toaster');
   const { dispatchToast } = useToastController(toasterId);
   const { enabled: presenting } = usePresentation();
   const presenterHeight = usePresenterHeight(presenting);
+  const phone = useMediaQuery(`(max-width: ${layout.drawerBreakpoint - 1}px)`);
   const [host, setHost] = useState<HTMLElement | null>(null);
 
   const show = useCallback(
     (intent: ToastIntent, title: string, options: ToastOptions = {}, action?: ReactElement) => {
       dispatchToast(
-        <Toast>
+        <Toast className={styles.toast}>
           <ToastTitle action={action}>{title}</ToastTitle>
           {options.body ? <ToastBody>{options.body}</ToastBody> : null}
         </Toast>,
@@ -74,7 +90,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         },
       );
     },
-    [dispatchToast],
+    [dispatchToast, styles.toast],
   );
 
   const api = useMemo<ToastApi>(
@@ -96,17 +112,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [show],
   );
 
+  // Toasts sit above the presenter strip while presenting, and above the bottom bar on a phone.
+  const vertical = (presenting ? presenterHeight + 12 : 16) + (phone ? layout.bottomBarHeight : 0);
+
   return (
     <ToastContext.Provider value={api}>
       {children}
       <div ref={setHost} role="region" aria-label="Notifications" />
-      {/* While presenting, toasts sit above the presenter strip (it is fixed to the bottom and publishes its height). */}
       <Toaster
         toasterId={toasterId}
         mountNode={host}
         position="bottom-end"
         limit={4}
-        offset={{ vertical: presenting ? presenterHeight + 12 : 16 }}
+        offset={{ vertical }}
       />
     </ToastContext.Provider>
   );

@@ -52,7 +52,7 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
-import { DeleteRegular, FolderRegular } from '@fluentui/react-icons';
+import { FolderIcon, Trash2Icon } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
 import {
   SAMPLE_ACTUAL_TRACK,
@@ -72,6 +72,7 @@ import {
   type SampleCaseRow,
 } from './samples';
 import { SAMPLE_GRAPH } from './sample-graph';
+import { KitGallery } from './KitGallery';
 
 const useStyles = makeStyles({
   page: {
@@ -450,6 +451,7 @@ export function DesignLab() {
   const [asOf, setAsOf] = useState<string | null>(null);
   const [dialogResult, setDialogResult] = useState('No action taken yet.');
   const sections = [
+    ['kit', 'Kit'],
     ['tokens', 'Tokens'],
     ['badges', 'Badges'],
     ['notices', 'Notices'],
@@ -485,6 +487,10 @@ export function DesignLab() {
           ))}
         </ul>
       </nav>
+
+      <section id="kit" aria-labelledby="kit-title">
+        <KitGallery />
+      </section>
 
       <Section
         id="tokens"
@@ -593,7 +599,7 @@ export function DesignLab() {
           <EmptyState
             title="No cases yet"
             description="Load the synthetic sample from Cases to see an analysed investigation."
-            icon={<FolderRegular />}
+            icon={<FolderIcon />}
             action={<Button appearance="primary">Open Cases</Button>}
           />
           <ErrorState
@@ -700,7 +706,7 @@ export function DesignLab() {
           </ConfirmDialog>
           <ConfirmDialog
             trigger={
-              <Button appearance="outline" icon={<DeleteRegular />}>
+              <Button appearance="outline" icon={<Trash2Icon />}>
                 Open a destructive confirmation with a reason
               </Button>
             }

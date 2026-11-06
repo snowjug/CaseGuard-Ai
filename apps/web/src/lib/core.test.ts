@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { buildCsp, entraOrigin, generateNonce } from './csp';
 import { readPublicEnv } from './env';
-import { buildBreadcrumbs, caseIdFromPath, navContext, NAV_ITEMS } from './nav';
+import {
+  buildBreadcrumbs,
+  caseIdFromPath,
+  navContext,
+  CASE_TABS,
+  NAV_ITEMS,
+  PRIMARY_NAV,
+} from './nav';
 import { safeInternalHref } from './safe-href';
 import { CASE_COOKIE, parseCaseId, readCaseCookie, serializeCaseCookie } from './case-cookie';
 import { caseHref, evidenceLinkHref, evidenceLinkLabel } from './deep-links';
@@ -97,24 +104,61 @@ describe('[CFG-ENV-01] public environment', () => {
 });
 
 describe('[UX-NAV-01] navigation model', () => {
-  it('has the 13 destinations (the 12 of the spec and the guided review) with unique shortcut keys', () => {
-    expect(NAV_ITEMS).toHaveLength(13);
+  it('has the 14 destinations with unique shortcut keys', () => {
+    expect(NAV_ITEMS).toHaveLength(14);
     const keys = NAV_ITEMS.map((item) => item.shortcutKey);
-    expect(new Set(keys).size).toBe(13);
+    expect(new Set(keys).size).toBe(14);
     expect(NAV_ITEMS.map((item) => item.label)).toEqual([
-      'Command Center',
+      'Home',
       'Cases',
-      'Guided Review',
-      'Case Timeline',
-      'Evidence Ledger',
-      'Hypothesis Arena',
-      'Counterfactual Lab',
-      'Quality Review',
-      'SkillDNA Library',
-      'Efficiency Monitor',
-      'Governance',
-      'System Health',
-      'Demo Guide',
+      'Review',
+      'Timeline',
+      'Evidence',
+      'Possible causes',
+      'What if',
+      'Quality',
+      'Skills',
+      'Advanced',
+      'Usage and cost',
+      'Settings and audit',
+      'System status',
+      'Guided demo',
+    ]);
+  });
+
+  it('shows five items in the main navigation and puts every screen under one of them', () => {
+    expect(PRIMARY_NAV.map((item) => item.label)).toEqual([
+      'Home',
+      'Cases',
+      'Quality',
+      'Skills',
+      'Advanced',
+    ]);
+    const owner = (path: string): string[] =>
+      PRIMARY_NAV.filter((item) => item.isActive(path)).map((item) => item.id);
+    expect(owner('/')).toEqual(['home']);
+    expect(owner('/cases')).toEqual(['cases']);
+    expect(owner('/cases/new')).toEqual(['cases']);
+    expect(owner('/cases/c1/review')).toEqual(['cases']);
+    expect(owner('/cases/c1/hypotheses')).toEqual(['cases']);
+    expect(owner('/quality')).toEqual(['quality']);
+    expect(owner('/skills/s1')).toEqual(['skills']);
+    for (const path of ['/advanced', '/governance', '/efficiency', '/system', '/demo'])
+      expect(owner(path)).toEqual(['advanced']);
+  });
+
+  it('lists the case tabs: five shown, the rest under More, every one a real page of the case', () => {
+    expect(CASE_TABS.filter((tab) => tab.primary).map((tab) => tab.label)).toEqual([
+      'Review',
+      'Score',
+      'Evidence',
+      'What if',
+      'Timeline',
+    ]);
+    expect(CASE_TABS.filter((tab) => !tab.primary).map((tab) => tab.label)).toEqual([
+      'Possible causes',
+      'Case details',
+      'Report',
     ]);
   });
 
@@ -140,6 +184,7 @@ describe('[UX-NAV-01] navigation model', () => {
     expect(active('/cases/c1/quality')).toEqual(['quality']);
     expect(active('/quality')).toEqual(['quality']);
     expect(active('/skills/s1')).toEqual(['skills']);
+    expect(active('/advanced')).toEqual(['advanced']);
   });
 
   it('extracts the case id from a path but never treats the wizard route as a case', () => {
@@ -149,25 +194,33 @@ describe('[UX-NAV-01] navigation model', () => {
     expect(caseIdFromPath('/cases/a%20b')).toBe('a b');
   });
 
-  it('builds breadcrumbs from the URL, preferring registered labels for ids', () => {
-    expect(buildBreadcrumbs('/')).toEqual([{ label: 'Command Center' }]);
-    expect(buildBreadcrumbs('/cases/case_1/timeline', { 'case:case_1': 'SAMPLE-001' })).toEqual([
-      { label: 'Command Center', href: '/' },
+  it('has breadcrumbs only where a page has depth, preferring registered labels for ids', () => {
+    expect(buildBreadcrumbs('/')).toEqual([]);
+    expect(buildBreadcrumbs('/cases')).toEqual([]);
+    expect(buildBreadcrumbs('/quality')).toEqual([]);
+    expect(buildBreadcrumbs('/advanced')).toEqual([]);
+    expect(buildBreadcrumbs('/cases/new')).toEqual([
       { label: 'Cases', href: '/cases' },
-      { label: 'SAMPLE-001', href: '/cases/case_1' },
-      { label: 'Case Timeline' },
+      { label: 'Add a case' },
     ]);
-    expect(buildBreadcrumbs('/skills/skill_1').at(-1)).toEqual({ label: 'skill_1' });
-    expect(
-      buildBreadcrumbs('/cases/case_1/review', { 'case:case_1': 'SAMPLE-001' }).at(-1),
-    ).toEqual({
-      label: 'Guided Review',
-    });
-    expect(
-      buildBreadcrumbs('/cases/case_1/report', { 'case:case_1': 'SAMPLE-001' }).at(-1),
-    ).toEqual({
-      label: 'Report',
-    });
+    // The tab of a case is not a crumb: the tab bar and the page title say where you are.
+    for (const tab of ['', '/review', '/timeline', '/report'])
+      expect(buildBreadcrumbs(`/cases/case_1${tab}`, { 'case:case_1': 'SAMPLE-001' })).toEqual([
+        { label: 'Cases', href: '/cases' },
+        { label: 'SAMPLE-001' },
+      ]);
+    expect(buildBreadcrumbs('/cases/case_1')).toEqual([
+      { label: 'Cases', href: '/cases' },
+      { label: 'case_1' },
+    ]);
+    expect(buildBreadcrumbs('/skills/skill_1')).toEqual([
+      { label: 'Skills', href: '/skills' },
+      { label: 'skill_1' },
+    ]);
+    expect(buildBreadcrumbs('/governance')).toEqual([
+      { label: 'Advanced', href: '/advanced' },
+      { label: 'Settings and audit' },
+    ]);
   });
 });
 

@@ -54,6 +54,8 @@ export interface DataTableProps<T> {
   /** Shown instead of the body when there are no rows. */
   empty?: ReactNode;
   dense?: boolean;
+  /** A height after which the table scrolls inside itself with its header pinned (for example `480px`). */
+  maxHeight?: string;
   className?: string;
 }
 
@@ -65,7 +67,7 @@ const useStyles = makeStyles({
     position: 'relative',
     ':focus-visible': { outline: `3px solid ${cg.focus}`, outlineOffset: '-3px' },
   },
-  table: { width: '100%', minWidth: 'max-content' },
+  table: { width: '100%', minWidth: 'max-content', backgroundColor: 'transparent' },
   caption: {
     captionSide: 'top',
     textAlign: 'left',
@@ -73,11 +75,19 @@ const useStyles = makeStyles({
     fontWeight: tokens.fontWeightSemibold,
     color: cg.text,
   },
-  headerCell: { color: cg.textSecondary, fontWeight: tokens.fontWeightSemibold },
+  headerCell: {
+    position: 'sticky',
+    top: 0,
+    zIndex: 1,
+    backgroundColor: cg.surface,
+    color: cg.textMuted,
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightMedium,
+  },
   end: { justifyContent: 'flex-end', textAlign: 'right' },
   center: { justifyContent: 'center', textAlign: 'center' },
   cell: { color: cg.text, fontSize: tokens.fontSizeBase300 },
-  selected: { backgroundColor: cg.tone.brand.tint },
+  selected: { backgroundColor: `color-mix(in srgb, ${cg.tone.brand.solid} 14%, transparent)` },
   numeric: { fontVariantNumeric: 'tabular-nums' },
   empty: { padding: cg.space[6], textAlign: 'center', color: cg.textSecondary },
 });
@@ -135,6 +145,7 @@ export function DataTable<T>({
   selectedRowId,
   empty,
   dense = false,
+  maxHeight,
   className,
 }: DataTableProps<T>) {
   const styles = useStyles();
@@ -174,7 +185,10 @@ export function DataTable<T>({
     <div
       ref={wrapRef}
       className={mergeClasses(styles.wrap, className)}
-      {...(scrolls ? { role: 'region', 'aria-label': `${caption}, scrollable`, tabIndex: 0 } : {})}
+      style={maxHeight ? { maxHeight, overflowY: 'auto' } : undefined}
+      {...(scrolls || maxHeight
+        ? { role: 'region', 'aria-label': `${caption}, scrollable`, tabIndex: 0 }
+        : {})}
     >
       <Table size={dense ? 'extra-small' : 'medium'} className={styles.table} sortable>
         <caption className={captionVisible ? styles.caption : hidden}>{caption}</caption>

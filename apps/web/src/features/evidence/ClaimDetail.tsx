@@ -10,24 +10,26 @@ import {
   type MissingEvidence,
 } from '@caseguard/schemas';
 import {
+  Accordion,
+  AccordionItem,
+  Badge,
+  Button,
   ConfirmDialog,
   CopyButton,
   EmptyState,
-  Notice,
-  Panel,
+  Field,
   ProvenanceBadge,
+  Select,
   StatusBadge,
   UiLink,
   cg,
   formatDateTimeUtc,
   formatProbability,
 } from '@caseguard/ui';
-import { Button, Field, Select, makeStyles, tokens } from '@fluentui/react-components';
-import { DismissRegular } from '@fluentui/react-icons';
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { FileQuestionIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { CategoryBadge } from '../../components/case/CategoryBadge';
-import { LaterDecisionsNote } from '../../components/case/as-of';
 import { ExpandableText } from '../../components/case/ExpandableText';
 import { METHOD_LABELS, REVIEW_STATE_LABELS, countOf } from '../../components/case/labels';
 import { ApiError, describeError } from '../../lib/api/errors';
@@ -35,38 +37,49 @@ import { useApiMutation } from '../../lib/api/hooks';
 import { invalidateRoutes } from '../../lib/api/query-keys';
 import { useAuth } from '../../lib/auth/context';
 import { GatedAction, useSession } from '../../lib/auth/session';
-import { CRITICALITY_LABELS } from '../../lib/labels';
 import { evidenceLinkHref } from '../../lib/deep-links';
+import { CRITICALITY_LABELS } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
+import { EvidenceCategoryBadge } from './category-meta';
+import { ReviewStateBadge } from './ClaimRow';
 import { CLAIM_FLAG_LABELS, isCorrected } from './ledger-filters';
+import { LaterDecisionsCaption } from './WhatWasKnownBar';
 
 const useStyles = makeStyles({
-  section: { display: 'flex', flexDirection: 'column', gap: cg.space[2], minWidth: 0 },
-  h4: {
-    margin: 0,
-    fontSize: tokens.fontSizeBase300,
-    fontWeight: tokens.fontWeightSemibold,
-    color: cg.text,
-  },
-  list: {
+  head: { display: 'flex', flexDirection: 'column', gap: cg.space[3], minWidth: 0 },
+  badges: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
+  chips: {
     display: 'flex',
-    flexDirection: 'column',
+    flexWrap: 'wrap',
     gap: cg.space[2],
     margin: 0,
     padding: 0,
     listStyle: 'none',
   },
-  item: {
+  stack: { display: 'flex', flexDirection: 'column', gap: cg.space[3], minWidth: 0 },
+  list: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[3],
+    margin: 0,
+    padding: 0,
+    listStyle: 'none',
+  },
+  step: {
     display: 'flex',
     flexDirection: 'column',
     gap: cg.space[1],
-    padding: cg.space[2],
-    borderRadius: cg.radius.md,
-    border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surfaceSunken,
     minWidth: 0,
+    paddingLeft: cg.space[3],
+    borderLeft: `2px solid ${cg.borderSubtle}`,
   },
-  badges: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[1] },
+  support: { borderLeftColor: cg.tone.productive.solid },
+  contradict: { borderLeftColor: cg.tone.unsupported.solid },
+  label: {
+    color: cg.textMuted,
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightSemibold,
+  },
   note: {
     margin: 0,
     color: cg.textSecondary,
@@ -88,15 +101,29 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase200,
     textDecorationLine: 'none',
     ':hover': { textDecorationLine: 'underline' },
+    '@media (pointer: coarse)': { minHeight: '44px' },
   },
-  form: {
+  recorded: {
     display: 'flex',
     flexDirection: 'column',
-    gap: cg.space[2],
+    gap: cg.space[1],
     padding: cg.space[3],
     borderRadius: cg.radius.md,
-    border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surface,
+    backgroundColor: cg.tone.brand.tint,
+  },
+  strong: { margin: 0, fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
+  review: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[3],
+    paddingTop: cg.space[4],
+    borderTop: `1px solid ${cg.borderSubtle}`,
+  },
+  h3: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase400,
+    lineHeight: tokens.lineHeightBase400,
+    fontWeight: tokens.fontWeightSemibold,
   },
   actions: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
 });
@@ -128,7 +155,7 @@ function ReviewControls({ caseId, claim, asOf, onRecordedInEarlierView }: Review
   const review = useApiMutation('claims.review', { invalidate: ['evidence.list', 'events.get'] });
   const changed = category !== claim.category;
   const trigger = (
-    <Button appearance="primary">
+    <Button variant="primary">
       {changed ? 'Correct classification' : 'Confirm classification'}
     </Button>
   );
@@ -163,8 +190,8 @@ function ReviewControls({ caseId, claim, asOf, onRecordedInEarlierView }: Review
   };
 
   return (
-    <section className={styles.form} aria-label="Reviewer decision">
-      <h3 className={styles.h4}>Reviewer decision</h3>
+    <section className={styles.review} aria-label="Reviewer decision">
+      <h3 className={styles.h3}>Reviewer decision</h3>
       <p className={styles.text}>
         The AI proposed <strong>{EVIDENCE_CATEGORY_LABELS[claim.aiCategory]}</strong>. You can
         confirm the current classification or correct it. Your decision and reason are audited, and
@@ -173,7 +200,7 @@ function ReviewControls({ caseId, claim, asOf, onRecordedInEarlierView }: Review
       <Field label="Classification">
         <Select
           value={category}
-          onChange={(_event, data) => setCategory(data.value as EvidenceCategory)}
+          onChange={(event) => setCategory(event.target.value as EvidenceCategory)}
         >
           {EVIDENCE_CATEGORIES.map((item) => (
             <option key={item} value={item}>
@@ -184,10 +211,10 @@ function ReviewControls({ caseId, claim, asOf, onRecordedInEarlierView }: Review
         </Select>
       </Field>
       {asOf ? (
-        <Notice variant="info" compact title={null}>
+        <p className={styles.note}>
           A decision you record now applies to the whole record. Earlier views, like this one, never
           show a decision recorded after their moment.
-        </Notice>
+        </p>
       ) : null}
       <div className={styles.actions}>
         {can('evidence:review') ? (
@@ -234,12 +261,14 @@ function EvidenceList({
   asOf,
   empty,
   label,
+  side,
 }: {
   caseId: string;
   items: readonly Evidence[];
   asOf: string | null;
   empty: string;
   label: string;
+  side: 'support' | 'contradict';
 }) {
   const styles = useStyles();
   const query = asOf ? `&asOf=${encodeURIComponent(asOf)}` : '';
@@ -247,7 +276,13 @@ function EvidenceList({
   return (
     <ul className={styles.list} aria-label={label}>
       {items.map((item) => (
-        <li key={item.id} className={styles.item}>
+        <li
+          key={item.id}
+          className={mergeClasses(
+            styles.step,
+            side === 'support' ? styles.support : styles.contradict,
+          )}
+        >
           <strong>{item.label}</strong>
           <p className={styles.note}>
             {item.kind === 'presence' ? 'Present' : 'Absent'} · {item.strength} strength ·
@@ -274,15 +309,14 @@ export interface ClaimDetailProps {
   missing: readonly MissingEvidence[];
   asOf: string | null;
   hypothesisName: (id: string) => string;
-  onClose: () => void;
   /** Returns to the whole record, offered after a decision that the earlier view on screen cannot show. */
   onShowWholeRecord?: (() => void) | undefined;
 }
 
 /**
- * One claim in full: its text, the effective category beside the original AI classification (never overwritten) with
- * the reviewer's decision and reason, why it was classified that way, its source, the supporting and contradicting
- * evidence, and the reviewer controls. With a time cursor set, a decision made later is not shown.
+ * One claim in full, for the drawer: its text, the effective category beside the original AI classification (never
+ * overwritten) with the reviewer's decision and reason, why it was classified that way, the evidence for and against it,
+ * its source, and the reviewer controls. With a time cursor set, a decision made later is not shown.
  */
 export function ClaimDetail({
   caseId,
@@ -291,7 +325,6 @@ export function ClaimDetail({
   missing,
   asOf,
   hypothesisName,
-  onClose,
   onShowWholeRecord,
 }: ClaimDetailProps) {
   const styles = useStyles();
@@ -312,180 +345,176 @@ export function ClaimDetail({
     : undefined;
   const eventQuery = asOf ? `&asOf=${encodeURIComponent(asOf)}` : '';
   return (
-    <Panel
-      title="Claim details"
-      level={2}
-      description="What was claimed, how it was classified and what supports it."
-      actions={
-        <Button
-          appearance="subtle"
-          size="small"
-          icon={<DismissRegular />}
-          aria-label="Close claim details"
-          onClick={onClose}
-        />
-      }
-    >
-      <div className={styles.section}>
+    <>
+      <div className={styles.head}>
         <div className={styles.badges}>
-          <CategoryBadge category={claim.category} size="medium" />
+          <EvidenceCategoryBadge category={claim.category} size="md" />
           {claim.simulated ? <ProvenanceBadge kind="simulated" /> : null}
-          <StatusBadge status={review.status} label={review.label} size="small" />
+          <ReviewStateBadge state={claim.reviewState} />
         </div>
         <ExpandableText text={claim.text} lines={8} label="claim text" />
-      </div>
-
-      <div className={styles.section}>
-        <h3 className={styles.h4}>Classification</h3>
-        {asOf ? (
-          recordedFor === claim.id ? (
-            <Notice variant="info" compact title="Your decision was recorded">
-              It applies to the whole record and is in the audit log. This earlier view never shows
-              a decision recorded after its moment, so the claim still appears as it was classified
-              then.{' '}
-              {onShowWholeRecord ? (
-                <Button appearance="transparent" size="small" onClick={onShowWholeRecord}>
-                  Show the whole record
-                </Button>
-              ) : null}
-            </Notice>
-          ) : (
-            <LaterDecisionsNote />
-          )
-        ) : null}
-        <ul className={styles.list} aria-label="Classification history">
-          <li className={styles.item}>
-            <span className={styles.note}>Original AI classification (never overwritten)</span>
-            <div className={styles.badges}>
-              <CategoryBadge category={claim.aiCategory} />
-            </div>
-            <p className={styles.note}>
-              Proposed by: {METHOD_LABELS[claim.method].toLowerCase()} (rule{' '}
-              <span className={styles.mono}>{claim.ruleId}</span>). It is a proposal for review, not
-              a fact.
-            </p>
-          </li>
-          {claim.reviewState !== 'pending' ? (
-            <li className={styles.item}>
-              <span className={styles.note}>
-                {corrected ? 'Reviewer correction' : 'Reviewer decision'}
-              </span>
-              <div className={styles.badges}>
-                <CategoryBadge category={claim.category} />
-                <StatusBadge status={review.status} label={review.label} size="small" />
-              </div>
-              {claim.reviewedAt ? (
-                <p className={styles.note}>
-                  {claim.reviewedBy ? `By ${claim.reviewedBy} on ` : 'On '}
-                  {formatDateTimeUtc(claim.reviewedAt)}
-                </p>
-              ) : null}
-              {claim.reviewReason ? (
-                <ExpandableText text={claim.reviewReason} lines={3} label="reviewer reason" />
-              ) : null}
-            </li>
-          ) : null}
-        </ul>
-      </div>
-
-      <div className={styles.section}>
-        <h3 className={styles.h4}>Why</h3>
-        <ExpandableText text={claim.explanation} lines={4} label="explanation" />
-        <p className={styles.note}>
-          Confidence {formatProbability(claim.confidence)} (a model estimate, not statistical truth)
-          · {METHOD_LABELS[claim.method]} · version {claim.version}
-        </p>
-        {claim.flags.length > 0 ? (
-          <div className={styles.badges} role="group" aria-label="Quality flags">
-            {claim.flags.map((flag) => (
-              <StatusBadge
-                key={flag}
-                status="unsupported"
-                size="small"
-                label={CLAIM_FLAG_LABELS[flag]}
-              />
-            ))}
-          </div>
-        ) : null}
-      </div>
-
-      <div className={styles.section}>
-        <h3 className={styles.h4}>Source</h3>
-        <p className={styles.note}>
-          {formatDateTimeUtc(claim.timestamp, { seconds: true })}
-          {claim.authorRole ? ` · ${PARTICIPANT_ROLE_LABELS[claim.authorRole]}` : ''}
-          {claim.subject ? ` · about ${claim.subject}` : ''}
-        </p>
-        {claim.sourceRef?.excerpt ? (
-          <ExpandableText text={claim.sourceRef.excerpt} lines={3} label="source excerpt" />
-        ) : null}
-        {claim.eventId ? (
-          <UiLink
-            href={`${evidenceLinkHref(caseId, { type: 'event', id: claim.eventId })}${eventQuery}`}
-            className={styles.link}
-          >
-            Open event {claim.eventId} in the timeline
-          </UiLink>
-        ) : (
-          <p className={styles.note}>This claim is not tied to one event.</p>
-        )}
-        <p className={styles.note}>
-          Claim ID <span className={styles.mono}>{claim.id}</span>{' '}
-          <CopyButton value={claim.id} label="Copy claim ID" />
-        </p>
-      </div>
-
-      {requirement ? (
-        <div className={styles.section}>
-          <h3 className={styles.h4}>Evidence that is missing</h3>
-          <div className={styles.item}>
-            <div className={styles.badges}>
-              <StatusBadge
-                status={requirement.criticality === 'critical' ? 'unsupported' : 'uncertain'}
-                size="small"
-                label={CRITICALITY_LABELS[requirement.criticality]}
-              />
-              <strong>{requirement.label}</strong>
-            </div>
-            <p className={styles.text}>{requirement.description}</p>
-            <p className={styles.note}>Suggested ask: {requirement.askText}</p>
-          </div>
-        </div>
-      ) : null}
-
-      {claim.relatedHypothesisIds.length > 0 ? (
-        <div className={styles.section}>
-          <h3 className={styles.h4}>Related hypotheses</h3>
-          <ul className={styles.list} aria-label="Related hypotheses">
+        {claim.relatedHypothesisIds.length > 0 ? (
+          <ul className={styles.chips} aria-label="Related causes">
             {claim.relatedHypothesisIds.map((id) => (
-              <li key={id} className={styles.text}>
-                {hypothesisName(id)}
+              <li key={id}>
+                <Badge tone="hypothesis" size="sm" outlined>
+                  {hypothesisName(id)}
+                </Badge>
               </li>
             ))}
           </ul>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
-      <div className={styles.section}>
-        <h3 className={styles.h4}>Supporting evidence ({supporting.length})</h3>
-        <EvidenceList
-          caseId={caseId}
-          items={supporting}
-          asOf={asOf}
-          label="Supporting evidence"
-          empty="No evidence supports this claim."
-        />
-      </div>
-      <div className={styles.section}>
-        <h3 className={styles.h4}>Contradicting evidence ({contradicting.length})</h3>
-        <EvidenceList
-          caseId={caseId}
-          items={contradicting}
-          asOf={asOf}
-          label="Contradicting evidence"
-          empty="Nothing contradicts this claim."
-        />
-      </div>
+      <Accordion>
+        <AccordionItem title="How it was classified" defaultOpen>
+          <div className={styles.stack}>
+            {asOf ? (
+              recordedFor === claim.id ? (
+                <div className={styles.recorded}>
+                  <p className={styles.strong}>Your decision was recorded</p>
+                  <p className={styles.note}>
+                    It applies to the whole record and is in the audit log. This earlier view never
+                    shows a decision recorded after its moment, so the claim still appears as it was
+                    classified then.{' '}
+                    {onShowWholeRecord ? (
+                      <Button variant="ghost" size="sm" onClick={onShowWholeRecord}>
+                        Show the whole record
+                      </Button>
+                    ) : null}
+                  </p>
+                </div>
+              ) : (
+                <LaterDecisionsCaption />
+              )
+            ) : null}
+            <ul className={styles.list} aria-label="Classification history">
+              <li className={styles.step}>
+                <span className={styles.label}>Original AI classification (never overwritten)</span>
+                <div className={styles.badges}>
+                  <EvidenceCategoryBadge category={claim.aiCategory} />
+                </div>
+                <p className={styles.note}>
+                  Proposed by: {METHOD_LABELS[claim.method].toLowerCase()} (rule{' '}
+                  <span className={styles.mono}>{claim.ruleId}</span>). It is a proposal for review,
+                  not a fact.
+                </p>
+              </li>
+              {claim.reviewState !== 'pending' ? (
+                <li className={styles.step}>
+                  <span className={styles.label}>
+                    {corrected ? 'Reviewer correction' : 'Reviewer decision'}
+                  </span>
+                  <div className={styles.badges}>
+                    <EvidenceCategoryBadge category={claim.category} />
+                    <StatusBadge status={review.status} label={review.label} size="small" />
+                  </div>
+                  {claim.reviewedAt ? (
+                    <p className={styles.note}>
+                      {claim.reviewedBy ? `By ${claim.reviewedBy} on ` : 'On '}
+                      {formatDateTimeUtc(claim.reviewedAt)}
+                    </p>
+                  ) : null}
+                  {claim.reviewReason ? (
+                    <ExpandableText text={claim.reviewReason} lines={3} label="reviewer reason" />
+                  ) : null}
+                </li>
+              ) : null}
+            </ul>
+          </div>
+        </AccordionItem>
+
+        <AccordionItem title="Why" defaultOpen>
+          <div className={styles.stack}>
+            <ExpandableText text={claim.explanation} lines={4} label="explanation" />
+            <p className={styles.note}>
+              Confidence {formatProbability(claim.confidence)} (a model estimate, not statistical
+              truth) · {METHOD_LABELS[claim.method]} · version {claim.version}
+            </p>
+            {claim.flags.length > 0 ? (
+              <div className={styles.badges} role="group" aria-label="Quality flags">
+                {claim.flags.map((flag) => (
+                  <StatusBadge
+                    key={flag}
+                    status="unsupported"
+                    size="small"
+                    label={CLAIM_FLAG_LABELS[flag]}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </AccordionItem>
+
+        <AccordionItem title={`Supporting evidence (${supporting.length})`} defaultOpen>
+          <EvidenceList
+            caseId={caseId}
+            items={supporting}
+            asOf={asOf}
+            label="Supporting evidence"
+            empty="No evidence supports this claim."
+            side="support"
+          />
+        </AccordionItem>
+
+        <AccordionItem
+          title={`Contradicting evidence (${contradicting.length})`}
+          defaultOpen={contradicting.length > 0}
+        >
+          <EvidenceList
+            caseId={caseId}
+            items={contradicting}
+            asOf={asOf}
+            label="Contradicting evidence"
+            empty="Nothing contradicts this claim."
+            side="contradict"
+          />
+        </AccordionItem>
+
+        {requirement ? (
+          <AccordionItem title="Evidence that is missing" defaultOpen>
+            <div className={styles.stack}>
+              <div className={styles.badges}>
+                <StatusBadge
+                  status={requirement.criticality === 'critical' ? 'unsupported' : 'uncertain'}
+                  size="small"
+                  label={CRITICALITY_LABELS[requirement.criticality]}
+                />
+                <strong>{requirement.label}</strong>
+              </div>
+              <p className={styles.text}>{requirement.description}</p>
+              <p className={styles.note}>Suggested ask: {requirement.askText}</p>
+            </div>
+          </AccordionItem>
+        ) : null}
+
+        <AccordionItem title="Source">
+          <div className={styles.stack}>
+            <p className={styles.note}>
+              {formatDateTimeUtc(claim.timestamp, { seconds: true })}
+              {claim.authorRole ? ` · ${PARTICIPANT_ROLE_LABELS[claim.authorRole]}` : ''}
+              {claim.subject ? ` · about ${claim.subject}` : ''}
+            </p>
+            {claim.sourceRef?.excerpt ? (
+              <ExpandableText text={claim.sourceRef.excerpt} lines={3} label="source excerpt" />
+            ) : null}
+            {claim.eventId ? (
+              <UiLink
+                href={`${evidenceLinkHref(caseId, { type: 'event', id: claim.eventId })}${eventQuery}`}
+                className={styles.link}
+              >
+                Open event {claim.eventId} in the timeline
+              </UiLink>
+            ) : (
+              <p className={styles.note}>This claim is not tied to one event.</p>
+            )}
+            <p className={styles.note}>
+              Claim ID <span className={styles.mono}>{claim.id}</span>{' '}
+              <CopyButton value={claim.id} label="Copy claim ID" />
+            </p>
+          </div>
+        </AccordionItem>
+      </Accordion>
 
       <ReviewControls
         key={`${claim.id}:${claim.version}`}
@@ -497,29 +526,28 @@ export function ClaimDetail({
       <p className={styles.note}>
         {countOf(supporting.length + contradicting.length, 'evidence item')} linked to this claim.
       </p>
-    </Panel>
+    </>
   );
 }
 
 /** Shown in place of the detail when the selected claim is not in the loaded (or filtered, or boundary-limited) list. */
 export function ClaimMissing({ onClose, searching }: { onClose: () => void; searching: boolean }) {
   return (
-    <Panel title="Claim details" level={2}>
-      <EmptyState
-        compact
-        headingLevel={3}
-        title={searching ? 'Looking for that claim…' : 'That claim is not in this view'}
-        description={
-          searching
-            ? 'Loading more of the ledger to find it.'
-            : 'It may be filtered out, recorded after the selected moment, or no longer exist.'
-        }
-        action={
-          <Button appearance="outline" onClick={onClose}>
-            Clear the selection
-          </Button>
-        }
-      />
-    </Panel>
+    <EmptyState
+      compact
+      headingLevel={3}
+      icon={<FileQuestionIcon />}
+      title={searching ? 'Looking for that claim…' : 'That claim is not in this view'}
+      description={
+        searching
+          ? 'Loading more of the ledger to find it.'
+          : 'It may be filtered out, recorded after the selected moment, or no longer exist.'
+      }
+      action={
+        <Button variant="secondary" onClick={onClose}>
+          Clear the selection
+        </Button>
+      }
+    />
   );
 }

@@ -1,8 +1,8 @@
 'use client';
 
-import { ConfirmDialog } from '@caseguard/ui';
-import { Button } from '@fluentui/react-components';
-import { DeleteRegular } from '@fluentui/react-icons';
+import { Button, ConfirmDialog } from '@caseguard/ui';
+import { Trash2Icon } from 'lucide-react';
+import type { ReactElement } from 'react';
 import { useActiveCase } from '../../lib/active-case';
 import { describeError } from '../../lib/api/errors';
 import { useApiMutation } from '../../lib/api/hooks';
@@ -21,54 +21,42 @@ export function explainDeleteError(error: unknown): string {
   return describeError(error);
 }
 
-export interface DeleteCaseButtonProps {
+export interface DeleteCaseDialogProps {
   caseId: string;
   reference: string;
   title: string;
-  /** `icon` for table rows (the accessible name carries the reference), `text` for the overview. */
-  display?: 'icon' | 'text';
+  /** Controlled state, for an opener that is not a button of its own (a menu item). Omit it when you pass `trigger`. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** The element that opens the dialog; focus returns to it when the dialog closes. */
+  trigger?: ReactElement;
   /** Called after the API confirmed the deletion. */
   onDeleted?: () => void;
 }
 
 /**
- * Administrator erasure of a case. The button is always visible; without `case:delete` it is disabled with the reason.
- * The confirmation says exactly what is removed, the API refuses while a job still runs (409, shown in the dialog),
- * and the result is announced with a toast.
+ * The confirmation that erases a case. It says exactly what is removed, the API refuses while a job still runs (409,
+ * shown in the dialog), and the result is announced with a toast. The caller decides who may open it.
  */
-export function DeleteCaseButton({
+export function DeleteCaseDialog({
   caseId,
   reference,
   title,
-  display = 'icon',
+  open,
+  onOpenChange,
+  trigger,
   onDeleted,
-}: DeleteCaseButtonProps) {
-  const { can } = useSession();
+}: DeleteCaseDialogProps) {
   const toast = useToast();
   const { caseId: activeCaseId, setActiveCase } = useActiveCase();
   const remove = useApiMutation('cases.delete', {
     invalidate: ['cases.list', 'dashboard.commandCenter'],
   });
-
-  const label = `Delete ${reference}`;
-  const button = (
-    <Button
-      appearance={display === 'icon' ? 'subtle' : 'outline'}
-      icon={<DeleteRegular />}
-      aria-label={display === 'icon' ? label : undefined}
-      title={display === 'icon' ? label : undefined}
-    >
-      {display === 'text' ? 'Delete case' : null}
-    </Button>
-  );
-
-  if (!can('case:delete')) {
-    return <GatedAction permission="case:delete">{button}</GatedAction>;
-  }
-
   return (
     <ConfirmDialog
-      trigger={button}
+      {...(trigger ? { trigger } : {})}
+      {...(open === undefined ? {} : { open })}
+      {...(onOpenChange ? { onOpenChange } : {})}
       tone="danger"
       title={`Delete ${reference}?`}
       confirmLabel="Delete case"
@@ -91,5 +79,51 @@ export function DeleteCaseButton({
         original payload. Only counts are kept in the audit log. This cannot be undone.
       </p>
     </ConfirmDialog>
+  );
+}
+
+export interface DeleteCaseButtonProps {
+  caseId: string;
+  reference: string;
+  title: string;
+  /** `icon` for table rows (the accessible name carries the reference), `text` for a case's own page. */
+  display?: 'icon' | 'text';
+  /** Called after the API confirmed the deletion. */
+  onDeleted?: () => void;
+}
+
+/**
+ * Administrator erasure of a case. The button is always visible; without `case:delete` it is disabled with the reason.
+ */
+export function DeleteCaseButton({
+  caseId,
+  reference,
+  title,
+  display = 'icon',
+  onDeleted,
+}: DeleteCaseButtonProps) {
+  const { can } = useSession();
+  const label = `Delete ${reference}`;
+  const button =
+    display === 'icon' ? (
+      <Button variant="ghost" icon={<Trash2Icon />} aria-label={label} title={label} />
+    ) : (
+      <Button variant="secondary" icon={<Trash2Icon />}>
+        Delete case
+      </Button>
+    );
+
+  if (!can('case:delete')) {
+    return <GatedAction permission="case:delete">{button}</GatedAction>;
+  }
+
+  return (
+    <DeleteCaseDialog
+      trigger={button}
+      caseId={caseId}
+      reference={reference}
+      title={title}
+      {...(onDeleted ? { onDeleted } : {})}
+    />
   );
 }

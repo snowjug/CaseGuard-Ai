@@ -46,8 +46,8 @@ test.describe('[NFR-REL-01] every problem answer is shown in words, with its cod
       await expect(alert).toBeVisible({ timeout: 60_000 });
       await expect(alert).toContainText(`HTTP ${problem.status}`);
       await expect(alert).toContainText(`Code ${problem.code}`);
-      await expect(alert).toContainText(`Correlation ID req_E2E${problem.status}`);
-      await expect(alert.getByRole('button', { name: 'Copy correlation ID' })).toBeVisible();
+      await expect(alert).toContainText(`Reference req_E2E${problem.status}`);
+      await expect(alert.getByRole('button', { name: 'Copy reference' })).toBeVisible();
       await expect(
         mainRegion(page).getByRole('heading', { level: 1, name: 'Cases' }),
         'never a blank page',
@@ -91,7 +91,7 @@ test.describe('[NFR-REL-01] every problem answer is shown in words, with its cod
     const alert = mainRegion(page).getByRole('alert');
     await expect(alert).toBeVisible({ timeout: 90_000 });
     await expect(alert).toContainText('HTTP 429');
-    await expect(alert).toContainText('Correlation ID req_E2E429');
+    await expect(alert).toContainText('Reference req_E2E429');
     expect(calls, 'the page honoured Retry-After and tried again before giving up').toBeGreaterThan(
       1,
     );
@@ -121,7 +121,7 @@ test.describe('[NFR-REL-01] every problem answer is shown in words, with its cod
       }),
     );
     await page.goto(`/cases/${demo.caseOneId}/timeline?asOf=2026-03-09T09%3A41%3A00Z`);
-    await expect(page.getByRole('heading', { level: 1, name: 'Case Timeline' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
     const main = mainRegion(page);
     // The visible notice is a note; the sentence that announces it to a screen reader is a separate, hidden status.
     const limited = main.getByRole('note').filter({ hasText: /^Earlier views are limited/ });
@@ -143,7 +143,7 @@ test.describe('[NFR-REL-01] every problem answer is shown in words, with its cod
 test.describe('[NFR-REL-01] when the API is not there, the app says so and offers Retry; it never shows a blank page', () => {
   test.setTimeout(300_000);
 
-  test('a web server whose API is down shows the failure state on Command Center and on Cases', async ({
+  test('a web server whose API is down shows the failure state on Home and on Cases', async ({
     browser,
     diagnostics,
   }) => {

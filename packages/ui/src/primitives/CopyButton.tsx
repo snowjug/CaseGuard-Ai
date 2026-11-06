@@ -1,9 +1,10 @@
 'use client';
 
-import { Button, makeStyles } from '@fluentui/react-components';
-import { CheckmarkRegular, CopyRegular, ErrorCircleRegular } from '@fluentui/react-icons';
+import { makeStyles } from '@fluentui/react-components';
+import { CheckIcon, CircleAlertIcon, CopyIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { VisuallyHidden } from '../a11y/VisuallyHidden';
+import { Button, IconButton } from '../kit/Button';
 
 type CopyState = 'idle' | 'copied' | 'failed';
 
@@ -37,11 +38,12 @@ export async function copyText(text: string): Promise<boolean> {
 export interface CopyButtonProps {
   /** The text placed on the clipboard. */
   value: string;
-  /** Accessible name before copying, for example "Copy correlation ID". */
+  /** Accessible name before copying, for example "Copy reference". */
   label?: string;
   /** Visible text. Omit for an icon-only button (the label stays as the accessible name). */
   text?: string;
   size?: 'small' | 'medium';
+  /** `subtle` and `transparent` are quiet (ghost) buttons; `outline` and `secondary` have an outline. */
   appearance?: 'subtle' | 'outline' | 'secondary' | 'transparent';
   /** Called after a successful copy (for example to show a toast). */
   onCopied?: () => void;
@@ -76,27 +78,32 @@ export function CopyButton({
   }, [value, onCopied]);
 
   const icon =
-    state === 'copied' ? (
-      <CheckmarkRegular />
-    ) : state === 'failed' ? (
-      <ErrorCircleRegular />
-    ) : (
-      <CopyRegular />
-    );
+    state === 'copied' ? <CheckIcon /> : state === 'failed' ? <CircleAlertIcon /> : <CopyIcon />;
   const visible =
     state === 'copied' ? (text ? 'Copied' : undefined) : state === 'failed' ? 'Copy failed' : text;
+  const variant = appearance === 'subtle' || appearance === 'transparent' ? 'ghost' : 'secondary';
+  const sizeName = size === 'small' ? 'sm' : 'md';
   return (
     <span className={styles.root}>
-      <Button
-        appearance={appearance}
-        size={size}
-        icon={icon}
-        onClick={() => void onClick()}
-        aria-label={visible ? undefined : label}
-        title={label}
-      >
-        {visible}
-      </Button>
+      {visible ? (
+        <Button
+          variant={variant}
+          size={sizeName}
+          icon={icon}
+          onClick={() => void onClick()}
+          title={label}
+        >
+          {visible}
+        </Button>
+      ) : (
+        <IconButton
+          variant={variant}
+          size={sizeName}
+          icon={icon}
+          label={label}
+          onClick={() => void onClick()}
+        />
+      )}
       <VisuallyHidden role="status" aria-live="polite">
         {state === 'copied' ? 'Copied to clipboard' : state === 'failed' ? 'Copy failed' : ''}
       </VisuallyHidden>

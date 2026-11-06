@@ -3,16 +3,20 @@ import { mainRegion, openPage, settle } from '../support/ui';
 
 const SKILL_TITLE = 'Isolate a pre-authentication failure before pursuing identity policy';
 
-test.describe('[FR-SK-01] SkillDNA Library: governed, reusable investigation skills', () => {
-  test('lists the published skill with its lifecycle state, and says that nothing is published automatically', async ({
+test.describe('[FR-SK-01] Skills: governed, reusable investigation skills', () => {
+  test('lists the published skill with its status, and says that nothing is published automatically', async ({
     page,
     demo,
   }) => {
     await openPage(page, '/skills');
-    await expect(page.getByRole('heading', { level: 1, name: 'SkillDNA Library' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Skills', exact: true }),
+    ).toBeVisible();
+    // The sentence is in the help of the page, which the question mark next to its title opens.
+    await page.getByRole('button', { name: 'About Skills' }).click();
     await expect(
       page.getByText(
-        /A skill is never published automatically: each lifecycle step needs a person with the right role/,
+        /A skill is never published automatically: every step of its status needs a person with the right role/,
       ),
     ).toBeVisible();
     const list = page.getByRole('list', { name: 'Skills' });
@@ -25,15 +29,17 @@ test.describe('[FR-SK-01] SkillDNA Library: governed, reusable investigation ski
     await expect(page.getByText('Showing 1 skill.')).toBeVisible();
   });
 
-  test('search and the lifecycle filter narrow the list and live in the URL', async ({ page }) => {
+  test('search and the status filter narrow the list and live in the URL', async ({ page }) => {
     await openPage(page, '/skills');
     await page.getByRole('searchbox', { name: 'Search' }).fill('no-such-skill-anywhere');
     await expect(page).toHaveURL(/q=/);
     await expect(page.getByRole('list', { name: 'Skills' })).toHaveCount(0);
-    await expect(page.getByRole('heading', { name: 'No skill matches the filters' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'No skills match' })).toBeVisible();
     await page.getByRole('button', { name: 'Clear filters' }).first().click();
     await expect(page.getByRole('list', { name: 'Skills' })).toBeVisible();
-    await page.getByRole('combobox', { name: 'Lifecycle state' }).selectOption({ label: 'Draft' });
+    await page
+      .getByRole('combobox', { name: 'Status', exact: true })
+      .selectOption({ label: 'Draft' });
     await expect(page).toHaveURL(/lifecycle=draft/);
     await expect(page.getByRole('list', { name: 'Skills' })).toHaveCount(0);
   });
@@ -54,17 +60,24 @@ test.describe('[FR-SK-02] a skill: what it is, where it came from, who approved 
       await expect(tabs.getByRole('tab', { name }), name).toBeVisible();
     }
     const overview = page.getByRole('tabpanel', { name: 'Overview' });
-    await expect(overview.getByRole('group', { name: 'Expected benefit' })).toBeVisible();
+    // The expected benefit is in the card at the top of the page, above the tabs.
+    await expect(page.getByRole('group', { name: 'Expected benefit' })).toBeVisible();
     const origin = overview.getByRole('group', { name: 'Where it came from' });
     await expect(origin.getByRole('link', { name: 'CG-SYN-1001' })).toHaveAttribute(
       'href',
       `/cases/${demo.caseOneId}`,
     );
     await expect(origin.getByRole('link', { name: 'Accepted simulated path' })).toBeVisible();
+    // The parts derived with hindsight are listed apart, in the accordion that says how many there are. A closed
+    // accordion only clips this content, so its state is asserted along with the content.
+    const known = origin.getByRole('button', { name: /^What was known when/ });
+    await known.click();
+    await expect(known).toHaveAttribute('aria-expanded', 'true');
     await expect(origin.getByRole('group', { name: 'Derived with hindsight' })).toBeVisible();
     const detail = overview.getByRole('group', { name: 'The skill in detail' });
-    await expect(detail.getByRole('heading', { level: 3 }).first()).toContainText(/^1\./);
-    // Each part of the definition is a disclosure; the ones that matter most are open already.
+    // The parts of the definition are the h3 of the accordions; the steps under them are h4.
+    await expect(detail.getByRole('heading', { level: 4 }).first()).toContainText(/^1\./);
+    // Each part of the definition is an accordion; the ones that matter most are open already.
     for (const title of [
       'Trigger conditions',
       'Exclusions',
@@ -73,14 +86,14 @@ test.describe('[FR-SK-02] a skill: what it is, where it came from, who approved 
       'Safety constraints',
     ]) {
       await expect(
-        detail.locator('summary', { hasText: new RegExp(`^${title}`) }),
+        detail.getByRole('button', { name: new RegExp(`^${title}`) }),
         title,
       ).toBeVisible();
     }
-    await detail.locator('summary', { hasText: /^Exclusions/ }).click();
+    await detail.getByRole('button', { name: /^Exclusions/ }).click();
     await expect(
       detail
-        .locator('details', { has: page.locator('summary', { hasText: /^Exclusions/ }) })
+        .getByRole('region', { name: /^Exclusions/ })
         .getByRole('listitem')
         .first(),
     ).toBeVisible();
@@ -167,8 +180,9 @@ test.describe('[FR-SK-02] a skill: what it is, where it came from, who approved 
     await expect(mainRegion(page)).toContainText(
       'It may have been removed, or the address may be mistyped.',
     );
-    await expect(
-      mainRegion(page).getByRole('link', { name: 'Open the SkillDNA Library' }),
-    ).toHaveAttribute('href', '/skills');
+    await expect(mainRegion(page).getByRole('link', { name: 'Browse skills' })).toHaveAttribute(
+      'href',
+      '/skills',
+    );
   });
 });

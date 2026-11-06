@@ -1,27 +1,14 @@
 'use client';
 
-import { makeStyles, mergeClasses } from '@fluentui/react-components';
-import type { CSSProperties } from 'react';
+import { makeStyles } from '@fluentui/react-components';
 import { VisuallyHidden } from '../a11y/VisuallyHidden';
+import { Card } from '../kit/Card';
+import { Skeleton } from '../kit/Skeleton';
 import { cg } from '../tokens/cg';
 
 const useStyles = makeStyles({
   region: { display: 'flex', flexDirection: 'column', gap: cg.space[3], width: '100%' },
-  block: {
-    display: 'block',
-    borderRadius: cg.radius.sm,
-    backgroundColor: cg.surfaceSunken,
-    // The shimmer (animated gradient) comes from the global `.cg-shimmer` class and stops under reduced motion.
-  },
-  card: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: cg.space[3],
-    padding: cg.space[4],
-    borderRadius: cg.radius.lg,
-    backgroundColor: cg.surface,
-    border: `1px solid ${cg.borderSubtle}`,
-  },
+  card: { gap: cg.space[3] },
   grid: {
     display: 'grid',
     gap: cg.space[4],
@@ -47,21 +34,8 @@ export interface SkeletonBlockProps {
 }
 
 /** A single shimmering placeholder block. Decorative: wrap in a `LoadingSkeleton` region for the announcement. */
-export function SkeletonBlock({
-  width = '100%',
-  height = 16,
-  radius,
-  className,
-}: SkeletonBlockProps) {
-  const styles = useStyles();
-  const style: CSSProperties = { width, height, ...(radius ? { borderRadius: radius } : {}) };
-  return (
-    <span
-      aria-hidden="true"
-      className={mergeClasses(styles.block, 'cg-shimmer', className)}
-      style={style}
-    />
-  );
+export function SkeletonBlock({ width = '100%', height = 16, className }: SkeletonBlockProps) {
+  return <Skeleton width={width} height={height} {...(className ? { className } : {})} />;
 }
 
 export interface LoadingSkeletonProps {
@@ -78,7 +52,7 @@ export interface LoadingSkeletonProps {
 
 /**
  * Skeleton placeholder region. It is a polite `status` with `aria-busy`, so assistive technology hears the label
- * once; the shapes themselves are hidden from it.
+ * once; the shapes themselves are hidden from it. Prefer a skeleton shaped like the real screen when there is one.
  */
 export function LoadingSkeleton({
   variant = 'text',
@@ -93,11 +67,11 @@ export function LoadingSkeleton({
       content = (
         <div className={styles.grid}>
           {Array.from({ length: count ?? 4 }, (_, i) => (
-            <div key={i} className={styles.card}>
-              <SkeletonBlock width="55%" height={14} />
-              <SkeletonBlock width="40%" height={32} />
-              <SkeletonBlock width="70%" height={10} />
-            </div>
+            <Card key={i} className={styles.card}>
+              <Skeleton width="55%" height={14} />
+              <Skeleton width="40%" height={32} />
+              <Skeleton width="70%" height={10} />
+            </Card>
           ))}
         </div>
       );
@@ -105,62 +79,62 @@ export function LoadingSkeleton({
     }
     case 'card': {
       content = (
-        <div className={styles.card}>
-          <SkeletonBlock width="40%" height={18} />
-          <SkeletonBlock height={12} />
-          <SkeletonBlock width="85%" height={12} />
-          <SkeletonBlock width="60%" height={12} />
-        </div>
+        <Card className={styles.card}>
+          <Skeleton width="40%" height={18} />
+          <Skeleton height={12} />
+          <Skeleton width="85%" height={12} />
+          <Skeleton width="60%" height={12} />
+        </Card>
       );
       break;
     }
     case 'table': {
       content = (
-        <div className={styles.card}>
-          <SkeletonBlock width="30%" height={16} />
+        <Card className={styles.card}>
+          <Skeleton width="30%" height={16} />
           {Array.from({ length: count ?? 5 }, (_, i) => (
             <div key={i} className={styles.tableRow}>
-              <SkeletonBlock height={14} />
-              <SkeletonBlock height={14} />
-              <SkeletonBlock height={14} />
-              <SkeletonBlock height={14} />
+              <Skeleton height={14} />
+              <Skeleton height={14} />
+              <Skeleton height={14} />
+              <Skeleton height={14} />
             </div>
           ))}
-        </div>
+        </Card>
       );
       break;
     }
     case 'chart': {
       content = (
-        <div className={styles.card}>
-          <SkeletonBlock width="35%" height={16} />
-          <SkeletonBlock height={180} radius="8px" />
-        </div>
+        <Card className={styles.card}>
+          <Skeleton width="35%" height={16} />
+          <Skeleton height={180} radius="md" />
+        </Card>
       );
       break;
     }
     case 'list': {
       content = (
-        <div className={styles.card}>
+        <Card className={styles.card}>
           {Array.from({ length: count ?? 4 }, (_, i) => (
             <div key={i} className={styles.row}>
-              <SkeletonBlock width={32} height={32} radius="999px" />
+              <Skeleton width={32} height={32} radius="pill" />
               <div className={styles.region}>
-                <SkeletonBlock width="60%" height={14} />
-                <SkeletonBlock width="85%" height={12} />
+                <Skeleton width="60%" height={14} />
+                <Skeleton width="85%" height={12} />
               </div>
             </div>
           ))}
-        </div>
+        </Card>
       );
       break;
     }
     case 'graph': {
       content = (
-        <div className={styles.card}>
-          <SkeletonBlock width="30%" height={16} />
-          <SkeletonBlock height={320} radius="12px" />
-        </div>
+        <Card className={styles.card}>
+          <Skeleton width="30%" height={16} />
+          <Skeleton height={320} radius="md" />
+        </Card>
       );
       break;
     }
@@ -168,7 +142,7 @@ export function LoadingSkeleton({
       content = (
         <div className={styles.region}>
           {Array.from({ length: count ?? 3 }, (_, i) => (
-            <SkeletonBlock key={i} width={i === (count ?? 3) - 1 ? '60%' : '100%'} height={14} />
+            <Skeleton key={i} width={i === (count ?? 3) - 1 ? '60%' : '100%'} height={14} />
           ))}
         </div>
       );

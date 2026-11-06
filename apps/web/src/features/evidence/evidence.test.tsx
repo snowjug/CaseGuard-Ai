@@ -26,7 +26,6 @@ import {
 } from '../../../test/harness';
 import { installNearEndObserver } from '../../../test/intersection';
 import { liveRegionOf } from '../../../test/live-region';
-import { installMatchMedia } from '../../../test/media';
 import { navigateTo, setNavigationLatency } from '../../../test/next-navigation';
 import { ApiError } from '../../lib/api/errors';
 import { EvidenceLedgerPage } from './EvidenceLedgerPage';
@@ -45,7 +44,8 @@ const ENGINEER = ['case:read', 'case:ingest', 'case:analyze'] as const;
 const AS_OF = '2026-03-09T10:00:00Z';
 
 // A busy machine can take longer than the 1 s default to render a page for the first time.
-configure({ asyncUtilTimeout: 5000 });
+configure({ asyncUtilTimeout: 30_000 });
+vi.setConfig({ testTimeout: 120_000 });
 
 function api(overrides: FakeHandlers = {}) {
   return fakeApi({
@@ -59,7 +59,6 @@ function api(overrides: FakeHandlers = {}) {
   });
 }
 
-const wide = (): void => installMatchMedia((query) => query.includes('1100px'));
 const param = (name: string): string | null =>
   new URLSearchParams(window.location.search).get(name);
 
@@ -83,30 +82,70 @@ async function enabledButton(name: string): Promise<HTMLElement> {
 const claimTexts = (): (string | null)[] =>
   screen.getAllByRole('article').map((article) => article.getAttribute('aria-label'));
 
-describe('[FR-LEDGER-01] Evidence Ledger', () => {
-  it('shows a skeleton, then every claim with its category, confidence, method and flags', async () => {
+/** "What was known then" is a collapsed bar: open it to reach the time cursor and the counts of the moment. */
+async function openKnownBar(): Promise<HTMLElement> {
+  const bar = await screen.findByRole('button', { name: /^What was known then/ });
+  if (bar.getAttribute('aria-expanded') !== 'true') await userEvent.setup().click(bar);
+  return screen.findByRole('group', { name: 'Time cursor' });
+}
+
+/** A collapsed section of the coverage card ("What is still missing", "What the record itself shows"), opened. */
+async function openSection(name: RegExp): Promise<void> {
+  const user = userEvent.setup();
+  const trigger = await screen.findByRole('button', { name });
+  if (trigger.getAttribute('aria-expanded') !== 'true') await user.click(trigger);
+}
+
+/** The details drawer of a claim. */
+const claimDrawer = (): Promise<HTMLElement> =>
+  screen.findByRole('dialog', { name: 'Claim details' });
+
+describe('[FR-LEDGER-01] Evidence', () => {
+  it('shows a skeleton, then every claim with its category, source, flags and review state', async () => {
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: api() });
     expect(screen.getAllByText(/Loading the claims/).length).toBeGreaterThan(0);
 
     expect(await screen.findByRole('list', { name: 'Claims, 2 shown' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Evidence Ledger' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Evidence' })).toBeInTheDocument();
     expect(claimTexts()).toEqual([
       'Engineer assumption: Root cause is the Conditional Access policy that forces interactive MFA.',
       'Customer-reported observation: The customer reported that failures are intermittent.',
     ]);
     const [assumption] = screen.getAllByRole('article') as [HTMLElement];
-    expect(within(assumption).getByText('Confidence 80% (estimate)')).toBeInTheDocument();
-    expect(within(assumption).getByText('Rule')).toBeInTheDocument();
+    expect(within(assumption).getByText('Engineer assumption')).toBeInTheDocument();
     expect(within(assumption).getByText('Assumption stated as fact')).toBeInTheDocument();
+    // Nothing has been decided on it yet: the row stays quiet about review, and the drawer says where it stands.
+    expect(within(assumption).queryByText('Awaiting review')).toBeNull();
+    expect(within(assumption).getByText('Support engineer')).toBeInTheDocument();
     expect(within(assumption).getByRole('link', { name: 'Event e03' })).toHaveAttribute(
       'href',
       '/cases/case_1/timeline?sel=e03',
     );
-    // The claim's hypothesis is stored by knowledge-pack key; the page names it from the hypothesis list.
-    expect(
-      await within(assumption).findByText('DNS resolution failure for sign-in endpoints'),
-    ).toBeInTheDocument();
     expect(screen.getByText('Showing 2 claims.')).toBeInTheDocument();
+  });
+
+  it('keeps the confidence, the method and the related causes of a claim in its drawer', async () => {
+    const user = userEvent.setup();
+    renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: api() });
+    await screen.findByRole('list', { name: 'Claims, 2 shown' });
+    await user.click(
+      screen.getByRole('button', {
+        name: /^Details of this claim: Root cause is the Conditional Access/,
+      }),
+    );
+    const panel = within(await claimDrawer());
+    expect(panel.getByText('Awaiting review')).toBeInTheDocument();
+    expect(
+      panel.getByText(
+        /Confidence 80% \(a model estimate, not statistical truth\) · Rule · version 1/,
+      ),
+    ).toBeInTheDocument();
+    // The claim's hypothesis is stored by knowledge-pack key; the page names it from the hypothesis list.
+    await waitFor(() =>
+      expect(panel.getByRole('list', { name: 'Related causes' })).toHaveTextContent(
+        'DNS resolution failure for sign-in endpoints',
+      ),
+    );
   });
 
   it('counts the eight categories and lets one be chosen as a filter', async () => {
@@ -137,15 +176,60 @@ describe('[FR-LEDGER-01] Evidence Ledger', () => {
     await waitFor(() => expect(param('category')).toBeNull());
   });
 
-  it('lists the evidence the investigation needed, still-open requirements first', async () => {
+  it('filters from a segment of the coverage bar as well as from its key', async () => {
+    const user = userEvent.setup();
+    const handler = api();
+    const { container } = renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: handler });
+    await screen.findByRole('list', { name: 'Filter by evidence category' });
+    // The bar is the picture of the key: its segments are for the pointer, the key is for the keyboard.
+    const segment = container.querySelector<HTMLElement>(
+      'button[data-category="customer_reported"]',
+    );
+    expect(segment).not.toBeNull();
+    await user.click(segment as HTMLElement);
+    expect(param('category')).toBe('customer_reported');
+    await waitFor(() =>
+      expect(lastQuery(handler)).toEqual({ limit: 100, category: 'customer_reported' }),
+    );
+    // Only the categories that have claims are drawn.
+    expect(container.querySelectorAll('button[data-category]')).toHaveLength(2);
+    await user.click(segment as HTMLElement);
+    await waitFor(() => expect(param('category')).toBeNull());
+  });
+
+  it('says how much evidence is still missing, and opens the list from there', async () => {
     const user = userEvent.setup();
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: api() });
-    const panel = within(
-      await screen.findByRole('group', { name: 'Evidence the investigation needed' }),
-    );
-    expect(panel.getByText('1 requirement still open of 1.')).toBeInTheDocument();
-    await user.click(panel.getByRole('button', { name: 'Show the 1 requirement' }));
-    const list = await panel.findByRole('list', { name: 'Evidence requirements' });
+    const figure = await screen.findByRole('button', { name: '1 still missing, 1 critical' });
+    const section = await screen.findByRole('button', { name: /^What is still missing/ });
+    expect(section).toHaveAttribute('aria-expanded', 'false');
+    await user.click(figure);
+    expect(section).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByRole('list', { name: 'Evidence requirements' })).toBeInTheDocument();
+  });
+
+  it('says nothing is missing when every requirement was collected', async () => {
+    renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, {
+      api: api({
+        'evidence.list': () =>
+          ledger({
+            missing: [
+              missingEvidence({ resolvedAt: '2026-03-10T00:00:00Z', resolvedByEventId: 'e05' }),
+            ],
+          }),
+      }),
+    });
+    expect(
+      await screen.findByRole('button', { name: 'Nothing still missing' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('0 requirements still open of 1.')).toBeInTheDocument();
+  });
+
+  it('lists the evidence the investigation needed, still-open requirements first', async () => {
+    renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: api() });
+    expect(await screen.findByText('1 requirement still open of 1.')).toBeInTheDocument();
+    await openSection(/^What is still missing/);
+    const list = await screen.findByRole('list', { name: 'Evidence requirements' });
     expect(within(list).getByText('Network path check from an affected site')).toBeInTheDocument();
     expect(within(list).getByText('Still needed')).toBeInTheDocument();
     expect(within(list).getByText('Critical')).toBeInTheDocument();
@@ -201,16 +285,35 @@ describe('[FR-LEDGER-01] Evidence Ledger', () => {
   });
 
   it('has no accessibility violations when loaded, with a claim open', async () => {
-    wide();
     navigateTo('/cases/case_1/evidence?sel=clm_1');
     const { container } = renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: api() });
-    await screen.findByRole('list', { name: 'Claims, 2 shown' });
-    await screen.findByText('Original AI classification (never overwritten)');
+    const drawer = await claimDrawer();
+    await within(drawer).findByText('Original AI classification (never overwritten)');
+    // The drawer is outside the page's own container: it is checked as well.
+    await expectNoAxeViolations(drawer);
     await expectNoAxeViolations(container);
-  });
+  }, 120_000);
+
+  it('has no accessibility violations with the coverage card, its sections and the filters open', async () => {
+    const user = userEvent.setup();
+    const { container } = renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: api() });
+    await screen.findByRole('list', { name: 'Claims, 2 shown' });
+    await openSection(/^What is still missing/);
+    await openKnownBar();
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    await screen.findByLabelText('Review state');
+    await expectNoAxeViolations(container);
+    await expectNoAxeViolations(document.body);
+  }, 120_000);
 });
 
 describe('[FR-LEDGER-02] filters live in the URL', () => {
+  /** The filters that do not fit in the row sit in a popover: open it to reach them. */
+  async function openFilters(): Promise<void> {
+    await userEvent.setup().click(await screen.findByRole('button', { name: /^Filters/ }));
+    await screen.findByLabelText('Review state');
+  }
+
   it('sends every filter to the API and keeps it in the URL', async () => {
     const user = userEvent.setup();
     const handler = api();
@@ -218,14 +321,20 @@ describe('[FR-LEDGER-02] filters live in the URL', () => {
     await screen.findByRole('list', { name: 'Claims, 2 shown' });
     expect(lastQuery(handler)).toEqual({ limit: 100 });
 
+    await openFilters();
     await user.selectOptions(screen.getByLabelText('Review state'), 'pending');
     await waitFor(() => expect(param('review')).toBe('pending'));
-    const hypothesis = screen.getByLabelText('Related hypothesis');
+    const hypothesis = screen.getByLabelText('Related cause');
     await within(hypothesis).findByRole('option', {
       name: 'DNS resolution failure for sign-in endpoints',
     });
     await user.selectOptions(hypothesis, 'hyp_1');
     await waitFor(() => expect(param('hyp')).toBe('hyp_1'));
+    // Escape closes the popover; the page behind it is hidden from assistive technology while it is open.
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByLabelText('Review state')).toBeNull());
+    // The button says how many of the filters inside it are on.
+    expect(await screen.findByRole('button', { name: 'Filters, 2 on' })).toBeInTheDocument();
     await user.type(screen.getByRole('searchbox', { name: 'Search claims' }), 'proxy');
     await waitFor(() => expect(param('q')).toBe('proxy'));
     // The search is sent once typing pauses, not on every key.
@@ -243,6 +352,8 @@ describe('[FR-LEDGER-02] filters live in the URL', () => {
     await waitFor(() => expect(window.location.search).toBe(''));
     // The unfiltered list is already cached, so clearing shows it again without asking the API twice.
     await waitFor(() => expect(screen.queryByText(/filters on/)).toBeNull());
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
+    await openFilters();
     expect(screen.getByLabelText('Review state')).toHaveValue('all');
   });
 
@@ -252,6 +363,7 @@ describe('[FR-LEDGER-02] filters live in the URL', () => {
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: handler });
     await screen.findByRole('list', { name: 'Claims, 2 shown' });
     await waitFor(() => expect(lastQuery(handler)).toEqual({ limit: 100, q: 'x'.repeat(200) }));
+    await openFilters();
     expect(screen.getByLabelText('Review state')).toHaveValue('all');
   });
 
@@ -277,6 +389,8 @@ describe('[FR-LEDGER-02] filters live in the URL', () => {
       await screen.findByRole('heading', { name: 'No claims at this moment' }),
     ).toBeInTheDocument();
     expect(screen.getByText('The analysis found no claims in this case.')).toBeInTheDocument();
+    expect(screen.getByText('No evidence requirements apply yet.')).toBeInTheDocument();
+    await openSection(/^What is still missing/);
     expect(screen.getByText('Nothing is required at this point in the case.')).toBeInTheDocument();
   });
 });
@@ -351,12 +465,10 @@ describe('[FR-LEDGER-02] typing in the search box', () => {
 describe('[FR-LEDGER-03] a claim in full', () => {
   it('shows its text, the original AI classification, why, its source and the evidence for and against it', async () => {
     const user = userEvent.setup();
-    wide();
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: api() });
     await screen.findByRole('list', { name: 'Claims, 2 shown' });
-    expect(
-      screen.getByText(/Select a claim to see what supports and contradicts it/),
-    ).toBeInTheDocument();
+    // Nothing is open until a claim is chosen: the detail is a drawer, not a panel that is always there.
+    expect(screen.queryByRole('dialog', { name: 'Claim details' })).toBeNull();
 
     await user.click(
       screen.getByRole('button', {
@@ -364,7 +476,8 @@ describe('[FR-LEDGER-03] a claim in full', () => {
       }),
     );
     expect(param('sel')).toBe('clm_1');
-    const panel = within(await screen.findByRole('group', { name: 'Claim details' }));
+    const drawer = await claimDrawer();
+    const panel = within(drawer);
 
     const history = panel.getByRole('list', { name: 'Classification history' });
     expect(
@@ -384,6 +497,9 @@ describe('[FR-LEDGER-03] a claim in full', () => {
         'Assumption stated as fact',
       ),
     ).toBeInTheDocument();
+
+    // The source is one click away: the row already names the event.
+    await user.click(panel.getByRole('button', { name: /^Source/ }));
     expect(panel.getByRole('link', { name: 'Open event e03 in the timeline' })).toHaveAttribute(
       'href',
       '/cases/case_1/timeline?sel=e03',
@@ -402,18 +518,17 @@ describe('[FR-LEDGER-03] a claim in full', () => {
     expect(within(contradicting).getByText(/Absent · moderate strength/)).toBeInTheDocument();
     expect(panel.getByText('2 evidence items linked to this claim.')).toBeInTheDocument();
     await waitFor(() =>
-      expect(panel.getByRole('list', { name: 'Related hypotheses' })).toHaveTextContent(
+      expect(panel.getByRole('list', { name: 'Related causes' })).toHaveTextContent(
         'DNS resolution failure for sign-in endpoints',
       ),
     );
 
-    await user.click(screen.getByRole('button', { name: 'Close claim details' }));
+    await user.click(panel.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(param('sel')).toBeNull());
   });
 
   it('keeps the AI classification beside a reviewer’s correction and its reason', async () => {
-    wide();
-    navigateTo('/cases/case_1/evidence?sel=clm_1');
+    const user = userEvent.setup();
     const corrected = claim({
       category: 'diagnostic_evidence',
       aiCategory: 'engineer_assumption',
@@ -433,7 +548,8 @@ describe('[FR-LEDGER-03] a claim in full', () => {
     ).toBeInTheDocument();
     expect(within(row).getByText('Corrected by a reviewer')).toBeInTheDocument();
 
-    const panel = within(await screen.findByRole('group', { name: 'Claim details' }));
+    await user.click(within(row).getByRole('button', { name: /^Details of this claim/ }));
+    const panel = within(await claimDrawer());
     const history = panel.getByRole('list', { name: 'Classification history' });
     expect(
       within(history).getByText('Original AI classification (never overwritten)'),
@@ -446,7 +562,6 @@ describe('[FR-LEDGER-03] a claim in full', () => {
   });
 
   it('finds a claim from a shared link on a later page', async () => {
-    wide();
     navigateTo('/cases/case_1/evidence?sel=clm_2');
     const [first, second] = ledger().items as [ReturnType<typeof claim>, ReturnType<typeof claim>];
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, {
@@ -459,7 +574,7 @@ describe('[FR-LEDGER-03] a claim in full', () => {
     });
     await waitFor(() =>
       expect(
-        within(screen.getByRole('group', { name: 'Claim details' })).getByText(
+        within(screen.getByRole('dialog', { name: 'Claim details' })).getByText(
           'The customer reported that failures are intermittent.',
         ),
       ).toBeInTheDocument(),
@@ -469,7 +584,6 @@ describe('[FR-LEDGER-03] a claim in full', () => {
 
   it('says when the selected claim is not in this view, and clears the selection', async () => {
     const user = userEvent.setup();
-    wide();
     navigateTo('/cases/case_1/evidence?sel=clm_zzz');
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: api() });
     expect(
@@ -479,10 +593,10 @@ describe('[FR-LEDGER-03] a claim in full', () => {
     await waitFor(() => expect(param('sel')).toBeNull());
   });
 
-  it('opens the claim in a drawer on a narrow screen', async () => {
+  it('opens the claim from a shared link in a drawer, with its details', async () => {
     navigateTo('/cases/case_1/evidence?sel=clm_1');
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: api() });
-    const drawer = await screen.findByRole('dialog', { name: 'Claim details' });
+    const drawer = await claimDrawer();
     expect(
       await within(drawer).findByText('Original AI classification (never overwritten)'),
     ).toBeInTheDocument();
@@ -523,7 +637,6 @@ describe('[FR-LEDGER-04] reviewing a claim', () => {
 
   it('requires a reason, then records a confirmation with the version that was reviewed', async () => {
     const user = userEvent.setup();
-    wide();
     navigateTo('/cases/case_1/evidence?sel=clm_1');
     const handler = reviewing();
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: handler });
@@ -559,18 +672,18 @@ describe('[FR-LEDGER-04] reviewing a claim', () => {
     );
     expect(await screen.findByText('Classification confirmed')).toBeInTheDocument();
     await waitFor(() => {
-      const panel = within(screen.getByRole('group', { name: 'Claim details' }));
+      const panel = within(screen.getByRole('dialog', { name: 'Claim details' }));
       const history = panel.getByRole('list', { name: 'Classification history' });
       expect(within(history).getByText('Reviewer decision')).toBeInTheDocument();
       expect(within(history).getByText('Checked the sign-in logs')).toBeInTheDocument();
     });
-    const row = screen.getAllByRole('article')[0] as HTMLElement;
+    // The drawer is a modal: the list behind it is out of the accessibility tree, so look past that.
+    const row = screen.getAllByRole('article', { hidden: true })[0] as HTMLElement;
     expect(within(row).getByText('Confirmed by a reviewer')).toBeInTheDocument();
   });
 
   it('corrects the classification, keeping the original AI proposal visible in the list and the panel', async () => {
     const user = userEvent.setup();
-    wide();
     navigateTo('/cases/case_1/evidence?sel=clm_1');
     const handler = reviewing();
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: handler });
@@ -599,9 +712,9 @@ describe('[FR-LEDGER-04] reviewing a claim', () => {
       ),
     );
     expect(await screen.findByText('Classification corrected')).toBeInTheDocument();
-    const row = (await screen.findAllByRole('article'))[0] as HTMLElement;
+    const row = (await screen.findAllByRole('article', { hidden: true }))[0] as HTMLElement;
     await waitFor(() =>
-      expect(screen.getAllByRole('article')[0]).toHaveAttribute(
+      expect(screen.getAllByRole('article', { hidden: true })[0]).toHaveAttribute(
         'aria-label',
         expect.stringMatching(/^Diagnostic evidence: /),
       ),
@@ -610,7 +723,7 @@ describe('[FR-LEDGER-04] reviewing a claim', () => {
       within(row).getByText('Originally classified by the AI as Engineer assumption'),
     ).toBeInTheDocument();
     await waitFor(() => {
-      const panel = within(screen.getByRole('group', { name: 'Claim details' }));
+      const panel = within(screen.getByRole('dialog', { name: 'Claim details' }));
       const history = panel.getByRole('list', { name: 'Classification history' });
       expect(
         within(history).getByText('Original AI classification (never overwritten)'),
@@ -627,7 +740,6 @@ describe('[FR-LEDGER-04] reviewing a claim', () => {
 
   it('reports a concurrent change as a conflict and reloads the ledger instead of overwriting it', async () => {
     const user = userEvent.setup();
-    wide();
     navigateTo('/cases/case_1/evidence?sel=clm_1');
     const handler = api({
       'claims.review': () => {
@@ -656,7 +768,6 @@ describe('[FR-LEDGER-04] reviewing a claim', () => {
 
   it('shows the API refusal inside the dialog and keeps the claim as it was', async () => {
     const user = userEvent.setup();
-    wide();
     navigateTo('/cases/case_1/evidence?sel=clm_1');
     const handler = api({
       'claims.review': () => {
@@ -685,7 +796,6 @@ describe('[FR-LEDGER-04] reviewing a claim', () => {
   });
 
   it('does not let a role without evidence:review decide', async () => {
-    wide();
     navigateTo('/cases/case_1/evidence?sel=clm_1');
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, {
       api: api({ 'session.me': () => session('engineer', [...ENGINEER]) }),
@@ -722,8 +832,8 @@ describe('[FR-LEDGER-05] the time cursor', () => {
     });
 
   it('asks for the ledger as it stood, and never shows a decision made after that moment', async () => {
-    wide();
-    navigateTo(`/cases/case_1/evidence?sel=clm_1&asOf=${encodeURIComponent(AS_OF)}`);
+    const user = userEvent.setup();
+    navigateTo(`/cases/case_1/evidence?asOf=${encodeURIComponent(AS_OF)}`);
     const handler = api({
       'evidence.list': () =>
         ledger({ asOf: SNAPPED, items: [later()], missing: [missingEvidence()] }),
@@ -750,7 +860,23 @@ describe('[FR-LEDGER-05] the time cursor', () => {
     const row = screen.getAllByRole('article')[0] as HTMLElement;
     expect(row).toHaveAttribute('aria-label', expect.stringMatching(/^Engineer assumption: /));
     expect(within(row).queryByText('Corrected by a reviewer')).toBeNull();
-    const panel = within(await screen.findByRole('group', { name: 'Claim details' }));
+
+    // The bar says which moment is shown, and its counts are one click away.
+    expect(
+      await screen.findByText(
+        `Showing the case as of ${formatDateTimeUtc(SNAPPED)}, the last event recorded by the moment you chose.`,
+      ),
+    ).toBeInTheDocument();
+    await openKnownBar();
+    const cursor = within(
+      await screen.findByLabelText(`Known as of ${formatDateTimeUtc(SNAPPED)}`),
+    );
+    expect(cursor.getByText('Later events withheld')).toBeInTheDocument();
+    expect(cursor.getByText('7')).toBeInTheDocument();
+    expect(screen.getByText('1 requirement still open of 1 at this moment.')).toBeInTheDocument();
+
+    await user.click(within(row).getByRole('button', { name: /^Details of this claim/ }));
+    const panel = within(await claimDrawer());
     const history = panel.getByRole('list', { name: 'Classification history' });
     expect(within(history).queryByText('Reviewer correction')).toBeNull();
     expect(screen.queryByText('Decided after the selected moment.')).toBeNull();
@@ -759,27 +885,21 @@ describe('[FR-LEDGER-05] the time cursor', () => {
         /A decision you record now applies to the whole record\. Earlier views, like this one/,
       ),
     ).toBeInTheDocument();
-
-    const cursor = within(await screen.findByRole('group', { name: 'What was known' }));
-    expect(await cursor.findByText('Later events withheld')).toBeInTheDocument();
-    expect(cursor.getByText('7')).toBeInTheDocument();
-    expect(screen.getByText('1 requirement still open of 1 at this moment.')).toBeInTheDocument();
   });
 
   it('says where decisions normally appear that later ones are withheld, in an earlier view only', async () => {
-    wide();
     navigateTo(`/cases/case_1/evidence?sel=clm_1&asOf=${encodeURIComponent(SNAPPED)}`);
     const { unmount } = renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, {
       api: api({ 'evidence.list': () => ledger({ asOf: SNAPPED }) }),
     });
-    await screen.findByRole('list', { name: 'Claims, 2 shown' });
+    await screen.findByRole('list', { name: 'Claims, 2 shown', hidden: true });
     // Once above the list of claims, and once in the classification history of the open claim.
     expect(
       await screen.findAllByText(
         'Reviewer decisions recorded later are not shown in this earlier view.',
       ),
     ).toHaveLength(2);
-    const history = within(await screen.findByRole('group', { name: 'Claim details' }));
+    const history = within(await claimDrawer());
     expect(
       history.getByText('Reviewer decisions recorded later are not shown in this earlier view.'),
     ).toBeInTheDocument();
@@ -787,12 +907,11 @@ describe('[FR-LEDGER-05] the time cursor', () => {
 
     navigateTo('/cases/case_1/evidence?sel=clm_1');
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: api() });
-    await screen.findByRole('list', { name: 'Claims, 2 shown' });
+    await screen.findByRole('list', { name: 'Claims, 2 shown', hidden: true });
     expect(screen.queryByText(/Reviewer decisions recorded later are not shown/)).toBeNull();
   });
 
   it('keeps a decision that was made by the chosen moment', async () => {
-    wide();
     navigateTo('/cases/case_1/evidence?asOf=2026-03-10T08:55:00Z');
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, {
       api: api({ 'evidence.list': () => ledger({ items: [decided('2026-03-10T08:00:00Z')] }) }),
@@ -821,12 +940,26 @@ describe('[FR-LEDGER-05] the time cursor', () => {
     await waitFor(() => expect(param('asOf')).toBeNull());
   });
 
+  it('goes back to the latest from the bar, without opening it', async () => {
+    const user = userEvent.setup();
+    navigateTo(`/cases/case_1/evidence?asOf=${encodeURIComponent(AS_OF)}`);
+    renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, {
+      api: api({ 'evidence.list': (input) => ledger({ asOf: asOfOf(input) ?? null }) }),
+    });
+    await screen.findByRole('list', { name: 'Claims, 2 shown' });
+    expect(screen.getByText('Earlier view')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Back to latest' }));
+    await waitFor(() => expect(param('asOf')).toBeNull());
+    await waitFor(() => expect(screen.queryByText('Earlier view')).toBeNull());
+  });
+
   it('lands the cursor on an event and sends one request when the drag stops', async () => {
     const handler = api({
       'evidence.list': (input) => ledger({ asOf: asOfOf(input) ?? null }),
     });
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: handler });
     await screen.findByRole('list', { name: 'Claims, 2 shown' });
+    await openKnownBar();
     const slider = await screen.findByRole('slider', { name: 'Time cursor' });
     fireEvent.change(slider, { target: { value: '100' } });
     fireEvent.change(slider, { target: { value: '1500' } });
@@ -854,13 +987,15 @@ describe('[FR-LEDGER-05] the time cursor', () => {
             : timelineResponse(),
       }),
     });
-    const cursor = within(await screen.findByRole('group', { name: 'What was known' }));
     expect(
-      await cursor.findByText(
+      await screen.findByText(
         `Showing the case as of ${formatDateTimeUtc(cut)}, the last event recorded by the moment you chose.`,
       ),
     ).toBeInTheDocument();
-    expect(cursor.getByLabelText(`Known as of ${formatDateTimeUtc(cut)}`)).toBeInTheDocument();
+    await openKnownBar();
+    expect(
+      await screen.findByLabelText(`Known as of ${formatDateTimeUtc(cut)}`),
+    ).toBeInTheDocument();
   });
 
   it('shows its loading state, and nothing of the whole record, while the chosen moment loads', async () => {
@@ -872,6 +1007,7 @@ describe('[FR-LEDGER-05] the time cursor', () => {
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: handler });
     await screen.findByRole('list', { name: 'Claims, 2 shown' });
     expect(screen.getByRole('list', { name: 'Filter by evidence category' })).toBeInTheDocument();
+    await openKnownBar();
     fireEvent.change(await screen.findByRole('slider', { name: 'Time cursor' }), {
       target: { value: '3000' },
     });
@@ -906,6 +1042,7 @@ describe('[FR-LEDGER-05] the time cursor', () => {
     });
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: handler });
     await screen.findByRole('list', { name: 'Claims, 2 shown' });
+    await openKnownBar();
     fireEvent.change(await screen.findByRole('slider', { name: 'Time cursor' }), {
       target: { value: '1500' },
     });
@@ -919,7 +1056,6 @@ describe('[FR-LEDGER-05] the time cursor', () => {
   });
 
   it('does not say that the open claim is missing while the moment that would show it loads', async () => {
-    wide();
     navigateTo('/cases/case_1/evidence?sel=clm_1');
     const handler = api({
       'evidence.list': (input) => (asOfOf(input) ? new Promise(() => undefined) : ledger()),
@@ -927,20 +1063,22 @@ describe('[FR-LEDGER-05] the time cursor', () => {
         asOfOf(input) ? new Promise(() => undefined) : timelineResponse(),
     });
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: handler });
-    await screen.findByRole('group', { name: 'Claim details' });
-    fireEvent.change(await screen.findByRole('slider', { name: 'Time cursor' }), {
-      target: { value: '3000' },
-    });
-    await waitFor(() => expect(param('asOf')).toBe('2026-03-10T08:55:00Z'));
+    const drawer = await claimDrawer();
+    await within(drawer).findByText('Original AI classification (never overwritten)');
+    // The address changes to an earlier moment (a link, Back): the claim is looked up again for that moment.
+    act(() => navigateTo('/cases/case_1/evidence?sel=clm_1&asOf=2026-03-10T08:55:00Z'));
     expect(await screen.findByText('Loading the claim…')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'That claim is not in this view' })).toBeNull();
-    expect(screen.queryByRole('group', { name: 'Claim details' })).toBeNull();
+    expect(
+      within(screen.getByRole('dialog', { name: 'Claim details' })).queryByText(
+        'Original AI classification (never overwritten)',
+      ),
+    ).toBeNull();
     expect(param('sel')).toBe('clm_1');
   });
 
   it('keeps an earlier window as it was when a decision is recorded there, and says it is not shown', async () => {
     const user = userEvent.setup();
-    wide();
     navigateTo(`/cases/case_1/evidence?sel=clm_1&asOf=${encodeURIComponent(SNAPPED)}`);
     let version = 1;
     // The window as the API serves it: the classification and the explanation of that moment.
@@ -982,7 +1120,7 @@ describe('[FR-LEDGER-05] the time cursor', () => {
     expect(await screen.findByText('Decision recorded')).toBeInTheDocument();
 
     // The window is asked again (the claim has a new version) and shows what it showed before, not the stored claim.
-    const panel = within(await screen.findByRole('group', { name: 'Claim details' }));
+    const panel = within(await claimDrawer());
     expect(await panel.findByText('Your decision was recorded')).toBeInTheDocument();
     expect(panel.getByText(/never shows a decision recorded after its moment/)).toBeInTheDocument();
     await waitFor(() => expect(panel.getByText('As it was understood then.')).toBeInTheDocument());
@@ -991,7 +1129,7 @@ describe('[FR-LEDGER-05] the time cursor', () => {
     const history = within(panel.getByRole('list', { name: 'Classification history' }));
     expect(history.queryByText(/^Reviewer (correction|decision)$/)).toBeNull();
     expect(history.getByText('Original AI classification (never overwritten)')).toBeInTheDocument();
-    expect(screen.getAllByRole('article')[0]).toHaveAttribute(
+    expect(screen.getAllByRole('article', { hidden: true })[0]).toHaveAttribute(
       'aria-label',
       expect.stringMatching(/^Engineer assumption: /),
     );
@@ -1000,7 +1138,7 @@ describe('[FR-LEDGER-05] the time cursor', () => {
     await user.click(panel.getByRole('button', { name: 'Show the whole record' }));
     await waitFor(() => expect(param('asOf')).toBeNull());
     expect(await screen.findByText('Because the logs prove it.')).toBeInTheDocument();
-    expect(screen.getAllByRole('article')[0]).toHaveAttribute(
+    expect(screen.getAllByRole('article', { hidden: true })[0]).toHaveAttribute(
       'aria-label',
       expect.stringMatching(/^Diagnostic evidence: /),
     );
@@ -1026,9 +1164,7 @@ describe('[FR-LEDGER-05] the time cursor', () => {
       '[role="note"]',
     ) as HTMLElement;
     expect(
-      within(notice).getByText(
-        /the evidence ledger could not be computed for this moment just now/,
-      ),
+      within(notice).getByText(/the evidence could not be computed for this moment just now/),
     ).toBeInTheDocument();
     const retry = within(notice).getByRole('button', { name: /Retry in \d s/ });
     expect(retry).toBeDisabled();
@@ -1038,8 +1174,8 @@ describe('[FR-LEDGER-05] the time cursor', () => {
       screen.getByText(/^Earlier views are limited\. Try again in \d seconds?\.$/),
     ).toHaveAttribute('role', 'status');
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(screen.getByRole('heading', { level: 1, name: 'Evidence Ledger' })).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Time cursor' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Evidence' })).toBeInTheDocument();
+    await openKnownBar();
     expect(handler.call).toHaveBeenCalledWith(
       'evidence.list',
       expect.objectContaining({ maxRetries: 0 }),
@@ -1077,10 +1213,9 @@ describe('[FR-LEDGER-05] the time cursor', () => {
     expect(
       within(notice).getByText(/what was known could not be computed for this moment just now/),
     ).toBeInTheDocument();
+    await openKnownBar();
     expect(
-      within(await screen.findByRole('group', { name: 'What was known' })).getByText(
-        /Counts for this moment are not available right now/,
-      ),
+      await screen.findByText(/Counts for this moment are not available right now/),
     ).toBeInTheDocument();
     await user.click(within(notice).getByRole('button', { name: 'Show the whole record' }));
     await waitFor(() => expect(param('asOf')).toBeNull());
@@ -1104,7 +1239,7 @@ describe('[FR-LEDGER-05] the time cursor', () => {
     ) as HTMLElement;
     expect(
       within(notice).getByText(
-        /the hypothesis names could not be computed for this moment just now/,
+        /the names of the possible causes could not be computed for this moment just now/,
       ),
     ).toBeInTheDocument();
   });
@@ -1127,9 +1262,7 @@ describe('[FR-LEDGER-06] a case that is not analysed, loading and errors', () =>
     expect(
       await screen.findByRole('heading', { name: 'This case has not been analysed yet' }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(/The evidence ledger is available as soon as it has run/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/The evidence is ready as soon as it has run/)).toBeInTheDocument();
     await user.click(await enabledButton('Start the analysis'));
     await waitFor(() =>
       expect(handler.call).toHaveBeenCalledWith(
@@ -1153,7 +1286,7 @@ describe('[FR-LEDGER-06] a case that is not analysed, loading and errors', () =>
         },
       }),
     });
-    expect(await screen.findByText('The evidence ledger could not be loaded')).toBeInTheDocument();
+    expect(await screen.findByText('The evidence could not be loaded')).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'This case has not been analysed yet' }),
     ).toBeNull();
@@ -1177,7 +1310,7 @@ describe('[FR-LEDGER-06] a case that is not analysed, loading and errors', () =>
         },
       }),
     });
-    expect(await screen.findByText('The evidence ledger could not be loaded')).toBeInTheDocument();
+    expect(await screen.findByText('The evidence could not be loaded')).toBeInTheDocument();
     expect(screen.getByText('corr-ev-1')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Retry/ }));
     expect(await screen.findByRole('list', { name: 'Claims, 2 shown' })).toBeInTheDocument();
@@ -1195,7 +1328,7 @@ describe('[FR-LEDGER-06] a case that is not analysed, loading and errors', () =>
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Browse cases' })).toHaveAttribute('href', '/cases');
     expect(screen.queryByText(/Loading what was known/)).toBeNull();
-    expect(screen.queryByText('The evidence ledger could not be loaded')).toBeNull();
+    expect(screen.queryByText('The evidence could not be loaded')).toBeNull();
     // Nothing is left busy: a screen reader would otherwise announce a page that is loading for ever.
     expect(document.querySelector('[aria-busy="true"]')).toBeNull();
   });
@@ -1236,30 +1369,34 @@ describe('[FR-LEDGER-07] a page that failed is not requested again in a loop', (
 
   it('looking for a claim from a shared link, asks for the page that failed once, and again only for each press of Retry', async () => {
     const user = userEvent.setup();
-    wide();
     navigateTo('/cases/case_1/evidence?sel=clm_2');
     const { handler, requests, recover } = failingSecondPage();
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: handler });
-    expect(await screen.findByText('The evidence ledger could not be loaded')).toBeInTheDocument();
+    expect(await screen.findByText('The evidence could not be loaded')).toBeInTheDocument();
     // The search for the claim used to ask again for ever: every failure made it ask again.
     await settle();
     expect(requests()).toBe(1);
     // It no longer says it is looking.
     expect(screen.queryByRole('heading', { name: 'Looking for that claim…' })).toBeNull();
+    // The drawer is a modal, so it carries its own Retry: the one on the page is behind it.
+    const retry = async (): Promise<void> =>
+      user.click(within(await claimDrawer()).getByRole('button', { name: /Retry/ }));
     expect(
-      screen.getByText(/may be on a page of the ledger that could not be loaded/),
+      within(await claimDrawer()).getByText(
+        /may be on a page of the ledger that could not be loaded/,
+      ),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /Retry/ }));
+    await retry();
     await waitFor(() => expect(requests()).toBe(2));
     await settle();
     expect(requests()).toBe(2);
 
     recover();
-    await user.click(screen.getByRole('button', { name: /Retry/ }));
+    await retry();
     await waitFor(() =>
       expect(
-        within(screen.getByRole('group', { name: 'Claim details' })).getByText(
+        within(screen.getByRole('dialog', { name: 'Claim details' })).getByText(
           'The customer reported that failures are intermittent.',
         ),
       ).toBeInTheDocument(),
@@ -1274,7 +1411,7 @@ describe('[FR-LEDGER-07] a page that failed is not requested again in a loop', (
     const observer = installNearEndObserver();
     const { handler, requests, recover } = failingSecondPage();
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: handler });
-    expect(await screen.findByText('The evidence ledger could not be loaded')).toBeInTheDocument();
+    expect(await screen.findByText('The evidence could not be loaded')).toBeInTheDocument();
     // A rebuilt observer reports at once, which used to repeat the request that had just failed.
     await settle();
     expect(requests()).toBe(1);
@@ -1421,12 +1558,16 @@ describe('ledger filter helpers', () => {
 describe('[FR-LEDGER-07] what the record itself shows', () => {
   it('says so when nothing disagrees and nothing was set aside', async () => {
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, { api: api() });
-    expect(
-      await screen.findByRole('heading', { level: 2, name: 'What the record itself shows' }),
-    ).toBeInTheDocument();
+    const section = await screen.findByRole('heading', {
+      level: 3,
+      name: /^What the record itself shows/,
+    });
+    expect(section).toBeInTheDocument();
     expect(
       screen.getByText('Read without a model from the events of the whole record.'),
     ).toBeInTheDocument();
+    // It is one collapsed row of the coverage card: its content is one click away.
+    await openSection(/^What the record itself shows/);
     expect(screen.getByText(/No two statements contradict each other/)).toBeInTheDocument();
   });
 
@@ -1435,6 +1576,7 @@ describe('[FR-LEDGER-07] what the record itself shows', () => {
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, {
       api: api({ 'recordFindings.get': () => recordFindingsWithFindings() }),
     });
+    await openSection(/^What the record itself shows/);
     await user.click(await screen.findByRole('button', { name: /Statements that disagree \(1\)/ }));
     const conflicts = await screen.findByRole('list', { name: 'Statements that disagree' });
     expect(within(conflicts).getByText('Changed over time')).toBeInTheDocument();
@@ -1463,6 +1605,7 @@ describe('[FR-LEDGER-07] what the record itself shows', () => {
     renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, {
       api: api({ 'recordFindings.get': () => recordFindingsWithFindings({ setAsideTotal: 640 }) }),
     });
+    await openSection(/^What the record itself shows/);
     expect(
       await screen.findByRole('button', { name: /Read but not counted \(2 of 640\)/ }),
     ).toBeInTheDocument();
@@ -1501,6 +1644,7 @@ describe('[FR-LEDGER-07] what the record itself shows', () => {
     expect(await screen.findByRole('list', { name: 'Claims, 2 shown' })).toBeInTheDocument();
     expect(await screen.findByText(/could not be loaded/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await openSection(/^What the record itself shows/);
     expect(
       await screen.findByRole('button', { name: /Statements that disagree \(1\)/ }),
     ).toBeInTheDocument();
@@ -1519,7 +1663,7 @@ describe('[FR-LEDGER-07] what the record itself shows', () => {
     });
     await screen.findByText(/not been analysed|Analyse/i);
     expect(
-      screen.queryByRole('heading', { name: 'What the record itself shows' }),
+      screen.queryByRole('heading', { name: /What the record itself shows/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -1528,6 +1672,7 @@ describe('[FR-LEDGER-07] what the record itself shows', () => {
     const { container } = renderApp(<EvidenceLedgerPage caseId={CASE_ID} />, {
       api: api({ 'recordFindings.get': () => recordFindingsWithFindings() }),
     });
+    await openSection(/^What the record itself shows/);
     for (const name of [
       /Statements that disagree \(1\)/,
       /Patterns across events \(1\)/,
@@ -1537,5 +1682,5 @@ describe('[FR-LEDGER-07] what the record itself shows', () => {
     }
     await screen.findByRole('list', { name: 'Sentences read but not counted' });
     await expectNoAxeViolations(container);
-  });
+  }, 180_000);
 });

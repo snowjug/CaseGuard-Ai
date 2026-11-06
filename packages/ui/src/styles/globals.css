@@ -1,11 +1,15 @@
 /*
- * CaseGuard global design variables and utilities ("Evidence Constellation").
+ * CaseGuard global design variables and utilities.
  *
  * Colour tokens are emitted per theme by FluentProvider (see src/tokens/themes.ts, `--cg*` variables).
  * The block below only covers (1) static tokens (spacing, radius, motion, type), (2) the page canvas that renders
  * outside the provider (html/body), and (3) shared utilities. `test/globals-css.test.ts` keeps it in sync with
  * src/tokens.
  */
+
+/* Geist, self-hosted (SIL OFL 1.1). The browser downloads only the subsets a page actually uses. */
+@import '@fontsource-variable/geist/index.css';
+@import '@fontsource-variable/geist-mono/index.css';
 
 :root {
   --cg-space-0: 0px;
@@ -15,46 +19,53 @@
   --cg-space-4: 16px;
   --cg-space-6: 24px;
   --cg-space-8: 32px;
+  --cg-space-10: 40px;
+  --cg-space-12: 48px;
+  --cg-space-16: 64px;
 
-  --cg-radius-sm: 6px;
-  --cg-radius-md: 8px;
-  --cg-radius-lg: 12px;
+  --cg-radius-sm: 8px;
+  --cg-radius-md: 12px;
+  --cg-radius-lg: 16px;
+  --cg-radius-xl: 24px;
   --cg-radius-pill: 999px;
 
   --cg-motion-fast: 150ms;
   --cg-motion-base: 200ms;
   --cg-motion-slow: 250ms;
+  --cg-motion-max: 300ms;
   --cg-motion-easing: cubic-bezier(0.16, 1, 0.3, 1);
 
   --cg-font-base:
-    'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial,
+    'Geist Variable', 'Geist', system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial,
     sans-serif;
-  --cg-font-mono: 'Cascadia Code', Consolas, 'SFMono-Regular', Menlo, monospace;
-  --cg-max-content: 1440px;
+  --cg-font-mono:
+    'Geist Mono Variable', 'Geist Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --cg-icon-stroke: 1.75;
+  --cg-max-content: 1200px;
   --cg-header-height: 56px;
 
   /* Page chrome (light). */
-  --cg-canvas: #f5f6fb;
+  --cg-canvas: #f6f5fa;
   --cg-surface: #ffffff;
-  --cg-text: #12172b;
-  --cg-focus: #2b39b6;
+  --cg-text: #17151f;
+  --cg-focus: #4a36c4;
   color-scheme: light;
 }
 
 :root[data-cg-theme='dark'] {
-  --cg-canvas: #0b1020;
-  --cg-surface: #111830;
-  --cg-text: #eef1fb;
-  --cg-focus: #aeb6ff;
+  --cg-canvas: #131218;
+  --cg-surface: #1b1b22;
+  --cg-text: #f5f4f7;
+  --cg-focus: #b9afff;
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root[data-cg-theme='system'] {
-    --cg-canvas: #0b1020;
-    --cg-surface: #111830;
-    --cg-text: #eef1fb;
-    --cg-focus: #aeb6ff;
+    --cg-canvas: #131218;
+    --cg-surface: #1b1b22;
+    --cg-text: #f5f4f7;
+    --cg-focus: #b9afff;
     color-scheme: dark;
   }
 }
@@ -77,10 +88,23 @@ body {
   background: var(--cg-canvas);
   color: var(--cg-text);
   font-family: var(--cg-font-base);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--cgToneBrandTint, #eeebfd);
+  color: var(--cgText, var(--cg-text));
+}
+
+/* One icon set (lucide): sized by the surrounding font-size like text, one stroke width everywhere. */
+svg.lucide {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+  stroke-width: var(--cg-icon-stroke);
 }
 
 /* Keyboard focus for plain elements; Fluent controls draw their own indicator (0 specificity here). */
@@ -119,9 +143,13 @@ body {
   top: 8px;
   left: 8px;
   z-index: 1000;
-  padding: 8px 16px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0 16px;
   border-radius: var(--cg-radius-md);
-  background: var(--cgToneBrandSolid, #4b55c9);
+  background: var(--cgToneBrandSolid, #5b46d6);
   color: var(--cgToneBrandOnSolid, #ffffff);
   font-weight: 600;
   text-decoration: none;
@@ -130,6 +158,42 @@ body {
 
 .cg-skip-link:focus {
   transform: translateY(0);
+}
+
+/* Touch targets: a switch or a checkbox row is at least 44 px tall on a touch screen (its hit area is its whole box). */
+@media (pointer: coarse) {
+  .fui-Switch,
+  .fui-Checkbox {
+    min-height: 44px;
+  }
+}
+
+/* A tab strip that scrolls sideways fades at the end that has more to see, so a tab cut by the edge reads as "more this way". */
+.cg-tab-strip[data-fade-start='true'] {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, black 24px);
+  mask-image: linear-gradient(to right, transparent 0, black 24px);
+}
+
+.cg-tab-strip[data-fade-end='true'] {
+  -webkit-mask-image: linear-gradient(to left, transparent 0, black 24px);
+  mask-image: linear-gradient(to left, transparent 0, black 24px);
+}
+
+.cg-tab-strip[data-fade-start='true'][data-fade-end='true'] {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 24px,
+    black calc(100% - 24px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 24px,
+    black calc(100% - 24px),
+    transparent 100%
+  );
 }
 
 /*
@@ -156,7 +220,7 @@ body {
   0%,
   100% {
     outline-offset: 2px;
-    outline-color: var(--cgToneBrandSolid, #4b55c9);
+    outline-color: var(--cgToneBrandSolid, #5b46d6);
   }
   50% {
     outline-offset: 5px;
@@ -173,20 +237,69 @@ body {
   }
 }
 
+/* Blur-fade on load: opacity, a small rise and a soft blur, staggered with `--cg-stagger` (0 to 5). */
+@keyframes cg-blur-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+.cg-blur-fade {
+  animation: cg-blur-fade var(--cg-motion-slow) var(--cg-motion-easing) both;
+  animation-delay: calc(var(--cg-stagger, 0) * 40ms);
+}
+
+/* The arc of a score ring draws itself once (the path has `pathLength="100"`). */
+@keyframes cg-ring-sweep {
+  from {
+    stroke-dashoffset: 100;
+  }
+}
+
+.cg-ring-arc {
+  stroke-dasharray: 100 100;
+  animation: cg-ring-sweep var(--cg-motion-slow) var(--cg-motion-easing) both;
+}
+
+/* The primary button's glint: one pass across the button on hover or focus, never a loop. */
+@keyframes cg-glint {
+  from {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  to {
+    transform: translateX(220%) skewX(-18deg);
+  }
+}
+
+/* The spinner inside a busy button: a loading indicator, so it repeats until the work is done. */
+@keyframes cg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Loading placeholders: the one animation that repeats, and only until the request finishes. */
 .cg-shimmer {
   background-image: linear-gradient(
     90deg,
-    var(--cgSurfaceSunken, #eceef6) 25%,
-    var(--cgBorderSubtle, #dde1ee) 37%,
-    var(--cgSurfaceSunken, #eceef6) 63%
+    var(--cgSurfaceSunken, #eeedf4) 25%,
+    var(--cgSurfaceRaised, #ffffff) 50%,
+    var(--cgSurfaceSunken, #eeedf4) 75%
   );
-  background-size: 400% 100%;
+  background-size: 300% 100%;
   animation: cg-shimmer 1.6s ease-in-out infinite;
 }
 
 /* Highlight for the next suggested action in presentation mode. */
 .cg-presenter-target {
-  outline: 2px solid var(--cgToneBrandSolid, #4b55c9);
+  outline: 2px solid var(--cgToneBrandSolid, #5b46d6);
   outline-offset: 2px;
   animation: cg-pulse-outline 1.8s var(--cg-motion-easing) infinite;
 }

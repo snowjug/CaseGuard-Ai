@@ -1,23 +1,18 @@
 'use client';
 
 import type { MissingEvidence } from '@caseguard/schemas';
-import { Panel, StatusBadge, cg, formatDateTimeUtc } from '@caseguard/ui';
-import {
-  Accordion,
-  AccordionHeader,
-  AccordionItem,
-  AccordionPanel,
-  makeStyles,
-  tokens,
-} from '@fluentui/react-components';
+import { AccordionItem, Badge, StatusBadge, cg, formatDateTimeUtc } from '@caseguard/ui';
+import { makeStyles, tokens } from '@fluentui/react-components';
+import { CircleHelpIcon } from 'lucide-react';
 import { countOf } from '../../components/case/labels';
 import { CRITICALITY_LABELS } from '../../lib/labels';
 
 const useStyles = makeStyles({
+  stack: { display: 'flex', flexDirection: 'column', gap: cg.space[3], minWidth: 0 },
   list: {
     display: 'flex',
     flexDirection: 'column',
-    gap: cg.space[2],
+    gap: cg.space[3],
     margin: 0,
     padding: 0,
     listStyle: 'none',
@@ -26,11 +21,9 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     gap: cg.space[1],
-    padding: cg.space[3],
-    borderRadius: cg.radius.md,
-    border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surfaceSunken,
     minWidth: 0,
+    paddingLeft: cg.space[3],
+    borderLeft: `2px solid ${cg.borderSubtle}`,
   },
   head: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
   title: {
@@ -51,7 +44,7 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase200,
     overflowWrap: 'anywhere',
   },
-  intro: { margin: 0, color: cg.textSecondary, fontSize: tokens.fontSizeBase300 },
+  intro: { margin: 0, color: cg.textSecondary, fontSize: tokens.fontSizeBase200 },
 });
 
 const CRITICALITY_ORDER: Record<MissingEvidence['criticality'], number> = {
@@ -73,72 +66,87 @@ export function sortMissing(items: readonly MissingEvidence[]): MissingEvidence[
 export interface MissingEvidencePanelProps {
   items: readonly MissingEvidence[];
   asOf: string | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 /**
  * What the knowledge pack says the investigation needed, and whether it was collected. With a time cursor the API lists
- * only requirements that had become relevant by then, and "collected" only if it had been by then.
+ * only requirements that had become relevant by then, and "collected" only if it had been by then. One collapsed row of
+ * the coverage card; the page opens it from the "still missing" figure.
  */
-export function MissingEvidencePanel({ items, asOf }: MissingEvidencePanelProps) {
+export function MissingEvidencePanel({
+  items,
+  asOf,
+  open,
+  onOpenChange,
+}: MissingEvidencePanelProps) {
   const styles = useStyles();
   const sorted = sortMissing(items);
-  const open = sorted.filter((item) => item.resolvedAt === null).length;
+  const stillOpen = sorted.filter((item) => item.resolvedAt === null).length;
   return (
-    <Panel
-      title="Evidence the investigation needed"
-      level={2}
-      description={
+    <AccordionItem
+      title="What is still missing"
+      subtitle={
         items.length === 0
           ? 'No evidence requirements apply yet.'
-          : `${countOf(open, 'requirement')} still open of ${items.length}${asOf ? ' at this moment' : ''}.`
+          : `${countOf(stillOpen, 'requirement')} still open of ${items.length}${asOf ? ' at this moment' : ''}.`
       }
-      help="Each requirement comes from the workload's knowledge pack: evidence that a careful investigation would collect, and the question to ask for it. Critical requirements should be met before a root cause is claimed."
+      icon={<CircleHelpIcon />}
+      headingLevel={3}
+      open={open}
+      onOpenChange={onOpenChange}
     >
       {items.length === 0 ? (
         <p className={styles.intro}>Nothing is required at this point in the case.</p>
       ) : (
-        <Accordion collapsible>
-          <AccordionItem value="requirements">
-            <AccordionHeader as="h3" expandIconPosition="end">
-              Show the {countOf(items.length, 'requirement')}
-            </AccordionHeader>
-            <AccordionPanel>
-              <ul className={styles.list} aria-label="Evidence requirements">
-                {sorted.map((item) => (
-                  <li key={item.id} className={styles.item}>
-                    <div className={styles.head}>
-                      {item.resolvedAt ? (
-                        <StatusBadge status="productive" size="small" label="Collected" />
-                      ) : (
-                        <StatusBadge status="missing" size="small" label="Still needed" />
-                      )}
+        <div className={styles.stack}>
+          <p className={styles.intro}>
+            Each requirement comes from the workload&rsquo;s knowledge pack: evidence a careful
+            investigation would collect, and the question to ask for it. Critical requirements
+            should be met before a root cause is claimed.
+          </p>
+          <ul className={styles.list} aria-label="Evidence requirements">
+            {sorted.map((item) => (
+              <li key={item.id} className={styles.item}>
+                <div className={styles.head}>
+                  {item.resolvedAt ? (
+                    <>
+                      <StatusBadge status="productive" size="small" label="Collected" />
+                      <Badge tone="neutral" size="sm" outlined>
+                        {CRITICALITY_LABELS[item.criticality]}
+                      </Badge>
+                    </>
+                  ) : (
+                    <>
+                      <StatusBadge status="missing" size="small" label="Still needed" />
                       <StatusBadge
                         status={item.criticality === 'critical' ? 'unsupported' : 'uncertain'}
                         size="small"
                         label={CRITICALITY_LABELS[item.criticality]}
                       />
-                      <h4 className={styles.title}>{item.label}</h4>
-                    </div>
-                    <p className={styles.text}>{item.description}</p>
-                    <p className={styles.note}>
-                      Relevant from {formatDateTimeUtc(item.firstRelevantAt)}
-                      {item.resolvedAt
-                        ? `; collected ${formatDateTimeUtc(item.resolvedAt)}${
-                            item.resolvedByEventId ? ` in event ${item.resolvedByEventId}` : ''
-                          }`
-                        : ''}
-                      .
-                    </p>
-                    {!item.resolvedAt ? (
-                      <p className={styles.note}>Suggested ask: {item.askText}</p>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            </AccordionPanel>
-          </AccordionItem>
-        </Accordion>
+                    </>
+                  )}
+                  <h4 className={styles.title}>{item.label}</h4>
+                </div>
+                <p className={styles.text}>{item.description}</p>
+                <p className={styles.note}>
+                  Relevant from {formatDateTimeUtc(item.firstRelevantAt)}
+                  {item.resolvedAt
+                    ? `; collected ${formatDateTimeUtc(item.resolvedAt)}${
+                        item.resolvedByEventId ? ` in event ${item.resolvedByEventId}` : ''
+                      }`
+                    : ''}
+                  .
+                </p>
+                {!item.resolvedAt ? (
+                  <p className={styles.note}>Suggested ask: {item.askText}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
-    </Panel>
+    </AccordionItem>
   );
 }

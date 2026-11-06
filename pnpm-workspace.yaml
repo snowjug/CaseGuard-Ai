@@ -33,3 +33,5 @@ catalog:
   '@types/react-dom': ^19.3.0
   pino: ^10.4.0
   jose: ^6.2.13
+  motion: ^14.9.1
+  lucide-react: ^1.70.0

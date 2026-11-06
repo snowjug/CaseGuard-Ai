@@ -10,14 +10,7 @@ import {
   type CaseSummary,
 } from './support/api';
 import { PERSONAS, shortName, type PersonaKey } from './support/personas';
-import {
-  accountButton,
-  mainRegion,
-  navLink,
-  openPage,
-  settle,
-  switchPersonaInUi,
-} from './support/ui';
+import { accountButton, mainRegion, openPage, settle, switchPersonaInUi } from './support/ui';
 import {
   confirmDialog,
   confirmWithReason,
@@ -92,7 +85,7 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
 
       await page.getByRole('button', { name: 'Choose persona' }).click();
       const dialog = page.getByRole('dialog', { name: 'Choose a development identity' });
-      await expect(dialog.getByText(/synthetic and exist only for local demos/)).toBeVisible();
+      await expect(dialog.getByText(/demo identities.*not real sign-in/)).toBeVisible();
       for (const key of [
         'engineer',
         'reviewer',
@@ -110,7 +103,7 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
         .click();
       await expect(accountButton(page, PERSONAS.engineer)).toBeVisible();
       await settle(page);
-      await expect(page.getByRole('heading', { level: 1, name: 'Command Center' })).toBeVisible();
+      await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible();
     });
 
     test('the honest labels are on every page from the start: synthetic data, development identity, model estimates', async ({
@@ -120,7 +113,15 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
       await page.goto('/cases');
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
       const banner = page.getByRole('banner');
-      await expect(banner.getByText('Synthetic demo data').first()).toBeVisible();
+      const demoData = banner.getByRole('button', { name: 'Demo data: what this means' });
+      await expect(demoData).toBeVisible();
+      await demoData.click();
+      await expect(
+        page.getByText(
+          'All case data, people and organisations in this environment are synthetic and for demonstration only.',
+        ),
+      ).toBeVisible();
+      await page.keyboard.press('Escape');
       await expect(banner.getByText('Development identity').first()).toBeVisible();
       await expect(page.getByRole('contentinfo')).toContainText('model estimates');
       await expect(page.getByRole('contentinfo')).toContainText(
@@ -140,13 +141,13 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
   test.describe('2. the engineer imports Case One and the timeline, ledger and hypotheses appear', () => {
     test.use({ persona: 'engineer' });
 
-    test('Cases is empty; "Use a sample" opens the wizard; the sample is previewed, confirmed, created and analysed', async ({
+    test('Cases is empty; "Try a sample case" opens the wizard; the sample is checked, confirmed, created and analysed', async ({
       page,
     }) => {
       await openPage(page, '/cases');
       await expect(page.getByRole('heading', { name: 'No cases yet' })).toBeVisible();
-      await page.getByRole('link', { name: 'Use a sample' }).click();
-      await expect(page.getByRole('heading', { level: 1, name: 'Ingest a case' })).toBeVisible();
+      await page.getByRole('link', { name: 'Try a sample case' }).click();
+      await expect(page.getByRole('heading', { level: 1, name: 'Add a case' })).toBeVisible();
 
       const caseOneId = await ingestBuiltInSample(page, 'CG-SYN-1001');
       story.caseOne = await waitUntilAnalysed(caseOneId);
@@ -158,7 +159,7 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
       expect(completedSteps(state), 'steps 1 to 5 are derived from the stored analysis').toBe(6);
     });
 
-    test('the timeline reconstructs 31 events; the earliest meaningful fork is event e03; an event opens with its claims and evidence', async ({
+    test('the timeline reconstructs 31 events; the first key decision is event e03; an event opens with its claims and evidence', async ({
       page,
     }) => {
       const { caseOneId } = ids();
@@ -166,24 +167,32 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
       await expect(page.getByText('Showing 31 of 31 events.')).toBeVisible();
       const events = page.getByRole('list', { name: /^Events, 31 shown/ });
       await expect(events).toBeVisible();
-      // e03 is the first decision fork: the engineer's request for more information at 9 Mar 09:41 UTC.
+      // e03 is the first key decision: the engineer's request for more information at 9 Mar 09:41 UTC.
       const detailsName = /^Details of Teams sign-in - information needed, 9 Mar 2026, 09:41 UTC/;
       const e03 = events
         .getByRole('listitem')
         .filter({ has: page.getByRole('button', { name: detailsName }) });
       await expect(e03).toHaveAttribute('aria-posinset', '3');
-      await expect(e03).toContainText('Decision fork');
+      await expect(e03).toContainText('Key decision');
       await expect(e03).toContainText('Event e03');
       await e03.getByRole('button', { name: detailsName }).click();
       await settle(page);
       await expect(page).toHaveURL(/sel=e03/);
-      await expect(mainRegion(page).getByText(/claim/i).first()).toBeVisible();
-      // Time travel: the previous-event button moves the cursor and the page states what was withheld.
+      // The event opens in a drawer, a modal dialog: the page behind it is hidden from assistive technology.
+      const drawer = page.getByRole('dialog', { name: 'Event details' });
+      await expect(drawer.getByText(/claim/i).first()).toBeVisible();
+      await drawer.getByRole('button', { name: 'Close', exact: true }).click();
+      await expect(page).not.toHaveURL(/sel=e03/);
+      // Time travel: the previous-event button of the "What was known then" bar moves the cursor and the page states
+      // what was withheld.
+      const bar = page.getByRole('button', { name: /^What was known then/ });
+      await bar.click();
+      await expect(bar).toHaveAttribute('aria-expanded', 'true');
       await page.getByRole('button', { name: 'Previous event' }).click();
       await expect(page.getByText(/later events? (are )?withheld|withheld/i).first()).toBeVisible();
     });
 
-    test('the evidence ledger classifies 59 claims into eight categories; a claim shows its classification and its source event', async ({
+    test('the evidence classifies 59 claims into eight categories; a claim shows its classification and its source event', async ({
       page,
     }) => {
       const { caseOneId } = ids();
@@ -213,22 +222,34 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
       await cited.getByRole('button', { name: /^Details of this claim/ }).click();
       await settle(page);
       await expect(page).toHaveURL(/sel=/);
+      // The claim opens in a drawer, a modal dialog: the page behind it is hidden from assistive technology.
       await expect(
-        mainRegion(page)
+        page
+          .getByRole('dialog', { name: 'Claim details' })
           .getByText(/classif/i)
           .first(),
       ).toBeVisible();
     });
 
-    test('the hypothesis arena shows nine competing hypotheses, the leading one as an estimate', async ({
+    test('the possible causes show nine competing explanations, the leading one as an estimate', async ({
       page,
     }) => {
       const { caseOneId } = ids();
       await openPage(page, `/cases/${caseOneId}/hypotheses`);
-      const list = page.getByRole('list', { name: 'Hypotheses ranked by confidence' });
-      await expect(list.getByRole('button')).toHaveCount(9);
+      // The leading cause is the hero; the other eight are ranked after it, five at first.
+      const hero = page.getByRole('region', {
+        name: 'DNS resolution failure for sign-in endpoints',
+      });
+      await expect(hero).toContainText('Most likely cause');
+      await expect(hero.getByText('Estimated')).toBeVisible();
+      const list = page.getByRole('list', { name: 'Possible causes ranked by confidence' });
+      await expect(list.getByRole('button')).toHaveCount(5);
+      await page.getByRole('button', { name: 'Show 3 more possible causes' }).click();
+      await expect(list.getByRole('button')).toHaveCount(8);
       await expect(
-        list.getByRole('button', { name: /^DNS resolution failure for sign-in endpoints/ }),
+        hero.getByRole('button', {
+          name: 'See evidence for DNS resolution failure for sign-in endpoints',
+        }),
       ).toBeVisible();
       await expect(
         page
@@ -242,61 +263,68 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
       ).toBeVisible();
     });
 
-    test('the counterfactual lab lists nine forks with the earliest meaningful one first, the temporal boundary and three simulated paths', async ({
+    test('the what-if screen lists nine key decisions with the earliest meaningful one first, the no-hindsight check and three simulated paths', async ({
       page,
     }) => {
       const { caseOneId } = ids();
       await openPage(page, `/cases/${caseOneId}/counterfactual`);
-      const forks = page.getByRole('list', { name: 'Decision forks in time order' });
+      const forks = page.getByRole('list', { name: 'Key decisions in time order' });
       await expect(forks.getByRole('button')).toHaveCount(9);
-      await expect(forks.getByRole('button').first()).toContainText('Earliest meaningful');
+      await expect(forks.getByRole('button').first()).toContainText('Earliest');
       await expect(forks.getByRole('button').first()).toContainText('9 Mar 2026, 09:41 UTC');
-      // The decision is judged on what was known then: later events are withheld, and the leak check says so.
+      // The decision is judged on what was known then: later events are withheld, and the no-hindsight check says so.
+      const check = page.getByRole('button', { name: /^No-hindsight check/ });
+      await check.click();
+      await expect(check).toHaveAttribute('aria-expanded', 'true');
       await expect(
         page.getByRole('img', {
           name: /events were known at the decision instant; \d+ later events were withheld/,
         }),
       ).toBeVisible();
       await expect(page.getByText(/Validity checks \(8 of 8 passed\)/)).toBeVisible();
-      const strategies = page.getByRole('tablist', { name: 'Simulated path strategies' });
-      await expect(strategies.getByRole('tab')).toHaveCount(3);
-      await expect(strategies.getByRole('tab', { name: /^Balanced path/ })).toContainText(
-        'Awaiting review',
-      );
+      const strategies = page.getByRole('radiogroup', { name: 'Simulated path strategies' });
+      await expect(strategies.getByRole('radio')).toHaveCount(3);
+      await expect(
+        strategies
+          .getByRole('radio', { name: /^Balanced path/ })
+          .getByRole('img', { name: 'Awaiting review' }),
+      ).toBeVisible();
       // Actual and simulated paths are compared on one page, labelled as estimates.
-      const compare = page.getByRole('tabpanel', { name: 'Compare paths' });
-      await expect(compare.getByRole('heading', { name: 'What would have changed' })).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: 'What would have changed the outcome' }),
+      ).toBeVisible();
+      const compare = page.getByRole('tabpanel', { name: 'Compare' });
       await expect(compare.getByText(/Simulated/).first()).toBeVisible();
       await expect(compare.getByText(/estimate/i).first()).toBeVisible();
       // Which evidence backs each step of the alternative is one tab away.
-      await page.getByRole('tab', { name: 'Evidence behind each step' }).click();
+      await page.getByRole('tab', { name: 'Evidence per step' }).click();
       await settle(page);
       await expect(
         page
-          .getByRole('tabpanel', { name: 'Evidence behind each step' })
+          .getByRole('tabpanel', { name: 'Evidence per step' })
           .getByText(/Simulated/)
           .first(),
       ).toBeVisible();
-      // Hindsight stays in its own labelled panel, apart from the generated paths.
-      await expect(
-        page.getByRole('region', { name: 'Hindsight (not used to generate)' }),
-      ).toBeVisible();
+      // Hindsight stays in its own labelled section, folded away, apart from the generated paths.
+      const hindsight = page.getByRole('button', { name: /^Known only later/ });
+      await expect(hindsight).toBeVisible();
+      await expect(hindsight).toContainText('is never used to generate a path');
     });
   });
 
   test.describe('3. the reviewer accepts the better path; the engineer cannot', () => {
     test.describe('as the engineer', () => {
       test.use({ persona: 'engineer' });
-      test('the accept and reject buttons are disabled, and extracting a skill waits for an accepted path', async ({
+      test('the accept and reject buttons are disabled, and creating a skill waits for an accepted path', async ({
         page,
       }) => {
         const { caseOneId } = ids();
         await openPage(page, `/cases/${caseOneId}/counterfactual`);
-        await page.getByRole('tab', { name: 'Review and SkillDNA' }).click();
-        const panel = page.getByRole('tabpanel', { name: 'Review and SkillDNA' });
+        await page.getByRole('tab', { name: 'Review' }).click();
+        const panel = page.getByRole('tabpanel', { name: 'Review' });
         await expect(panel.getByRole('button', { name: 'Accept this path' })).toBeDisabled();
         await expect(panel.getByRole('button', { name: 'Reject this path' })).toBeDisabled();
-        await expect(panel.getByRole('button', { name: 'Extract SkillDNA' })).toBeDisabled();
+        await expect(panel.getByRole('button', { name: 'Create skill' })).toBeDisabled();
       });
     });
 
@@ -308,7 +336,7 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
       }) => {
         const { caseOneId } = ids();
         await openPage(page, `/cases/${caseOneId}/counterfactual`);
-        await page.getByRole('tab', { name: 'Review and SkillDNA' }).click();
+        await page.getByRole('tab', { name: 'Review' }).click();
         await page.getByRole('button', { name: 'Accept this path' }).click();
         await expect(
           confirmDialog(page).getByRole('heading', { name: 'Accept this simulated path?' }),
@@ -319,7 +347,7 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
           'The balanced path asks for less and only uses what was known before the decision.',
         );
         await expect(toast(page, 'Path accepted')).toBeVisible();
-        const panel = page.getByRole('tabpanel', { name: 'Review and SkillDNA' });
+        const panel = page.getByRole('tabpanel', { name: 'Review' });
         await expect(panel.getByText(/Accepted/).first()).toBeVisible();
         await expect(panel.getByText(/The balanced path asks for less/)).toBeVisible();
 
@@ -334,7 +362,7 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
 
   test.describe('4. the manager reads the quality score and the effort estimate', () => {
     test.use({ persona: 'manager' });
-    test('the Case Quality Index and the avoidable support effort equal the API and carry their estimate labels', async ({
+    test('the Case Quality Index and the time that could have been saved equal the API and carry their estimate labels', async ({
       page,
       api,
     }) => {
@@ -342,15 +370,15 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
       const summary = (await listCases(api('manager'))).find((item) => item.id === caseOneId)!;
       expect(summary.qualityIndex).toBe(36);
       await openPage(page, `/cases/${caseOneId}/quality`);
-      const panel = page.getByRole('tabpanel', { name: 'Quality index' });
-      await expect(panel.getByRole('group', { name: 'Case Quality Index' })).toBeVisible();
-      await expect(panel.getByText(/Model estimate from a rule-based analysis/)).toBeVisible();
-      await expect(panel.getByRole('group', { name: 'Applied penalties' })).toBeVisible();
+      const index = page.getByRole('group', { name: 'Case Quality Index', exact: true });
+      await expect(index).toBeVisible();
+      await expect(index.getByText(/Model estimate from a rule-based analysis/)).toBeVisible();
+      await expect(page.getByRole('group', { name: 'What lowered the score' })).toBeVisible();
 
       await page.getByRole('tab', { name: 'Effort and metrics' }).click();
       await settle(page);
       const metrics = page.getByRole('tabpanel', { name: 'Effort and metrics' });
-      await expect(metrics.getByText(/Avoidable Support Effort/i).first()).toBeVisible();
+      await expect(metrics.getByText(/Time that could have been saved/i).first()).toBeVisible();
       await expect(metrics.getByText(/estimate/i).first()).toBeVisible();
       // The page says what the figure is not: a measurement.
       await expect(
@@ -371,7 +399,7 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
     }) => {
       const { caseOneId } = ids();
       await openPage(page, `/cases/${caseOneId}/counterfactual?tab=review`);
-      await page.getByRole('button', { name: 'Extract SkillDNA' }).click();
+      await page.getByRole('button', { name: 'Create skill' }).click();
       await page.waitForURL(/\/skills\/skl_/, { timeout: 120_000 });
       await settle(page);
       story.skillId = /\/skills\/(skl_[A-Za-z0-9]+)/.exec(page.url())![1];
@@ -430,20 +458,13 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
 
     test.describe('the reviewer tests and reviews it', () => {
       test.use({ persona: 'reviewer' });
-      test('a full simulation test passes, then Simulation Tested and Expert Reviewed', async ({
-        page,
-        api,
-      }) => {
+      test('a full simulation test passes, then Tested and Reviewed', async ({ page, api }) => {
         await runCheck(page, 'Run simulation test');
-        await moveTo(
-          page,
-          'Move to Simulation Tested',
-          'The full simulation test passed on the source case.',
-        );
+        await moveTo(page, 'Move to Tested', 'The full simulation test passed on the source case.');
         expect(await lifecycleOf(api)).toBe('simulation_tested');
         await moveTo(
           page,
-          'Move to Expert Reviewed',
+          'Move to Reviewed',
           'Reviewed the steps against the case and the evidence.',
         );
         expect(await lifecycleOf(api)).toBe('expert_reviewed');
@@ -557,7 +578,7 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
         `/cases/${caseTwoId}/quality?tab=skills&asOf=${encodeURIComponent(firstEmail)}`,
       );
       const card = page
-        .getByRole('tabpanel', { name: 'SkillDNA' })
+        .getByRole('tabpanel', { name: 'Skills', exact: true })
         .getByRole('listitem')
         .filter({ hasText: SKILL_TITLE });
       await expect(card).toContainText('Applies');
@@ -573,7 +594,7 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
       const { caseTwoId } = ids();
       await openPage(page, `/cases/${caseTwoId}/quality?tab=skills`);
       const card = page
-        .getByRole('tabpanel', { name: 'SkillDNA' })
+        .getByRole('tabpanel', { name: 'Skills', exact: true })
         .getByRole('listitem')
         .filter({ hasText: SKILL_TITLE });
       await card.getByRole('button', { name: /^Apply to this case/ }).click();
@@ -603,7 +624,7 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
         query: { caseIds: `${caseOneId},${caseTwoId}` },
       });
       await openPage(page, `/cases/${caseTwoId}/quality?tab=compare`);
-      const panel = page.getByRole('tabpanel', { name: 'Compare cases' });
+      const panel = page.getByRole('tabpanel', { name: 'Compare', exact: true });
       await expect(panel).toBeVisible();
       await expect(panel.getByText(/stronger estimate/).first()).toBeVisible();
       await expect(panel.getByText(/model estimates, not measurements/i).first()).toBeVisible();
@@ -613,7 +634,7 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
       await expect(panel).toContainText(comparison.narrative[0]!);
     });
 
-    test('the efficiency monitor shows the token improvement as an estimate and a simulation, equal to the API', async ({
+    test('usage and cost shows the token improvement as an estimate and a simulation, equal to the API', async ({
       page,
       api,
     }) => {
@@ -621,8 +642,15 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
         caseProcess?: { actualTokens?: number; counterfactualTokens?: number } | null;
       }>('/efficiency/overview');
       await openPage(page, '/efficiency');
-      const process = page.getByRole('group', {
-        name: 'Real process versus a simulated better path',
+      // The comparison is a section of the page, closed until it is opened. A closed section keeps its content mounted
+      // but clipped, so Playwright would call it visible: what proves it is open is `aria-expanded`.
+      const trigger = page
+        .getByRole('heading', { name: /^Real process versus a simulated better path/ })
+        .getByRole('button');
+      if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+      await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+      const process = page.getByRole('region', {
+        name: /^Real process versus a simulated better path/,
       });
       await expect(process).toBeVisible();
       await expect(process.getByText('Estimated').first()).toBeVisible();
@@ -633,16 +661,22 @@ test.describe('[FR-UX-06] the whole story, persona by persona', () => {
     });
   });
 
-  test.describe('9. the Demo Guide ends at 13 of 13', () => {
+  test.describe('9. the Guided demo ends at 13 of 13', () => {
     test.use({ persona: 'manager' });
-    test('every step is derived from stored data and complete; the navigation says so', async ({
+    test('every step is derived from stored data and complete; the page says so', async ({
       page,
     }) => {
       const state = await demoState();
       expect(completedSteps(state)).toBe(13);
       expect(state.caseTwoId).toBe(story.caseTwo!.id);
       await openPage(page, '/demo');
-      await expect(navLink(page, 'Demo Guide')).toContainText('13 of 13');
+      // The main navigation no longer lists the demo, so the page says it itself: the progress bar and the summary.
+      await expect(
+        page.getByRole('progressbar', { name: 'Demo progress: 13 of 13 steps complete' }),
+      ).toBeVisible();
+      await expect(page.getByRole('group', { name: 'Progress' })).toContainText(
+        '13 of 13 steps complete',
+      );
       await expect(mainRegion(page)).toContainText('13 of 13');
     });
 

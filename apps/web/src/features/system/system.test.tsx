@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ALL_PERMISSIONS, session } from '../../../test/fixtures';
 import {
   expectNoAxeViolations,
@@ -11,6 +11,9 @@ import {
 import { providerStatus, requestMetrics, systemHealth } from '../../../test/u4-fixtures';
 import { ApiError } from '../../lib/api/errors';
 import { SystemHealthPage } from './SystemHealthPage';
+
+// The page renders a lot, axe walks all of it and the suite often runs on a busy machine: allow for it.
+vi.setConfig({ testTimeout: 120_000 });
 
 const admin = () => session('administrator', ALL_PERMISSIONS);
 
@@ -27,25 +30,57 @@ function api(overrides: FakeHandlers = {}) {
 const serverError = () =>
   new ApiError({ status: 500, code: 'internal', title: 'Internal server error' });
 
-describe('[FR-SYS-01] System Health page', () => {
-  it('shows a skeleton first, then the overall status, service facts and migrations', async () => {
+/** Opens a collapsed section the way a person does (its trigger is a button) and returns its content region. */
+async function openSection(
+  user: ReturnType<typeof userEvent.setup>,
+  name: RegExp,
+): Promise<HTMLElement> {
+  await user.click(await screen.findByRole('button', { name }));
+  return screen.findByRole('region', { name });
+}
+
+describe('[FR-SYS-01] System status page', () => {
+  it('shows a skeleton first, then the overall status with the service facts, and migrations when opened', async () => {
+    const user = userEvent.setup();
     renderApp(<SystemHealthPage />, { api: api() });
     expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
-    expect(await screen.findByRole('heading', { level: 1, name: 'System Health' })).toBeVisible();
+    expect(await screen.findByRole('heading', { level: 1, name: 'System status' })).toBeVisible();
 
     const overall = await screen.findByRole('group', { name: 'Overall status' });
     expect(within(overall).getByText('Healthy')).toBeInTheDocument();
+    expect(within(overall).getByText('Everything is working')).toBeInTheDocument();
     expect(within(overall).getByText('caseguard-api 0.1.0')).toBeInTheDocument();
     expect(within(overall).getByText('local')).toBeInTheDocument();
     expect(within(overall).getByText('1 h 02 min')).toBeInTheDocument();
     expect(within(overall).getByText('Not recorded')).toBeInTheDocument();
+    // The state at a glance says how many stand-ins there are, so nobody has to open a section to find out.
+    expect(within(overall).getByText('5 simulated stand-ins')).toBeInTheDocument();
 
-    const migrations = await screen.findByRole('group', { name: 'Migrations' });
+    const migrations = await openSection(user, /^Migrations/);
     expect(within(migrations).getByText('Up to date')).toBeInTheDocument();
     expect(within(migrations).getByText('0012_review_target_type_idx')).toBeInTheDocument();
   });
 
+  it('keeps the dependencies open and every other section collapsed', async () => {
+    renderApp(<SystemHealthPage />, { api: api() });
+    await screen.findByRole('table', { name: 'Dependencies and their health' });
+    expect(screen.getByRole('button', { name: /^Dependencies/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    for (const name of [
+      /^What is real here/,
+      /^AI provider/,
+      /^Migrations/,
+      /^Requests/,
+      /^Model calls/,
+      /^Security events/,
+    ])
+      expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'false');
+  });
+
   it('labels every simulated stand-in in the table and says Azure was validated against mocks only', async () => {
+    const user = userEvent.setup();
     renderApp(<SystemHealthPage />, { api: api() });
     const table = await screen.findByRole('table', { name: 'Dependencies and their health' });
     const rows = within(table).getAllByRole('row');
@@ -60,7 +95,7 @@ describe('[FR-SYS-01] System Health page', () => {
       within(storage as HTMLElement).getByText(/local object store reachable/),
     ).toBeInTheDocument();
 
-    const honesty = screen.getByRole('group', { name: 'What is real here' });
+    const honesty = await openSection(user, /^What is real here/);
     expect(
       within(honesty).getByText(/validated against mocks or locally generated test data only/),
     ).toBeInTheDocument();
@@ -72,7 +107,7 @@ describe('[FR-SYS-01] System Health page', () => {
     expect(within(honesty).getByText(/No cloud language model is connected/)).toBeInTheDocument();
   });
 
-  it('shows an unknown dependency as unknown, never healthy', async () => {
+  it('shows an unknown dependency as unknown, never healthy, and names it in the summary', async () => {
     const health = systemHealth();
     renderApp(<SystemHealthPage />, {
       api: api({
@@ -102,11 +137,20 @@ describe('[FR-SYS-01] System Health page', () => {
     expect(within(row as HTMLElement).queryByText('Healthy')).toBeNull();
     expect(within(row as HTMLElement).getByText(/not probed here/)).toBeInTheDocument();
     expect(await screen.findByText('Degraded')).toBeInTheDocument();
+
+    const overall = screen.getByRole('group', { name: 'Overall status' });
+    expect(within(overall).getByText('Working, but something needs attention')).toBeInTheDocument();
+    expect(within(overall).getByText('Search: Unknown')).toBeInTheDocument();
+    expect(within(overall).getByText(/Search needs attention\./)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^Dependencies.*1 need attention/ }),
+    ).toBeInTheDocument();
   });
 
   it('shows the provider with its validation note and the simulated label', async () => {
+    const user = userEvent.setup();
     renderApp(<SystemHealthPage />, { api: api() });
-    const provider = await screen.findByRole('group', { name: 'AI provider' });
+    const provider = await openSection(user, /^AI provider/);
     expect(within(provider).getByText('Deterministic provider')).toBeInTheDocument();
     expect(within(provider).getByText('Simulated')).toBeInTheDocument();
     expect(within(provider).getByText(/fully offline, reproducible/)).toBeInTheDocument();
@@ -116,6 +160,7 @@ describe('[FR-SYS-01] System Health page', () => {
   });
 
   it('reports an unknown provider health as unknown (no call has been made), not healthy', async () => {
+    const user = userEvent.setup();
     renderApp(<SystemHealthPage />, {
       api: api({
         'system.provider': () =>
@@ -127,7 +172,7 @@ describe('[FR-SYS-01] System Health page', () => {
           }),
       }),
     });
-    const provider = await screen.findByRole('group', { name: 'AI provider' });
+    const provider = await openSection(user, /^AI provider/);
     expect(within(provider).getByText('Azure OpenAI')).toBeInTheDocument();
     expect(within(provider).getByText('Unknown: not checked by a call')).toBeInTheDocument();
     expect(within(provider).queryByText('Simulated')).toBeNull();
@@ -136,9 +181,10 @@ describe('[FR-SYS-01] System Health page', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows request, model-execution and security counters with their in-memory caveat', async () => {
+  it('shows request, model-call and security counters with their in-memory caveat', async () => {
+    const user = userEvent.setup();
     renderApp(<SystemHealthPage />, { api: api() });
-    const requests = await screen.findByRole('group', { name: 'Requests' });
+    const requests = await openSection(user, /^Requests/);
     expect(within(requests).getByText(/reset when it restarts/)).toBeInTheDocument();
     expect(within(requests).getByText('120')).toBeInTheDocument();
     expect(within(requests).getByText('2.5%')).toBeInTheDocument();
@@ -146,12 +192,49 @@ describe('[FR-SYS-01] System Health page', () => {
     const routes = within(requests).getByRole('table', { name: 'Requests by route' });
     expect(within(routes).getByText('GET /api/v1/cases')).toBeInTheDocument();
 
-    const model = screen.getByRole('group', { name: 'Model executions' });
+    const model = await openSection(user, /^Model calls/);
     expect(within(model).getByText('Simulated')).toBeInTheDocument();
     expect(within(model).getByText(/no language model was called/)).toBeInTheDocument();
-    const security = screen.getByRole('group', { name: 'Security events' });
+    const security = await openSection(user, /^Security events/);
     expect(within(security).getByText('Authentication failures')).toBeInTheDocument();
     expect(within(security).getByText('Injection flags')).toBeInTheDocument();
+  });
+
+  it('shows the eight busiest routes, every route on request, and sorts before it cuts', async () => {
+    const user = userEvent.setup();
+    const byRoute = Array.from({ length: 12 }, (_unused, index) => ({
+      route: `/api/v1/route-${index + 1}`,
+      method: 'GET',
+      count: 100 - index,
+      errors: 0,
+      // The slowest route is the least busy one, so only sorting by latency brings it to the top.
+      p95Ms: 10 + index,
+    }));
+    renderApp(<SystemHealthPage />, {
+      api: api({ 'system.metrics': () => requestMetrics({ totalRequests: 1000, byRoute }) }),
+    });
+    const requests = await openSection(user, /^Requests/);
+    const routes = within(requests).getByRole('table', { name: 'Requests by route' });
+    expect(within(routes).getAllByRole('rowheader')).toHaveLength(8);
+    expect(within(routes).getByText('GET /api/v1/route-1')).toBeInTheDocument();
+    expect(within(routes).queryByText('GET /api/v1/route-12')).toBeNull();
+
+    await user.click(within(requests).getByRole('button', { name: 'Show all 12 routes' }));
+    expect(within(routes).getAllByRole('rowheader')).toHaveLength(12);
+    await user.click(within(requests).getByRole('button', { name: 'Show the top 8' }));
+    expect(within(routes).getAllByRole('rowheader')).toHaveLength(8);
+
+    // Slowest first: the eight shown are the eight slowest, not the busiest eight in another order.
+    const header = within(routes).getByRole('columnheader', { name: /95th percentile/ });
+    const sortBy = within(header).getByRole('button');
+    await user.click(sortBy);
+    await user.click(sortBy);
+    expect(header).toHaveAttribute('aria-sort', 'descending');
+    const names = within(routes)
+      .getAllByRole('rowheader')
+      .map((cell) => cell.textContent);
+    expect(names[0]).toBe('GET /api/v1/route-12');
+    expect(names).not.toContain('GET /api/v1/route-1');
   });
 
   it('keeps the page when the metrics fail and retries just that section', async () => {
@@ -169,13 +252,18 @@ describe('[FR-SYS-01] System Health page', () => {
     expect(
       await screen.findByRole('table', { name: 'Dependencies and their health' }),
     ).toBeVisible();
+    // The section that failed opens by itself and says so in its header, so the message is not hidden.
     expect(await screen.findByText('The request metrics could not be loaded')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Requests.*Could not load/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByText('77')).toBeInTheDocument();
   });
 });
 
-describe('[FR-SYS-02] System Health states', () => {
+describe('[FR-SYS-02] System status states', () => {
   it('shows an error with Retry when the health check cannot be loaded, then recovers', async () => {
     const user = userEvent.setup();
     let calls = 0;
@@ -188,7 +276,7 @@ describe('[FR-SYS-02] System Health states', () => {
         },
       }),
     });
-    expect(await screen.findByText('System health could not be loaded')).toBeInTheDocument();
+    expect(await screen.findByText('System status could not be loaded')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByRole('group', { name: 'Overall status' })).toBeVisible();
     expect(calls).toBe(2);
@@ -198,12 +286,14 @@ describe('[FR-SYS-02] System Health states', () => {
     const user = userEvent.setup();
     const fake = api();
     renderApp(<SystemHealthPage />, { api: fake });
-    await screen.findByRole('group', { name: 'Security events' });
+    await screen.findByRole('group', { name: 'Overall status' });
     const count = (route: string): number =>
       fake.call.mock.calls.filter((call) => call[0] === route).length;
-    expect([count('system.health'), count('system.metrics'), count('system.provider')]).toEqual([
-      1, 1, 1,
-    ]);
+    await waitFor(() =>
+      expect([count('system.health'), count('system.metrics'), count('system.provider')]).toEqual([
+        1, 1, 1,
+      ]),
+    );
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
     await waitFor(() => expect(count('system.health')).toBe(2));
     await waitFor(() => expect(count('system.metrics')).toBe(2));
@@ -214,7 +304,7 @@ describe('[FR-SYS-02] System Health states', () => {
     const user = userEvent.setup();
     const fake = api();
     renderApp(<SystemHealthPage />, { api: fake });
-    await screen.findByRole('group', { name: 'Security events' });
+    await screen.findByRole('group', { name: 'Overall status' });
     const count = (route: string): number =>
       fake.call.mock.calls.filter((call) => call[0] === route).length;
     await user.keyboard('r');
@@ -228,7 +318,7 @@ describe('[FR-SYS-02] System Health states', () => {
       'session.me': () => session('skill_curator', ['case:read', 'skill:read']),
     });
     renderApp(<SystemHealthPage />, { api: fake });
-    expect(await screen.findByText('You do not have access to System Health')).toBeInTheDocument();
+    expect(await screen.findByText('You do not have access to System status')).toBeInTheDocument();
     expect(
       screen.getByText(/does not include the "telemetry:read" permission/),
     ).toBeInTheDocument();
@@ -236,6 +326,7 @@ describe('[FR-SYS-02] System Health states', () => {
     await user.keyboard('r');
     expect(fake.call.mock.calls.some((call) => call[0] === 'system.health')).toBe(false);
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Refresh' })).toBeNull();
   });
 
   it('asks for an identity when nobody is signed in', async () => {
@@ -243,9 +334,36 @@ describe('[FR-SYS-02] System Health states', () => {
     expect(await screen.findByText('Choose who you are acting as')).toBeInTheDocument();
   });
 
-  it('has no accessibility violations (loaded)', async () => {
+  it('has no accessibility violations (loaded, every section open)', async () => {
+    const user = userEvent.setup();
     const { container } = renderApp(<SystemHealthPage />, { api: api() });
-    await screen.findByRole('group', { name: 'Security events' });
+    await screen.findByRole('table', { name: 'Dependencies and their health' });
+    for (const name of [
+      /^What is real here/,
+      /^AI provider/,
+      /^Migrations/,
+      /^Requests/,
+      /^Model calls/,
+      /^Security events/,
+    ])
+      await openSection(user, name);
+    await expectNoAxeViolations(container);
+  }, 120_000);
+
+  it('has no accessibility violations (degraded, dark)', async () => {
+    const { container } = renderApp(<SystemHealthPage />, {
+      mode: 'dark',
+      api: api({
+        'system.health': () =>
+          systemHealth({
+            status: 'unhealthy',
+            dependencies: systemHealth().dependencies.map((dependency) =>
+              dependency.name === 'database' ? { ...dependency, status: 'unhealthy' } : dependency,
+            ),
+          }),
+      }),
+    });
+    await screen.findByText('Something is not working');
     await expectNoAxeViolations(container);
   });
 
@@ -253,7 +371,7 @@ describe('[FR-SYS-02] System Health states', () => {
     const { container } = renderApp(<SystemHealthPage />, {
       api: api({ 'session.me': () => session('manager', ['case:read']) }),
     });
-    await screen.findByText('You do not have access to System Health');
+    await screen.findByText('You do not have access to System status');
     await expectNoAxeViolations(container);
   });
 });

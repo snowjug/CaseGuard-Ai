@@ -23,44 +23,52 @@ interface PageSpec {
 }
 
 const PAGES: readonly PageSpec[] = [
-  { name: 'Command Center', path: () => '/', persona: 'manager', key: true },
+  { name: 'Home', path: () => '/', persona: 'manager', key: true },
   { name: 'Cases', path: () => '/cases', persona: 'engineer', key: true },
-  { name: 'Ingest a case', path: () => '/cases/new', persona: 'engineer' },
-  { name: 'Case overview', path: (ids) => `/cases/${ids.caseOneId}`, persona: 'engineer' },
+  { name: 'Add a case', path: () => '/cases/new', persona: 'engineer', key: true },
+  { name: 'Add a case, sample', path: () => '/cases/new?source=sample', persona: 'engineer' },
+  { name: 'Case details', path: (ids) => `/cases/${ids.caseOneId}`, persona: 'engineer' },
   {
-    name: 'Case Timeline',
+    name: 'Review',
+    path: (ids) => `/cases/${ids.caseOneId}/review`,
+    persona: 'reviewer',
+    key: true,
+  },
+  {
+    name: 'Timeline',
     path: (ids) => `/cases/${ids.caseOneId}/timeline`,
     persona: 'engineer',
     key: true,
   },
   {
-    name: 'Evidence Ledger',
+    name: 'Evidence',
     path: (ids) => `/cases/${ids.caseOneId}/evidence`,
     persona: 'engineer',
   },
   {
-    name: 'Hypothesis Arena',
+    name: 'Possible causes',
     path: (ids) => `/cases/${ids.caseOneId}/hypotheses`,
     persona: 'engineer',
   },
   {
-    name: 'Counterfactual Lab',
+    name: 'What if',
     path: (ids) => `/cases/${ids.caseOneId}/counterfactual`,
     persona: 'reviewer',
     key: true,
   },
   {
-    name: 'Case Quality Review',
+    name: 'Score',
     path: (ids) => `/cases/${ids.caseOneId}/quality`,
     persona: 'manager',
   },
-  { name: 'Quality Review (portfolio)', path: () => '/quality', persona: 'manager' },
-  { name: 'SkillDNA Library', path: () => '/skills', persona: 'engineer' },
+  { name: 'Quality', path: () => '/quality', persona: 'manager' },
+  { name: 'Skills', path: () => '/skills', persona: 'engineer' },
   { name: 'Skill detail', path: (ids) => `/skills/${ids.skillId}`, persona: 'curator' },
-  { name: 'Efficiency Monitor', path: () => '/efficiency', persona: 'manager', key: true },
-  { name: 'Governance', path: () => '/governance', persona: 'admin' },
-  { name: 'System Health', path: () => '/system', persona: 'admin' },
-  { name: 'Demo Guide', path: () => '/demo', persona: 'admin', key: true },
+  { name: 'Advanced', path: () => '/advanced', persona: 'admin', key: true },
+  { name: 'Usage and cost', path: () => '/efficiency', persona: 'manager', key: true },
+  { name: 'Settings and audit', path: () => '/governance', persona: 'admin' },
+  { name: 'System status', path: () => '/system', persona: 'admin' },
+  { name: 'Guided demo', path: () => '/demo', persona: 'admin', key: true },
 ];
 
 interface Finding {
@@ -186,8 +194,8 @@ const PHONE = { width: 390, height: 844 } as const;
  * page's first view would leave most of the interface unchecked.
  */
 const STATES: readonly StateSpec[] = [
-  { name: 'Command Center, no identity chosen', persona: null, path: () => '/' },
-  { name: 'Command Center in Presentation Mode', persona: 'manager', path: () => '/?present=1' },
+  { name: 'Home, first visit with no identity chosen', persona: null, path: () => '/' },
+  { name: 'Home in Presentation Mode', persona: 'manager', path: () => '/?present=1' },
   {
     name: 'A case that does not exist',
     persona: 'engineer',
@@ -195,40 +203,49 @@ const STATES: readonly StateSpec[] = [
     tolerate: [/Failed to load resource: the server responded with a status of 404/],
   },
   {
-    name: 'Case Quality Review of a case that does not exist',
+    name: 'Score of a case that does not exist',
     persona: 'manager',
     path: () => '/cases/case_does_not_exist/quality',
     tolerate: [/Failed to load resource: the server responded with a status of 404/],
   },
   {
-    name: 'Case Timeline of a case that does not exist',
+    name: 'Timeline of a case that does not exist',
     persona: 'engineer',
     path: () => '/cases/case_does_not_exist/timeline',
     tolerate: [/Failed to load resource: the server responded with a status of 404/],
   },
   {
-    name: 'Evidence Ledger of a case that does not exist',
+    name: 'Evidence of a case that does not exist',
     persona: 'engineer',
     path: () => '/cases/case_does_not_exist/evidence',
     tolerate: [/Failed to load resource: the server responded with a status of 404/],
   },
   {
-    name: 'Ingest a case, the preview step',
+    name: 'Add a case, the check step',
     persona: 'engineer',
-    path: () => '/cases/new',
+    path: () => '/cases/new?source=sample',
     prepare: async (page) => {
-      await page.getByRole('button', { name: 'Validate and preview' }).click();
-      await expect(page.getByRole('heading', { name: /Step 2 of 4/ })).toBeVisible();
+      await page.getByRole('button', { name: 'Check case' }).click();
+      await expect(page.getByRole('heading', { name: 'Check what will be created' })).toBeVisible();
       await expect(page.getByRole('group', { name: 'Result of the check' })).toBeVisible();
     },
   },
   {
-    name: 'Case Timeline at an earlier moment with an event open',
+    name: 'Add a case, the paste area with a problem',
+    persona: 'engineer',
+    path: () => '/cases/new',
+    prepare: async (page) => {
+      await page.getByRole('textbox', { name: /^Case text/ }).fill('x'.repeat(200_001));
+      await expect(page.getByText(/This is over the limit of/)).toBeVisible();
+    },
+  },
+  {
+    name: 'Timeline at an earlier moment with an event open',
     persona: 'engineer',
     path: (ids) => `/cases/${ids.caseOneId}/timeline?sel=e06&asOf=2026-03-09T12%3A10%3A00Z`,
   },
   {
-    name: 'Evidence Ledger with a claim open',
+    name: 'Evidence with a claim open',
     persona: 'reviewer',
     path: (ids) => `/cases/${ids.caseOneId}/evidence?category=ai_inference`,
     prepare: async (page) => {
@@ -241,25 +258,93 @@ const STATES: readonly StateSpec[] = [
     },
   },
   {
-    name: 'Hypothesis Arena with another hypothesis open',
+    name: 'Possible causes with another cause open',
     persona: 'engineer',
     path: (ids) => `/cases/${ids.caseOneId}/hypotheses`,
     prepare: async (page) => {
+      // The third cause by confidence: the leading one is the hero, so the list starts at the second.
       await page
-        .getByRole('list', { name: 'Hypotheses ranked by confidence' })
+        .getByRole('list', { name: 'Possible causes ranked by confidence' })
         .getByRole('button')
-        .nth(2)
+        .nth(1)
         .click();
       await settle(page);
+      await expect(
+        page.getByRole('dialog', { name: 'Conditional Access or MFA policy enforcement' }),
+      ).toBeVisible();
+    },
+  },
+  {
+    name: 'Timeline with "What was known then" open',
+    persona: 'engineer',
+    path: (ids) => `/cases/${ids.caseOneId}/timeline`,
+    prepare: async (page) => {
+      const bar = page.getByRole('button', { name: /^What was known then/ });
+      await bar.click();
+      await expect(bar).toHaveAttribute('aria-expanded', 'true');
+      await expect(page.getByRole('slider', { name: 'Time cursor' })).toBeVisible();
+    },
+  },
+  {
+    name: 'Timeline with the filters open',
+    persona: 'engineer',
+    path: (ids) => `/cases/${ids.caseOneId}/timeline`,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: /^Filters/ }).click();
+      await expect(page.getByLabel('Zoom from')).toBeVisible();
+    },
+  },
+  {
+    name: 'Evidence with "What was known then" and its sections open',
+    persona: 'engineer',
+    path: (ids) => `/cases/${ids.caseOneId}/evidence`,
+    prepare: async (page) => {
+      for (const name of [
+        /^What was known then/,
+        /^What is still missing/,
+        /^What the record itself shows/,
+        /^Patterns across events/,
+      ]) {
+        const toggle = page.getByRole('button', { name });
+        await toggle.click();
+        await expect(toggle, String(name)).toHaveAttribute('aria-expanded', 'true');
+      }
+    },
+  },
+  {
+    name: 'Evidence with the filters open',
+    persona: 'engineer',
+    path: (ids) => `/cases/${ids.caseOneId}/evidence`,
+    prepare: async (page) => {
+      await page.getByRole('button', { name: /^Filters/ }).click();
+      await expect(page.getByLabel('Review state')).toBeVisible();
+    },
+  },
+  {
+    name: 'Possible causes with "What was known then" and what to test next open',
+    persona: 'engineer',
+    path: (ids) => `/cases/${ids.caseOneId}/hypotheses`,
+    prepare: async (page) => {
+      for (const name of [
+        /^What was known then/,
+        /^What to test next/,
+        /^The formula/,
+        /^Blocked by the safety policy/,
+      ]) {
+        const toggle = page.getByRole('button', { name });
+        if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+        await expect(toggle, String(name)).toHaveAttribute('aria-expanded', 'true');
+      }
+      await expect(page.getByRole('group', { name: 'What to test next' })).toBeVisible();
     },
   },
   ...(['evidence', 'decision', 'graph', 'review'] as const).map((tab): StateSpec => ({
-    name: `Counterfactual Lab, ${tab} tab`,
+    name: `What if, ${tab} tab`,
     persona: 'reviewer',
     path: (ids) => `/cases/${ids.caseOneId}/counterfactual?tab=${tab}`,
   })),
   ...(['effort', 'warnings', 'skills', 'coaching', 'compare'] as const).map((tab): StateSpec => ({
-    name: `Case Quality Review, ${tab} tab`,
+    name: `Score, ${tab} tab`,
     persona: 'manager',
     path: (ids) => `/cases/${ids.caseTwoId}/quality?tab=${tab}`,
   })),
@@ -283,17 +368,17 @@ const STATES: readonly StateSpec[] = [
       'operations',
     ] as const
   ).map((tab): StateSpec => ({
-    name: `Governance, ${tab} section`,
+    name: `Settings and audit, ${tab} section`,
     persona: 'admin',
     path: () => `/governance?tab=${tab}`,
   })),
   {
-    name: 'Governance as an engineer (permission needed)',
+    name: 'Settings and audit as an engineer (permission needed)',
     persona: 'engineer',
     path: () => '/governance',
   },
   {
-    name: 'System Health as a curator (permission needed)',
+    name: 'System status as a curator (permission needed)',
     persona: 'curator',
     path: () => '/system',
   },
@@ -314,21 +399,27 @@ for (const theme of THEMES) {
   }
 }
 
-test.describe('[NFR-A11Y-01] the phone navigation drawer and the stacked layouts', () => {
+test.describe('[NFR-A11Y-01] the phone navigation and the stacked layouts', () => {
   test.use({ viewport: PHONE, hasTouch: true });
 
-  test('the open navigation drawer has no violations, and Escape closes it and returns focus to its button', async ({
+  test('the bottom bar has the five places, no violations, and a target of at least 44 px for each', async ({
     page,
   }) => {
     await openPage(page, '/cases');
-    const opener = page.getByRole('button', { name: 'Open navigation' });
-    await opener.click();
-    const drawer = page.getByRole('dialog').filter({ has: page.getByRole('navigation') });
-    await expect(drawer).toBeVisible();
-    expect(await scan(page), 'navigation drawer').toEqual([]);
-    await page.keyboard.press('Escape');
-    await expect(drawer).toBeHidden();
-    await expect(opener).toBeFocused();
+    const bar = page.getByRole('navigation', { name: 'Primary, mobile' });
+    await expect(bar.getByRole('link')).toHaveText([
+      /^Home/,
+      /^Cases/,
+      /^Quality/,
+      /^Skills/,
+      /^Advanced/,
+    ]);
+    expect(await scan(page), 'bottom bar').toEqual([]);
+    for (const link of await bar.getByRole('link').all()) {
+      const box = await link.boundingBox();
+      expect(box?.height ?? 0, 'target height').toBeGreaterThanOrEqual(44);
+      expect(box?.width ?? 0, 'target width').toBeGreaterThanOrEqual(44);
+    }
   });
 });
 
@@ -410,7 +501,7 @@ test.describe('[NFR-A11Y-01] keyboard only', () => {
       'the brand link is in the tab order',
     ).toBe(true);
     expect(
-      stops.some((stop) => /Command Center|Cases/.test(stop)),
+      stops.some((stop) => /Home|Cases/.test(stop)),
       'the navigation is reached by keyboard',
     ).toBe(true);
   });
@@ -419,10 +510,10 @@ test.describe('[NFR-A11Y-01] keyboard only', () => {
     page,
   }) => {
     await openPage(page, '/cases');
-    await navLink(page, 'SkillDNA Library').focus();
+    await navLink(page, 'Skills').focus();
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/skills$/);
-    await expect(page.getByRole('heading', { level: 1, name: 'SkillDNA Library' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Skills' })).toBeVisible();
     await expect(page.locator('#main-content')).toBeFocused();
   });
 
@@ -430,7 +521,7 @@ test.describe('[NFR-A11Y-01] keyboard only', () => {
     page,
   }) => {
     await openPage(page, '/');
-    const trigger = page.getByRole('button', { name: 'Commands' });
+    const trigger = page.getByRole('button', { name: 'Search or jump to' });
     await trigger.focus();
     await page.keyboard.press('Control+K');
     const palette = page.getByRole('dialog', { name: 'Command palette' });
@@ -440,7 +531,7 @@ test.describe('[NFR-A11Y-01] keyboard only', () => {
     await expect(palette).toBeHidden();
     await expect(trigger, 'focus returns to where it was').toBeFocused();
 
-    await runCommand(page, 'Go to Efficiency Monitor');
+    await runCommand(page, 'Go to Usage and cost');
     await expect(page).toHaveURL(/\/efficiency$/);
   });
 
@@ -461,7 +552,7 @@ test.describe('[NFR-A11Y-01] keyboard only', () => {
     const search = page.getByRole('searchbox', { name: 'Search' });
     await search.focus();
     // No pause between the keys: the field keeps its text locally and writes it to the address afterwards, so nothing is
-    // lost however fast it is typed, and "g" then "d" typed into a field does not go to the Demo Guide.
+    // lost however fast it is typed, and "g" then "d" typed into a field does not go to the Guided demo.
     await page.keyboard.type('gd', { delay: 0 });
     await expect(search).toHaveValue('gd');
     await expect(page).toHaveURL(/\/cases\?(.*&)?q=gd(&.*)?$/);
@@ -487,17 +578,17 @@ test.describe('[NFR-A11Y-01] keyboard only', () => {
     await expect(page.locator(':focus')).toBeVisible();
   });
 
-  test('lab tabs are keyboard controls: an arrow key moves between them and Enter selects', async ({
+  test('the what-if tabs are keyboard controls: an arrow key moves between them and Enter selects', async ({
     page,
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/counterfactual`);
-    const tabs = page.getByRole('tablist', { name: 'Lab sections' });
-    await tabs.getByRole('tab', { name: 'Compare paths' }).focus();
+    const tabs = page.getByRole('tablist', { name: 'What if sections' });
+    await tabs.getByRole('tab', { name: 'Compare' }).focus();
     await page.keyboard.press('ArrowRight');
-    await expect(tabs.getByRole('tab', { name: 'Evidence behind each step' })).toBeFocused();
+    await expect(tabs.getByRole('tab', { name: 'Evidence per step' })).toBeFocused();
     await page.keyboard.press('Enter');
-    await expect(tabs.getByRole('tab', { name: 'Evidence behind each step' })).toHaveAttribute(
+    await expect(tabs.getByRole('tab', { name: 'Evidence per step' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
@@ -509,7 +600,7 @@ test.describe('[NFR-A11Y-01] keyboard only', () => {
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/counterfactual?tab=graph`);
     await settle(page);
-    const panel = page.getByRole('tabpanel', { name: 'Investigation graph' });
+    const panel = page.getByRole('tabpanel', { name: 'Graph' });
     await expect(panel).toBeVisible();
     const canvas = panel.getByRole('group', {
       name: /^Investigation graph with \d+ nodes and \d+ connections\. Tab to enter the graph/,

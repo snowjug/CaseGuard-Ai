@@ -593,4 +593,5 @@ abstraction, [0005](adr/0005-ai-provider-abstraction.md) provider abstraction an
 [0006](adr/0006-authentication.md) authentication, [0007](adr/0007-counterfactual-temporal-integrity.md) branded `TemporalView`,
 [0008](adr/0008-audit-strategy.md) audit strategy, [0009](adr/0009-skilldna-governance.md) SkillDNA governance,
 [0010](adr/0010-azure-hosting-choice.md) Azure Container Apps with Bicep, [0011](adr/0011-custom-svg-graph-and-charts.md) custom SVG
-graph, [0012](adr/0012-nextjs-fluentui-same-origin-proxy.md) Next.js with a same-origin proxy.
+graph, [0012](adr/0012-nextjs-fluentui-same-origin-proxy.md) Next.js with a same-origin proxy,
+[0013](adr/0013-ui-kit-on-fluent.md) the token-driven UI kit on Fluent.

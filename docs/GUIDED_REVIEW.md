@@ -1,6 +1,6 @@
-# Guided review and report
+# Review and report
 
-The guided review is the way to read one analysed case: a single page that goes from the verdict to what to do next, in the
+The review is the way to read one analysed case: a single page that goes from the verdict to what to fix and what to learn, in the
 order a person decides. The report is the same read as a page to print, copy or download. Both are made from the reads the other
 case pages already make; they add no engine, change no score and (apart from two read routes) add nothing to the API. This
 document says what each part reads, how it behaves when a role may not read something, what is checked, and what is not.
@@ -8,37 +8,43 @@ document says what each part reads, how it behaves when a role may not read some
 Every figure on both pages is an estimate or a simulation and says so. Wherever the engine could not support a statement, the
 page says that instead of filling the gap.
 
-| Page          | Route                    | Open it from                                                              |
-| ------------- | ------------------------ | ------------------------------------------------------------------------- |
-| Guided review | `/cases/[caseId]/review` | "Guided Review" in the navigation (`g` then `r`), or "Open guided review" |
-| Report        | `/cases/[caseId]/report` | "Report" on the guided review, or the Share section                       |
+**Page names.** The review was called Guided Review before the redesign, and this file keeps its old name so that links to it keep
+working. Its sections were renamed too: Chronology is now What happened, What should have happened is What would have changed the
+outcome, Next actions is Fix first and Learning is What to learn.
 
-"Open guided review" is the primary action of the case overview, and of the last step of the add-case wizard once the analysis
-has succeeded. The specialist pages (timeline, evidence ledger, hypotheses, Counterfactual Lab, quality review) are unchanged
-and one link away; the review links into them ("Show in timeline", "Open in the Counterfactual Lab").
+| Page   | Route                    | Open it from                                                                                                                           |
+| ------ | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Review | `/cases/[caseId]/review` | The first tab of a case ("Review"), the row of a case in Cases, "Go to Review" in the command palette (`g` then `r`), or "Open review" |
+| Report | `/cases/[caseId]/report` | "Report" in the More menu of a case, or "Open the report" in the Share section                                                         |
+
+"Open review" is the primary action of Case details, and of the last step of the add-case wizard once the analysis has succeeded.
+The other pages (Timeline, Evidence, Possible causes, What if, Score) are one link away; the review links into them ("Show in
+timeline", "Open in What if").
 
 ## 1. The page, section by section
 
-The sections follow the order of a review: what the verdict is, how the case unfolded, where it went wrong, what a better path
-would have looked like, what to do, what to learn, how to share it. Each section except Share ends with a closed "How this was
-calculated" note in plain words, and one note after the last section covers the whole review.
+The sections follow the order of a review: what the verdict is, what to fix first, how well the evidence backs the case, what a
+better path would have changed, how the case unfolded, where it went wrong, what to learn, how to share it. Each section except
+Evidence and Share ends with a closed "How this was calculated" note in plain words, and one note after the last section covers the
+whole review.
 
-| #   | Section                   | Answers                                                                                                  | Reads (permission)                                                                                                        | Writes (permission)                                                      |
-| --- | ------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| 1   | Verdict                   | How good was the case, in words, and what was the earliest important missed moment?                      | `quality.get`, `metrics.get`, `coaching.get` (`quality:read`); `cases.get`, `analysis.latest`, `forks.list` (`case:read`) | none                                                                     |
-| 2   | Chronology                | What happened, who was waiting for whom, where were the decisions?                                       | `timeline.get` (up to five pages of 200 events), `forks.list`, `analysis.latest`, `cases.get` (`case:read`)               | none                                                                     |
-| 3   | What went wrong           | At each decision point: what was known, what was not yet known, what was done, what was better?          | `forks.list`, `analysis.latest` (`case:read`)                                                                             | none                                                                     |
-| 4   | What should have happened | The recorded path beside a simulated better-supported path, with ranges, confidence, checks, assumptions | `counterfactuals.list`, `forks.list`, `actions.list` (`case:read`)                                                        | `counterfactuals.run`: simulate when none exists (`counterfactual:run`)  |
-| 5   | Next actions              | What to do, most urgent first, each with its reason and its evidence                                     | `actionValue.rank`, `warnings.list`, `counterfactuals.list` (`case:read`); `quality.get`, `coaching.get` (`quality:read`) | none                                                                     |
-| 6   | Learning                  | Which published skill resembles the case, and what would following it have changed?                      | `skillMatches.list`, `skillOverlay.get` per match (`skill:read`)                                                          | `skillMatches.apply` (`skill:apply`), `skills.extract` (`skill:extract`) |
-| 7   | Share                     | The report, and a short summary to copy                                                                  | the reads above that the role may make                                                                                    | none (the summary is copied in the browser)                              |
+| #   | Section                             | Answers                                                                                                  | Reads (permission)                                                                                                        | Writes (permission)                                                      |
+| --- | ----------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 1   | Verdict                             | How good was the case, in words, and what was the earliest important missed moment?                      | `quality.get`, `metrics.get`, `coaching.get` (`quality:read`); `cases.get`, `analysis.latest`, `forks.list` (`case:read`) | none                                                                     |
+| 2   | Fix first                           | What to do, most urgent first, each with its reason and its evidence                                     | `actionValue.rank`, `warnings.list`, `counterfactuals.list` (`case:read`); `quality.get`, `coaching.get` (`quality:read`) | none                                                                     |
+| 3   | Evidence                            | How well are the statements of the case backed by what is on record?                                     | `metrics.get` (`quality:read`)                                                                                            | none                                                                     |
+| 4   | What would have changed the outcome | The recorded path beside a simulated better-supported path, with ranges, confidence, checks, assumptions | `counterfactuals.list`, `forks.list`, `actions.list` (`case:read`)                                                        | `counterfactuals.run`: simulate when none exists (`counterfactual:run`)  |
+| 5   | What happened                       | What happened, who was waiting for whom, where were the decisions?                                       | `timeline.get` (up to five pages of 200 events), `forks.list`, `analysis.latest`, `cases.get` (`case:read`)               | none                                                                     |
+| 6   | What went wrong                     | At each decision point: what was known, what was not yet known, what was done, what was better?          | `forks.list`, `analysis.latest` (`case:read`)                                                                             | none                                                                     |
+| 7   | What to learn                       | Which published skill resembles the case, and what would following it have changed?                      | `skillMatches.list`, `skillOverlay.get` per match (`skill:read`)                                                          | `skillMatches.apply` (`skill:apply`), `skills.extract` (`skill:extract`) |
+| 8   | Share                               | The report, and a short summary to copy                                                                  | the reads above that the role may make                                                                                    | none (the summary is copied in the browser)                              |
 
 Three properties hold for every section:
 
 - **A part never waits for another and never fails the page.** Each read is its own query. A role that lacks the permission
   of a read does not send it (the API would answer 403) and is told which permission is missing and who has it; a read that
   failed shows its own retry; the rest of the page works. A skill curator, who may not read case quality, still gets the missed
-  moment, the chronology, the decision points, the actions that need no quality data and the learning.
+  moment, what happened, what went wrong, the fixes that need no quality data and what to learn.
 - **Nothing is computed by the screen that the server computed.** The chronology picture, the verdict wording and the table of
   recorded and with-skill figures are laid out from the API's figures, never re-derived. The model layer
   (`apps/web/src/features/review/model/`) is pure functions with unit tests.
@@ -51,25 +57,25 @@ was done, what was already known and the better step), then "See what went wrong
 
 ## 2. Evidence one interaction away
 
-Every warning, recommendation and decision point lists its evidence as chips. A chip opens one drawer (Fluent overlay drawer)
+Every warning, fix and decision point lists its evidence as chips. A chip opens one drawer (Fluent overlay drawer)
 that shows, for each link: what it is, who wrote it and when, and for text the passage with the matched part highlighted.
 
 - **The drawer shows a quotation only if the server checked it.** `provenance.resolve` compares the excerpt the engine recorded
   with the stored event text at the recorded field and offsets, and answers `verified`, `mismatch` or `not_checkable`. Only
-  `verified` carries the surrounding text and the "checked against the stored message" badge. A derived item (a hypothesis, a
-  scenario) shows its title and no quotation. See [DOMAIN_ENGINE.md](DOMAIN_ENGINE.md#51-source-references-and-checking-a-citation-provenance).
+  `verified` carries the surrounding text and the "checked against the stored message" badge. A derived item (a possible cause, a
+  simulated path) shows its title and no quotation. See [DOMAIN_ENGINE.md](DOMAIN_ENGINE.md#51-source-references-and-checking-a-citation-provenance).
 - **Evidence stored before engine 2026.3.1 cannot be checked** until the case is analysed again; it then reads "not checked",
   never "verified" ([KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md), PL-14). A verified citation proves the excerpt is a real
   quotation of that event, not that the evidence supports the conclusion.
 - **The drawer is in the address** (`?evidence=<type>:<id>`): it survives a reload, can be shared, and is still open when someone
   comes back from "Show in timeline" with the Back button. Opening it never adds a history step.
 - Escape and the close button close it, Tab stays inside it while it is open, and focus returns to the chip that opened it.
-- A recommendation with no case-specific evidence says "General guidance — no case-specific evidence" and carries no link. The
+- A fix with no case-specific evidence says "General guidance — no case-specific evidence" and carries no link. The
   page never invents one.
 
 ## 3. Recorded versus with the skill
 
-The Learning section shows, for each published skill that applies or partly applies to the case ("This resembles ..."), the
+The What to learn section shows, for each published skill that applies or partly applies to the case ("This resembles ..."), the
 recorded path beside what following the skill would have changed. It is an explicit comparison laid over the analysis, not a
 second analysis: the base engine output is untouched, `skillOverlay.get` writes nothing, and adopting the plan is the separate,
 audited `skillMatches.apply`.
@@ -112,7 +118,7 @@ report was made from.
 - Below 640 px the chronology picture gives way to the list that is its text alternative, laid out in one column with the
   side (customer, engineer, system) named on each event. The section navigation scrolls sideways instead of wrapping over the
   content. Tables stay tables inside a named, keyboard-focusable scroll region.
-- The sections are landmarks with headings in reading order; "On this page" is plain links that move focus to the section.
+- The sections are landmarks with headings in reading order; the navigation "Sections of the review" is plain links that move focus to the section.
 - Meaning is never colour alone: every status carries an icon or pattern and a word, and the verdict names the quality band in
   one word everywhere on its card.
 - Control names contain their visible text (WCAG 2.5.3), so a voice-control command that says what is shown works.
@@ -122,13 +128,13 @@ report was made from.
 
 ## 6. What this does not do
 
-- **Reads are not audited.** The audit log records changes and the reads of the audit log and the user list. The guided review,
+- **Reads are not audited.** The audit log records changes and the reads of the audit log and the user list. The review,
   `provenance.resolve` and `skillOverlay.get` read case data under the caller's permission and tenant (and row-level security),
   and leave no audit event, like every other case read. The report is composed in the browser, so printing, copying or
   downloading it leaves no server record. Who read a case review is therefore not recorded ([KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md), PL-15).
 - It reads the first 1,000 events of a case and says when there are more; the key events of the chronology are chosen by rule,
   and the spacing of the picture is compressed (it says so). See PL-13.
-- It does not rank or rate people: the coach's words and every recommendation are about the case and its process.
+- It does not rank or rate people: the coach's words and every fix are about the case and its process.
 - The model path is **not part of what was verified**: every figure comes from the deterministic rules. If a model is
   configured, its proposals are validated and recorded but never merged into these figures ([AI_ORCHESTRATION.md](AI_ORCHESTRATION.md)).
 

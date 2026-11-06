@@ -38,7 +38,7 @@ const metric: MetricCardModel = {
 };
 
 describe('badges', () => {
-  it('StatusBadge shows icon, text label and a pattern chip for each status', () => {
+  it('StatusBadge shows an icon and a text label for each status, and missing is dashed', () => {
     const { container } = renderWithTheme(
       <>
         {(['productive', 'uncertain', 'unsupported', 'missing', 'neutral'] as const).map((s) => (
@@ -49,13 +49,8 @@ describe('badges', () => {
     for (const label of ['Productive', 'Uncertain', 'Unsupported', 'Missing', 'Neutral']) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+    // Colour is never alone: every badge has its own icon next to the word.
     expect(container.querySelectorAll('svg')).toHaveLength(5);
-    // Uncertain uses a dotted chip, unsupported a cross-hatch, missing an outline: not colour alone.
-    const chips = [...container.querySelectorAll('[aria-hidden="true"]')].map(
-      (c) => (c as HTMLElement).style.backgroundImage,
-    );
-    expect(chips.some((b) => b.includes('radial-gradient'))).toBe(true);
-    expect(chips.filter((b) => b.includes('repeating-linear-gradient')).length).toBeGreaterThan(0);
     expect(screen.getByText('Missing').parentElement?.getAttribute('style')).toContain('dashed');
   });
 
@@ -72,7 +67,7 @@ describe('badges', () => {
         <ProvenanceBadge kind="simulated" />
       </>,
     );
-    expect(screen.getByText('Synthetic')).toBeInTheDocument();
+    expect(screen.getByText('Demo data')).toBeInTheDocument();
     expect(screen.getByText('Estimated')).toHaveStyle({ textDecoration: 'underline dotted' });
     expect(screen.getByText('Simulated').parentElement?.getAttribute('style')).toContain('dashed');
   });
@@ -89,7 +84,7 @@ describe('Notice, EmptyState, ErrorState, LoadingSkeleton', () => {
       </>,
     );
     expect(screen.getAllByRole('note')).toHaveLength(4);
-    for (const title of ['Information', 'Warning', 'Synthetic data', 'Model estimate']) {
+    for (const title of ['Information', 'Warning', 'Demo data', 'Model estimate']) {
       expect(screen.getByText(title)).toBeInTheDocument();
     }
     expect(screen.queryByRole('alert')).toBeNull();
@@ -109,7 +104,7 @@ describe('Notice, EmptyState, ErrorState, LoadingSkeleton', () => {
     await expectNoAxeViolations(container);
   });
 
-  it('ErrorState is an alert with a Retry that works and a copyable correlation id', async () => {
+  it('ErrorState is an alert with a Retry that works and a copyable reference', async () => {
     const user = userEvent.setup();
     const onRetry = vi.fn();
     const { container } = renderWithTheme(
@@ -122,7 +117,7 @@ describe('Notice, EmptyState, ErrorState, LoadingSkeleton', () => {
     const alert = screen.getByRole('alert');
     expect(within(alert).getByText('provider_unavailable')).toBeInTheDocument();
     expect(within(alert).getByText('cid-123')).toBeInTheDocument();
-    expect(within(alert).getByRole('button', { name: 'Copy correlation ID' })).toBeInTheDocument();
+    expect(within(alert).getByRole('button', { name: 'Copy reference' })).toBeInTheDocument();
     await user.click(within(alert).getByRole('button', { name: 'Retry' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
     await expectNoAxeViolations(container);
@@ -207,7 +202,7 @@ describe('[FR-UX-07] MetricCard', () => {
     expect(within(card).getByText(/\(improving\)/)).toBeInTheDocument();
     expect(within(card).getByText('Estimated range 64 to 80')).toBeInTheDocument();
     expect(within(card).getByText('Estimated')).toBeInTheDocument();
-    expect(within(card).getByText('Synthetic')).toBeInTheDocument();
+    expect(within(card).getByText('Demo data')).toBeInTheDocument();
     expect(within(card).getByRole('link', { name: 'View score composition' })).toHaveAttribute(
       'href',
       '/cases/case_1/quality',

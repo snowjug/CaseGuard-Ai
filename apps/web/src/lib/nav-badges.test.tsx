@@ -49,7 +49,7 @@ describe('[UX-NAV-BADGE-01] the figures on the navigation', () => {
     expect(demoBadge({ steps: [] })).toBeNull();
   });
 
-  it('keeps System Health quiet while everything is healthy and names every other state', () => {
+  it('keeps System status quiet while everything is healthy and names every other state', () => {
     expect(systemBadge('healthy')).toBeNull();
     expect(systemBadge('degraded')).toMatchObject({ text: 'Degraded', tone: 'warning' });
     expect(systemBadge('unhealthy')).toMatchObject({ text: 'Down', tone: 'danger' });
@@ -92,70 +92,66 @@ const primaryNav = () => screen.getByRole('navigation', { name: 'Primary' });
 const navLink = (name: RegExp) =>
   within(primaryNav()).findByRole('link', { name }, { timeout: 8000 });
 
+const requested = (api: { call: { mock: { calls: readonly (readonly unknown[])[] } } }): string[] =>
+  api.call.mock.calls.map((call) => String(call[0]));
+
 describe('[UX-NAV-BADGE-02] navigation badges in the shell', () => {
-  it('puts the case count, open warnings, demo progress and system status on their items and reads them out', async () => {
+  it('puts the case count, open warnings and system status on their items and reads them out', async () => {
     navigateTo('/');
     mount();
     expect(await navLink(/^Cases.*\(2 cases\)/)).toBeInTheDocument();
-    expect(
-      await navLink(/^Quality Review.*\(3 open warnings across 2 cases\)/),
-    ).toBeInTheDocument();
-    expect(await navLink(/^Demo Guide.*\(4 of 13 demo steps complete\)/)).toBeInTheDocument();
-    expect(await navLink(/^System Health.*\(System status: degraded\)/)).toBeInTheDocument();
-    expect(within(primaryNav()).getAllByRole('link')).toHaveLength(13);
+    expect(await navLink(/^Quality.*\(3 open warnings across 2 cases\)/)).toBeInTheDocument();
+    expect(await navLink(/^Advanced.*\(System status: degraded\)/)).toBeInTheDocument();
+    expect(within(primaryNav()).getAllByRole('link')).toHaveLength(5);
   });
 
   it('does not ask for system health when the role may not read telemetry', async () => {
     navigateTo('/');
     const { api } = mount({}, ['case:read', 'quality:read']);
-    await navLink(/^Demo Guide.*\(4 of 13/);
-    const routes = api.call.mock.calls.map((call: readonly unknown[]) => String(call[0]));
-    expect(routes).toContain('demo.state');
-    expect(routes).not.toContain('system.health');
+    await navLink(/^Cases.*\(2 cases\)/);
+    expect(requested(api)).not.toContain('system.health');
   });
 
-  it('does not ask for the demo state when the role may not read cases', async () => {
+  it('does not poll the guided demo from the shell: only the Advanced page shows its progress', async () => {
+    navigateTo('/');
+    const { api } = mount();
+    await navLink(/^Advanced.*degraded/);
+    expect(requested(api)).not.toContain('demo.state');
+  });
+
+  it('does not ask for the case list when the role may not read cases', async () => {
     navigateTo('/');
     const { api } = mount({}, ['telemetry:read']);
-    await navLink(/^System Health.*degraded/);
-    const routes = api.call.mock.calls.map((call: readonly unknown[]) => String(call[0]));
-    expect(routes).toContain('system.health');
-    expect(routes).not.toContain('demo.state');
+    await navLink(/^Advanced.*degraded/);
+    expect(requested(api)).toContain('system.health');
+    expect(requested(api)).not.toContain('cases.list');
   });
 
   it('stays quiet (no badge, no error) while a figure fails to load', async () => {
     navigateTo('/');
     mount({
-      'demo.state': () => {
-        throw new ApiError({ status: 500, code: 'internal', title: 'Failed', message: 'boom' });
-      },
       'system.health': () => {
         throw new ApiError({ status: 503, code: 'unavailable', title: 'Down', message: 'down' });
       },
     });
     await navLink(/^Cases.*\(2 cases\)/);
-    const nav = primaryNav();
-    expect(within(nav).getByRole('link', { name: /^Demo Guide$/ })).toBeInTheDocument();
-    expect(within(nav).getByRole('link', { name: /^System Health$/ })).toBeInTheDocument();
+    expect(within(primaryNav()).getByRole('link', { name: /^Advanced$/ })).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('is silent for a healthy system', async () => {
     navigateTo('/');
     mount({ 'system.health': () => systemHealth() });
-    await navLink(/^Demo Guide.*\(4 of 13/);
-    expect(within(primaryNav()).getByRole('link', { name: /^System Health$/ })).toBeInTheDocument();
+    await navLink(/^Cases.*\(2 cases\)/);
+    expect(within(primaryNav()).getByRole('link', { name: /^Advanced$/ })).toBeInTheDocument();
   });
 
-  it('says there are no cases yet on the items that need one, instead of "choose a case first"', async () => {
+  it('shows no count when there are no cases yet', async () => {
     navigateTo('/');
-    mount({
-      'cases.list': () => ({ items: [], nextCursor: null }),
-      'demo.state': () => demoState(0),
-    });
-    const timeline = await navLink(/^Case Timeline.*no cases yet: ingest one first/);
-    expect(timeline).toHaveTextContent(/No cases yet/);
+    mount({ 'cases.list': () => ({ items: [], nextCursor: null }) });
+    await navLink(/^Advanced.*degraded/);
     expect(within(primaryNav()).queryByRole('link', { name: /^Cases.*\(\d+ cases?\)/ })).toBeNull();
+    expect(within(primaryNav()).getByRole('link', { name: /^Cases$/ })).toBeInTheDocument();
   });
 });
 
@@ -165,36 +161,32 @@ describe('[UX-NAV-BADGE-03] re-reading the figures', () => {
     document.dispatchEvent(new Event('visibilitychange', { bubbles: true }));
   }
 
-  it('re-reads the demo state and system health once a minute while the tab is visible, and not while it is hidden', async () => {
+  it('re-reads system health once a minute while the tab is visible, and not while it is hidden', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       navigateTo('/');
       const { api } = mount();
-      await navLink(/^Demo Guide.*\(4 of 13/);
-      await navLink(/^System Health.*degraded/);
-      const polled = () =>
-        api.call.mock.calls.filter((call: readonly unknown[]) =>
-          ['demo.state', 'system.health'].includes(String(call[0])),
-        ).length;
+      await navLink(/^Advanced.*degraded/);
+      const polled = () => requested(api).filter((route) => route === 'system.health').length;
       const first = polled();
-      expect(first).toBeGreaterThanOrEqual(2);
+      expect(first).toBeGreaterThanOrEqual(1);
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(60_000);
       });
-      expect(polled()).toBe(first + 2);
+      expect(polled()).toBe(first + 1);
 
       showTab('hidden');
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5 * 60_000);
       });
-      expect(polled()).toBe(first + 2);
+      expect(polled()).toBe(first + 1);
 
       showTab('visible');
       await act(async () => {
         await vi.advanceTimersByTimeAsync(60_000);
       });
-      expect(polled()).toBe(first + 4);
+      expect(polled()).toBe(first + 2);
     } finally {
       Reflect.deleteProperty(document, 'visibilityState');
       vi.useRealTimers();

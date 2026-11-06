@@ -1,8 +1,7 @@
 'use client';
 
-import { ErrorState, type ErrorStateProps } from '@caseguard/ui';
-import { Button } from '@fluentui/react-components';
-import { PersonSwapRegular, SignOutRegular } from '@fluentui/react-icons';
+import { Button, ErrorState, type ErrorStateProps } from '@caseguard/ui';
+import { LogInIcon, UserRoundCogIcon } from 'lucide-react';
 import { describeError, isApiError } from '../../lib/api/errors';
 import { useAuth } from '../../lib/auth/context';
 
@@ -58,17 +57,13 @@ export function QueryErrorState({
   if (onRetry && !api?.isForbidden && !needsIdentity) props.onRetry = onRetry;
   if (needsIdentity && auth.dev) {
     props.actions = (
-      <Button
-        appearance="primary"
-        icon={<PersonSwapRegular />}
-        onClick={() => auth.dev?.openPicker()}
-      >
+      <Button variant="primary" icon={<UserRoundCogIcon />} onClick={() => auth.dev?.openPicker()}>
         Choose a development persona
       </Button>
     );
   } else if (needsIdentity && auth.signIn) {
     props.actions = (
-      <Button appearance="primary" icon={<SignOutRegular />} onClick={() => void auth.signIn?.()}>
+      <Button variant="primary" icon={<LogInIcon />} onClick={() => void auth.signIn?.()}>
         Sign in
       </Button>
     );

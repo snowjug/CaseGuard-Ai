@@ -2,12 +2,15 @@
 
 import type { CounterfactualScenario, DecisionFork, GraphNode } from '@caseguard/schemas';
 import {
+  Button,
+  IconButton,
   InvestigationGraphView,
   KIND_META,
   LoadingSkeleton,
   Notice,
   Panel,
   ProvenanceBadge,
+  SegmentedControl,
   StatusBadge,
   UiLink,
   cg,
@@ -15,8 +18,8 @@ import {
   formatProbability,
   type GraphMode,
 } from '@caseguard/ui';
-import { Button, Radio, RadioGroup, makeStyles, tokens } from '@fluentui/react-components';
-import { DismissRegular } from '@fluentui/react-icons';
+import { makeStyles, tokens } from '@fluentui/react-components';
+import { XIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { AsOfLimited, LaterDecisionsNote, isRateLimited } from '../../components/case/as-of';
 import { QueryErrorState } from '../../components/common/QueryErrorState';
@@ -31,7 +34,7 @@ const MODE_CODEC = codecs.enumOf(MODES, 'compare');
 const MODE_TEXT: Record<GraphMode, { label: string; note: string }> = {
   compare: {
     label: 'Compare both paths',
-    note: 'The whole record with the simulated path branching from its fork. It includes what happened after the decision, which the simulation did not know.',
+    note: 'The whole record with the simulated path branching from its key decision. It includes what happened after the decision, which the simulation did not know.',
   },
   actual: {
     label: 'Recorded path only',
@@ -39,7 +42,7 @@ const MODE_TEXT: Record<GraphMode, { label: string; note: string }> = {
   },
   counterfactual: {
     label: 'Decision-time view',
-    note: 'Only what was known at the decision moment, plus the simulated path. The recorded path stops at the fork and nothing later is requested.',
+    note: 'Only what was known at the decision moment, plus the simulated path. The recorded path stops at the key decision and nothing later is requested.',
   },
 };
 
@@ -137,19 +140,19 @@ function NodeDetails({
     switch (ref.type) {
       case 'fork':
         return (
-          <Button size="small" appearance="outline" onClick={() => onOpenFork(ref.id)}>
-            Open this decision fork
+          <Button size="sm" variant="secondary" onClick={() => onOpenFork(ref.id)}>
+            Open this key decision
           </Button>
         );
       case 'scenario':
         return (
-          <Button size="small" appearance="outline" onClick={() => onOpenScenario(ref.id)}>
+          <Button size="sm" variant="secondary" onClick={() => onOpenScenario(ref.id)}>
             Open this simulated path
           </Button>
         );
       case 'step':
         return (
-          <Button size="small" appearance="outline" onClick={() => onOpenStep(ref.id)}>
+          <Button size="sm" variant="secondary" onClick={() => onOpenStep(ref.id)}>
             Inspect this simulated step
           </Button>
         );
@@ -194,13 +197,7 @@ function NodeDetails({
           <p className={styles.muted}>{kind.label}</p>
           <h3 className={styles.h3}>{node.label}</h3>
         </div>
-        <Button
-          size="small"
-          appearance="subtle"
-          icon={<DismissRegular />}
-          aria-label="Close the node details"
-          onClick={onClose}
-        />
+        <IconButton size="sm" icon={<XIcon />} label="Close the node details" onClick={onClose} />
       </div>
       <div className={styles.badges}>
         <StatusBadge status={node.status} size="small" />
@@ -263,32 +260,26 @@ export function GraphPanel({
     <Panel
       title="Investigation graph"
       level={3}
-      description="The problem, the evidence, the hypotheses, what was done and where the simulated path diverges."
+      description="The problem, the evidence, the possible causes, what was done and where the simulated path diverges."
       help="Solid connectors are what happened. Dashed, hatched connectors and nodes are simulated and always labelled. Use the arrow keys to move between nodes, Enter to select and Escape to clear. The table below the canvas lists every node and connection."
       accent="simulated"
     >
       <div className={styles.stack}>
-        <RadioGroup
-          layout="horizontal"
-          className={styles.radios}
-          value={effectiveMode}
-          onChange={(_event, data) => setMode(data.value as GraphMode)}
+        <SegmentedControl
           aria-label="Graph view"
-        >
-          {MODES.map((value) => (
-            <Radio
-              key={value}
-              value={value}
-              label={MODE_TEXT[value].label}
-              disabled={value !== 'actual' && !scenario}
-            />
-          ))}
-        </RadioGroup>
+          value={effectiveMode}
+          onValueChange={(value) => setMode(value)}
+          options={MODES.map((value) => ({
+            value,
+            label: MODE_TEXT[value].label,
+            disabled: value !== 'actual' && !scenario,
+          }))}
+        />
         <p className={styles.muted}>{MODE_TEXT[effectiveMode].note}</p>
         {effectiveMode === 'counterfactual' ? <LaterDecisionsNote /> : null}
         {!scenario ? (
           <Notice variant="info" compact title="Recorded path only">
-            Generate a simulated path for this fork to compare the two paths in the graph.
+            Generate a simulated path for this key decision to compare the two paths in the graph.
           </Notice>
         ) : null}
         {query.isPending ? (

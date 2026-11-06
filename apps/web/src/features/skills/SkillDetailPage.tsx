@@ -1,30 +1,36 @@
 'use client';
 
-import type { SkillDetail } from '@caseguard/schemas';
 import {
+  SYNTHETIC_DATA_NOTICE,
+  SYNTHETIC_EFFECTIVENESS_NOTICE,
+  type SkillDetail,
+} from '@caseguard/schemas';
+import {
+  BlurFade,
+  Button,
+  ButtonLink,
   EmptyState,
-  Notice,
+  IconButton,
   PageHeader,
-  Panel,
-  ProvenanceBadge,
-  StatusBadge,
+  TabPanel,
+  Tabs,
   cg,
+  type TabItem,
 } from '@caseguard/ui';
-import { Button, Tab, TabList, makeStyles, mergeClasses } from '@fluentui/react-components';
-import { ArrowSyncRegular, MoleculeRegular } from '@fluentui/react-icons';
-import { useId } from 'react';
-import { LinkButton } from '../../components/common/LinkButton';
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { GitPullRequestArrowIcon, PuzzleIcon, RefreshCwIcon } from 'lucide-react';
+import { useState } from 'react';
 import { PermissionGate } from '../../components/common/PermissionGate';
 import { QueryBoundary } from '../../components/common/QueryBoundary';
-import { useAuth } from '../../lib/auth/context';
 import { useSession } from '../../lib/auth/session';
 import { useTabState } from '../../lib/url-state';
-import { useInsightStyles } from '../quality/styles';
+import { ApplyToCase, type AppliedRecord } from './ApplyToCase';
 import { DefinitionTab } from './DefinitionTab';
 import { GovernanceTab } from './GovernanceTab';
+import { DemoPill, InfoPill, LifecycleBadge, StatusExplanation } from './Hints';
 import { useSkillDetail } from './hooks';
-import { LIFECYCLE_BADGES } from './labels';
-import { LifecycleStepper, furthestReached } from './LifecycleStepper';
+import { SkillHero } from './SkillHero';
+import { LIFECYCLE_LABELS } from './labels';
 import { SkillDetailSkeleton } from './Skeleton';
 import { UsageTab } from './UsageTab';
 import { ValidationTab } from './ValidationTab';
@@ -32,48 +38,91 @@ import { VersionsTab } from './VersionsTab';
 
 const TABS = ['overview', 'governance', 'versions', 'validation', 'cases'] as const;
 type Tab = (typeof TABS)[number];
-const TAB_LABELS: Record<Tab, string> = {
-  overview: 'Overview',
-  governance: 'Governance',
-  versions: 'Versions',
-  validation: 'Validation',
-  cases: 'Cases',
-};
+
+/** The order people read in: what it is, where it was used, how it was checked, how it changed, who decided. */
+const TAB_ITEMS: readonly TabItem[] = [
+  { value: 'overview', label: 'Overview' },
+  { value: 'cases', label: 'Cases' },
+  { value: 'validation', label: 'Validation' },
+  { value: 'versions', label: 'Versions' },
+  { value: 'governance', label: 'Governance' },
+];
 
 const useStyles = makeStyles({
-  tabs: {
-    overflowX: 'auto',
-    maxWidth: '100%',
-    borderBottom: `1px solid ${cg.borderSubtle}`,
+  page: { display: 'flex', flexDirection: 'column', gap: cg.space[6], minWidth: 0 },
+  busy: { opacity: 0.72 },
+  panel: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[6],
+    minWidth: 0,
+    paddingTop: cg.space[6],
+  },
+  note: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: `${cg.space[3]} ${cg.space[4]}`,
+    padding: `${cg.space[3]} ${cg.space[4]}`,
+    borderRadius: cg.radius.md,
+    backgroundColor: cg.tone.brand.tint,
+    border: `1px solid color-mix(in srgb, ${cg.tone.brand.border} 35%, transparent)`,
+  },
+  noteIcon: { display: 'inline-flex', flexShrink: 0, color: cg.tone.brand.fg, fontSize: '20px' },
+  noteText: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[1],
+    minWidth: 0,
+    flex: '1 1 260px',
+  },
+  noteTitle: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase300,
+    fontWeight: tokens.fontWeightSemibold,
+    color: cg.text,
+  },
+  noteBody: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+    color: cg.textSecondary,
   },
 });
 
-const PAGE_HELP = (
-  <>
-    <p>
-      A SkillDNA skill is a reusable investigation plan distilled from a validated case. This page
-      shows where it stands in its lifecycle, what it contains, how its versions differ, how it was
-      validated and where it has been used.
-    </p>
-    <p>
-      Nothing here is automatic: every lifecycle step, proposed change and rollback is a
-      person&apos;s decision, recorded with their name and reason, and approvals stay independent of
-      whoever created or proposed the skill. Confidence and effectiveness are model estimates.
-    </p>
-  </>
-);
+/** The one inline note of the page, because it asks for a decision: a proposed change waits, and it is never applied on its own. */
+function ProposalNote({ version, onReview }: { version: string; onReview: () => void }) {
+  const styles = useStyles();
+  return (
+    <div role="note" className={styles.note}>
+      <span aria-hidden="true" className={styles.noteIcon}>
+        <GitPullRequestArrowIcon />
+      </span>
+      <div className={styles.noteText}>
+        <p className={styles.noteTitle}>A change is waiting for a decision</p>
+        <p className={styles.noteBody}>
+          Version {version} was proposed. It is never applied on its own.
+        </p>
+      </div>
+      <Button variant="secondary" size="sm" onClick={onReview}>
+        Review the proposed change
+      </Button>
+    </div>
+  );
+}
 
 function SkillMissing() {
   return (
     <EmptyState
       headingLevel={2}
-      icon={<MoleculeRegular />}
+      icon={<PuzzleIcon />}
       title="We could not find that skill"
       description="It may have been removed, or the address may be mistyped."
       action={
-        <LinkButton href="/skills" appearance="primary" icon={<MoleculeRegular />}>
-          Open the SkillDNA Library
-        </LinkButton>
+        <ButtonLink href="/skills" variant="primary" icon={<PuzzleIcon />}>
+          Browse skills
+        </ButtonLink>
       }
     />
   );
@@ -82,151 +131,156 @@ function SkillMissing() {
 function SkillBody({
   detail,
   refreshing,
+  tab,
+  setTab,
+  applied,
   onReload,
 }: {
   detail: SkillDetail;
   refreshing: boolean;
+  tab: Tab;
+  setTab: (tab: Tab) => void;
+  applied: AppliedRecord | null;
   onReload: () => void;
 }) {
   const styles = useStyles();
-  const insight = useInsightStyles();
-  const baseId = useId();
-  const [tab, setTab] = useTabState(TABS, 'overview');
-  const { skill } = detail;
-  const reached = furthestReached(skill.lifecycle, detail.approvals);
   return (
-    <div className={mergeClasses(insight.page, refreshing && insight.busy)} aria-busy={refreshing}>
-      <Panel
-        title="Where this skill stands"
-        description="Its place on the lifecycle, from discovery to publication."
-        help="A skill moves forward one governed step at a time, and each step needs the right role, an independent person where the four-eyes rule applies, and its gate (for example a passed full simulation test). It can be sent back to Draft for changes, or withdrawn as Deprecated or Retired."
-      >
-        <LifecycleStepper lifecycle={skill.lifecycle} reached={reached} />
-        {detail.proposedVersion ? (
-          <Notice
-            variant="info"
-            compact
-            title="A change is waiting for a decision"
-            action={
-              <Button appearance="outline" onClick={() => setTab('versions')}>
-                Review the proposed change
-              </Button>
-            }
-          >
-            Version {detail.proposedVersion.version} was proposed. It is never applied on its own.
-          </Notice>
-        ) : null}
-        {detail.notices.map((notice) => (
-          <Notice key={notice} variant="info" compact title={null}>
-            {notice}
-          </Notice>
-        ))}
-      </Panel>
-      <div className={styles.tabs}>
-        <TabList
-          selectedValue={tab}
-          onTabSelect={(_event, data) => setTab(data.value as Tab)}
+    <div className={mergeClasses(styles.page, refreshing && styles.busy)} aria-busy={refreshing}>
+      <BlurFade index={0}>
+        <SkillHero detail={detail} />
+      </BlurFade>
+      {detail.proposedVersion ? (
+        <BlurFade index={1}>
+          <ProposalNote
+            version={detail.proposedVersion.version}
+            onReview={() => setTab('versions')}
+          />
+        </BlurFade>
+      ) : null}
+      <BlurFade index={2}>
+        <Tabs
+          value={tab}
+          onValueChange={(value) => setTab(value as Tab)}
+          items={TAB_ITEMS}
           aria-label="Skill sections"
         >
-          {TABS.map((value) => (
-            <Tab
-              key={value}
-              value={value}
-              id={`${baseId}-tab-${value}`}
-              aria-controls={`${baseId}-panel-${value}`}
-            >
-              {TAB_LABELS[value]}
-            </Tab>
-          ))}
-        </TabList>
-      </div>
-      <div
-        role="tabpanel"
-        id={`${baseId}-panel-${tab}`}
-        aria-labelledby={`${baseId}-tab-${tab}`}
-        className={insight.page}
-      >
-        {tab === 'overview' ? <DefinitionTab detail={detail} /> : null}
-        {tab === 'governance' ? <GovernanceTab detail={detail} onReload={onReload} /> : null}
-        {tab === 'versions' ? <VersionsTab detail={detail} onReload={onReload} /> : null}
-        {tab === 'validation' ? <ValidationTab detail={detail} onReload={onReload} /> : null}
-        {tab === 'cases' ? <UsageTab detail={detail} /> : null}
-      </div>
+          <TabPanel value="overview" className={styles.panel}>
+            <DefinitionTab detail={detail} />
+          </TabPanel>
+          <TabPanel value="cases" className={styles.panel}>
+            <UsageTab detail={detail} applied={applied} />
+          </TabPanel>
+          <TabPanel value="validation" className={styles.panel}>
+            <ValidationTab detail={detail} onReload={onReload} />
+          </TabPanel>
+          <TabPanel value="versions" className={styles.panel}>
+            <VersionsTab detail={detail} onReload={onReload} />
+          </TabPanel>
+          <TabPanel value="governance" className={styles.panel}>
+            <GovernanceTab detail={detail} onReload={onReload} />
+          </TabPanel>
+        </Tabs>
+      </BlurFade>
     </div>
   );
 }
 
-function SkillContent({ query }: { query: ReturnType<typeof useSkillDetail> }) {
-  const auth = useAuth();
+function SkillContent({
+  query,
+  tab,
+  setTab,
+  applied,
+}: {
+  query: ReturnType<typeof useSkillDetail>;
+  tab: Tab;
+  setTab: (tab: Tab) => void;
+  applied: AppliedRecord | null;
+}) {
   if (query.isError && query.error.isNotFound) return <SkillMissing />;
   return (
-    <>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <Button
-          appearance="outline"
-          icon={<ArrowSyncRegular />}
-          disabled={auth.status !== 'ready' || query.isFetching}
-          onClick={() => void query.refetch()}
-        >
-          {query.isFetching && !query.isPending ? 'Refreshing…' : 'Refresh'}
-        </Button>
-      </div>
-      <QueryBoundary query={query} subject="The skill" skeleton={<SkillDetailSkeleton />}>
-        {(detail, meta) => (
-          <SkillBody
-            detail={detail}
-            refreshing={meta.isRefreshing}
-            onReload={() => void query.refetch()}
-          />
-        )}
-      </QueryBoundary>
-    </>
+    <QueryBoundary query={query} subject="The skill" skeleton={<SkillDetailSkeleton />}>
+      {(detail, meta) => (
+        <SkillBody
+          detail={detail}
+          refreshing={meta.isRefreshing}
+          tab={tab}
+          setTab={setTab}
+          applied={applied}
+          onReload={() => void query.refetch()}
+        />
+      )}
+    </QueryBoundary>
   );
 }
 
 /**
- * SkillDNA detail (`/skills/[skillId]`): the lifecycle stepper, the skill's definition, its governance (next steps that
- * are role-gated with the reason when blocked, and every decision so far), versions with a human-readable diff, the
- * proposed change and rollback, validation runs with their scope, effectiveness and applying the skill to a case.
- * `?tab=` selects the section and `?from=` / `?to=` the two versions to compare.
+ * Skill detail (`/skills/[skillId]`): where the skill stands and what it is expected to save at the top, then tabs for
+ * its overview and definition, the cases it matched and was applied to, its validation runs, its versions (with a
+ * human-readable diff, the proposed change and rollback) and its governance (role-gated next steps with the reason when
+ * blocked, and every decision so far). `?tab=` selects the tab and `?from=` / `?to=` the two versions to compare.
  */
 export function SkillDetailPage({ skillId }: { skillId: string }) {
   const { can } = useSession();
   const query = useSkillDetail(skillId, can('skill:read'));
-  const skill = query.data?.skill;
-  const lifecycle = skill ? LIFECYCLE_BADGES[skill.lifecycle] : null;
+  const [tab, setTab] = useTabState(TABS, 'overview');
+  const [applied, setApplied] = useState<AppliedRecord | null>(null);
+  const detail = query.data;
+  const skill = detail?.skill;
   return (
     <>
       <PageHeader
-        title={skill?.name ?? 'SkillDNA skill'}
+        title={skill?.name ?? 'Skill'}
         description={
           skill
-            ? `${skill.product} · ${skill.workload} · version ${skill.currentVersion}`
-            : 'A governed, reusable investigation skill.'
+            ? `Reusable fix for ${skill.product} · ${skill.workload} · version ${skill.currentVersion}`
+            : 'A reusable fix that worked on earlier cases.'
         }
-        help={PAGE_HELP}
         meta={
-          skill && lifecycle ? (
+          skill ? (
             <>
-              <StatusBadge status={lifecycle.status} label={lifecycle.label} />
-              <ProvenanceBadge kind="estimated" label="Estimated confidence" />
-              {skill.synthetic ? <ProvenanceBadge kind="synthetic" /> : null}
+              <InfoPill
+                label={`${LIFECYCLE_LABELS[skill.lifecycle]}: what this means`}
+                title={`Status: ${LIFECYCLE_LABELS[skill.lifecycle]}`}
+                content={<StatusExplanation lifecycle={skill.lifecycle} showTitle={false} />}
+              >
+                <LifecycleBadge lifecycle={skill.lifecycle} />
+              </InfoPill>
+              {skill.synthetic ? (
+                <DemoPill>
+                  <p>{SYNTHETIC_DATA_NOTICE}</p>
+                  <p>{SYNTHETIC_EFFECTIVENESS_NOTICE}</p>
+                </DemoPill>
+              ) : null}
             </>
           ) : undefined
         }
         actions={
-          <LinkButton href="/skills" appearance="outline" icon={<MoleculeRegular />}>
-            All skills
-          </LinkButton>
+          detail ? (
+            <>
+              <IconButton
+                icon={<RefreshCwIcon />}
+                label={query.isFetching && !query.isPending ? 'Refreshing…' : 'Refresh'}
+                loading={query.isFetching}
+                onClick={() => void query.refetch()}
+              />
+              <ApplyToCase
+                detail={detail}
+                onApplied={(record) => {
+                  setApplied(record);
+                  setTab('cases');
+                }}
+              />
+            </>
+          ) : undefined
         }
       />
       <PermissionGate
         permission="skill:read"
-        subject="the SkillDNA Library"
+        subject="skills"
         grantedTo="Every role"
         skeleton={<SkillDetailSkeleton />}
       >
-        <SkillContent query={query} />
+        <SkillContent query={query} tab={tab} setTab={setTab} applied={applied} />
       </PermissionGate>
     </>
   );

@@ -6,7 +6,6 @@ import {
   confirmWithReason,
   createThrowawayCase,
   deleteCase,
-  toast,
   type ThrowawayCase,
 } from '../support/flows';
 import { mainRegion, openPage, settle } from '../support/ui';
@@ -32,17 +31,24 @@ const claimsStatus = (page: Page): Locator =>
 const shownCount = async (page: Page): Promise<number> =>
   Number(/^Showing (\d+)/.exec((await claimsStatus(page).innerText()).trim())![1]);
 
-/** The side panel: what was known at the chosen moment and, once a claim is chosen, that claim in full. */
-const claimPanel = (page: Page): Locator =>
-  page.getByRole('complementary', { name: 'What was known, and the selected claim' });
+/** The details drawer of a claim: a modal dialog, so the page behind it is hidden from assistive technology while it is open. */
+const claimPanel = (page: Page): Locator => page.getByRole('dialog', { name: 'Claim details' });
 
-test.describe('[FR-EV-01] Evidence Ledger: claims classified into eight categories', () => {
+/** "What was known then" is one bar, closed until it is opened: the time cursor and the counts are inside it. */
+async function openKnownBar(page: Page): Promise<Locator> {
+  const toggle = page.getByRole('button', { name: /^What was known then/ });
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  return page.getByRole('region', { name: /^What was known then/ });
+}
+
+test.describe('[FR-EV-01] Evidence: claims classified into eight categories', () => {
   test('59 claims of Case One in eight categories whose counts add up, with each category named in words', async ({
     page,
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/evidence`);
-    await expect(page.getByRole('heading', { level: 1, name: 'Evidence Ledger' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Evidence' })).toBeVisible();
     const tiles = page.getByRole('list', { name: 'Filter by evidence category' });
     await expect(tiles.getByRole('button', { name: /^All categories 59$/ })).toHaveAttribute(
       'aria-pressed',
@@ -124,12 +130,16 @@ test.describe('[FR-EV-01] Evidence Ledger: claims classified into eight categori
     ).toBeVisible();
     await expect(first.locator('time')).toBeVisible();
     await expect(first.locator('time')).toHaveText(/\d{1,2} \w{3} 2026, \d\d:\d\d UTC/);
-    await expect(first).toContainText(/Confidence \d+% \(estimate\)/);
     await expect(first.getByRole('link', { name: /^Event e\d+$/ })).toHaveAttribute(
       'href',
       new RegExp(`/cases/${demo.caseOneId}/timeline\\?sel=e\\d+`),
     );
     await expect(first.getByRole('button', { name: /^Details of this claim/ })).toBeVisible();
+    // How sure the model is sits with the claim's details (a drawer), no longer in the list.
+    await first.getByRole('button', { name: /^Details of this claim/ }).click();
+    await expect(claimPanel(page)).toContainText(
+      /Confidence \d+% \(a model estimate, not statistical truth\)/,
+    );
   });
 
   test('opening a claim shows its classification history, why, source, support and contradiction, and its place in the URL', async ({
@@ -152,6 +162,10 @@ test.describe('[FR-EV-01] Evidence Ledger: claims classified into eight categori
     await expect(panel.getByRole('heading', { level: 3, name: 'Why' })).toBeVisible();
     await expect(panel.getByText(/a model estimate, not statistical truth/)).toBeVisible();
     await expect(panel.getByRole('heading', { level: 3, name: 'Source' })).toBeVisible();
+    // The source is a row that opens.
+    const source = panel.getByRole('button', { name: 'Source', exact: true });
+    await source.click();
+    await expect(source).toHaveAttribute('aria-expanded', 'true');
     await expect(
       panel.getByRole('link', { name: /^Open event e\d+ in the timeline$/ }),
     ).toBeVisible();
@@ -161,19 +175,21 @@ test.describe('[FR-EV-01] Evidence Ledger: claims classified into eight categori
     await expect(
       panel.getByRole('heading', { level: 3, name: /^Contradicting evidence \(\d+\)$/ }),
     ).toBeVisible();
-    await panel.getByRole('button', { name: 'Close claim details' }).click();
+    await panel.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(page).not.toHaveURL(/sel=clm_/);
   });
 
-  test('the evidence the investigation needed is listed, and the missing items are claims of their own', async ({
+  test('the evidence the investigation needed is listed under "What is still missing", and the missing items are claims of their own', async ({
     page,
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/evidence`);
-    const needed = page.getByRole('group', { name: 'Evidence the investigation needed' });
-    await expect(needed.getByRole('heading', { name: 'Show the 13 requirements' })).toBeVisible();
-    await needed.getByRole('button', { name: 'Show the 13 requirements' }).click();
-    await expect(needed.getByRole('listitem').first()).toBeVisible();
+    const needed = page.getByRole('button', { name: /^What is still missing/ });
+    await expect(needed).toContainText('of 13');
+    await needed.click();
+    await expect(needed).toHaveAttribute('aria-expanded', 'true');
+    const requirements = page.getByRole('list', { name: 'Evidence requirements' });
+    await expect(requirements.getByRole('listitem').first()).toBeVisible();
   });
 });
 
@@ -245,7 +261,12 @@ test.describe('[FR-EV-03] only a reviewer may correct a classification', () => {
         'Record the correction',
         'Checked the thread: the reply does not support this inference.',
       );
-      await expect(toast(page, 'Classification corrected')).toBeVisible();
+      // The toast sits in the page behind the open drawer, which a modal hides from assistive technology.
+      await expect(
+        page
+          .getByRole('region', { name: 'Notifications', includeHidden: true })
+          .getByRole('listitem', { name: 'Classification corrected', includeHidden: true }),
+      ).toBeVisible();
 
       // The corrected claim leaves the "AI inference" filter; the claim itself keeps both classifications.
       await openPage(page, `/cases/${copy.id}/evidence?sel=${claim!.id}`);
@@ -257,9 +278,10 @@ test.describe('[FR-EV-03] only a reviewer may correct a classification', () => {
       await expect(history).toContainText(
         'Checked the thread: the reply does not support this inference.',
       );
+      // The list is behind the open drawer, which a modal hides from assistive technology: it is still on the page.
       await expect(
         page
-          .getByRole('article', { name: /^Engineer assumption:/ })
+          .getByRole('article', { name: /^Engineer assumption:/, includeHidden: true })
           .filter({ hasText: 'Originally classified by the AI as AI inference' }),
       ).toBeVisible();
 
@@ -287,9 +309,8 @@ test.describe('[FR-TL-06] the ledger is a window onto the past too', () => {
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/evidence?asOf=2026-03-09T09%3A41%3A00Z`);
-    await expect(
-      page.getByRole('group', { name: 'What was known' }).getByRole('status'),
-    ).toContainText('9 Mar 2026, 09:41 UTC');
+    const bar = await openKnownBar(page);
+    await expect(bar.getByRole('status')).toContainText('9 Mar 2026, 09:41 UTC');
     await expect(claimsStatus(page)).toHaveText(/^Showing \d+ claims?\./);
     const known = await shownCount(page);
     expect(known).toBeLessThan(59);
@@ -304,17 +325,25 @@ test.describe('[FR-EV-04] the ledger shows what the record itself shows', () => 
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/evidence`);
-    await expect(
-      page.getByRole('heading', { level: 2, name: 'What the record itself shows' }),
-    ).toBeVisible();
+    const section = page.getByRole('heading', {
+      level: 3,
+      name: /^What the record itself shows/,
+    });
+    await expect(section).toBeVisible();
     await expect(
       page.getByText('Read without a model from the events of the whole record.'),
     ).toBeVisible();
+    // The section is a row that opens, with its three lists inside.
+    const toggle = section.getByRole('button');
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     // A domain test pins that the shipped sample holds no two statements that cannot both stand.
     await expect(
       page.getByRole('button', { name: /^Statements that disagree \(0\)/ }),
     ).toBeVisible();
-    await page.getByRole('button', { name: /^Patterns across events \(\d+\)/ }).click();
+    const patternsToggle = page.getByRole('button', { name: /^Patterns across events \(\d+\)/ });
+    await patternsToggle.click();
+    await expect(patternsToggle).toHaveAttribute('aria-expanded', 'true');
     const patterns = page.getByRole('list', { name: 'Patterns across events' });
     await expect(patterns).toContainText('The earliest moment a better step was open');
     await expect(patterns.getByRole('listitem').first()).toBeVisible();

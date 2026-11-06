@@ -25,9 +25,14 @@ async function renderLayout(
 function providersProps(layout: ReactElement<{ children: ReactNode }>): {
   initialThemeMode: string;
   initialCaseId: string | null;
+  initialPersonaId: string | null;
 } {
   const body = layout.props.children as ReactElement<{
-    children: ReactElement<{ initialThemeMode: string; initialCaseId: string | null }>;
+    children: ReactElement<{
+      initialThemeMode: string;
+      initialCaseId: string | null;
+      initialPersonaId: string | null;
+    }>;
   }>;
   return body.props.children.props;
 }
@@ -56,6 +61,22 @@ describe('[UX-THEME-01] root layout reads the cg-theme cookie on the server', ()
       providersProps(await renderLayout({ 'cg-case': '../etc/passwd' })).initialCaseId,
     ).toBeNull();
     expect(providersProps(await renderLayout({})).initialCaseId).toBeNull();
+  });
+
+  it('passes only a well-formed remembered persona to the client, so a returning person gets a skeleton and not the first-visit page', async () => {
+    expect(
+      providersProps(await renderLayout({ 'cg-persona': 'user_ava_engineer' })).initialPersonaId,
+    ).toBe('user_ava_engineer');
+    expect(
+      providersProps(await renderLayout({ 'cg-persona': 'user%3Aava' })).initialPersonaId,
+    ).toBe('user:ava');
+    expect(
+      providersProps(await renderLayout({ 'cg-persona': '../../admin' })).initialPersonaId,
+    ).toBeNull();
+    expect(
+      providersProps(await renderLayout({ 'cg-persona': '%E0%A4%A' })).initialPersonaId,
+    ).toBeNull();
+    expect(providersProps(await renderLayout({})).initialPersonaId).toBeNull();
   });
 
   it('declares light and dark theme colours and keeps the app out of search engines', () => {

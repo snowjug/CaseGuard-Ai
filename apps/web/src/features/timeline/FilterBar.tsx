@@ -11,50 +11,55 @@ import {
   type ParticipantRole,
   type TimelineEvent,
 } from '@caseguard/schemas';
-import { cg, formatDateTimeUtc } from '@caseguard/ui';
-import {
-  Button,
-  Field,
-  Menu,
-  MenuButton,
-  MenuItemCheckbox,
-  MenuList,
-  MenuPopover,
-  MenuTrigger,
-  Select,
-  ToggleButton,
-  makeStyles,
-  tokens,
-} from '@fluentui/react-components';
+import { Button, Field, Select, borderColors, cg, formatDateTimeUtc } from '@caseguard/ui';
+import { Checkbox, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { GitForkIcon, HourglassIcon, RepeatIcon, type LucideIcon } from 'lucide-react';
 import { clipText } from '../../lib/text';
+import { FilterPopover } from '../evidence/FilterPopover';
 import {
   FLAGS,
   FLAG_LABELS,
-  type TimelineFlag,
   type TimelineFilterValues,
+  type TimelineFlag,
 } from './timeline-filters';
 
 const useStyles = makeStyles({
-  bar: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: cg.space[3],
-    padding: cg.space[3],
-    borderRadius: cg.radius.lg,
-    border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surface,
-  },
-  row: { display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: cg.space[3] },
-  field: { flex: '1 1 180px', minWidth: 0, '& .fui-Select': { width: '100%', minWidth: 0 } },
-  group: { display: 'flex', flexWrap: 'wrap', gap: cg.space[1] },
-  label: {
-    margin: 0,
+  root: { display: 'flex', flexDirection: 'column', gap: cg.space[2], margin: 0 },
+  row: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
+  lead: {
+    color: cg.textMuted,
     fontSize: tokens.fontSizeBase200,
     fontWeight: tokens.fontWeightSemibold,
-    color: cg.textMuted,
   },
-  status: { margin: 0, color: cg.textSecondary, fontSize: tokens.fontSizeBase300 },
+  chips: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
+  pressed: {
+    backgroundColor: cg.tone.brand.tint,
+    color: cg.tone.brand.fg,
+    ...borderColors(cg.tone.brand.border),
+  },
+  spacer: { flex: '1 1 0' },
+  status: { margin: 0, color: cg.textSecondary, fontSize: tokens.fontSizeBase200 },
+  group: { margin: 0, padding: 0, border: 0, minWidth: 0 },
+  legend: {
+    padding: 0,
+    marginBottom: cg.space[1],
+    color: cg.textSecondary,
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  options: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    alignItems: 'start',
+    columnGap: cg.space[2],
+  },
 });
+
+const FLAG_ICONS: Record<TimelineFlag, LucideIcon> = {
+  delay: HourglassIcon,
+  repeat: RepeatIcon,
+  fork: GitForkIcon,
+};
 
 export interface FilterBarProps {
   filters: TimelineFilterValues;
@@ -73,8 +78,9 @@ const clip = (text: string, max: number): string =>
   text.length > max ? `${clipText(text, max - 1)}…` : text;
 
 /**
- * Filters of the timeline: event kind, participant role, evidence category, hypothesis (applied by the server), the
- * delay, repeat and fork highlights and the zoom window. Everything is in the URL.
+ * Filters of the timeline in one row: the three highlights (delays, repeated diagnostics, key decisions) as toggles, and
+ * everything else (event kind, who, evidence category, possible cause and the zoom window) in a popover that says how
+ * many of its filters are on. Everything is in the URL.
  */
 export function FilterBar({
   filters,
@@ -102,141 +108,153 @@ export function FilterBar({
   }
   zoomOptions.sort((a, b) => Date.parse(a.value) - Date.parse(b.value));
 
+  // The filters inside the popover: the highlights are the row's own.
+  const popoverCount =
+    (filters.types.length > 0 ? 1 : 0) +
+    (filters.roles.length > 0 ? 1 : 0) +
+    (filters.category !== 'all' ? 1 : 0) +
+    (filters.hyp ? 1 : 0) +
+    (filters.from || filters.to ? 1 : 0);
+
+  const toggle = <T extends string>(list: readonly T[], value: T, on: boolean): T[] =>
+    on ? [...list, value] : list.filter((item) => item !== value);
+
   return (
     <form
       role="search"
       aria-label="Filter events"
-      className={styles.bar}
+      className={styles.root}
       onSubmit={(event) => event.preventDefault()}
     >
       <div className={styles.row}>
-        <Menu
-          checkedValues={{ types: filters.types }}
-          onCheckedValueChange={(_event, data) =>
-            onChange({ types: data.checkedItems as EventType[] })
-          }
-        >
-          <MenuTrigger disableButtonEnhancement>
-            <MenuButton>
-              Event kind{filters.types.length > 0 ? ` (${filters.types.length})` : ''}
-            </MenuButton>
-          </MenuTrigger>
-          <MenuPopover>
-            <MenuList>
-              {EVENT_TYPES.map((type) => (
-                <MenuItemCheckbox key={type} name="types" value={type}>
-                  {EVENT_TYPE_LABELS[type]}
-                </MenuItemCheckbox>
-              ))}
-            </MenuList>
-          </MenuPopover>
-        </Menu>
-        <Menu
-          checkedValues={{ roles: filters.roles }}
-          onCheckedValueChange={(_event, data) =>
-            onChange({ roles: data.checkedItems as ParticipantRole[] })
-          }
-        >
-          <MenuTrigger disableButtonEnhancement>
-            <MenuButton>
-              Participant role{filters.roles.length > 0 ? ` (${filters.roles.length})` : ''}
-            </MenuButton>
-          </MenuTrigger>
-          <MenuPopover>
-            <MenuList>
-              {PARTICIPANT_ROLES.map((role) => (
-                <MenuItemCheckbox key={role} name="roles" value={role}>
-                  {PARTICIPANT_ROLE_LABELS[role]}
-                </MenuItemCheckbox>
-              ))}
-            </MenuList>
-          </MenuPopover>
-        </Menu>
-        <Field label="Evidence category" className={styles.field}>
-          <Select
-            value={filters.category}
-            onChange={(_event, data) =>
-              onChange({ category: data.value as TimelineFilterValues['category'] })
-            }
-          >
-            <option value="all">Any category</option>
-            {EVIDENCE_CATEGORIES.map((category) => (
-              <option key={category} value={category}>
-                {EVIDENCE_CATEGORY_LABELS[category]}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Hypothesis" className={styles.field}>
-          <Select
-            value={filters.hyp ?? ''}
-            onChange={(_event, data) => onChange({ hyp: data.value || null })}
-          >
-            <option value="">Any hypothesis</option>
-            {hypotheses.map((hypothesis) => (
-              <option key={hypothesis.id} value={hypothesis.id}>
-                {hypothesis.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      </div>
-      <div className={styles.row}>
-        <div role="group" aria-labelledby="timeline-highlights">
-          <p id="timeline-highlights" className={styles.label}>
+        <div role="group" aria-label="Show only" className={styles.chips}>
+          <span className={styles.lead} aria-hidden="true">
             Show only
-          </p>
-          <div className={styles.group}>
-            {FLAGS.map((flag) => {
-              const on = filters.flags.includes(flag);
-              return (
-                <ToggleButton
-                  key={flag}
-                  size="small"
-                  checked={on}
-                  onClick={() =>
+          </span>
+          {FLAGS.map((flag) => {
+            const on = filters.flags.includes(flag);
+            const Icon = FLAG_ICONS[flag];
+            return (
+              <Button
+                key={flag}
+                size="sm"
+                variant={on ? 'secondary' : 'ghost'}
+                className={mergeClasses(on && styles.pressed)}
+                icon={<Icon />}
+                aria-pressed={on}
+                onClick={() =>
+                  onChange({
+                    flags: on
+                      ? filters.flags.filter((item) => item !== flag)
+                      : ([...filters.flags, flag] as TimelineFlag[]),
+                  })
+                }
+              >
+                {FLAG_LABELS[flag]}
+              </Button>
+            );
+          })}
+        </div>
+        <span className={styles.spacer} />
+        <FilterPopover activeCount={popoverCount}>
+          <fieldset className={styles.group}>
+            <legend className={styles.legend}>
+              Event kind{filters.types.length > 0 ? ` (${filters.types.length})` : ''}
+            </legend>
+            <div className={styles.options}>
+              {EVENT_TYPES.map((type) => (
+                <Checkbox
+                  key={type}
+                  label={EVENT_TYPE_LABELS[type]}
+                  checked={filters.types.includes(type)}
+                  onChange={(_event, data) =>
                     onChange({
-                      flags: on
-                        ? filters.flags.filter((item) => item !== flag)
-                        : ([...filters.flags, flag] as TimelineFlag[]),
+                      types: toggle<EventType>(filters.types, type, data.checked === true),
                     })
                   }
-                >
-                  {FLAG_LABELS[flag]}
-                </ToggleButton>
-              );
-            })}
-          </div>
-        </div>
-        <Field label="Zoom from" className={styles.field}>
-          <Select
-            value={filters.from ?? ''}
-            onChange={(_event, data) => onChange({ from: data.value || null })}
-          >
-            <option value="">Start of the case</option>
-            {zoomOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Zoom to" className={styles.field}>
-          <Select
-            value={filters.to ?? ''}
-            onChange={(_event, data) => onChange({ to: data.value || null })}
-          >
-            <option value="">End of the case</option>
-            {zoomOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Button appearance="subtle" disabled={activeCount === 0} onClick={onClear}>
-          Clear filters
-        </Button>
+                />
+              ))}
+            </div>
+          </fieldset>
+          <fieldset className={styles.group}>
+            <legend className={styles.legend}>
+              Participant role{filters.roles.length > 0 ? ` (${filters.roles.length})` : ''}
+            </legend>
+            <div className={styles.options}>
+              {PARTICIPANT_ROLES.map((role) => (
+                <Checkbox
+                  key={role}
+                  label={PARTICIPANT_ROLE_LABELS[role]}
+                  checked={filters.roles.includes(role)}
+                  onChange={(_event, data) =>
+                    onChange({
+                      roles: toggle<ParticipantRole>(filters.roles, role, data.checked === true),
+                    })
+                  }
+                />
+              ))}
+            </div>
+          </fieldset>
+          <Field label="Evidence category">
+            <Select
+              value={filters.category}
+              onChange={(event) =>
+                onChange({ category: event.target.value as TimelineFilterValues['category'] })
+              }
+            >
+              <option value="all">Any category</option>
+              {EVIDENCE_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {EVIDENCE_CATEGORY_LABELS[category]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Possible cause">
+            <Select
+              value={filters.hyp ?? ''}
+              onChange={(event) => onChange({ hyp: event.target.value || null })}
+            >
+              <option value="">Any cause</option>
+              {hypotheses.map((hypothesis) => (
+                <option key={hypothesis.id} value={hypothesis.id}>
+                  {hypothesis.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Zoom from">
+            <Select
+              value={filters.from ?? ''}
+              onChange={(event) => onChange({ from: event.target.value || null })}
+            >
+              <option value="">Start of the case</option>
+              {zoomOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Zoom to">
+            <Select
+              value={filters.to ?? ''}
+              onChange={(event) => onChange({ to: event.target.value || null })}
+            >
+              <option value="">End of the case</option>
+              {zoomOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </FilterPopover>
+        {activeCount > 0 ? (
+          <Button variant="ghost" onClick={onClear}>
+            Clear filters
+          </Button>
+        ) : null}
       </div>
       <p className={styles.status} role="status" aria-live="polite">
         {total === undefined

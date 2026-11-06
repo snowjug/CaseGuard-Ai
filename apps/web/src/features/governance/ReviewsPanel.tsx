@@ -2,22 +2,23 @@
 
 import { ROLE_LABELS, type ReviewDecision } from '@caseguard/schemas';
 import {
+  Button,
+  ButtonLink,
   EmptyState,
+  Field,
   LoadingSkeleton,
-  Notice,
   Panel,
-  StatusBadge,
+  RelativeTime,
   UiLink,
   cg,
-  formatDateTimeUtc,
   type BadgeStatus,
 } from '@caseguard/ui';
-import { Button, Field, makeStyles, tokens } from '@fluentui/react-components';
-import { ArrowSyncRegular, ClipboardTaskListLtrRegular } from '@fluentui/react-icons';
+import { makeStyles, tokens } from '@fluentui/react-components';
 import { keepPreviousData } from '@tanstack/react-query';
+import { ClipboardCheckIcon, RefreshCwIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
-import { LinkButton } from '../../components/common/LinkButton';
 import { QueryErrorState } from '../../components/common/QueryErrorState';
+import { StateBadge } from '../../lib/advanced-view-parts';
 import { pagedBoundary, useApiPages } from '../../lib/api/pages';
 import { useAuth } from '../../lib/auth/context';
 import { caseHref } from '../../lib/deep-links';
@@ -30,19 +31,22 @@ import { retryPages, useAutoLoadNext } from './use-auto-load';
 
 const useStyles = makeStyles({
   stack: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
-  filters: { display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: cg.space[3] },
-  field: { flex: '1 1 220px', maxWidth: '360px' },
+  caption: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+    color: cg.textMuted,
+  },
+  filters: { display: 'flex', flexWrap: 'wrap', alignItems: 'end', gap: cg.space[3] },
+  field: { flex: '1 1 240px', maxWidth: '360px' },
   status: { margin: 0, color: cg.textSecondary, fontSize: tokens.fontSizeBase300 },
-  list: { margin: 0, padding: 0, listStyle: 'none' },
+  list: { margin: 0, padding: 0, listStyleType: 'none' },
   row: {
     display: 'flex',
     flexDirection: 'column',
     gap: cg.space[2],
-    padding: cg.space[3],
-    marginBottom: cg.space[2],
-    borderRadius: cg.radius.md,
-    border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surface,
+    padding: `${cg.space[3]} 0`,
+    borderBottom: `1px solid ${cg.borderSubtle}`,
     minWidth: 0,
   },
   head: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: cg.space[2] },
@@ -83,13 +87,13 @@ const DECISIONS: Record<ReviewDecision['decision'], { label: string; status: Bad
 
 const TARGETS: Record<ReviewDecision['targetType'], string> = {
   claim: 'Claim',
-  fork: 'Decision fork',
-  counterfactual: 'Counterfactual path',
+  fork: 'Key decision',
+  counterfactual: 'What-if path',
   warning: 'Quality warning',
   skill: 'Skill',
   skill_version: 'Skill version',
   action_value: 'Action ranking',
-  hypothesis: 'Hypothesis',
+  hypothesis: 'Possible cause',
   twin_field: 'Case field',
 };
 
@@ -134,7 +138,7 @@ function ReviewRow({ decision }: { decision: ReviewDecision }) {
   return (
     <article className={styles.row} aria-label={`${badge.label}: ${target}`}>
       <div className={styles.head}>
-        <StatusBadge status={badge.status} label={badge.label} />
+        <StateBadge status={badge.status} label={badge.label} size="sm" />
         <span className={styles.target}>
           {href ? (
             <UiLink href={href} className={styles.link}>
@@ -150,7 +154,7 @@ function ReviewRow({ decision }: { decision: ReviewDecision }) {
           {decision.reviewerId} ({ROLE_LABELS[decision.reviewerRole]})
         </span>
         <span>
-          <time dateTime={decision.decidedAt}>{formatDateTimeUtc(decision.decidedAt)}</time>
+          <RelativeTime value={decision.decidedAt} />
         </span>
         {decision.caseId ? <span>Case {shortId(decision.caseId, 18)}</span> : null}
       </p>
@@ -200,28 +204,30 @@ export function ReviewsPanel() {
   const boundary = pagedBoundary(pages);
 
   return (
-    <div className={styles.stack}>
-      <Notice variant="info" compact title={null}>
-        Skill approvals (pilot, validation, publication and rollback) are recorded in the SkillDNA
-        Library, with who approved each step, and in the audit log as skill events. This list holds
-        the review decisions on evidence, forks, counterfactual paths, warnings and rankings.
-      </Notice>
-      <Panel
-        title="Reviewer decisions"
-        description="Who confirmed, corrected, rejected or overrode what, and why. The original proposal is always kept."
-        help="A reviewer decision never overwrites the original: the model's proposal and the human decision are stored side by side, with the reason. Decisions describe the work product (a claim, a path, a ranking), not the person who produced it."
-        actions={
-          <Button
-            appearance="outline"
-            size="small"
-            icon={<ArrowSyncRegular />}
-            disabled={!ready || pages.isFetching}
-            onClick={() => void pages.refetch()}
-          >
-            {pages.isFetching && !pages.isPending ? 'Refreshing…' : 'Refresh'}
-          </Button>
-        }
-      >
+    <Panel
+      title="Reviewer decisions"
+      description="Who confirmed, corrected, rejected or overrode what, and why. The original proposal is always kept."
+      help="A reviewer decision never overwrites the original: the model's proposal and the human decision are stored side by side, with the reason. Decisions describe the work product (a claim, a path, a ranking), not the person who produced it."
+      actions={
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<RefreshCwIcon />}
+          loading={pages.isFetching && !pages.isPending}
+          disabledFocusable={!ready || pages.isPending}
+          onClick={() => void pages.refetch()}
+        >
+          {pages.isFetching && !pages.isPending ? 'Refreshing…' : 'Refresh'}
+        </Button>
+      }
+    >
+      <div className={styles.stack}>
+        <p className={styles.caption}>
+          Skill approvals (pilot, validation, publication and rollback) are recorded in the Skills
+          library, with who approved each step, and in the audit log as skill events. This list
+          holds the review decisions on evidence, key decisions, what-if paths, warnings and
+          rankings.
+        </p>
         <div className={styles.filters} role="search" aria-label="Filter reviewer decisions">
           <Field label="Case" className={styles.field}>
             <CaseFilterSelect
@@ -230,7 +236,11 @@ export function ReviewsPanel() {
               onChange={(value) => setCaseId(value || null)}
             />
           </Field>
-          <Button appearance="subtle" disabled={caseId === null} onClick={() => setCaseId(null)}>
+          <Button
+            variant="ghost"
+            disabledFocusable={caseId === null}
+            onClick={() => setCaseId(null)}
+          >
             Clear filter
           </Button>
         </div>
@@ -266,18 +276,18 @@ export function ReviewsPanel() {
             {decisions.length === 0 ? (
               <EmptyState
                 headingLevel={3}
-                icon={<ClipboardTaskListLtrRegular />}
+                icon={<ClipboardCheckIcon />}
                 title={caseId ? 'No decisions for this case' : 'No reviewer decisions yet'}
-                description="Decisions appear when a reviewer confirms or corrects a claim, accepts or rejects a counterfactual path, or overrides an action ranking."
+                description="Decisions appear when a reviewer confirms or corrects a claim, accepts or rejects a what-if path, or overrides an action ranking."
                 action={
                   caseId ? (
-                    <Button appearance="primary" onClick={() => setCaseId(null)}>
+                    <Button variant="primary" onClick={() => setCaseId(null)}>
                       Show all cases
                     </Button>
                   ) : (
-                    <LinkButton href="/cases" appearance="primary">
-                      Open Cases
-                    </LinkButton>
+                    <ButtonLink href="/cases" variant="primary">
+                      Open cases
+                    </ButtonLink>
                   )
                 }
               />
@@ -311,8 +321,8 @@ export function ReviewsPanel() {
               <div className={styles.more}>
                 <div ref={sentinel} aria-hidden="true" />
                 <Button
-                  appearance="outline"
-                  disabled={isFetchingNextPage}
+                  variant="secondary"
+                  loading={isFetchingNextPage}
                   onClick={() => void fetchNextPage()}
                 >
                   {isFetchingNextPage ? 'Loading…' : 'Load more decisions'}
@@ -321,7 +331,7 @@ export function ReviewsPanel() {
             ) : null}
           </>
         )}
-      </Panel>
-    </div>
+      </div>
+    </Panel>
   );
 }

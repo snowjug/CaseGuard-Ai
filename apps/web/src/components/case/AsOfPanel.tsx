@@ -85,15 +85,15 @@ export interface AsOfPanelProps {
    * shows decisions itself puts the note next to them instead.
    */
   decisionsNote?: boolean;
-  /** Pages to offer "the same moment in ..." links to (default: Timeline, Evidence Ledger, Hypothesis Arena). */
+  /** Pages to offer "the same moment in ..." links to (default: Timeline, Evidence, Possible causes). */
   linkTo?: readonly ('timeline' | 'evidence' | 'hypotheses')[];
   headingLevel?: 2 | 3;
 }
 
 const LINK_LABELS = {
-  timeline: 'Case Timeline',
-  evidence: 'Evidence Ledger',
-  hypotheses: 'Hypothesis Arena',
+  timeline: 'Timeline',
+  evidence: 'Evidence',
+  hypotheses: 'Possible causes',
 } as const;
 
 const HELP =

@@ -1,62 +1,98 @@
 'use client';
 
 import { ROLE_LABELS, type DemoStep, type Persona } from '@caseguard/schemas';
-import { BadgeShell, StatusBadge, cg } from '@caseguard/ui';
-import { Button, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { Badge, Button, ButtonLink, borderColors, cg } from '@caseguard/ui';
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
 import {
-  ArrowRightRegular,
-  ChevronDownRegular,
-  ChevronUpRegular,
-  LockClosedRegular,
-  PersonSwapRegular,
-  PlayRegular,
-} from '@fluentui/react-icons';
-import { LinkButton } from '../../components/common/LinkButton';
+  ArrowRightIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  LockIcon,
+  PlayIcon,
+  UserCogIcon,
+  UserRoundIcon,
+} from 'lucide-react';
+import { StateBadge } from '../../lib/advanced-view-parts';
 import { safeInternalHref } from '../../lib/safe-href';
 
 const useStyles = makeStyles({
-  list: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: cg.space[3],
-    margin: 0,
-    padding: 0,
-    listStyle: 'none',
-  },
-  card: {
+  list: { display: 'flex', flexDirection: 'column', margin: 0, padding: 0, listStyleType: 'none' },
+  step: {
     display: 'grid',
-    gridTemplateColumns: 'auto minmax(0, 1fr)',
-    gap: `${cg.space[2]} ${cg.space[4]}`,
-    padding: cg.space[4],
-    borderRadius: cg.radius.lg,
-    border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surface,
+    gridTemplateColumns: '36px minmax(0, 1fr)',
+    columnGap: cg.space[4],
     scrollMarginTop: 'calc(var(--cg-shell-top, 84px) + 16px)',
   },
-  next: { border: `2px solid ${cg.tone.brand.solid}`, backgroundColor: cg.tone.brand.tint },
-  locked: { backgroundColor: cg.surfaceSunken },
-  selected: { boxShadow: `0 0 0 3px ${cg.focus}` },
-  number: {
+  rail: { display: 'flex', flexDirection: 'column', alignItems: 'center' },
+  marker: {
     display: 'inline-flex',
+    flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
     width: '36px',
     height: '36px',
     borderRadius: cg.radius.pill,
-    border: `2px solid ${cg.borderControl}`,
+    border: `1px solid ${cg.borderControl}`,
+    backgroundColor: cg.surfaceSunken,
+    color: cg.text,
+    fontSize: tokens.fontSizeBase300,
     fontWeight: tokens.fontWeightSemibold,
     fontVariantNumeric: 'tabular-nums',
-    color: cg.text,
-    backgroundColor: cg.surface,
   },
-  numberDone: { border: `2px solid ${cg.tone.productive.border}`, color: cg.tone.productive.fg },
-  body: { display: 'flex', flexDirection: 'column', gap: cg.space[2], minWidth: 0 },
-  head: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: cg.space[2] },
+  markerDone: {
+    color: cg.tone.productive.fg,
+    backgroundColor: cg.tone.productive.tint,
+    ...borderColors(`color-mix(in srgb, ${cg.tone.productive.border} 60%, transparent)`),
+    fontSize: tokens.fontSizeBase400,
+  },
+  markerNext: {
+    backgroundImage: cg.gradientAccent,
+    color: cg.tone.brand.onSolid,
+    ...borderColors('transparent'),
+    boxShadow: `0 0 0 4px ${cg.glow}`,
+  },
+  markerLocked: { color: cg.textMuted, fontSize: tokens.fontSizeBase300 },
+  line: {
+    flex: '1 1 auto',
+    width: '2px',
+    minHeight: cg.space[4],
+    marginBlock: cg.space[1],
+    borderRadius: cg.radius.pill,
+    backgroundColor: cg.borderSubtle,
+  },
+  lineDone: {
+    backgroundColor: `color-mix(in srgb, ${cg.tone.productive.border} 55%, transparent)`,
+  },
+  card: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[2],
+    minWidth: 0,
+    paddingBottom: cg.space[6],
+  },
+  cardNext: {
+    padding: cg.space[4],
+    marginBottom: cg.space[6],
+    borderRadius: cg.radius.lg,
+    backgroundColor: `color-mix(in srgb, ${cg.tone.brand.tint} 60%, transparent)`,
+    border: `1px solid color-mix(in srgb, ${cg.tone.brand.border} 45%, transparent)`,
+    boxShadow: `0 16px 48px -24px ${cg.glow}`,
+  },
+  cardLast: { paddingBottom: 0 },
+  selected: { outline: `2px solid ${cg.focus}`, outlineOffset: '4px', borderRadius: cg.radius.lg },
+  head: {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: `${cg.space[1]} ${cg.space[2]}`,
+  },
   title: {
     margin: 0,
     fontSize: tokens.fontSizeBase400,
     lineHeight: tokens.lineHeightBase400,
     fontWeight: tokens.fontWeightSemibold,
+    letterSpacing: '-0.01em',
     color: cg.text,
   },
   text: {
@@ -70,28 +106,47 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: cg.space[2],
+    gap: `${cg.space[1]} ${cg.space[2]}`,
     fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
     color: cg.textMuted,
   },
   lockedText: {
     margin: 0,
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: cg.space[2],
-    fontSize: tokens.fontSizeBase300,
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
     color: cg.textSecondary,
   },
-  actions: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: cg.space[2] },
+  actions: {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: cg.space[2],
+    marginTop: cg.space[1],
+  },
+  // A person's name can be long ("Switch to Morgan Manager (synthetic)"): the label wraps instead of leaving the card.
+  wrapLabel: {
+    maxWidth: '100%',
+    minWidth: 0,
+    flexShrink: 1,
+    paddingBlock: cg.space[1],
+    whiteSpace: 'normal',
+    textAlign: 'start',
+    lineHeight: tokens.lineHeightBase200,
+  },
   notes: {
     margin: 0,
-    padding: `${cg.space[2]} ${cg.space[3]}`,
-    borderLeft: `3px solid ${cg.borderControl}`,
+    padding: `${cg.space[1]} ${cg.space[3]}`,
+    borderLeft: `3px solid ${cg.tone.brand.border}`,
     fontSize: tokens.fontSizeBase300,
     lineHeight: tokens.lineHeightBase300,
-    color: cg.text,
+    color: cg.textSecondary,
     maxWidth: '78ch',
   },
+  noteLabel: { color: cg.text, fontWeight: tokens.fontWeightSemibold },
 });
 
 export interface StepListProps {
@@ -99,7 +154,7 @@ export interface StepListProps {
   /** Step whose presenter notes are open (`?step=`); the next step's notes are always shown. */
   selectedId: string | null;
   onSelect: (id: string | null) => void;
-  /** True while presenting: the presenter strip owns role switching, and the next action is outlined. */
+  /** True while presenting: the presenter strip owns role switching. */
   presenting: boolean;
   /** Whether the signed-in identity holds a role. */
   actingAs: (role: DemoStep['persona']) => boolean;
@@ -109,31 +164,30 @@ export interface StepListProps {
 }
 
 function StatusOf({ step }: { step: DemoStep }) {
-  if (step.completed) return <StatusBadge status="productive" label="Done" />;
+  if (step.completed)
+    return <StateBadge status="productive" label="Done" title="The data for this step exists." />;
   if (step.isNextAction)
     return (
-      <BadgeShell
-        tone="brand"
-        pattern="solid"
-        icon={<PlayRegular />}
-        label="Next"
-        title="The next step to show"
-      />
+      <Badge tone="brand" icon={<PlayIcon />} title="The next step to show">
+        Next
+      </Badge>
     );
-  if (!step.enabled) return <StatusBadge status="missing" label="Locked" />;
-  return <StatusBadge status="neutral" label="Available" />;
+  if (!step.enabled)
+    return <StateBadge status="missing" label="Locked" title="Steps unlock in order." />;
+  return <StateBadge status="neutral" label="Available" title="Ready to show." />;
 }
 
 function StepCard({
   step,
   total,
+  last,
   selected,
   onSelect,
   presenting,
   actingAs,
   personaFor,
   onSwitch,
-}: { step: DemoStep; total: number; selected: boolean } & Omit<
+}: { step: DemoStep; total: number; last: boolean; selected: boolean } & Omit<
   StepListProps,
   'steps' | 'selectedId'
 >) {
@@ -144,24 +198,36 @@ function StepCard({
   const persona = personaFor(step.persona);
   const notesOpen = step.isNextAction || selected;
   const notesId = `demo-notes-${step.id}`;
+  const locked = !step.enabled && !step.completed;
   return (
     <li
       id={`demo-step-${step.id}`}
-      className={mergeClasses(
-        styles.card,
-        step.isNextAction && styles.next,
-        !step.enabled && styles.locked,
-        selected && styles.selected,
-      )}
+      className={styles.step}
       aria-current={step.isNextAction ? 'step' : undefined}
     >
-      <span
-        className={mergeClasses(styles.number, step.completed && styles.numberDone)}
-        aria-hidden="true"
+      <div className={styles.rail} aria-hidden="true">
+        <span
+          className={mergeClasses(
+            styles.marker,
+            step.completed && styles.markerDone,
+            step.isNextAction && !step.completed && styles.markerNext,
+            locked && styles.markerLocked,
+          )}
+        >
+          {step.completed ? <CheckIcon /> : locked ? <LockIcon /> : step.order}
+        </span>
+        {last ? null : (
+          <span className={mergeClasses(styles.line, step.completed && styles.lineDone)} />
+        )}
+      </div>
+      <div
+        className={mergeClasses(
+          styles.card,
+          step.isNextAction && styles.cardNext,
+          last && !step.isNextAction && styles.cardLast,
+          selected && styles.selected,
+        )}
       >
-        {step.order}
-      </span>
-      <div className={styles.body}>
         <div className={styles.head}>
           <h3 className={styles.title}>
             <span className="cg-sr-only">
@@ -173,12 +239,13 @@ function StepCard({
         </div>
         <p className={styles.text}>{step.description}</p>
         <p className={styles.meta}>
+          <UserRoundIcon aria-hidden="true" />
           <span>Present as {role}</span>
           {matches ? <span>· you are acting as this role</span> : null}
         </p>
         {!step.enabled && step.lockedReason ? (
           <p className={styles.lockedText}>
-            <LockClosedRegular aria-hidden="true" />
+            <LockIcon aria-hidden="true" />
             <span>
               <strong>Locked.</strong> {step.lockedReason}
             </span>
@@ -187,28 +254,31 @@ function StepCard({
         <div className={styles.actions}>
           {step.enabled ? (
             href ? (
-              <LinkButton
+              <ButtonLink
                 href={href}
-                appearance="outline"
-                icon={<ArrowRightRegular />}
-                iconPosition="after"
+                variant="secondary"
+                size="sm"
+                icon={<ArrowRightIcon />}
+                iconPosition="end"
               >
                 {step.actionLabel}
-              </LinkButton>
+              </ButtonLink>
             ) : (
-              <Button appearance="outline" disabledFocusable>
+              <Button variant="secondary" size="sm" disabledFocusable>
                 {step.actionLabel} (link unavailable)
               </Button>
             )
           ) : (
-            <Button appearance="outline" disabledFocusable>
+            <Button variant="secondary" size="sm" disabledFocusable>
               {step.actionLabel}
             </Button>
           )}
           {!presenting && step.isNextAction && !matches && persona ? (
             <Button
-              appearance="subtle"
-              icon={<PersonSwapRegular />}
+              variant="ghost"
+              size="sm"
+              icon={<UserCogIcon />}
+              className={styles.wrapLabel}
               onClick={() => onSwitch(persona)}
             >
               {`Switch to ${persona.displayName}`}
@@ -216,8 +286,9 @@ function StepCard({
           ) : null}
           {!step.isNextAction ? (
             <Button
-              appearance="subtle"
-              icon={selected ? <ChevronUpRegular /> : <ChevronDownRegular />}
+              variant="ghost"
+              size="sm"
+              icon={selected ? <ChevronUpIcon /> : <ChevronDownIcon />}
               aria-expanded={selected}
               aria-controls={notesId}
               onClick={() => onSelect(selected ? null : step.id)}
@@ -228,7 +299,7 @@ function StepCard({
         </div>
         {notesOpen ? (
           <p id={notesId} className={styles.notes}>
-            <strong>Presenter notes. </strong>
+            <strong className={styles.noteLabel}>Presenter notes. </strong>
             {step.presenterNotes}
           </p>
         ) : null}
@@ -237,16 +308,21 @@ function StepCard({
   );
 }
 
-/** The ordered story. Every flag comes from `demo.state`, which the API derives from stored data: nothing is ticked by hand. */
+/**
+ * The story as a vertical stepper: a marker per step (a check when done, the number when it can be shown, a lock when it
+ * cannot yet), the next step highlighted. Every flag comes from `demo.state`, which the API derives from stored data:
+ * nothing is ticked by hand.
+ */
 export function StepList({ steps, selectedId, ...rest }: StepListProps) {
   const styles = useStyles();
   return (
     <ol className={styles.list} aria-label="Demo steps">
-      {steps.map((step) => (
+      {steps.map((step, index) => (
         <StepCard
           key={step.id}
           step={step}
           total={steps.length}
+          last={index === steps.length - 1}
           selected={selectedId === step.id}
           {...rest}
         />

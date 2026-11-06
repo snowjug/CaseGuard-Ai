@@ -52,7 +52,8 @@ function api(overrides: FakeHandlers = {}) {
 }
 
 describe('[FR-CASES-01] Cases list', () => {
-  it('shows a skeleton, then every case with its quality, effort, hypothesis and warnings', async () => {
+  it('shows a skeleton, then every case with its score, savings, likeliest cause and warnings', async () => {
+    const user = userEvent.setup();
     renderApp(<CasesPage />, { api: api() });
     expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Loading cases/).length).toBeGreaterThan(0);
@@ -61,28 +62,46 @@ describe('[FR-CASES-01] Cases list', () => {
     const rows = within(table).getAllByRole('row');
     // Header plus two cases, newest opened first (the server's order).
     expect(rows).toHaveLength(3);
+    // An analysed case opens on its review.
     expect(
       within(rows[1] as HTMLElement).getByRole('link', { name: 'CG-SYN-1002' }),
-    ).toHaveAttribute('href', '/cases/case_2');
+    ).toHaveAttribute('href', '/cases/case_2/review');
     const first = rows[2] as HTMLElement;
     expect(within(first).getByRole('link', { name: 'CG-SYN-1001' })).toHaveAttribute(
       'href',
-      '/cases/case_1',
+      '/cases/case_1/review',
     );
     expect(within(first).getByText('36')).toBeInTheDocument();
     expect(within(first).getByText('57%')).toBeInTheDocument();
-    expect(within(first).getByText('DNS resolution failure')).toBeInTheDocument();
-    expect(within(first).getByText(/93% confidence \(estimate\)/)).toBeInTheDocument();
-    expect(within(first).getByText('Synthetic')).toBeInTheDocument();
-    expect(within(first).getByText('Analysed')).toBeInTheDocument();
-    // Honest labelling of the estimates.
-    expect(screen.getByText(/are estimates from the analysis of each case/)).toBeInTheDocument();
     expect(
-      within(table).getByRole('columnheader', { name: /Quality \(est\.\)/ }),
+      within(first).getByText(/DNS resolution failure \(93%, estimated\) · 2 open warnings/),
+    ).toBeInTheDocument();
+    expect(within(first).getByText('Demo data')).toBeInTheDocument();
+    expect(within(first).getByText('Analysed')).toBeInTheDocument();
+    // Honest labelling of the estimates: in the column headers, and in the page help.
+    expect(
+      within(table).getByRole('columnheader', { name: /Score \(est\.\)/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(table).getByRole('columnheader', { name: /Could have been saved \(est\.\)/ }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'About Cases' }));
+    expect(
+      await screen.findByText(/are estimates from the analysis of each case/),
     ).toBeInTheDocument();
   });
 
-  it('never invents a number: a case that is not analysed shows "Not available"', async () => {
+  it('says when a case was opened in words, with the exact time on hover', async () => {
+    renderApp(<CasesPage />, { api: api() });
+    const table = await screen.findByRole('table', { name: 'Cases' });
+    const opened = within(table).getAllByRole('row')[2] as HTMLElement;
+    expect(within(opened).getByText('9 Mar 2026')).toHaveAttribute(
+      'title',
+      expect.stringMatching(/UTC$/),
+    );
+  });
+
+  it('never invents a number: a case that is not analysed shows "Not available" and opens the case', async () => {
     const pending = caseSummary({
       id: 'case_3',
       reference: 'CG-DRAFT-1',
@@ -95,31 +114,32 @@ describe('[FR-CASES-01] Cases list', () => {
       api: api({ 'cases.list': () => ({ items: [pending], nextCursor: null }) }),
     });
     const row = (await screen.findAllByRole('row'))[1] as HTMLElement;
-    expect(within(row).getAllByText('Not available')).toHaveLength(3);
+    expect(within(row).getAllByText('Not available')).toHaveLength(2);
     expect(within(row).getByText('Not analysed')).toBeInTheDocument();
+    expect(within(row).getByRole('link', { name: 'CG-DRAFT-1' })).toHaveAttribute(
+      'href',
+      '/cases/case_3',
+    );
   });
 
-  it('shows the empty state with "Ingest a case" and "Use a sample" when there are no cases', async () => {
+  it('shows the empty state with "Add a case" and "Try a sample case" when there are no cases', async () => {
     const { container } = renderApp(<CasesPage />, {
       api: api({ 'cases.list': () => ({ items: [], nextCursor: null }) }),
     });
     expect(await screen.findByRole('heading', { name: 'No cases yet' })).toBeInTheDocument();
     await waitFor(() =>
-      expect(screen.getAllByRole('link', { name: 'Ingest a case' })[0]).not.toHaveAttribute(
-        'aria-disabled',
-        'true',
-      ),
+      expect(screen.getAllByRole('link', { name: 'Add a case' })[0]).toBeInTheDocument(),
     );
-    const ingest = screen.getAllByRole('link', { name: 'Ingest a case' });
-    expect(ingest.some((link) => link.getAttribute('href') === '/cases/new')).toBe(true);
-    expect(screen.getByRole('link', { name: 'Use a sample' })).toHaveAttribute(
+    const add = screen.getAllByRole('link', { name: 'Add a case' });
+    expect(add.every((link) => link.getAttribute('href') === '/cases/new')).toBe(true);
+    expect(screen.getByRole('link', { name: 'Try a sample case' })).toHaveAttribute(
       'href',
       '/cases/new?source=sample',
     );
     await expectNoAxeViolations(container);
   });
 
-  it('explains who can ingest when the role cannot', async () => {
+  it('explains who can add a case when the role cannot, and keeps a disabled button that says why', async () => {
     renderApp(<CasesPage />, {
       api: api({
         'session.me': () => session('reviewer', ['case:read']),
@@ -127,12 +147,15 @@ describe('[FR-CASES-01] Cases list', () => {
       }),
     });
     expect(
-      await screen.findByText(/Someone with the Engineer or Administrator role can ingest one/),
+      await screen.findByText(/Someone with the Engineer or Administrator role can add one/),
     ).toBeInTheDocument();
-    await waitFor(() => {
-      const [button] = screen.getAllByRole('link', { name: 'Ingest a case' });
-      expect(button).toHaveAttribute('aria-disabled', 'true');
-    });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Add a case' })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      ),
+    );
+    expect(screen.queryByRole('link', { name: 'Add a case' })).toBeNull();
   });
 
   it('shows an error with Retry and recovers on retry', async () => {
@@ -166,6 +189,11 @@ describe('[FR-CASES-01] Cases list', () => {
   });
 });
 
+const openFilters = async (user: ReturnType<typeof userEvent.setup>): Promise<void> => {
+  await user.click(screen.getByRole('button', { name: /^Filters/ }));
+  await screen.findByLabelText('Analysis state');
+};
+
 describe('[FR-CASES-02] filters, sort and pagination live in the URL', () => {
   it('sends the filters to the API and keeps them in the URL', async () => {
     const user = userEvent.setup();
@@ -173,10 +201,13 @@ describe('[FR-CASES-02] filters, sort and pagination live in the URL', () => {
     renderApp(<CasesPage />, { api: handler });
     await screen.findByRole('table', { name: 'Cases' });
 
+    await openFilters(user);
     await user.selectOptions(screen.getByLabelText('Analysis state'), 'analyzed');
     await user.selectOptions(screen.getByLabelText('Case status'), 'resolved');
     await waitFor(() => expect(window.location.search).toContain('state=analyzed'));
     expect(window.location.search).toContain('status=resolved');
+    // The button says how many filters are on.
+    expect(screen.getByRole('button', { name: /^Filters/ })).toHaveTextContent('2');
     await waitFor(() =>
       expect(handler.call).toHaveBeenCalledWith(
         'cases.list',
@@ -199,8 +230,10 @@ describe('[FR-CASES-02] filters, sort and pagination live in the URL', () => {
     expect(
       await screen.findByRole('heading', { name: 'No cases match these filters' }),
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Filters/ })).toHaveTextContent('2');
+    await openFilters(user);
     expect(screen.getByLabelText('Analysis state')).toHaveValue('failed');
-    expect(screen.getByRole('searchbox')).toHaveValue('proxy');
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('proxy');
     await waitFor(() =>
       expect(handler.call).toHaveBeenCalledWith(
         'cases.list',
@@ -213,6 +246,7 @@ describe('[FR-CASES-02] filters, sort and pagination live in the URL', () => {
         }),
       ),
     );
+    await user.keyboard('{Escape}');
     await user.click(screen.getAllByRole('button', { name: 'Clear filters' })[0] as HTMLElement);
     await waitFor(() => expect(window.location.search).toBe(''));
   });
@@ -228,13 +262,14 @@ describe('[FR-CASES-02] filters, sort and pagination live in the URL', () => {
     );
   });
 
-  it('applies the synthetic label filter to the loaded cases', async () => {
+  it('applies the demo data label filter to the loaded cases', async () => {
     const user = userEvent.setup();
     const real = caseSummary({ id: 'case_4', reference: 'REAL-4', synthetic: false });
     renderApp(<CasesPage />, {
       api: api({ 'cases.list': () => ({ items: [real, one], nextCursor: null }) }),
     });
     await screen.findByRole('link', { name: 'REAL-4' });
+    await openFilters(user);
     await user.selectOptions(screen.getByLabelText('Data label'), 'synthetic');
     await waitFor(() => expect(screen.queryByRole('link', { name: 'REAL-4' })).toBeNull());
     expect(screen.getByRole('link', { name: 'CG-SYN-1001' })).toBeInTheDocument();
@@ -282,8 +317,8 @@ describe('[FR-CASES-02] filters, sort and pagination live in the URL', () => {
     const list = await screen.findByRole('list', { name: 'Cases' });
     expect(screen.queryByRole('table')).toBeNull();
     expect(within(list).getAllByRole('listitem')).toHaveLength(2);
-    expect(within(list).getAllByRole('link', { name: 'Open case' })).toHaveLength(2);
-    expect(within(list).getAllByText('Quality (estimated)')).toHaveLength(2);
+    expect(within(list).getAllByRole('link', { name: 'Open review' })).toHaveLength(2);
+    expect(within(list).getAllByText('Score (estimated)')).toHaveLength(2);
     expect(within(list).getByText(/15 events/)).toBeInTheDocument();
   });
 
@@ -470,7 +505,10 @@ describe('[FR-CASES-03] deleting a case (administrator)', () => {
       ),
     );
     await waitFor(() => expect(screen.queryByRole('link', { name: 'CG-SYN-1001' })).toBeNull());
-    expect(screen.getByRole('link', { name: 'CG-SYN-1002' })).toBeInTheDocument();
+    // While the dialog is open the page behind it is hidden from the accessibility tree, so the check above can pass
+    // before the list is back: wait for the remaining case, then check again that the deleted one is gone.
+    expect(await screen.findByRole('link', { name: 'CG-SYN-1002' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'CG-SYN-1001' })).toBeNull();
   });
 
   it('explains the refusal while a job still runs (reason job_active) inside the dialog and keeps the case', async () => {

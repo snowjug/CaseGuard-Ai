@@ -4,32 +4,25 @@ import {
   SYNTHETIC_EFFECTIVENESS_NOTICE,
   type SkillDetail,
   type SkillEffectiveness,
-  type SkillMatch,
 } from '@caseguard/schemas';
 import {
   EmptyState,
-  Notice,
   Panel,
   ProvenanceBadge,
-  StatusBadge,
   UiLink,
+  cg,
   formatDuration,
   formatProbability,
 } from '@caseguard/ui';
-import { Button, Field, Select } from '@fluentui/react-components';
-import { PeopleCommunityRegular } from '@fluentui/react-icons';
-import { useState } from 'react';
-import { useApiMutation } from '../../lib/api/hooks';
+import { makeStyles, tokens } from '@fluentui/react-components';
+import { UsersIcon } from 'lucide-react';
 import { formatNumber } from '../../lib/format';
 import { SKILL_APPLICABILITY } from '../../lib/labels';
-import { useToast } from '../../lib/toast';
-import { explainFailure, failureText } from '../quality/failure';
-import { GatedConfirm } from '../quality/GatedConfirm';
-import { useInsightStyles } from '../quality/styles';
-import { APPLY_INVALIDATES, SkillMatchCard } from './SkillMatchCard';
-import { useAnalysedCases } from './hooks';
-import { isWithdrawn } from './labels';
+import type { AppliedRecord } from './ApplyToCase';
+import { StatusPill } from './Hints';
 import { PRECEDENT_READING_GUIDE, precedentHeadline, precedentTitle } from './precedent';
+import { SkillMatchCard } from './SkillMatchCard';
+import { useSkillStyles } from './styles';
 
 /** The skill's time to diagnosis against its baseline, in words (both figures come from the API, estimated). */
 export function timeComparison(effectiveness: SkillEffectiveness): string {
@@ -55,8 +48,50 @@ const BASELINE_CAVEAT =
   'The simulated baseline has no waiting between steps, so a recorded time reads longer than it by construction. Treat these figures as a rough reference only.';
 const SECONDARY_TITLE = 'Secondary: against a simulated baseline';
 
+const useStyles = makeStyles({
+  precedent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[2],
+    minWidth: 0,
+    padding: cg.space[4],
+    borderRadius: cg.radius.md,
+    backgroundColor: cg.surfaceSunken,
+    boxShadow: `inset 3px 0 0 ${cg.tone.brand.solid}`,
+  },
+  headline: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase400,
+    lineHeight: tokens.lineHeightBase400,
+    fontWeight: tokens.fontWeightSemibold,
+    color: cg.text,
+    overflowWrap: 'anywhere',
+  },
+  secondary: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[2],
+    minWidth: 0,
+    padding: cg.space[4],
+    borderRadius: cg.radius.md,
+    border: `1px dashed ${cg.tone.simulated.border}`,
+  },
+  figure: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
+  notes: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[1],
+    margin: 0,
+    paddingLeft: cg.space[4],
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+    color: cg.textMuted,
+  },
+});
+
 function Effectiveness({ effectiveness }: { effectiveness: SkillEffectiveness }) {
-  const styles = useInsightStyles();
+  const styles = useSkillStyles();
+  const own = useStyles();
   const precedent =
     effectiveness.precedent && effectiveness.precedent.cases > 0 ? effectiveness.precedent : null;
   const hasBaselineFigure =
@@ -116,20 +151,20 @@ function Effectiveness({ effectiveness }: { effectiveness: SkillEffectiveness })
       </ul>
       {precedent ? (
         <>
-          <div role="group" aria-label={precedentTitle(precedent)} className={styles.precedent}>
-            <div className={styles.itemHead}>
-              <p className={styles.itemTitle}>{precedentTitle(precedent)}</p>
+          <div role="group" aria-label={precedentTitle(precedent)} className={own.precedent}>
+            <div className={own.figure}>
+              <p className={styles.title}>{precedentTitle(precedent)}</p>
               <ProvenanceBadge kind="estimated" size="small" />
             </div>
-            <p className={styles.headline}>
+            <p className={own.headline}>
               {precedentHeadline(precedent, effectiveness.applications)}
             </p>
             <p className={styles.meta}>{PRECEDENT_READING_GUIDE}</p>
             <p className={styles.meta}>{precedent.basis}</p>
           </div>
-          <div role="group" aria-label={SECONDARY_TITLE} className={styles.secondary}>
-            <div className={styles.itemHead}>
-              <p className={styles.itemTitle}>{SECONDARY_TITLE}</p>
+          <div role="group" aria-label={SECONDARY_TITLE} className={own.secondary}>
+            <div className={own.figure}>
+              <p className={styles.title}>{SECONDARY_TITLE}</p>
               <ProvenanceBadge kind="simulated" size="small" />
             </div>
             {baseline}
@@ -139,23 +174,21 @@ function Effectiveness({ effectiveness }: { effectiveness: SkillEffectiveness })
         baseline
       )}
       {effectiveness.notes.length > 0 ? (
-        <ul className={styles.bullets} aria-label="Notes on the figures">
+        <ul className={own.notes} aria-label="Notes on the figures">
           {effectiveness.notes.map((note) => (
             <li key={note}>{note}</li>
           ))}
         </ul>
       ) : null}
       {effectiveness.synthetic ? (
-        <Notice variant="synthetic" compact>
-          {SYNTHETIC_EFFECTIVENESS_NOTICE}
-        </Notice>
+        <p className={styles.caption}>{SYNTHETIC_EFFECTIVENESS_NOTICE}</p>
       ) : null}
     </Panel>
   );
 }
 
 function MatchedCases({ detail }: { detail: SkillDetail }) {
-  const styles = useInsightStyles();
+  const styles = useSkillStyles();
   return (
     <Panel
       title="Cases this skill matched"
@@ -166,33 +199,31 @@ function MatchedCases({ detail }: { detail: SkillDetail }) {
         <EmptyState
           compact
           headingLevel={3}
-          icon={<PeopleCommunityRegular />}
+          icon={<UsersIcon />}
           title="No case has matched this skill"
           description="Matches appear when an analysed case meets the skill's trigger conditions."
         />
       ) : (
-        <ul className={styles.list} aria-label="Matched cases">
+        <ul className={styles.rows} aria-label="Matched cases">
           {detail.matches.map((match) => {
             const applicability = SKILL_APPLICABILITY[match.applicability];
             return (
-              <li key={match.caseId} className={styles.item}>
-                <div className={styles.itemHead}>
+              <li key={match.caseId} className={styles.rowItem}>
+                <div className={styles.spread}>
                   <UiLink
                     href={`/cases/${encodeURIComponent(match.caseId)}/quality?tab=skills`}
                     className={styles.link}
                   >
                     {match.caseReference}
                   </UiLink>
-                  <StatusBadge
-                    status={applicability.status}
-                    label={applicability.label}
-                    size="small"
-                  />
-                  {match.applied ? (
-                    <StatusBadge status="productive" label="Applied" size="small" />
-                  ) : (
-                    <StatusBadge status="missing" label="Not applied" size="small" />
-                  )}
+                  <div className={styles.row}>
+                    <StatusPill status={applicability.status} label={applicability.label} />
+                    {match.applied ? (
+                      <StatusPill status="productive" label="Applied" />
+                    ) : (
+                      <StatusPill status="missing" label="Not applied" />
+                    )}
+                  </div>
                 </div>
                 <p className={styles.meta}>
                   Match score {formatProbability(match.score, 0)} (estimate)
@@ -206,89 +237,37 @@ function MatchedCases({ detail }: { detail: SkillDetail }) {
   );
 }
 
-function ApplyToCase({ detail }: { detail: SkillDetail }) {
-  const styles = useInsightStyles();
-  const toast = useToast();
-  const { analysed } = useAnalysedCases();
-  const apply = useApiMutation('skills.apply', { invalidate: APPLY_INVALIDATES });
-  const [caseId, setCaseId] = useState('');
-  const [result, setResult] = useState<SkillMatch | null>(null);
-  const { skill } = detail;
-  const chosen =
-    caseId && analysed.some((item) => item.id === caseId) ? caseId : (analysed[0]?.id ?? '');
-  const blocked = isWithdrawn(skill.lifecycle)
-    ? `A ${skill.lifecycle} skill can no longer be applied.`
-    : analysed.length === 0
-      ? 'There is no analysed case to apply it to.'
-      : null;
-  return (
-    <Panel
-      title="Apply to a case"
-      description="Match the skill against a case and record that its plan was adopted."
-      help="Applying matches the skill against the case's evidence and records that the guided plan was adopted, with how closely it was followed. It does not run anything and does not change the case. The record is audited, and applying again does nothing new."
-    >
-      <div className={styles.toolbar}>
-        <Field label="Case" className={styles.field}>
-          <Select
-            className={styles.select}
-            value={chosen}
-            disabled={analysed.length === 0}
-            onChange={(_event, next) => setCaseId(next.value)}
-          >
-            {analysed.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.reference} · {item.title}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <GatedConfirm
-          permission="skill:apply"
-          blockedReason={blocked}
-          trigger={<Button appearance="primary">Apply to this case</Button>}
-          title="Apply this skill to the case?"
-          confirmLabel="Apply skill"
-          onConfirm={async () => {
-            try {
-              const match = await apply.mutateAsync({
-                params: { caseId: chosen },
-                body: { skillId: skill.id },
-              });
-              setResult(match);
-              toast.success('Skill applied', {
-                body: 'The adoption is recorded in the audit log with how closely the plan was followed.',
-              });
-            } catch (error) {
-              throw new Error(failureText(explainFailure(error)), { cause: error });
-            }
-          }}
-        >
-          <p>
-            Applying records that the guided plan of “{skill.name}” was adopted for the chosen case.
-            It does not run anything or change the case, and the record is audited.
-          </p>
-        </GatedConfirm>
-      </div>
-      {blocked ? <p className={styles.meta}>{blocked}</p> : null}
-      {result ? (
-        <ul className={styles.list} aria-label="The match that was recorded">
-          <SkillMatchCard match={result} caseId={result.caseId} requestedAsOf={null} />
-        </ul>
-      ) : null}
-    </Panel>
-  );
+export interface UsageTabProps {
+  detail: SkillDetail;
+  /** The application that was just recorded from the page's "Apply to a case" action, shown first. */
+  applied?: AppliedRecord | null;
 }
 
-/** The "Cases" tab: effectiveness (estimated, synthetic where it is), the cases the skill matched, and applying it. */
-export function UsageTab({ detail }: { detail: SkillDetail }) {
-  const styles = useInsightStyles();
+/** The "Cases" tab: what was just applied, effectiveness (estimated, demo data where it is) and the cases the skill matched. */
+export function UsageTab({ detail, applied = null }: UsageTabProps) {
+  const styles = useSkillStyles();
   return (
     <div className={styles.page}>
+      {applied ? (
+        <Panel
+          title="Just applied"
+          description={
+            applied.caseReference
+              ? `Recorded on ${applied.caseReference}.`
+              : 'Recorded on the case you chose.'
+          }
+        >
+          <ul className={styles.rows} aria-label="The match that was recorded">
+            <SkillMatchCard
+              match={applied.match}
+              caseId={applied.match.caseId}
+              requestedAsOf={null}
+            />
+          </ul>
+        </Panel>
+      ) : null}
       <Effectiveness effectiveness={detail.skill.effectiveness} />
-      <div className={styles.band}>
-        <MatchedCases detail={detail} />
-        <ApplyToCase detail={detail} />
-      </div>
+      <MatchedCases detail={detail} />
     </div>
   );
 }

@@ -46,7 +46,12 @@ export function storageStateFor(
     sameSite: 'Lax' as const,
   });
   return {
-    cookies: [cookie('cg-theme', theme)],
+    cookies: [
+      cookie('cg-theme', theme),
+      // The development identity is remembered in a cookie as well as in localStorage, so the server can render a
+      // returning person's page signed in (as a real browser that picked a persona does).
+      ...(persona === null ? [] : [cookie('cg-persona', encodeURIComponent(PERSONAS[persona].id))]),
+    ],
     origins:
       persona === null
         ? []

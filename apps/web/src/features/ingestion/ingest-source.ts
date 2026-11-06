@@ -1,13 +1,15 @@
 import type { IngestRequest } from '@caseguard/schemas';
 
-export const SOURCE_CHOICES = ['sample', 'paste', 'file', 'bundle'] as const;
+/** In the order the segmented control shows them. The URL parameter `source` carries one of these values. */
+export const SOURCE_CHOICES = ['paste', 'file', 'sample', 'bundle'] as const;
 export type SourceChoice = (typeof SOURCE_CHOICES)[number];
 
+/** The short segment texts. */
 export const SOURCE_CHOICE_LABELS: Record<SourceChoice, string> = {
-  sample: 'Built-in sample',
-  paste: 'Paste text',
-  file: 'Upload a file',
-  bundle: 'JSON bundle',
+  paste: 'Paste',
+  file: 'Upload',
+  sample: 'Sample',
+  bundle: 'JSON',
 };
 
 /** The limits the API publishes in its contract (`IngestRequestSchema`): longer input is refused with a 422. */
@@ -32,7 +34,7 @@ export interface SourceDraft {
 }
 
 export const EMPTY_DRAFT: SourceDraft = {
-  choice: 'sample',
+  choice: 'paste',
   sampleId: null,
   pasteText: '',
   title: '',

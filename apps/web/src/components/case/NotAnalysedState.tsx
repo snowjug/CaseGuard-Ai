@@ -1,9 +1,9 @@
 'use client';
 
 import type { AnalysisState, Job, RouteId } from '@caseguard/schemas';
-import { EmptyState, cg } from '@caseguard/ui';
-import { Button, Spinner, makeStyles } from '@fluentui/react-components';
-import { PlayRegular, SearchRegular } from '@fluentui/react-icons';
+import { Button, EmptyState, cg } from '@caseguard/ui';
+import { makeStyles } from '@fluentui/react-components';
+import { PlayIcon, SearchIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { JobProgress } from '../common/JobProgress';
@@ -123,19 +123,20 @@ export function NotAnalysedState({ caseId, subject, analysisState }: NotAnalysed
   return (
     <EmptyState
       headingLevel={2}
-      icon={<SearchRegular />}
+      icon={<SearchIcon />}
       title="This case has not been analysed yet"
-      description={`The analysis rebuilds the timeline, classifies evidence and weighs the hypotheses. ${
+      description={`The analysis rebuilds the timeline, checks the evidence and weighs the possible causes. ${
         subject.charAt(0).toUpperCase() + subject.slice(1)
-      } is available as soon as it has run.${
+      } is ready as soon as it has run.${
         live ? ' An analysis is queued: this page will update when it starts.' : ''
       }`}
       action={
         <GatedAction permission="case:analyze">
           <Button
-            appearance="primary"
-            disabled={start.isPending || live}
-            icon={start.isPending ? <Spinner size="tiny" /> : <PlayRegular />}
+            variant="primary"
+            disabled={live}
+            loading={start.isPending}
+            icon={<PlayIcon />}
             onClick={() => void startAnalysis()}
           >
             {start.isPending ? 'Starting…' : 'Start the analysis'}

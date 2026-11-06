@@ -2,9 +2,8 @@
 
 import { UiLink, cg } from '@caseguard/ui';
 import { makeStyles, tokens } from '@fluentui/react-components';
-import { ChevronRightRegular } from '@fluentui/react-icons';
+import { ChevronRightIcon } from 'lucide-react';
 import { usePathname } from 'next/navigation';
-import { Fragment } from 'react';
 import { useBreadcrumbLabels } from '../../lib/breadcrumbs';
 import { buildBreadcrumbs } from '../../lib/nav';
 
@@ -17,56 +16,77 @@ const useStyles = makeStyles({
     gap: cg.space[1],
     margin: 0,
     padding: 0,
-    listStyle: 'none',
+    listStyleType: 'none',
     fontSize: tokens.fontSizeBase200,
   },
   item: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: cg.space[1],
+    minWidth: 0,
+    maxWidth: '100%',
     color: cg.textSecondary,
     minHeight: '24px',
   },
   link: {
-    color: cg.textLink,
+    color: cg.textSecondary,
     textDecorationLine: 'none',
-    fontWeight: tokens.fontWeightSemibold,
-    ':hover': { textDecorationLine: 'underline' },
+    fontWeight: tokens.fontWeightMedium,
+    ':hover': { color: cg.text, textDecorationLine: 'underline' },
+    '@media (pointer: coarse)': {
+      display: 'inline-flex',
+      alignItems: 'center',
+      minHeight: '44px',
+      minWidth: '44px',
+    },
   },
-  current: { color: cg.text, fontWeight: tokens.fontWeightSemibold, overflowWrap: 'anywhere' },
+  current: {
+    color: cg.text,
+    fontWeight: tokens.fontWeightMedium,
+    maxWidth: 'min(56ch, 100%)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
   sep: { display: 'inline-flex', color: cg.textMuted },
 });
 
-/** Breadcrumb trail derived from the URL; pages can name dynamic segments with `useBreadcrumbLabel`. */
+/**
+ * Breadcrumb trail, only where a page has depth (a case, a skill, an Advanced view, adding a case); top-level pages
+ * show none. Pages can name dynamic segments with `useBreadcrumbLabel`.
+ */
 export function Breadcrumbs() {
   const styles = useStyles();
   const pathname = usePathname();
   const labels = useBreadcrumbLabels();
   const crumbs = buildBreadcrumbs(pathname, labels);
+  if (crumbs.length < 2) return null;
   return (
     <nav aria-label="Breadcrumb" className={styles.nav}>
       <ol className={styles.list}>
         {crumbs.map((crumb, index) => {
           const last = index === crumbs.length - 1;
           return (
-            <Fragment key={`${crumb.label}-${index}`}>
-              <li className={styles.item}>
-                {crumb.href && !last ? (
-                  <UiLink href={crumb.href} className={styles.link}>
-                    {crumb.label}
-                  </UiLink>
-                ) : (
-                  <span aria-current={last ? 'page' : undefined} className={styles.current}>
-                    {crumb.label}
-                  </span>
-                )}
-                {!last ? (
-                  <span aria-hidden="true" className={styles.sep}>
-                    <ChevronRightRegular />
-                  </span>
-                ) : null}
-              </li>
-            </Fragment>
+            <li key={`${crumb.label}-${index}`} className={styles.item}>
+              {crumb.href && !last ? (
+                <UiLink href={crumb.href} className={styles.link}>
+                  {crumb.label}
+                </UiLink>
+              ) : (
+                <span
+                  aria-current={last ? 'page' : undefined}
+                  title={crumb.label}
+                  className={styles.current}
+                >
+                  {crumb.label}
+                </span>
+              )}
+              {!last ? (
+                <span aria-hidden="true" className={styles.sep}>
+                  <ChevronRightIcon />
+                </span>
+              ) : null}
+            </li>
           );
         })}
       </ol>

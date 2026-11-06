@@ -1,8 +1,8 @@
 'use client';
 
 import type { IngestResult, IngestionPreview } from '@caseguard/schemas';
-import { Notice, PageHeader, cg } from '@caseguard/ui';
-import { makeStyles, tokens } from '@fluentui/react-components';
+import { BlurFade, Notice, PageHeader, cg } from '@caseguard/ui';
+import { makeStyles } from '@fluentui/react-components';
 import { useEffect, useRef, useState } from 'react';
 import { useApiMutation, useApiQuery } from '../../lib/api/hooks';
 import { useAuth } from '../../lib/auth/context';
@@ -22,48 +22,47 @@ import {
 } from './ingest-source';
 import { ReviewStep } from './ReviewStep';
 import { SourceStep } from './SourceStep';
-import { Stepper } from './Stepper';
+import { StepHeading, Stepper } from './Stepper';
 
-const STEPS = [
-  { id: 'source', label: 'Choose a source' },
-  { id: 'review', label: 'Review' },
-  { id: 'confirm', label: 'Confirm' },
-  { id: 'create', label: 'Create and analyse' },
+/** Four internal steps, three phases: the review and the confirmation are both part of "Check". */
+const PHASES = [
+  { id: 'add', label: 'Add' },
+  { id: 'check', label: 'Check' },
+  { id: 'create', label: 'Create' },
 ] as const;
-type StepId = (typeof STEPS)[number]['id'];
+type StepId = 'source' | 'review' | 'confirm' | 'create';
+const PHASE_OF: Record<StepId, number> = { source: 0, review: 1, confirm: 1, create: 2 };
 
-const STEP_TITLES: Record<StepId, string> = {
-  source: 'Choose a source',
-  review: 'Review what will be created',
-  confirm: 'Confirm and create',
-  create: 'Create and analyse',
+/** What the heading of each step says, which is where the focus goes when the step changes. The last step names itself. */
+const STEP_TITLES: Record<Exclude<StepId, 'create'>, string> = {
+  source: 'Add your case',
+  review: 'Check what will be created',
+  confirm: 'Create the case',
 };
 
 const useStyles = makeStyles({
-  page: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
-  heading: {
-    margin: 0,
-    fontSize: tokens.fontSizeBase500,
-    lineHeight: tokens.lineHeightBase500,
-    fontWeight: tokens.fontWeightSemibold,
-    outlineStyle: 'none',
+  page: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[4],
+    minWidth: 0,
+    maxWidth: '960px',
   },
+  step: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
 });
 
-const CHOICE_CODEC = codecs.enumOf(SOURCE_CHOICES, 'sample');
+const CHOICE_CODEC = codecs.enumOf(SOURCE_CHOICES, 'paste');
 const SAMPLE_CODEC = codecs.optionalString();
 
 const PAGE_HELP = (
   <>
     <p>
-      Bring a support case into CaseGuard in four steps. First you pick a source: a built-in
-      synthetic sample, pasted text, an uploaded file or a JSON bundle. Then the same pipeline that
-      stores cases checks it and shows you the result without saving anything: validation problems,
-      what would be redacted, prompt-injection findings and a preview of the timeline.
+      Paste text, upload a file, or try a built-in sample. CaseGuard checks it first and shows what
+      would be saved, including anything hidden for privacy, without saving anything.
     </p>
     <p>
-      Only when you confirm is the case stored, as an immutable record, and its analysis started.
-      Creating the same content twice never duplicates a case.
+      When you create the case, it is saved as a record that cannot be edited and its review starts.
+      Adding the same content twice never makes a duplicate.
     </p>
   </>
 );
@@ -73,10 +72,12 @@ function newAttemptKey(): string {
 }
 
 /**
- * The ingestion wizard (`/cases/new`): choose a source, review the validation, redaction and injection preview, confirm,
- * create (idempotent) and follow the analysis job to the finished case. The chosen source is in the URL; every API
- * error is explained: 413, 415, 422 (invalid, unsafe, redaction incomplete, key reuse), the 409s (reference in use,
- * identical request still running, anything else) and 429 with its retry delay.
+ * The "Add a case" wizard (`/cases/new`), four steps in three phases (Add, Check, Create): add the case from a paste, an
+ * upload, a built-in sample or a JSON bundle; check the validation, redaction and injection preview (the review and the
+ * confirmation are both "Check"); create it (idempotent) and follow the analysis job to the finished case. The chosen
+ * source is in the URL (`?source=`, Paste by default); every API error is explained: 413, 415, 422 (invalid, unsafe,
+ * redaction incomplete, key reuse), the 409s (reference in use, identical request still running, anything else) and 429
+ * with its retry delay.
  */
 export function NewCasePage() {
   const styles = useStyles();
@@ -221,72 +222,73 @@ export function NewCasePage() {
     setAnalyze(true);
   };
 
-  const index = STEPS.findIndex((item) => item.id === step);
   return (
     <>
       <PageHeader
-        title="Ingest a case"
-        description="Bring a support case into CaseGuard: see how it will be read first, then confirm."
+        title="Add a case"
+        description="Paste, upload or try a sample, then get the review."
         help={PAGE_HELP}
       />
       <div className={styles.page}>
         {session && !can('case:ingest') ? (
-          <Notice variant="warning" title="Your role cannot ingest cases">
-            You can explore this page, but validating and creating a case needs the Engineer or
-            Administrator role, so those buttons are disabled.
+          <Notice variant="warning" compact title="Your role cannot add cases">
+            You can look around, but checking and creating a case needs the Engineer or
+            Administrator role.
           </Notice>
         ) : null}
-        <Stepper steps={STEPS} current={index} label="Ingestion steps" />
-        <h2 ref={heading} tabIndex={-1} className={styles.heading}>
-          {`Step ${index + 1} of ${STEPS.length}: ${STEP_TITLES[step]}`}
-        </h2>
-        {step === 'source' ? (
-          <SourceStep
-            draft={draft}
-            onDraftChange={changeDraft}
-            onChoiceChange={changeChoice}
-            onSampleChange={(id) => {
-              setSampleParam(id);
-              setProblem(null);
-            }}
-            samples={samples}
-            examples={examples}
-            onSubmit={() => void validate()}
-            pending={pending}
-            problem={problem}
-            retryIn={retryIn}
-          />
-        ) : null}
-        {step === 'review' && preview ? (
-          <ReviewStep
-            preview={preview}
-            source={choice}
-            onBack={() => setStep('source')}
-            onContinue={() => {
-              setProblem(null);
-              setStep('confirm');
-            }}
-          />
-        ) : null}
-        {step === 'confirm' && preview ? (
-          <ConfirmStep
-            preview={preview}
-            choice={choice}
-            analyze={analyze}
-            onAnalyzeChange={setAnalyze}
-            onBack={() => {
-              setProblem(null);
-              setStep('review');
-            }}
-            onCreate={() => void create()}
-            pending={pending}
-            problem={problem}
-            retryIn={retryIn}
-          />
-        ) : null}
-        {step === 'create' && result ? (
-          <ProgressStep result={result} onAnotherCase={restart} />
-        ) : null}
+        <BlurFade index={0}>
+          <Stepper steps={PHASES} current={PHASE_OF[step]} label="Progress" />
+        </BlurFade>
+        <div className={styles.step}>
+          {step === 'create' ? null : <StepHeading ref={heading}>{STEP_TITLES[step]}</StepHeading>}
+          {step === 'source' ? (
+            <SourceStep
+              draft={draft}
+              onDraftChange={changeDraft}
+              onChoiceChange={changeChoice}
+              onSampleChange={(id) => {
+                setSampleParam(id);
+                setProblem(null);
+              }}
+              samples={samples}
+              examples={examples}
+              onSubmit={() => void validate()}
+              pending={pending}
+              problem={problem}
+              retryIn={retryIn}
+            />
+          ) : null}
+          {step === 'review' && preview ? (
+            <ReviewStep
+              preview={preview}
+              source={choice}
+              onBack={() => setStep('source')}
+              onContinue={() => {
+                setProblem(null);
+                setStep('confirm');
+              }}
+            />
+          ) : null}
+          {step === 'confirm' && preview ? (
+            <ConfirmStep
+              preview={preview}
+              choice={choice}
+              analyze={analyze}
+              onAnalyzeChange={setAnalyze}
+              onBack={() => {
+                setProblem(null);
+                setStep('review');
+              }}
+              onCreate={() => void create()}
+              pending={pending}
+              problem={problem}
+              retryIn={retryIn}
+            />
+          ) : null}
+          {step === 'create' && result ? (
+            <ProgressStep result={result} onAnotherCase={restart} headingRef={heading} />
+          ) : null}
+        </div>
       </div>
     </>
   );

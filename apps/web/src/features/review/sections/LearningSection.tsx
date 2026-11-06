@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Button,
   EmptyState,
   LoadingSkeleton,
   Notice,
@@ -12,8 +13,8 @@ import {
   formatDateTimeUtc,
   useRestoreFocusTarget,
 } from '@caseguard/ui';
-import { Button, makeStyles, tokens } from '@fluentui/react-components';
-import { MoleculeRegular } from '@fluentui/react-icons';
+import { makeStyles, tokens } from '@fluentui/react-components';
+import { DnaIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useId, useMemo, useState } from 'react';
 import { JobProgress } from '../../../components/common/JobProgress';
@@ -149,14 +150,18 @@ const useStyles = makeStyles({
     color: cg.textLink,
     fontWeight: tokens.fontWeightSemibold,
     minHeight: '24px',
+    '@media (pointer: coarse)': { minHeight: '44px', paddingBlock: cg.space[3] },
   },
   actions: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
   link: {
+    display: 'inline-flex',
+    alignItems: 'center',
     color: cg.textLink,
     textDecorationLine: 'underline',
     textUnderlineOffset: '2px',
     fontSize: tokens.fontSizeBase300,
     minHeight: '24px',
+    '@media (pointer: coarse)': { minHeight: '44px' },
   },
 });
 
@@ -380,7 +385,7 @@ function MatchCard({
             <GatedConfirm
               permission="skill:apply"
               trigger={
-                <Button appearance="primary" aria-label={`Adopt this plan: ${match.skillName}`}>
+                <Button variant="secondary" aria-label={`Adopt this plan: ${match.skillName}`}>
                   Adopt this plan
                 </Button>
               }
@@ -447,8 +452,8 @@ function Extract({ caseId, scenarioId }: { caseId: string; scenarioId: string })
       <div className={styles.actions}>
         <GatedAction permission="skill:extract">
           <Button
-            appearance="primary"
-            icon={<MoleculeRegular />}
+            variant="secondary"
+            icon={<DnaIcon />}
             disabled={extract.isPending || jobId !== null}
             onClick={() => void start()}
             {...restoreFocus}
@@ -525,10 +530,11 @@ export function LearningSection({ caseId }: { caseId: string }) {
   return (
     <SectionFrame
       id="learning"
-      title="Learning"
-      description="Reusable skills that resemble this case, and what following them would have changed."
+      title="What to learn"
+      description="Reusable fixes that resemble this case, and what following them would have changed."
       badges={<ProvenanceBadge kind="estimated" />}
       method={notes}
+      collapsible
     >
       <div className={styles.stack}>
         {matches.source.kind !== 'ready' ? (
@@ -536,7 +542,7 @@ export function LearningSection({ caseId }: { caseId: string }) {
         ) : !learning || learning.matches.length === 0 ? (
           <EmptyState
             compact
-            icon={<MoleculeRegular />}
+            icon={<DnaIcon />}
             title="No reusable skill resembles this case"
             description={
               learning && learning.notApplicable > 0

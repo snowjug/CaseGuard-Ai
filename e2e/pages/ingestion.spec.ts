@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from '../support/fixtures';
 import { asPersona, listCases } from '../support/api';
 import { ROOT } from '../support/env';
@@ -34,24 +35,71 @@ const INJECTION =
 const NEUTRAL =
   'Reviewed the sign-in logs for three sample users and the error code on the client.';
 
-async function pasteAndPreview(page: Page, text: string): Promise<void> {
-  await openPage(page, '/cases/new');
-  await page.getByRole('tab', { name: 'Paste text' }).click();
-  await page.getByRole('textbox', { name: 'Case text' }).fill(text);
-  await page.getByRole('button', { name: 'Validate and preview' }).click();
-  await expect(page.getByRole('heading', { name: /Step 2 of 4/ })).toBeVisible();
+type Source = 'Paste' | 'Upload' | 'Sample' | 'JSON';
+
+/** Picks where the case comes from in the "Case source" switch (a radio group of four segments). */
+async function chooseSource(page: Page, source: Source): Promise<void> {
+  const segment = page
+    .getByRole('radiogroup', { name: 'Case source' })
+    .getByRole('radio', { name: source, exact: true });
+  await segment.click();
+  await expect(segment).toBeChecked();
 }
 
-test.describe('[FR-ING-01] the ingestion wizard offers four sources and the downloads to write your own', () => {
+type Check = 'Format' | 'Redaction' | 'Injection screening';
+
+/**
+ * The detail of one of the three checks of the Check step. Each check is a row that gives its outcome up front: a clean
+ * one is closed and opens on a click, one that found something is open already (a click would close it).
+ */
+async function openCheck(page: Page, check: Check): Promise<Locator> {
+  const row = page.getByRole('button', { name: new RegExp(`^${check}`) });
+  if ((await row.getAttribute('aria-expanded')) !== 'true') await row.click();
+  await expect(row).toHaveAttribute('aria-expanded', 'true');
+  return page.getByRole('region', { name: new RegExp(`^${check}`) });
+}
+
+/** The value of one fact in the result of the check ("Events", "Workload"): the definition that follows its term. */
+const fact = (result: Locator, term: string): Locator =>
+  result
+    .getByRole('term')
+    .filter({ hasText: new RegExp(`^${term}$`) })
+    .locator('xpath=following-sibling::dd');
+
+/**
+ * The heading of the last step once the case exists, whichever state its analysis is in: running ("Creating your case"),
+ * finished ("Your case is ready") or failed ("Your case is saved").
+ */
+const createdHeading = (page: Page): Locator =>
+  page.getByRole('heading', {
+    name: /^(Creating your case|Your case is ready|Your case is saved)$/,
+  });
+
+async function pasteAndPreview(page: Page, text: string): Promise<void> {
+  await openPage(page, '/cases/new');
+  await chooseSource(page, 'Paste');
+  await page.getByRole('textbox', { name: 'Case text' }).fill(text);
+  await page.getByRole('button', { name: 'Check case' }).click();
+  await expect(page.getByRole('heading', { name: 'Check what will be created' })).toBeVisible();
+}
+
+test.describe('[FR-ING-01] the Add a case wizard offers four sources and the downloads to write your own', () => {
   test('built-in sample, pasted text, an uploaded file and a JSON bundle; schemas and examples can be downloaded', async ({
     page,
   }) => {
     await openPage(page, '/cases/new');
-    await expect(page.getByRole('heading', { level: 1, name: 'Ingest a case' })).toBeVisible();
-    const sources = page.getByRole('tablist', { name: 'Case source' });
-    for (const name of ['Built-in sample', 'Paste text', 'Upload a file', 'JSON bundle']) {
-      await expect(sources.getByRole('tab', { name }), name).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Add a case' })).toBeVisible();
+    const sources = page.getByRole('radiogroup', { name: 'Case source' });
+    for (const name of ['Paste', 'Upload', 'Sample', 'JSON']) {
+      await expect(sources.getByRole('radio', { name, exact: true }), name).toBeVisible();
     }
+    await expect(
+      sources.getByRole('radio', { name: 'Paste', exact: true }),
+      'pasting is the source the page opens on',
+    ).toBeChecked();
+    await expect(page.getByRole('textbox', { name: 'Case text' })).toBeVisible();
+
+    await chooseSource(page, 'Sample');
     const samples = page.getByRole('radiogroup', { name: 'Built-in sample' });
     await expect(samples.getByRole('radio', { name: /^CG-SYN-1001:/ })).toBeChecked();
     await expect(samples.getByRole('radio', { name: /^CG-SYN-1002:/ })).toBeVisible();
@@ -60,6 +108,9 @@ test.describe('[FR-ING-01] the ingestion wizard offers four sources and the down
         /Built-in cases are synthetic: every person, organisation and incident in them is fictional/,
       ),
     ).toBeVisible();
+
+    // The downloads are folded under "More ways to add".
+    await page.getByRole('button', { name: /^More ways to add/ }).click();
     await expect(
       page.getByRole('button', { name: 'Download Case bundle JSON Schema' }),
     ).toBeVisible();
@@ -68,15 +119,42 @@ test.describe('[FR-ING-01] the ingestion wizard offers four sources and the down
     );
   });
 
-  test('the four steps are named, and the current one is announced', async ({ page }) => {
+  test('a link to the sample choice opens it', async ({ page }) => {
+    await openPage(page, '/cases/new?source=sample');
+    await expect(
+      page
+        .getByRole('radiogroup', { name: 'Case source' })
+        .getByRole('radio', { name: 'Sample', exact: true }),
+    ).toBeChecked();
+    await expect(
+      page
+        .getByRole('radiogroup', { name: 'Built-in sample' })
+        .getByRole('radio', { name: /^CG-SYN-1001:/ }),
+    ).toBeChecked();
+  });
+
+  test('the three phases are named, and the current one is announced', async ({ page }) => {
     await openPage(page, '/cases/new');
-    const steps = page.getByRole('list', { name: 'Ingestion steps' });
-    await expect(steps.getByRole('listitem').nth(0)).toContainText(
-      'Step 1 of 4, current: Choose a source',
-    );
-    await expect(steps.getByRole('listitem').nth(3)).toContainText(
-      'Step 4 of 4, upcoming: Create and analyse',
-    );
+    const steps = page.getByRole('list', { name: 'Progress' }).getByRole('listitem');
+    await expect(steps).toHaveCount(3);
+    await expect(steps.nth(0)).toContainText('Step 1 of 3, current: Add');
+    await expect(steps.nth(1)).toContainText('Step 2 of 3, upcoming: Check');
+    await expect(steps.nth(2)).toContainText('Step 3 of 3, upcoming: Create');
+  });
+
+  test('the review and the confirmation are both the Check phase', async ({ page }) => {
+    await openPage(page, '/cases/new?source=sample');
+    const steps = page.getByRole('list', { name: 'Progress' }).getByRole('listitem');
+    await page.getByRole('button', { name: 'Check case' }).click();
+    await expect(page.getByRole('heading', { name: 'Check what will be created' })).toBeVisible();
+    await expect(steps.nth(0)).toContainText('Step 1 of 3, completed: Add');
+    await expect(steps.nth(1)).toContainText('Step 2 of 3, current: Check');
+
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Create the case' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Create and analyse' })).toBeVisible();
+    await expect(steps.nth(1)).toContainText('Step 2 of 3, current: Check');
+    await expect(steps.nth(2)).toContainText('Step 3 of 3, upcoming: Create');
   });
 });
 
@@ -86,26 +164,39 @@ test.describe('[FR-ING-03] a preview shows what will be stored, without storing 
     api,
   }) => {
     const before = (await listCases(api('engineer'))).length;
-    await openPage(page, '/cases/new');
-    await page.getByRole('button', { name: 'Validate and preview' }).click();
-    await expect(page.getByRole('heading', { name: /Step 2 of 4/ })).toBeVisible();
-    await expect(page.getByRole('group', { name: 'Result of the check' })).toContainText(
-      'Ready to ingest',
-    );
-    await expect(page.getByRole('group', { name: 'Result of the check' })).toContainText(
-      '0 errors',
-    );
-    const created = page.getByRole('group', { name: 'What would be created' });
-    await expect(created.getByText('CG-SYN-1001')).toBeVisible();
-    await expect(created.getByText('31', { exact: true })).toBeVisible();
+    await openPage(page, '/cases/new?source=sample');
+    await page.getByRole('button', { name: 'Check case' }).click();
+    await expect(page.getByRole('heading', { name: 'Check what will be created' })).toBeVisible();
+    const result = page.getByRole('group', { name: 'Result of the check' });
+    await expect(result).toContainText('Ready to create');
+    await expect(result).toContainText('0 errors');
+    // What would be created is part of the result.
+    await expect(result.getByText('CG-SYN-1001')).toBeVisible();
+    await expect(result.getByText('31', { exact: true })).toBeVisible();
+    await expect(fact(result, 'Events')).toHaveText('31');
     await expect(page.getByText('This record is immutable')).toBeVisible();
-    await expect(page.getByRole('group', { name: 'Redaction' })).toContainText(
+    // The three checks are rows that give their outcome up front; a clean one is closed until it is opened.
+    for (const check of ['Format', 'Redaction', 'Injection screening']) {
+      await expect(
+        page.getByRole('button', { name: new RegExp(`^${check}`) }),
+        check,
+      ).toContainText('Passed');
+    }
+    await expect(await openCheck(page, 'Redaction')).toContainText(
       'Nothing that looks like a secret or personal data was found',
     );
-    await expect(page.getByRole('group', { name: 'Prompt-injection screening' })).toBeVisible();
-    await expect(
-      page.getByRole('list', { name: 'Preview of the first events' }).getByRole('listitem').first(),
-    ).toContainText('Customer email');
+    await expect(await openCheck(page, 'Injection screening')).toContainText(
+      'No prompt-injection patterns were detected.',
+    );
+    const timeline = page.getByRole('list', { name: 'Preview of the first events' });
+    await expect(timeline.getByRole('listitem').first()).toContainText('Customer email');
+    // The timeline shows the first five events; "Show all" opens the rest of what the preview carries.
+    await expect(timeline.getByRole('listitem')).toHaveCount(5);
+    const showAll = page.getByRole('button', { name: /^Show all \d+ events$/ });
+    const shown = Number(/\d+/.exec(await showAll.innerText())![0]);
+    await showAll.click();
+    await expect(timeline.getByRole('listitem')).toHaveCount(shown);
+    await expect(page.getByRole('button', { name: 'Show fewer events' })).toBeVisible();
     expect((await listCases(api('engineer'))).length, 'a preview stores nothing').toBe(before);
   });
 
@@ -117,7 +208,8 @@ test.describe('[FR-ING-03] a preview shows what will be stored, without storing 
       'The customer sent user@host.com from 8.8.8.8 and 1.2.3.4, and the token was Bearer abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGH.',
     );
     await pasteAndPreview(page, text);
-    const redaction = page.getByRole('group', { name: 'Redaction' });
+    // The check found values to replace, so its row is already open.
+    const redaction = await openCheck(page, 'Redaction');
     await expect(redaction).not.toContainText(
       'Nothing that looks like a secret or personal data was found',
     );
@@ -162,12 +254,12 @@ test.describe('[FR-ING-02] validation is friendly and field-level', () => {
     page,
   }) => {
     await openPage(page, '/cases/new');
-    await page.getByRole('tab', { name: 'JSON bundle' }).click();
+    await chooseSource(page, 'JSON');
     const box = page.getByRole('textbox', { name: /^Case bundle \(JSON\)/ });
-    const validate = page.getByRole('button', { name: 'Validate and preview' });
+    const check = page.getByRole('button', { name: 'Check case' });
     await box.fill('{ this is not json');
     await expect(page.getByText(/^Not valid JSON:/)).toBeVisible();
-    await expect(validate).toBeDisabled();
+    await expect(check).toBeDisabled();
 
     await box.fill(
       JSON.stringify({
@@ -178,17 +270,19 @@ test.describe('[FR-ING-02] validation is friendly and field-level', () => {
         events: [],
       }),
     );
-    await expect(validate).toBeEnabled();
-    await validate.click();
-    await expect(page.getByRole('heading', { name: /Step 2 of 4/ })).toBeVisible();
+    await expect(check).toBeEnabled();
+    await check.click();
+    await expect(page.getByRole('heading', { name: 'Check what will be created' })).toBeVisible();
     await expect(page.getByRole('group', { name: 'Result of the check' })).toContainText(
-      'Cannot be ingested yet',
+      'Cannot be created yet',
     );
-    const issues = page.getByRole('table', { name: 'Validation issues' });
+    // The format check found problems, so its row is already open.
+    const format = await openCheck(page, 'Format');
+    const issues = format.getByRole('table', { name: 'Validation issues' });
     await expect(issues).toBeVisible();
     await expect(issues.getByRole('row').nth(1).getByRole('cell').first()).toContainText('Error');
     await expect(issues).toContainText(/case\.|participants|events/);
-    await expect(page.getByRole('button', { name: 'Continue to confirm' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeDisabled();
   });
 });
 
@@ -214,11 +308,12 @@ test.describe('[NFR-SEC-05] text in a case is data, never an instruction', () =>
       (window as unknown as { __pwned?: number }).__pwned = undefined;
     });
     await openPage(page, '/cases/new');
-    await page.getByRole('tab', { name: 'JSON bundle' }).click();
+    await chooseSource(page, 'JSON');
     await page.getByRole('textbox', { name: /^Case bundle \(JSON\)/ }).fill(JSON.stringify(bundle));
-    await page.getByRole('button', { name: 'Validate and preview' }).click();
-    await expect(page.getByRole('heading', { name: /Step 2 of 4/ })).toBeVisible();
-    const screening = page.getByRole('group', { name: 'Prompt-injection screening' });
+    await page.getByRole('button', { name: 'Check case' }).click();
+    await expect(page.getByRole('heading', { name: 'Check what will be created' })).toBeVisible();
+    // The screening flagged the note, so its row is already open.
+    const screening = await openCheck(page, 'Injection screening');
     await expect(screening).toContainText(/finding/);
     await expect(screening).toContainText('high');
     await expect(
@@ -234,11 +329,9 @@ test.describe('[NFR-SEC-05] text in a case is data, never an instruction', () =>
       await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned),
     ).toBeUndefined();
 
-    await page.getByRole('button', { name: 'Continue to confirm' }).click();
-    await page.getByRole('button', { name: 'Create case' }).click();
-    await expect(page.getByRole('group', { name: 'The case was created' })).toBeVisible({
-      timeout: 60_000,
-    });
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('button', { name: 'Create and analyse' }).click();
+    await expect(createdHeading(page)).toBeVisible({ timeout: 60_000 });
     const injected = await caseByReference(bundle.case.reference);
     created.push(injected.id);
     await waitUntilAnalysed(injected.id);
@@ -276,7 +369,7 @@ test.describe('[FR-ING-05] a reference that is taken says so, in words', () => {
   }) => {
     await pasteAndPreview(page, transcript('CG-SYN-1001', NEUTRAL));
     await expect(page.getByRole('group', { name: 'Result of the check' })).toContainText(
-      'Cannot be ingested yet',
+      'Cannot be created yet',
     );
     await expect(page.getByText('Reference CG-SYN-1001 is already in use')).toBeVisible();
     await expect(
@@ -285,7 +378,7 @@ test.describe('[FR-ING-05] a reference that is taken says so, in words', () => {
     await expect(
       page.getByRole('link', { name: 'Find that case in the Cases list' }),
     ).toHaveAttribute('href', '/cases?q=CG-SYN-1001');
-    await expect(page.getByRole('button', { name: 'Continue to confirm' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeDisabled();
     await expect(mainRegion(page)).not.toContainText(/at \w+ \(|node_modules|stack trace/i);
 
     // The API says the same thing with a token, not a sentence, and creates nothing.
@@ -312,26 +405,22 @@ test.describe('[FR-ING-01] an uploaded file goes through the same pipeline', () 
     page,
     api,
   }) => {
-    await openPage(page, '/cases/new');
-    await page.getByRole('tab', { name: 'Upload a file' }).click();
-    await page
-      .locator('input[type="file"]')
-      .setInputFiles(path.join(ROOT, 'synthetic-data', 'examples', 'minimal-case-bundle.json'));
-    await page.getByRole('button', { name: 'Validate and preview' }).click();
-    await expect(page.getByRole('heading', { name: /Step 2 of 4/ })).toBeVisible();
-    await expect(page.getByRole('group', { name: 'What would be created' })).toContainText('3');
+    const bundlePath = path.join(ROOT, 'synthetic-data', 'examples', 'minimal-case-bundle.json');
     const reference = (
-      await page
-        .getByRole('group', { name: 'What would be created' })
-        .getByRole('definition')
-        .first()
-        .innerText()
-    ).trim();
-    await page.getByRole('button', { name: 'Continue to confirm' }).click();
-    await page.getByRole('button', { name: 'Create case' }).click();
-    await expect(page.getByRole('group', { name: 'The case was created' })).toBeVisible({
-      timeout: 60_000,
-    });
+      JSON.parse(readFileSync(bundlePath, 'utf8')) as { case: { reference: string } }
+    ).case.reference;
+    await openPage(page, '/cases/new');
+    await chooseSource(page, 'Upload');
+    await page.locator('input[type="file"]').setInputFiles(bundlePath);
+    await page.getByRole('button', { name: 'Check case' }).click();
+    await expect(page.getByRole('heading', { name: 'Check what will be created' })).toBeVisible();
+    const result = page.getByRole('group', { name: 'Result of the check' });
+    await expect(fact(result, 'Events')).toHaveText('3');
+    // What the preview shows is the case the file describes: its reference is the one the list is searched for below.
+    await expect(result).toContainText(reference);
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('button', { name: 'Create and analyse' }).click();
+    await expect(createdHeading(page)).toBeVisible({ timeout: 60_000 });
     const found = (await listCases(api('engineer'))).find((item) => item.reference === reference);
     expect(found, `the case ${reference} exists`).toBeTruthy();
     expect(found!.synthetic).toBe(true);
@@ -339,7 +428,7 @@ test.describe('[FR-ING-01] an uploaded file goes through the same pipeline', () 
   });
 });
 
-test.describe('[NFR-REL-01] pressing "Create case" twice creates one case', () => {
+test.describe('[NFR-REL-01] pressing "Create and analyse" twice creates one case', () => {
   test.setTimeout(300_000);
   let createdId: string | null = null;
   test.afterAll(async () => {
@@ -358,11 +447,9 @@ test.describe('[NFR-REL-01] pressing "Create case" twice creates one case', () =
       }
     });
     await pasteAndPreview(page, transcript(reference, NEUTRAL));
-    await page.getByRole('button', { name: 'Continue to confirm' }).click();
-    await page.getByRole('button', { name: 'Create case' }).dblclick();
-    await expect(page.getByRole('group', { name: 'The case was created' })).toBeVisible({
-      timeout: 60_000,
-    });
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('button', { name: 'Create and analyse' }).dblclick();
+    await expect(createdHeading(page)).toBeVisible({ timeout: 60_000 });
 
     expect(posts.length, 'at least one create request').toBeGreaterThanOrEqual(1);
     expect(

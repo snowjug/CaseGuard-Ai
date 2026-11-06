@@ -1,15 +1,57 @@
 'use client';
 
 import type { SkillCondition, SkillContent } from '@caseguard/schemas';
-import { CopyButton, StatusBadge, UiLink } from '@caseguard/ui';
+import {
+  Accordion,
+  AccordionItem,
+  Badge,
+  CopyButton,
+  UiLink,
+  cg,
+  formatProbability,
+} from '@caseguard/ui';
+import { makeStyles, tokens } from '@fluentui/react-components';
+import { HistoryIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { evidenceLinkHref } from '../../lib/deep-links';
-import { formatProbability } from '../../lib/format';
-import { useInsightStyles } from '../quality/styles';
+import { HINDSIGHT_LABEL } from './labels';
+import { useSkillStyles } from './styles';
 
 const HINDSIGHT_MARK = /\(hindsight-informed\)/i;
 
-function Collapsible({
+const useStyles = makeStyles({
+  stepTitle: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase300,
+    fontWeight: tokens.fontWeightSemibold,
+    color: cg.text,
+  },
+  branches: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[3],
+    margin: 0,
+    padding: `${cg.space[1]} 0 0 ${cg.space[4]}`,
+    listStyle: 'none',
+    borderLeft: `2px solid ${cg.borderSubtle}`,
+  },
+  branch: { display: 'flex', flexDirection: 'column', gap: cg.space[1], minWidth: 0 },
+  // One quiet line per branch: the long explanation is said once, above the steps.
+  hindsightLine: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: cg.space[2],
+    margin: 0,
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+    color: cg.tone.uncertain.fg,
+    '& > svg': { flexShrink: 0, marginTop: cg.space[1] },
+  },
+  hindsightTitle: { fontWeight: tokens.fontWeightSemibold },
+});
+
+function Section({
   title,
   count,
   defaultOpen = false,
@@ -20,15 +62,21 @@ function Collapsible({
   defaultOpen?: boolean;
   children: ReactNode;
 }) {
-  const styles = useInsightStyles();
   return (
-    <details className={styles.details} open={defaultOpen || undefined}>
-      <summary className={styles.summary}>
-        {title}
-        {count !== undefined ? <span className={styles.meta}>({count})</span> : null}
-      </summary>
-      <div className={styles.detailsBody}>{children}</div>
-    </details>
+    <AccordionItem
+      title={title}
+      headingLevel={3}
+      defaultOpen={defaultOpen}
+      badge={
+        count !== undefined ? (
+          <Badge tone="neutral" size="sm">
+            {count}
+          </Badge>
+        ) : undefined
+      }
+    >
+      {children}
+    </AccordionItem>
   );
 }
 
@@ -41,25 +89,25 @@ function Conditions({
   hindsightPaths: readonly string[];
   group: 'triggerConditions' | 'exclusions';
 }) {
-  const styles = useInsightStyles();
+  const styles = useSkillStyles();
   if (conditions.length === 0) return <p className={styles.text}>None.</p>;
   return (
-    <ul className={styles.list}>
+    <ul className={styles.rows}>
       {conditions.map((condition) => {
         const hindsight =
           HINDSIGHT_MARK.test(condition.description) ||
           hindsightPaths.includes(`${group}.${condition.id}`) ||
           hindsightPaths.includes(group);
         return (
-          <li key={condition.id} className={styles.item}>
-            <div className={styles.itemHead}>
-              <StatusBadge
-                status={condition.required ? 'productive' : 'neutral'}
-                label={condition.required ? 'Required' : 'Optional'}
-                size="small"
-              />
+          <li key={condition.id} className={styles.rowItem}>
+            <div className={styles.rowHead}>
+              <Badge tone={condition.required ? 'brand' : 'neutral'} size="sm">
+                {condition.required ? 'Required' : 'Optional'}
+              </Badge>
               {hindsight ? (
-                <StatusBadge status="uncertain" label="Learned with hindsight" size="small" />
+                <Badge tone="uncertain" icon={<HistoryIcon />} size="sm">
+                  {HINDSIGHT_LABEL}
+                </Badge>
               ) : null}
               <span className={styles.meta}>weight {formatProbability(condition.weight, 0)}</span>
             </div>
@@ -81,7 +129,7 @@ function Conditions({
 }
 
 function TextList({ items, empty }: { items: readonly string[]; empty: string }) {
-  const styles = useInsightStyles();
+  const styles = useSkillStyles();
   if (items.length === 0) return <p className={styles.text}>{empty}</p>;
   return (
     <ul className={styles.bullets}>
@@ -93,7 +141,11 @@ function TextList({ items, empty }: { items: readonly string[]; empty: string })
 }
 
 function DecisionSequence({ content }: { content: SkillContent }) {
-  const styles = useInsightStyles();
+  const styles = useSkillStyles();
+  const own = useStyles();
+  const anyHindsightEstimate = content.decisionSequence.some((step) =>
+    step.branches.some((branch) => branch.hindsightProbability !== undefined),
+  );
   const titleOf = (next: string): string => {
     if (next === 'stop') return 'Stop';
     if (next === 'escalate') return 'Escalate';
@@ -101,57 +153,67 @@ function DecisionSequence({ content }: { content: SkillContent }) {
     return content.decisionSequence.find((step) => step.id === next)?.title ?? next;
   };
   return (
-    <ol className={styles.list}>
-      {[...content.decisionSequence]
-        .sort((a, b) => a.order - b.order)
-        .map((step) => (
-          <li key={step.id} className={styles.item}>
-            <h3 className={styles.itemTitle}>
-              {step.order}. {step.title}
-            </h3>
-            <p className={styles.text}>{step.instruction}</p>
-            <p className={styles.meta}>
-              {step.actionKey ? `Action ${step.actionKey}` : 'No catalogued action'}
-              {step.expectedInformationGainBits !== null
-                ? ` · expected information gain ${step.expectedInformationGainBits} bits (estimate)`
-                : ''}
-              {step.requiresInputs.length > 0 ? ` · needs ${step.requiresInputs.join(', ')}` : ''}
-            </p>
-            {step.branches.length > 0 ? (
-              <ul className={styles.list} aria-label={`Branches after ${step.title}`}>
-                {step.branches.map((branch) => (
-                  <li key={`${branch.condition}:${branch.next}`} className={styles.detailsBody}>
-                    <p className={styles.text}>
-                      <span className={styles.strong}>If</span> {branch.condition}{' '}
-                      <span className={styles.strong}>then</span> {titleOf(branch.next)}
-                    </p>
-                    <p className={styles.meta}>{branch.rationale}</p>
-                    {branch.probability !== undefined ? (
-                      <p className={styles.meta}>
-                        Decision-time estimate: {formatProbability(branch.probability, 0)} that this
-                        outcome occurs.
+    <div className={styles.stack}>
+      {anyHindsightEstimate ? (
+        <p className={styles.caption}>
+          Hindsight estimates use the recorded cause of the source case. They only calibrate the
+          decision-time estimates: a branch probability like this does not count towards a match or
+          towards the steps the skill recommends.
+        </p>
+      ) : null}
+      <ol className={styles.rows}>
+        {[...content.decisionSequence]
+          .sort((a, b) => a.order - b.order)
+          .map((step) => (
+            <li key={step.id} className={styles.rowItem}>
+              <h4 className={own.stepTitle}>
+                {step.order}. {step.title}
+              </h4>
+              <p className={styles.text}>{step.instruction}</p>
+              <p className={styles.meta}>
+                {step.actionKey ? `Action ${step.actionKey}` : 'No catalogued action'}
+                {step.expectedInformationGainBits !== null
+                  ? ` · expected information gain ${step.expectedInformationGainBits} bits (estimate)`
+                  : ''}
+                {step.requiresInputs.length > 0 ? ` · needs ${step.requiresInputs.join(', ')}` : ''}
+              </p>
+              {step.branches.length > 0 ? (
+                <ul className={own.branches} aria-label={`Branches after ${step.title}`}>
+                  {step.branches.map((branch) => (
+                    <li key={`${branch.condition}:${branch.next}`} className={own.branch}>
+                      <p className={styles.text}>
+                        <span className={styles.strong}>If</span> {branch.condition}{' '}
+                        <span className={styles.strong}>then</span> {titleOf(branch.next)}
                       </p>
-                    ) : null}
-                    {branch.hindsightProbability !== undefined ? (
-                      <div className={styles.hindsight}>
-                        <p className={styles.hindsightTitle}>
-                          Hindsight estimate (uses the recorded cause)
+                      <p className={styles.meta}>{branch.rationale}</p>
+                      {branch.probability !== undefined ? (
+                        <p className={styles.meta}>
+                          Decision-time estimate: {formatProbability(branch.probability, 0)} that
+                          this outcome occurs.
                         </p>
-                        <p className={styles.text}>
-                          {formatProbability(branch.hindsightProbability, 0)} given the recorded
-                          root cause of the source case. It only calibrates the decision-time
-                          estimate above: a branch probability like this does not count towards a
-                          match or towards the steps the skill recommends.
+                      ) : null}
+                      {branch.hindsightProbability !== undefined ? (
+                        <p className={own.hindsightLine}>
+                          <HistoryIcon aria-hidden="true" />
+                          <span>
+                            <span className={own.hindsightTitle}>
+                              Hindsight estimate (uses the recorded cause)
+                            </span>{' '}
+                            <span>
+                              {formatProbability(branch.hindsightProbability, 0)} given the recorded
+                              root cause of the source case.
+                            </span>
+                          </span>
                         </p>
-                      </div>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </li>
-        ))}
-    </ol>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </li>
+          ))}
+      </ol>
+    </div>
   );
 }
 
@@ -159,30 +221,30 @@ export interface DefinitionSectionsProps {
   content: SkillContent;
 }
 
-/** The parts of the current version, each in a disclosure: what triggers it, what it does, what it must never do. */
+/** The parts of the current version, each in an accordion: what triggers it, what it does, what it must never do. */
 export function DefinitionSections({ content }: DefinitionSectionsProps) {
-  const styles = useInsightStyles();
+  const styles = useSkillStyles();
   const hindsightPaths = content.provenance?.hindsight.parts ?? [];
   return (
-    <div className={styles.stack}>
-      <Collapsible title="Trigger conditions" count={content.triggerConditions.length} defaultOpen>
+    <Accordion>
+      <Section title="Trigger conditions" count={content.triggerConditions.length} defaultOpen>
         <Conditions
           conditions={content.triggerConditions}
           hindsightPaths={hindsightPaths}
           group="triggerConditions"
         />
-      </Collapsible>
-      <Collapsible title="Exclusions" count={content.exclusions.length}>
+      </Section>
+      <Section title="Exclusions" count={content.exclusions.length}>
         <Conditions
           conditions={content.exclusions}
           hindsightPaths={hindsightPaths}
           group="exclusions"
         />
-      </Collapsible>
-      <Collapsible title="Decision sequence" count={content.decisionSequence.length} defaultOpen>
+      </Section>
+      <Section title="Decision sequence" count={content.decisionSequence.length} defaultOpen>
         <DecisionSequence content={content} />
-      </Collapsible>
-      <Collapsible title="Required inputs" count={content.requiredInputs.length}>
+      </Section>
+      <Section title="Required inputs" count={content.requiredInputs.length}>
         {content.requiredInputs.length === 0 ? (
           <p className={styles.text}>None.</p>
         ) : (
@@ -195,8 +257,8 @@ export function DefinitionSections({ content }: DefinitionSectionsProps) {
             ))}
           </ul>
         )}
-      </Collapsible>
-      <Collapsible title="Minimum evidence" count={content.minimumEvidence.length}>
+      </Section>
+      <Section title="Minimum evidence" count={content.minimumEvidence.length}>
         {content.minimumEvidence.length === 0 ? (
           <p className={styles.text}>None.</p>
         ) : (
@@ -208,15 +270,15 @@ export function DefinitionSections({ content }: DefinitionSectionsProps) {
             ))}
           </ul>
         )}
-      </Collapsible>
-      <Collapsible title="Candidate actions" count={content.candidateActions.length}>
+      </Section>
+      <Section title="Candidate actions" count={content.candidateActions.length}>
         {content.candidateActions.length === 0 ? (
           <p className={styles.text}>None.</p>
         ) : (
-          <ul className={styles.list}>
+          <ul className={styles.rows}>
             {content.candidateActions.map((action) => (
-              <li key={action.actionKey} className={styles.item}>
-                <p className={styles.itemTitle}>{action.label}</p>
+              <li key={action.actionKey} className={styles.rowItem}>
+                <p className={styles.title}>{action.label}</p>
                 <p className={styles.text}>{action.whenToUse}</p>
                 <p className={styles.meta}>
                   Risk {action.risk} · customer effort {action.customerEffort.replace('_', ' ')} ·{' '}
@@ -226,63 +288,71 @@ export function DefinitionSections({ content }: DefinitionSectionsProps) {
             ))}
           </ul>
         )}
-      </Collapsible>
-      <Collapsible title="When to stop, succeed or escalate">
-        <p className={styles.itemTitle}>Stop conditions</p>
-        <TextList items={content.stopConditions} empty="None." />
-        <p className={styles.itemTitle}>Success conditions</p>
-        <TextList items={content.successConditions} empty="None." />
-        <p className={styles.itemTitle}>Escalation conditions</p>
-        <TextList items={content.escalationConditions} empty="None." />
-      </Collapsible>
-      <Collapsible title="Safety constraints" count={content.safetyConstraints.length} defaultOpen>
+      </Section>
+      <Section title="When to stop, succeed or escalate">
+        <div className={styles.stack}>
+          <div className={styles.tight}>
+            <p className={styles.title}>Stop conditions</p>
+            <TextList items={content.stopConditions} empty="None." />
+          </div>
+          <div className={styles.tight}>
+            <p className={styles.title}>Success conditions</p>
+            <TextList items={content.successConditions} empty="None." />
+          </div>
+          <div className={styles.tight}>
+            <p className={styles.title}>Escalation conditions</p>
+            <TextList items={content.escalationConditions} empty="None." />
+          </div>
+        </div>
+      </Section>
+      <Section title="Safety constraints" count={content.safetyConstraints.length} defaultOpen>
         <TextList items={content.safetyConstraints} empty="None." />
-      </Collapsible>
-      <Collapsible title="Query templates" count={content.queryTemplates.length}>
-        {content.queryTemplates.length === 0 ? (
-          <p className={styles.text}>None.</p>
-        ) : (
-          <ul className={styles.list}>
-            {content.queryTemplates.map((template) => (
-              <li key={template.id} className={styles.item}>
-                <div className={styles.itemHead}>
-                  <p className={styles.itemTitle}>{template.title}</p>
-                  <StatusBadge
-                    status="neutral"
-                    label={template.language === 'kql' ? 'KQL' : 'PowerShell'}
-                    size="small"
-                  />
-                  <CopyButton value={template.template} label={`Copy ${template.title}`} />
-                </div>
-                <p className={styles.text}>{template.description}</p>
-                <pre className={styles.code}>{template.template}</pre>
-                {template.parameters.length > 0 ? (
-                  <ul className={styles.bullets} aria-label="Parameters">
-                    {template.parameters.map((parameter) => (
-                      <li key={parameter.name}>
-                        <span className={styles.mono}>{`{{${parameter.name}}}`}</span>:{' '}
-                        {parameter.description}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-                <p className={styles.meta}>Safety: {template.safetyNote}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className={styles.meta}>
-          Templates use placeholders and never contain customer data. Run them only in an
-          environment you are allowed to query.
-        </p>
-      </Collapsible>
-      <Collapsible title="Known failure modes" count={content.knownFailureModes.length}>
+      </Section>
+      <Section title="Query templates" count={content.queryTemplates.length}>
+        <div className={styles.stack}>
+          {content.queryTemplates.length === 0 ? (
+            <p className={styles.text}>None.</p>
+          ) : (
+            <ul className={styles.rows}>
+              {content.queryTemplates.map((template) => (
+                <li key={template.id} className={styles.rowItem}>
+                  <div className={styles.rowHead}>
+                    <p className={styles.title}>{template.title}</p>
+                    <Badge tone="neutral" size="sm">
+                      {template.language === 'kql' ? 'KQL' : 'PowerShell'}
+                    </Badge>
+                    <CopyButton value={template.template} label={`Copy ${template.title}`} />
+                  </div>
+                  <p className={styles.text}>{template.description}</p>
+                  <pre className={styles.code}>{template.template}</pre>
+                  {template.parameters.length > 0 ? (
+                    <ul className={styles.bullets} aria-label="Parameters">
+                      {template.parameters.map((parameter) => (
+                        <li key={parameter.name}>
+                          <span className={styles.mono}>{`{{${parameter.name}}}`}</span>:{' '}
+                          {parameter.description}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  <p className={styles.meta}>Safety: {template.safetyNote}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className={styles.meta}>
+            Templates use placeholders and never contain customer data. Run them only in an
+            environment you are allowed to query.
+          </p>
+        </div>
+      </Section>
+      <Section title="Known failure modes" count={content.knownFailureModes.length}>
         <TextList items={content.knownFailureModes} empty="None recorded." />
-      </Collapsible>
-      <Collapsible title="Source cases" count={content.sourceCases.length}>
-        <ul className={styles.list}>
+      </Section>
+      <Section title="Source cases" count={content.sourceCases.length}>
+        <ul className={styles.rows}>
           {content.sourceCases.map((source) => (
-            <li key={`${source.caseId}:${source.role}`} className={styles.item}>
+            <li key={`${source.caseId}:${source.role}`} className={styles.rowItem}>
               <UiLink href={`/cases/${encodeURIComponent(source.caseId)}`} className={styles.link}>
                 {source.reference}
               </UiLink>
@@ -296,17 +366,17 @@ export function DefinitionSections({ content }: DefinitionSectionsProps) {
             </li>
           ))}
         </ul>
-      </Collapsible>
+      </Section>
       {content.cheaperAlternatives && content.cheaperAlternatives.length > 0 ? (
-        <Collapsible
+        <Section
           title="Cheaper ways to learn the same thing"
           count={content.cheaperAlternatives.length}
         >
-          <ul className={styles.list}>
+          <ul className={styles.rows}>
             {content.cheaperAlternatives.map((alternative) => (
               <li
                 key={`${alternative.insteadOfActionKey}:${alternative.useActionKey}`}
-                className={styles.item}
+                className={styles.rowItem}
               >
                 <p className={styles.text}>
                   Instead of <span className={styles.strong}>{alternative.insteadOfLabel}</span>,
@@ -322,20 +392,20 @@ export function DefinitionSections({ content }: DefinitionSectionsProps) {
               </li>
             ))}
           </ul>
-        </Collapsible>
+        </Section>
       ) : null}
       {content.validationCriteria && content.validationCriteria.length > 0 ? (
-        <Collapsible title="What validation checks" count={content.validationCriteria.length}>
+        <Section title="What validation checks" count={content.validationCriteria.length}>
           <TextList items={content.validationCriteria} empty="None." />
-        </Collapsible>
+        </Section>
       ) : null}
-    </div>
+    </Accordion>
   );
 }
 
-/** Links from the provenance block to the case, fork and scenario the skill was extracted from. */
+/** Links from the source block to the case, fork and scenario the skill was extracted from. */
 export function ProvenanceLinks({ content }: { content: SkillContent }) {
-  const styles = useInsightStyles();
+  const styles = useSkillStyles();
   const provenance = content.provenance;
   if (!provenance) return null;
   return (
@@ -351,7 +421,7 @@ export function ProvenanceLinks({ content }: { content: SkillContent }) {
             href={evidenceLinkHref(provenance.caseId, { type: 'fork', id: provenance.forkId })}
             className={styles.chip}
           >
-            Decision fork
+            Key decision
           </UiLink>
         </li>
       ) : null}

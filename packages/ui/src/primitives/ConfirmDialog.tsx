@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  Button,
   Dialog,
   DialogActions,
   DialogBody,
@@ -10,23 +9,20 @@ import {
   DialogTitle,
   DialogTrigger,
   Field,
-  Spinner,
   Textarea,
   makeStyles,
+  mergeClasses,
   tokens,
   useRestoreFocusTarget,
 } from '@fluentui/react-components';
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { Button } from '../kit/Button';
+import { useDialogClasses } from '../kit/Dialog';
 import { cg } from '../tokens/cg';
 
 const useStyles = makeStyles({
   content: { display: 'flex', flexDirection: 'column', gap: cg.space[3], color: cg.textSecondary },
   error: { margin: 0, color: cg.tone.unsupported.fg, fontSize: tokens.fontSizeBase300 },
-  danger: {
-    backgroundColor: cg.tone.unsupported.solid,
-    color: cg.tone.unsupported.onSolid,
-    ':hover': { backgroundColor: cg.tone.unsupported.fg, color: cg.tone.unsupported.tint },
-  },
 });
 
 export interface ConfirmReasonOptions {
@@ -130,8 +126,9 @@ export function ConfirmDialog({
     else setFailure(message);
   };
 
+  const dialog = useDialogClasses('sm');
   const surface = (
-    <DialogSurface>
+    <DialogSurface className={dialog.surface} backdrop={{ className: dialog.backdrop }}>
       <ConfirmBody
         title={title}
         confirmLabel={confirmLabel}
@@ -193,6 +190,7 @@ function ConfirmBody({
   onCancel,
 }: ConfirmBodyProps) {
   const styles = useStyles();
+  const dialog = useDialogClasses('sm');
   const [text, setText] = useState('');
   const [touched, setTouched] = useState(false);
   const confirmButton = useRef<HTMLButtonElement>(null);
@@ -212,9 +210,9 @@ function ConfirmBody({
   };
 
   return (
-    <DialogBody>
-      <DialogTitle>{title}</DialogTitle>
-      <DialogContent className={styles.content}>
+    <DialogBody className={dialog.body}>
+      <DialogTitle className={dialog.title}>{title}</DialogTitle>
+      <DialogContent className={mergeClasses(dialog.content, styles.content)}>
         <div>{children}</div>
         {reason ? (
           <Field
@@ -241,17 +239,16 @@ function ConfirmBody({
           </p>
         ) : null}
       </DialogContent>
-      <DialogActions>
-        <Button appearance="secondary" onClick={onCancel} disabled={pending}>
+      <DialogActions className={dialog.actions}>
+        <Button variant="secondary" onClick={onCancel} disabled={pending}>
           {cancelLabel}
         </Button>
         <Button
           ref={confirmButton}
-          appearance="primary"
-          className={tone === 'danger' ? styles.danger : undefined}
+          variant={tone === 'danger' ? 'danger' : 'primary'}
           onClick={confirm}
           disabled={pending}
-          icon={pending ? <Spinner size="tiny" /> : undefined}
+          loading={pending}
         >
           {confirmLabel}
         </Button>

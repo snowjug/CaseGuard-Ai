@@ -279,8 +279,6 @@ Rules of thumb:
   refused the item simply has no badge, and nothing is invented.
 - `PermissionGate` / `PermissionNeeded` (`components/common`): identity, loading and error states, then a
   plain "you do not have access" explanation (no request is made) before the page content.
-  `ScrollTable` is a `DataTable` that keeps a minimum width inside a labelled, focusable scroll region,
-  so a table scrolls on a phone instead of squeezing its columns.
 - `useRoleSwitch()` (`lib/presentation`): switches to a synthetic persona of the same tenant that holds
   a step's role (the presenter strip and the Demo Guide use it); other tenants' personas are never offered.
 - Page shortcuts appear in the `?` dialog while you are on the page: `n` opens the next step on the Demo

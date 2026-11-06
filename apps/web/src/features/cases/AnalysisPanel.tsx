@@ -2,43 +2,40 @@
 
 import type { AnalysisRun, CaseDetail, Job } from '@caseguard/schemas';
 import {
-  ConfirmDialog,
+  Button,
   CopyButton,
   ErrorState,
   KeyValueList,
   LoadingSkeleton,
   Notice,
-  Panel,
-  ProvenanceBadge,
-  StatusBadge,
+  RelativeTime,
   cg,
-  formatDateTimeUtc,
   formatNumber,
 } from '@caseguard/ui';
-import { Button, Spinner, makeStyles, tokens } from '@fluentui/react-components';
-import { ArrowSyncRegular, PlayRegular } from '@fluentui/react-icons';
-import { useState } from 'react';
+import { makeStyles, tokens } from '@fluentui/react-components';
+import { PlayIcon } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 import {
   useActiveAnalysisJob,
   useRefreshAnalysisViews,
 } from '../../components/case/NotAnalysedState';
-import { JobProgress } from '../../components/common/JobProgress';
 import { describeError, type ApiError } from '../../lib/api/errors';
 import { useApiMutation } from '../../lib/api/hooks';
-import { GatedAction, useSession } from '../../lib/auth/session';
-import { ANALYSIS_STATE_BADGES, PROVIDER_LABELS } from '../../lib/labels';
+import { GatedAction } from '../../lib/auth/session';
+import { PROVIDER_LABELS } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 
 const useStyles = makeStyles({
-  head: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
+  stack: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
   mono: { fontFamily: cg.font.mono, fontSize: tokens.fontSizeBase200, overflowWrap: 'anywhere' },
   text: { margin: 0, fontSize: tokens.fontSizeBase300, color: cg.textSecondary },
-  actions: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
   counts: {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-    gap: `${cg.space[1]} ${cg.space[3]}`,
+    gap: `${cg.space[3]} ${cg.space[4]}`,
     margin: 0,
+    paddingTop: cg.space[3],
+    borderTop: `1px solid ${cg.borderSubtle}`,
     fontSize: tokens.fontSizeBase300,
   },
   countTerm: { color: cg.textMuted, fontSize: tokens.fontSizeBase200 },
@@ -56,54 +53,51 @@ const RUN_STATUS: Record<AnalysisRun['status'], string> = {
   cancelled: 'Cancelled',
 };
 
-export interface AnalysisPanelProps {
-  detail: CaseDetail;
-  run: AnalysisRun | null | undefined;
-  loading: boolean;
-  error: ApiError | null;
-  onRetry: () => void;
-  /** With a time cursor set, totals of the whole record (forks, warnings) are not shown. */
-  asOf: string | null;
+/** Where a review is in its life on this page: what to show and what may be started. */
+export interface ReviewRun {
+  /** The job being followed (found through the job list, or started here), if any. */
+  job: Job | null;
+  /** A review is queued or running: nothing else may be started until it ends. */
+  busy: boolean;
+  /** The progress card belongs on screen: a job that is running, or one that ended without a result. */
+  showJob: boolean;
+  starting: boolean;
+  /** Starts a review. It rejects with a plain-language message, for a dialog to show. */
+  begin: (force: boolean) => Promise<void>;
+  /** Starts a review from a button: a refusal becomes a toast. */
+  startPlain: () => void;
+  /** To pass to the job's progress card. */
+  onTerminal: (job: Job) => void;
 }
 
-const COUNT_LABELS: readonly [keyof AnalysisRun['counts'], string][] = [
-  ['events', 'Events'],
-  ['evidence', 'Evidence items'],
-  ['claims', 'Claims'],
-  ['hypotheses', 'Hypotheses'],
-  ['actions', 'Actions'],
-  ['forks', 'Decision forks'],
-  ['warnings', 'Warnings'],
-  ['modelExecutions', 'Model executions'],
-];
-
 /**
- * Analysis status of the case: its state, the latest run (provider, versions, input hash, counts), the live job with its
- * real stages while it runs, and the actions to start or re-run it (re-running replaces the stored analysis, so it asks).
+ * Starting and following the review of a case (the API calls it an analysis): the live job with its real stages while it
+ * runs, and the two ways to start one. A review with the same input is never re-run (the stored one is reused);
+ * re-running on purpose replaces the stored one, so the caller asks first.
  */
-export function AnalysisPanel({ detail, run, loading, error, onRetry, asOf }: AnalysisPanelProps) {
-  const styles = useStyles();
+export function useReviewRun(detail: CaseDetail): ReviewRun {
   const toast = useToast();
-  const { can } = useSession();
   const refresh = useRefreshAnalysisViews();
   const [started, setStarted] = useState<Job | null>(null);
+  const [ended, setEnded] = useState<{ id: string; status: Job['status'] } | null>(null);
   const live = detail.analysisState === 'queued' || detail.analysisState === 'running';
   const found = useActiveAnalysisJob(detail.id, live && started === null);
-  const activeJob = started ?? found;
+  const job = started ?? found;
+  const over = job !== null && ended?.id === job.id;
   const start = useApiMutation('analysis.start', {
     invalidate: ['cases.get', 'analysis.latest', 'jobs.list'],
   });
-  const state = ANALYSIS_STATE_BADGES[detail.analysisState];
 
   const begin = async (force: boolean): Promise<void> => {
     try {
       const response = await start.mutateAsync({ params: { caseId: detail.id }, body: { force } });
       if (response.reused) {
-        toast.info('The stored analysis was reused', {
+        toast.info('The stored review was reused', {
           body: 'The input is identical, so nothing had to be re-run.',
         });
         refresh();
       } else {
+        setEnded(null);
         setStarted(response.job);
       }
     } catch (failure) {
@@ -112,164 +106,183 @@ export function AnalysisPanel({ detail, run, loading, error, onRetry, asOf }: An
   };
   const startPlain = (): void => {
     begin(false).catch((failure: unknown) =>
-      toast.error('The analysis could not be started', { body: describeError(failure) }),
+      toast.error('The review could not be started', { body: describeError(failure) }),
     );
   };
+  const onTerminal = (finished: Job): void => {
+    setEnded({ id: finished.id, status: finished.status });
+    refresh();
+    if (finished.status === 'succeeded') toast.success('The review finished');
+  };
 
-  const analysed = run?.status === 'succeeded';
+  return {
+    job,
+    busy: live || (job !== null && !over),
+    showJob: job !== null && !(over && ended?.status === 'succeeded'),
+    starting: start.isPending,
+    begin,
+    startPlain,
+    onTerminal,
+  };
+}
+
+/** Runs the review of a case that has none (or whose last one failed). Disabled, with the reason, without `case:analyze`. */
+export function RunReviewButton({ review, failed }: { review: ReviewRun; failed: boolean }) {
   return (
-    <Panel
-      title="Analysis"
-      level={2}
-      description="How CaseGuard analysed this case, and whether it is up to date."
-      help="The analysis rebuilds the timeline, classifies every statement as evidence, weighs competing hypotheses, finds decision forks and scores quality. It is deterministic: identical input is never re-run, so repeating it returns the stored result. Re-running on purpose replaces the stored analysis; reviewer decisions are carried forward."
-    >
-      <div className={styles.head}>
-        <StatusBadge status={state.status} label={state.label} />
-        {run?.simulated ? <ProvenanceBadge kind="simulated" /> : null}
-      </div>
+    <GatedAction permission="case:analyze">
+      <Button
+        variant="secondary"
+        icon={<PlayIcon />}
+        loading={review.starting}
+        disabledFocusable={review.busy}
+        onClick={review.startPlain}
+      >
+        {failed ? 'Retry the review' : 'Run the review'}
+      </Button>
+    </GatedAction>
+  );
+}
 
-      {activeJob ? (
-        <JobProgress
-          jobId={activeJob.id}
-          title="Analysis in progress"
-          level={3}
-          onTerminal={(job) => {
-            refresh();
-            if (job.status === 'succeeded') toast.success('The analysis finished');
-          }}
-        />
-      ) : null}
-
-      {loading ? (
-        <LoadingSkeleton variant="text" count={4} label="Loading the analysis" />
-      ) : error ? (
-        <ErrorState
-          compact
-          title="The analysis summary could not be loaded"
-          description={describeError(error)}
-          onRetry={onRetry}
-        />
-      ) : run ? (
+/** One line for the closed section: how the latest run ended, with what, and when. */
+export function runSubtitle(run: AnalysisRun | null | undefined, loading: boolean): ReactNode {
+  if (loading) return 'Loading…';
+  if (!run) return 'No review has run yet';
+  return (
+    <>
+      {RUN_STATUS[run.status]} · {PROVIDER_LABELS[run.provider]}
+      {run.completedAt ? (
         <>
-          {run.status === 'failed' && run.error ? (
-            <Notice variant="warning" title="The last analysis failed">
-              {run.error}
-            </Notice>
-          ) : null}
-          <KeyValueList
-            columns={1}
-            layout="inline"
-            aria-label="Latest analysis"
-            items={[
-              { id: 'status', label: 'Run', value: RUN_STATUS[run.status] },
-              {
-                id: 'provider',
-                label: 'Provider',
-                value: PROVIDER_LABELS[run.provider],
-                hint: run.simulated
-                  ? 'Rules and the knowledge pack, not a language model. Results are labelled Simulated.'
-                  : undefined,
-              },
-              { id: 'model', label: 'Model', value: run.model },
-              {
-                id: 'pack',
-                label: 'Knowledge pack',
-                value: `${run.knowledgePackId} ${run.knowledgePackVersion}`,
-              },
-              {
-                id: 'configs',
-                label: 'Configuration',
-                value: `quality ${run.qualityConfigVersion}, action value ${run.actionValueConfigVersion}`,
-              },
-              {
-                id: 'started',
-                label: 'Started',
-                value: formatDateTimeUtc(run.startedAt),
-              },
-              {
-                id: 'completed',
-                label: 'Completed',
-                value: run.completedAt ? formatDateTimeUtc(run.completedAt) : 'Not completed',
-              },
-              {
-                id: 'hash',
-                label: 'Input hash',
-                value: (
-                  <span>
-                    <span className={styles.mono}>{run.inputHash.slice(0, 16)}…</span>{' '}
-                    <CopyButton value={run.inputHash} label="Copy analysis input hash" />
-                  </span>
-                ),
-                hint: 'Identical input is never re-run.',
-              },
-            ]}
-          />
-          {asOf === null ? (
-            <dl className={styles.counts} aria-label="What the analysis produced">
-              {COUNT_LABELS.map(([key, label]) => (
-                <div key={key}>
-                  <dt className={styles.countTerm}>{label}</dt>
-                  <dd className={styles.countValue}>{formatNumber(run.counts[key])}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : (
-            <p className={styles.text}>
-              Totals for the whole record (forks, warnings, claims) are hidden while a time cursor
-              is set.
-            </p>
-          )}
+          {' · '}
+          <RelativeTime value={run.completedAt} />
         </>
+      ) : null}
+    </>
+  );
+}
+
+export interface ReviewRunDetailsProps {
+  /** The latest run, `null` when there is none, `undefined` while it is unknown. */
+  run: AnalysisRun | null | undefined;
+  /** An analysis is queued or running. */
+  live: boolean;
+  loading: boolean;
+  error: ApiError | null;
+  onRetry: () => void;
+  /** With a time cursor set, totals of the whole record (decisions, warnings) are not shown. */
+  asOf: string | null;
+}
+
+const COUNT_LABELS: readonly [keyof AnalysisRun['counts'], string][] = [
+  ['events', 'Events'],
+  ['evidence', 'Evidence items'],
+  ['claims', 'Claims'],
+  ['hypotheses', 'Possible causes'],
+  ['actions', 'Actions'],
+  ['forks', 'Key decisions'],
+  ['warnings', 'Warnings'],
+  ['modelExecutions', 'Model executions'],
+];
+
+/**
+ * How the review was made: the latest run (provider, model, versions, input hash), what it produced, and why it failed
+ * when it did. Technical detail, so it sits behind an accordion; starting and re-running live elsewhere.
+ */
+export function ReviewRunDetails({
+  run,
+  live,
+  loading,
+  error,
+  onRetry,
+  asOf,
+}: ReviewRunDetailsProps) {
+  const styles = useStyles();
+  if (loading)
+    return <LoadingSkeleton variant="text" count={4} label="Loading the review details" />;
+  if (error) {
+    return (
+      <ErrorState
+        compact
+        title="The review details could not be loaded"
+        description={describeError(error)}
+        onRetry={onRetry}
+      />
+    );
+  }
+  if (!run) {
+    return (
+      <p className={styles.text} role={live ? 'status' : undefined}>
+        {live
+          ? 'A review is queued. This section updates when it starts.'
+          : 'This case has not been analysed yet. The timeline, evidence and possible causes appear once it has been.'}
+      </p>
+    );
+  }
+  return (
+    <div className={styles.stack}>
+      {run.status === 'failed' && run.error ? (
+        <Notice variant="warning" title="The last review failed">
+          {run.error}
+        </Notice>
+      ) : null}
+      <KeyValueList
+        columns={1}
+        layout="inline"
+        aria-label="Latest review"
+        items={[
+          { id: 'status', label: 'Run', value: RUN_STATUS[run.status] },
+          {
+            id: 'provider',
+            label: 'Provider',
+            value: PROVIDER_LABELS[run.provider],
+            hint: run.simulated
+              ? 'Rules and the knowledge pack, not a language model. Results are labelled Simulated.'
+              : undefined,
+          },
+          { id: 'model', label: 'Model', value: run.model },
+          {
+            id: 'pack',
+            label: 'Knowledge pack',
+            value: `${run.knowledgePackId} ${run.knowledgePackVersion}`,
+          },
+          {
+            id: 'configs',
+            label: 'Configuration',
+            value: `quality ${run.qualityConfigVersion}, action value ${run.actionValueConfigVersion}`,
+          },
+          { id: 'started', label: 'Started', value: <RelativeTime value={run.startedAt} /> },
+          {
+            id: 'completed',
+            label: 'Completed',
+            value: run.completedAt ? <RelativeTime value={run.completedAt} /> : 'Not completed',
+          },
+          {
+            id: 'hash',
+            label: 'Input hash',
+            value: (
+              <span>
+                <span className={styles.mono}>{run.inputHash.slice(0, 16)}…</span>{' '}
+                <CopyButton value={run.inputHash} label="Copy review input hash" />
+              </span>
+            ),
+            hint: 'Identical input is never re-run.',
+          },
+        ]}
+      />
+      {asOf === null ? (
+        <dl className={styles.counts} aria-label="What the review produced">
+          {COUNT_LABELS.map(([key, label]) => (
+            <div key={key}>
+              <dt className={styles.countTerm}>{label}</dt>
+              <dd className={styles.countValue}>{formatNumber(run.counts[key])}</dd>
+            </div>
+          ))}
+        </dl>
       ) : (
-        <p className={styles.text} role={live ? 'status' : undefined}>
-          {live
-            ? 'An analysis is queued. This panel updates when it starts.'
-            : 'This case has not been analysed yet. The timeline, evidence and hypotheses appear once it has been.'}
+        <p className={styles.text}>
+          Totals for the whole record (decisions, warnings, claims) are hidden while an earlier
+          moment is shown.
         </p>
       )}
-
-      {!activeJob && !live ? (
-        <div className={styles.actions}>
-          {analysed ? (
-            can('case:analyze') ? (
-              <ConfirmDialog
-                trigger={
-                  <Button appearance="outline" icon={<ArrowSyncRegular />}>
-                    Re-run the analysis
-                  </Button>
-                }
-                title="Re-run the analysis?"
-                confirmLabel="Re-run"
-                onConfirm={() => begin(true)}
-              >
-                This replaces the stored analysis with a fresh run of the same case, even though the
-                input has not changed. Reviewer decisions on claims and counterfactuals are carried
-                forward where the result is unchanged.
-              </ConfirmDialog>
-            ) : (
-              <GatedAction permission="case:analyze">
-                <Button appearance="outline" icon={<ArrowSyncRegular />}>
-                  Re-run the analysis
-                </Button>
-              </GatedAction>
-            )
-          ) : (
-            <GatedAction permission="case:analyze">
-              <Button
-                appearance="primary"
-                icon={start.isPending ? <Spinner size="tiny" /> : <PlayRegular />}
-                disabled={start.isPending}
-                onClick={startPlain}
-              >
-                {run?.status === 'failed' || detail.analysisState === 'failed'
-                  ? 'Retry the analysis'
-                  : 'Start the analysis'}
-              </Button>
-            </GatedAction>
-          )}
-        </div>
-      ) : null}
-    </Panel>
+    </div>
   );
 }
