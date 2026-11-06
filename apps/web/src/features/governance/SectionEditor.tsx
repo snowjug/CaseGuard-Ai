@@ -1,10 +1,10 @@
 'use client';
 
 import type { GovernanceSection, GovernanceSettings } from '@caseguard/schemas';
-import { Notice, Panel, cg, formatDateTimeUtc } from '@caseguard/ui';
-import { Button, Field, Input, makeStyles, tokens } from '@fluentui/react-components';
-import { ArrowUndoRegular, SaveRegular } from '@fluentui/react-icons';
+import { Badge, Button, Field, Input, Notice, Panel, RelativeTime, cg } from '@caseguard/ui';
+import { makeStyles, tokens } from '@fluentui/react-components';
 import { useQueryClient } from '@tanstack/react-query';
+import { EyeIcon, InfoIcon, SaveIcon, ShieldCheckIcon, TagIcon, Undo2Icon } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import type { ZodType } from 'zod';
 import { ApiError, describeError } from '../../lib/api/errors';
@@ -17,24 +17,30 @@ import { EditorProvider, type EditorState } from './fields';
 import { NOTE_KEY, WHOLE_KEY, deepEqual, issuesToErrors, sentence, setIn } from './messages';
 
 const useStyles = makeStyles({
-  fields: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
+  status: { display: 'flex', flexDirection: 'column', gap: cg.space[2] },
+  badges: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
   meta: {
     margin: 0,
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: `${cg.space[1]} ${cg.space[3]}`,
     fontSize: tokens.fontSizeBase200,
     lineHeight: tokens.lineHeightBase200,
     color: cg.textMuted,
   },
+  effect: {
+    margin: 0,
+    maxWidth: '78ch',
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase300,
+    color: cg.textSecondary,
+  },
+  fields: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
   footer: {
     display: 'flex',
     flexDirection: 'column',
-    gap: cg.space[3],
-    paddingTop: cg.space[3],
+    gap: cg.space[4],
+    paddingTop: cg.space[4],
     borderTop: `1px solid ${cg.borderSubtle}`,
   },
-  note: { maxWidth: '640px' },
+  note: { maxWidth: '560px' },
   buttons: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: cg.space[2] },
   hint: { margin: 0, fontSize: tokens.fontSizeBase200, color: cg.textMuted },
   problems: {
@@ -68,10 +74,11 @@ export interface SectionEditorProps<S extends GovernanceSection> {
 }
 
 /**
- * One versioned section of the governed configuration: its metadata, an honest note on whether anything enforces it,
- * the fields, and a save that sends `expectedVersion` with a mandatory change note. A 422 shows the API's problems per
- * field, a 409 says someone else saved first and offers the latest version; nothing is saved silently over another
- * person's change. The parent renders it with `key={version}` so a new version always starts from a clean draft.
+ * One versioned section of the governed configuration: its version and whether anything enforces it (a badge and one
+ * plain line, so nobody assumes a recorded-only section does something), the fields, and a save that sends
+ * `expectedVersion` with a mandatory change note. A 422 shows the API's problems per field, a 409 says someone else
+ * saved first and offers the latest version; nothing is saved silently over another person's change. The parent renders
+ * it with `key={version}` so a new version always starts from a clean draft.
  */
 export function SectionEditor<S extends GovernanceSection>({
   section,
@@ -179,23 +186,33 @@ export function SectionEditor<S extends GovernanceSection>({
       ? `Describe the change in at least ${MIN_NOTE} characters.`
       : undefined);
   const wholeError = errors[WHOLE_KEY];
+  const enforced = effect === 'enforced';
 
   return (
     <Panel title={title} description={description} help={help}>
-      <p className={styles.meta}>
-        <strong>Version {envelope.version}</strong>
-        <span>
-          Changed {formatDateTimeUtc(envelope.updatedAt)} by {envelope.updatedBy}
-        </span>
-        <span>Change note: {envelope.changeNote || 'none'}</span>
-      </p>
-      <Notice
-        variant={effect === 'enforced' ? 'info' : 'warning'}
-        compact
-        title={effect === 'enforced' ? 'Enforced' : 'Recorded only'}
-      >
-        {effectNote}
-      </Notice>
+      <div className={styles.status}>
+        <div className={styles.badges}>
+          <Badge tone="neutral" icon={<TagIcon />} title="The version this form started from">
+            Version {envelope.version}
+          </Badge>
+          <Badge
+            tone={enforced ? 'brand' : 'uncertain'}
+            icon={enforced ? <ShieldCheckIcon /> : <InfoIcon />}
+            title={
+              enforced
+                ? 'The application reads this section.'
+                : 'Stored and audited, but nothing reads it yet.'
+            }
+          >
+            {enforced ? 'Enforced' : 'Recorded only'}
+          </Badge>
+        </div>
+        <p className={styles.effect}>{effectNote}</p>
+        <p className={styles.meta}>
+          Changed <RelativeTime value={envelope.updatedAt} /> by {envelope.updatedBy}. Change note:{' '}
+          {envelope.changeNote || 'none'}
+        </p>
+      </div>
       <EditorProvider value={state}>
         <div key={epoch} className={styles.fields}>
           {children}
@@ -212,7 +229,7 @@ export function SectionEditor<S extends GovernanceSection>({
             variant="warning"
             title="Someone else saved first"
             action={
-              <Button appearance="primary" onClick={() => void loadLatest()}>
+              <Button variant="secondary" onClick={() => void loadLatest()}>
                 Load the latest version
               </Button>
             }
@@ -248,29 +265,29 @@ export function SectionEditor<S extends GovernanceSection>({
             label="Change note"
             required
             hint="Stored with the new version so the next person sees why it changed."
-            validationState={noteError ? 'error' : 'none'}
-            validationMessage={noteError}
+            error={noteError}
           >
             <Input
               value={note}
               maxLength={500}
               disabled={saving}
-              onChange={(_event, data) => setNote(data.value)}
+              onChange={(event) => setNote(event.target.value)}
               onBlur={() => setNoteTouched(true)}
             />
           </Field>
           <div className={styles.buttons}>
             <Button
-              appearance="primary"
-              icon={<SaveRegular />}
+              variant={dirty && !invalid ? 'primary' : 'secondary'}
+              icon={<SaveIcon />}
+              loading={saving}
               disabledFocusable={!dirty || saving || invalid}
               onClick={() => void save()}
             >
               {saving ? 'Saving…' : 'Save changes'}
             </Button>
             <Button
-              appearance="subtle"
-              icon={<ArrowUndoRegular />}
+              variant="ghost"
+              icon={<Undo2Icon />}
               disabledFocusable={!dirty || saving}
               onClick={discard}
             >
@@ -286,10 +303,13 @@ export function SectionEditor<S extends GovernanceSection>({
           </div>
         </div>
       ) : (
-        <Notice variant="info" compact title="View only">
+        <p className={styles.meta}>
+          <Badge tone="neutral" icon={<EyeIcon />}>
+            View only
+          </Badge>{' '}
           Your role can read this section but not change it. Changing configuration needs the
           governance:write permission.
-        </Notice>
+        </p>
       )}
     </Panel>
   );

@@ -1,8 +1,9 @@
 'use client';
 
-import { cg } from '@caseguard/ui';
-import { Field, Input, Select, Switch, makeStyles, tokens } from '@fluentui/react-components';
+import { AccordionItem, Field, Input, Select, cg } from '@caseguard/ui';
+import { Switch, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
 import { createContext, useContext, useId, useState, type ReactNode } from 'react';
+import { StateBadge } from '../../lib/advanced-view-parts';
 import { getIn } from './messages';
 
 /** What every field of one section editor shares: the draft, how to change it, the problems and whether it is read-only. */
@@ -25,25 +26,12 @@ export function useEditor(): EditorState {
   return value;
 }
 
+const wide = '@media (min-width: 720px)';
+
 const useStyles = makeStyles({
-  group: {
-    margin: 0,
-    padding: cg.space[3],
-    border: `1px solid ${cg.borderSubtle}`,
-    borderRadius: cg.radius.md,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: cg.space[3],
-    minWidth: 0,
-  },
-  legend: {
-    padding: `0 ${cg.space[2]}`,
-    fontSize: tokens.fontSizeBase300,
-    fontWeight: tokens.fontWeightSemibold,
-    color: cg.text,
-  },
+  rows: { display: 'flex', flexDirection: 'column', minWidth: 0 },
   groupText: {
-    margin: 0,
+    margin: `0 0 ${cg.space[2]}`,
     fontSize: tokens.fontSizeBase300,
     lineHeight: tokens.lineHeightBase300,
     color: cg.textSecondary,
@@ -54,48 +42,122 @@ const useStyles = makeStyles({
     color: cg.tone.unsupported.fg,
     fontWeight: tokens.fontWeightSemibold,
   },
-  grid: {
-    display: 'grid',
-    gap: cg.space[3],
-    gridTemplateColumns: 'minmax(0, 1fr)',
-    alignItems: 'start',
+  // One setting is one row: what it is on the left (label, hint, problem), the control on the right; stacked on a phone.
+  // The kit `Field` is the row: the selectors place its label, control and messages without wrapping them again.
+  row: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[2],
+    padding: `${cg.space[3]} 0`,
+    borderTop: `1px solid ${cg.borderSubtle}`,
+    ':first-child': { borderTop: 0 },
+    [wide]: {
+      display: 'grid',
+      gridTemplateColumns: 'minmax(0, 5fr) minmax(0, 6fr)',
+      columnGap: cg.space[6],
+      rowGap: 0,
+      alignItems: 'start',
+    },
+    '& > label': {
+      gridColumn: '1',
+      gridRow: '1',
+      fontSize: tokens.fontSizeBase300,
+      fontWeight: tokens.fontWeightMedium,
+      color: cg.text,
+    },
+    '& > span': { gridColumn: '2', gridRow: '1 / span 4' },
+    '& > p': { gridColumn: '1', marginTop: cg.space[1] },
   },
-  grid2: { '@media (min-width: 640px)': { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' } },
-  grid3: {
-    '@media (min-width: 640px)': { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' },
-    '@media (min-width: 1280px)': { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' },
+  narrow: { maxWidth: '240px' },
+  cell: { maxWidth: '148px' },
+  unit: { color: cg.textMuted, fontSize: tokens.fontSizeBase200 },
+  switchRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: cg.space[4],
+    minHeight: '44px',
+    padding: `${cg.space[3]} 0`,
+    borderTop: `1px solid ${cg.borderSubtle}`,
+    ':first-child': { borderTop: 0 },
+    [wide]: {
+      display: 'grid',
+      gridTemplateColumns: 'minmax(0, 5fr) minmax(0, 6fr)',
+      columnGap: cg.space[6],
+      justifyContent: 'stretch',
+    },
   },
-  switchRow: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 },
-  hint: { fontSize: tokens.fontSizeBase200, color: cg.textMuted, paddingLeft: '44px' },
+  switchText: { display: 'flex', flexDirection: 'column', gap: cg.space[1], minWidth: 0 },
+  switchLabel: {
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightMedium,
+    color: cg.text,
+  },
+  hint: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+    color: cg.textMuted,
+  },
+  hintError: { color: cg.tone.unsupported.fg },
 });
 
-/** A labelled group of related settings (a native `fieldset`, so assistive technology announces the group). */
+/** The settings of one group, one per row. */
+export function FieldRows({ children }: { children: ReactNode }) {
+  const styles = useStyles();
+  return <div className={styles.rows}>{children}</div>;
+}
+
+export interface FieldGroupProps {
+  title: string;
+  description?: ReactNode;
+  /**
+   * Dotted paths of the settings in the group. A problem under any of them opens the group and says so in its header,
+   * so a closed group can never hide the reason that saving is blocked.
+   */
+  paths?: readonly string[];
+  /** The group is open when the section first shows (the first group of a section). */
+  defaultOpen?: boolean;
+  children: ReactNode;
+}
+
+/**
+ * A labelled group of related settings, collapsed unless it is the first or has a problem. Its content stays mounted
+ * while closed (and is inert), so a draft and its validation never depend on what is open.
+ */
 export function FieldGroup({
   title,
   description,
+  paths = [],
+  defaultOpen = false,
   children,
-}: {
-  title: string;
-  description?: ReactNode;
-  children: ReactNode;
-}) {
+}: FieldGroupProps) {
   const styles = useStyles();
+  const { errors } = useEditor();
+  const [open, setOpen] = useState(defaultOpen);
+  const problems = Object.keys(errors).filter((key) =>
+    paths.some((path) => key === path || key.startsWith(`${path}.`)),
+  ).length;
   return (
-    <fieldset className={styles.group}>
-      <legend className={styles.legend}>{title}</legend>
+    <AccordionItem
+      headingLevel={3}
+      title={title}
+      lazy={false}
+      open={open || problems > 0}
+      onOpenChange={setOpen}
+      badge={
+        problems > 0 ? (
+          <StateBadge
+            status="unsupported"
+            size="sm"
+            label={`${problems} ${problems === 1 ? 'problem' : 'problems'}`}
+          />
+        ) : undefined
+      }
+    >
       {description ? <p className={styles.groupText}>{description}</p> : null}
-      {children}
-    </fieldset>
-  );
-}
-
-/** Responsive grid for fields (one column on a phone, two on a tablet, up to three on a wide screen). */
-export function FieldGrid({ children, columns = 3 }: { children: ReactNode; columns?: 2 | 3 }) {
-  const styles = useStyles();
-  return (
-    <div className={`${styles.grid} ${columns === 2 ? styles.grid2 : styles.grid3}`}>
-      {children}
-    </div>
+      <FieldRows>{children}</FieldRows>
+    </AccordionItem>
   );
 }
 
@@ -116,6 +178,8 @@ interface BaseFieldProps {
   path: string;
   label: string;
   hint?: string;
+  /** Label above the control instead of beside it: for a field that sits in a row of fields. */
+  stacked?: boolean;
 }
 
 export interface NumberFieldProps extends BaseFieldProps {
@@ -126,6 +190,7 @@ export interface NumberFieldProps extends BaseFieldProps {
   step?: number;
   /** Shown after the number, for example "ms". */
   unit?: string;
+  /** What an empty box means ("No limit set"): a hint beside the label, never the label itself. */
   placeholder?: string;
   /** For dense tables: the label becomes the accessible name instead of visible text. */
   hideLabel?: boolean;
@@ -146,38 +211,40 @@ export function NumberField({
   unit,
   placeholder,
   hideLabel = false,
+  stacked = false,
 }: NumberFieldProps) {
+  const styles = useStyles();
   const { draft, set, errors, disabled } = useEditor();
   const current = getIn(draft, path);
   const [text, setText] = useState(() =>
     typeof current === 'number' && Number.isFinite(current) ? String(current) : '',
   );
-  const error = errors[path];
   return (
     <Field
-      {...(hideLabel ? {} : { label })}
+      label={hideLabel ? <span className="cg-sr-only">{label}</span> : label}
       hint={hint}
-      validationState={error ? 'error' : 'none'}
-      validationMessage={error}
+      error={errors[path]}
+      className={hideLabel || stacked ? undefined : styles.row}
     >
       <Input
         type="number"
         inputMode="decimal"
         value={text}
         disabled={disabled}
-        {...(hideLabel ? { 'aria-label': label } : {})}
+        wrapperClassName={hideLabel ? styles.cell : styles.narrow}
         {...(placeholder ? { placeholder } : {})}
         {...(min !== undefined ? { min } : {})}
         {...(max !== undefined ? { max } : {})}
         {...(step !== undefined ? { step } : {})}
-        {...(unit ? { contentAfter: <span>{unit}</span> } : {})}
-        onChange={(_event, data) => {
-          setText(data.value);
-          if (data.value.trim() === '') {
+        {...(unit ? { endAdornment: <span className={styles.unit}>{unit}</span> } : {})}
+        onChange={(event) => {
+          const value = event.target.value;
+          setText(value);
+          if (value.trim() === '') {
             set(path, nullable ? null : Number.NaN);
             return;
           }
-          const parsed = Number(data.value);
+          const parsed = Number(value);
           set(path, Number.isFinite(parsed) ? parsed : Number.NaN);
         }}
       />
@@ -190,6 +257,8 @@ export interface TextFieldProps extends BaseFieldProps {
   nullable?: boolean;
   maxLength?: number;
   placeholder?: string;
+  /** Without a visible label (a table cell or a repeated row): the label is the accessible name. */
+  hideLabel?: boolean;
 }
 
 /** A text setting. */
@@ -200,23 +269,27 @@ export function TextField({
   nullable = false,
   maxLength,
   placeholder,
+  hideLabel = false,
+  stacked = false,
 }: TextFieldProps) {
+  const styles = useStyles();
   const { draft, set, errors, disabled } = useEditor();
   const current = getIn(draft, path);
-  const error = errors[path];
   return (
     <Field
-      label={label}
+      label={hideLabel ? <span className="cg-sr-only">{label}</span> : label}
       hint={hint}
-      validationState={error ? 'error' : 'none'}
-      validationMessage={error}
+      error={errors[path]}
+      className={hideLabel || stacked ? undefined : styles.row}
     >
       <Input
         value={typeof current === 'string' ? current : ''}
         disabled={disabled}
         {...(maxLength !== undefined ? { maxLength } : {})}
         {...(placeholder ? { placeholder } : {})}
-        onChange={(_event, data) => set(path, nullable && data.value === '' ? null : data.value)}
+        onChange={(event) =>
+          set(path, nullable && event.target.value === '' ? null : event.target.value)
+        }
       />
     </Field>
   );
@@ -227,51 +300,92 @@ export interface SwitchFieldProps extends BaseFieldProps {
   lockedReason?: string;
 }
 
-/** An on/off setting. */
-export function SwitchField({ path, label, hint, lockedReason }: SwitchFieldProps) {
+export interface SwitchRowProps {
+  label: string;
+  hint?: string | undefined;
+  /** A problem with the setting: shown in place of the hint, as an alert. */
+  error?: string | undefined;
+  checked: boolean;
+  disabled?: boolean;
+  onChange?: (on: boolean) => void;
+}
+
+/** One on/off setting as a row: the label (which toggles it) and its hint on the left, the switch on the right. */
+export function SwitchRow({ label, hint, error, checked, disabled, onChange }: SwitchRowProps) {
   const styles = useStyles();
-  const { draft, set, errors, disabled } = useEditor();
-  const hintId = useId();
-  const error = errors[path];
-  const note = lockedReason ?? error ?? hint;
+  const id = useId();
+  const hintId = `${id}-hint`;
+  const note = error ?? hint;
   return (
     <div className={styles.switchRow}>
+      <div className={styles.switchText}>
+        <label htmlFor={id} className={styles.switchLabel}>
+          {label}
+        </label>
+        {note ? (
+          <span
+            id={hintId}
+            className={mergeClasses(styles.hint, error && styles.hintError)}
+            role={error ? 'alert' : undefined}
+          >
+            {note}
+          </span>
+        ) : null}
+      </div>
       <Switch
-        label={label}
-        checked={getIn(draft, path) === true}
-        disabled={disabled || lockedReason !== undefined}
+        id={id}
+        checked={checked}
+        disabled={disabled ?? false}
         {...(note ? { 'aria-describedby': hintId } : {})}
-        onChange={(_event, data) => set(path, data.checked)}
+        onChange={(_event, data) => onChange?.(data.checked)}
       />
-      {note ? (
-        <span id={hintId} className={styles.hint} role={error ? 'alert' : undefined}>
-          {note}
-        </span>
-      ) : null}
     </div>
+  );
+}
+
+/** An on/off setting of the section being edited. */
+export function SwitchField({ path, label, hint, lockedReason }: SwitchFieldProps) {
+  const { draft, set, errors, disabled } = useEditor();
+  return (
+    <SwitchRow
+      label={label}
+      hint={lockedReason ?? hint}
+      error={lockedReason ? undefined : errors[path]}
+      checked={getIn(draft, path) === true}
+      disabled={disabled || lockedReason !== undefined}
+      onChange={(on) => set(path, on)}
+    />
   );
 }
 
 export interface SelectFieldProps extends BaseFieldProps {
   options: readonly { value: string; label: string }[];
+  hideLabel?: boolean;
 }
 
 /** A choice among a fixed set. */
-export function SelectField({ path, label, hint, options }: SelectFieldProps) {
+export function SelectField({
+  path,
+  label,
+  hint,
+  options,
+  hideLabel = false,
+  stacked = false,
+}: SelectFieldProps) {
+  const styles = useStyles();
   const { draft, set, errors, disabled } = useEditor();
   const current = getIn(draft, path);
-  const error = errors[path];
   return (
     <Field
-      label={label}
+      label={hideLabel ? <span className="cg-sr-only">{label}</span> : label}
       hint={hint}
-      validationState={error ? 'error' : 'none'}
-      validationMessage={error}
+      error={errors[path]}
+      className={hideLabel || stacked ? undefined : styles.row}
     >
       <Select
         value={typeof current === 'string' ? current : ''}
         disabled={disabled}
-        onChange={(_event, data) => set(path, data.value)}
+        onChange={(event) => set(path, event.target.value)}
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

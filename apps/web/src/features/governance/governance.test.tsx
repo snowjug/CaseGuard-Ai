@@ -15,10 +15,12 @@ vi.setConfig({ testTimeout: 120_000 });
 
 const wide = () => installMatchMedia((query) => query.includes('min-width: 900px'));
 
-describe('[FR-GOV-10] Governance page navigation', () => {
+describe('[FR-GOV-10] Settings and audit navigation', () => {
   it('opens on the model section and offers every section in the chooser on a narrow screen', async () => {
     renderApp(<GovernancePage />, { api: api() });
-    expect(await screen.findByRole('heading', { level: 1, name: 'Governance' })).toBeVisible();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Settings and audit' }),
+    ).toBeVisible();
     const chooser = await screen.findByRole('combobox', { name: 'Section' });
     expect(chooser).toHaveValue('model');
     expect(within(chooser).getAllByRole('option')).toHaveLength(GOVERNANCE_TABS.length);
@@ -45,11 +47,25 @@ describe('[FR-GOV-10] Governance page navigation', () => {
     expect(await screen.findByRole('combobox', { name: 'Section' })).toHaveValue('model');
   });
 
+  it('summarises the current setup and the audit log check above the sections', async () => {
+    renderApp(<GovernancePage />, { api: api() });
+    const summary = await screen.findByRole('group', { name: 'Current setup' });
+    expect(
+      await within(summary).findByText('Deterministic provider runs the analysis'),
+    ).toBeVisible();
+    expect(within(summary).getByText('Simulated')).toBeInTheDocument();
+    const facts = within(summary).getByLabelText('Current settings');
+    expect(within(facts).getByText('deterministic-knowledge-pack')).toBeInTheDocument();
+    const check = within(summary).getByRole('group', { name: 'Audit log check' });
+    expect(await within(check).findByText('Chain intact')).toBeVisible();
+    expect(within(check).getByRole('button', { name: 'Verify again' })).toBeEnabled();
+  });
+
   it('uses a vertical tab list on a wide screen, with the selected tab labelling the panel', async () => {
     wide();
     const user = userEvent.setup();
     renderApp(<GovernancePage />, { api: api() });
-    const tablist = await screen.findByRole('tablist', { name: 'Governance sections' });
+    const tablist = await screen.findByRole('tablist', { name: 'Settings and audit sections' });
     expect(tablist).toHaveAttribute('aria-orientation', 'vertical');
     expect(within(tablist).getAllByRole('tab')).toHaveLength(GOVERNANCE_TABS.length);
     expect(within(tablist).getByRole('tab', { name: 'Model' })).toHaveAttribute(
@@ -81,7 +97,7 @@ describe('[FR-GOV-10] Governance page navigation', () => {
   });
 });
 
-describe('[FR-GOV-11] Governance permissions and states', () => {
+describe('[FR-GOV-11] Settings and audit permissions and states', () => {
   it('opens a reviewer on the audit log and explains the configuration sections without requesting them', async () => {
     const fake = api({
       'session.me': asRole('reviewer', ['case:read', 'audit:read', 'telemetry:read']),
@@ -105,7 +121,9 @@ describe('[FR-GOV-11] Governance permissions and states', () => {
 
   it('explains the whole page for a role with neither governance nor audit access', async () => {
     renderApp(<GovernancePage />, { api: api({ 'session.me': asRole('manager', ['case:read']) }) });
-    expect(await screen.findByText('You do not have access to Governance')).toBeInTheDocument();
+    expect(
+      await screen.findByText('You do not have access to Settings and audit'),
+    ).toBeInTheDocument();
     expect(screen.getByText(/"governance:read" or "audit:read"/)).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Section' })).toBeNull();
   });
@@ -128,9 +146,7 @@ describe('[FR-GOV-11] Governance permissions and states', () => {
         },
       }),
     });
-    expect(
-      await screen.findByText('The governance settings could not be loaded'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('The settings could not be loaded')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByRole('group', { name: 'Model configuration' })).toBeVisible();
     expect(calls).toBe(2);

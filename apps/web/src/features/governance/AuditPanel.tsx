@@ -2,22 +2,24 @@
 
 import { ROLE_LABELS, type AuditEvent } from '@caseguard/schemas';
 import {
+  Button,
   CopyButton,
   EmptyState,
+  Field,
+  Input,
   LoadingSkeleton,
-  Notice,
   Panel,
-  StatusBadge,
+  RelativeTime,
+  Select,
   UiLink,
   cg,
-  formatDateTimeUtc,
 } from '@caseguard/ui';
-import { Button, Field, Input, Select, makeStyles, tokens } from '@fluentui/react-components';
-import { ArrowSyncRegular, HistoryRegular, ShieldCheckmarkRegular } from '@fluentui/react-icons';
+import { makeStyles, tokens } from '@fluentui/react-components';
 import { keepPreviousData } from '@tanstack/react-query';
+import { HistoryIcon, RefreshCwIcon, ShieldCheckIcon } from 'lucide-react';
 import { useCallback, useId, useMemo } from 'react';
 import { QueryErrorState } from '../../components/common/QueryErrorState';
-import { useApiQuery } from '../../lib/api/hooks';
+import { StateBadge } from '../../lib/advanced-view-parts';
 import { pagedBoundary, useApiPages } from '../../lib/api/pages';
 import { useAuth } from '../../lib/auth/context';
 import { caseHref } from '../../lib/deep-links';
@@ -40,29 +42,29 @@ import { retryPages, useAutoLoadNext } from './use-auto-load';
 
 const useStyles = makeStyles({
   stack: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
-  filters: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    alignItems: 'flex-end',
-    gap: cg.space[3],
-    padding: cg.space[3],
-    borderRadius: cg.radius.lg,
-    border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surface,
+  caption: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+    color: cg.textMuted,
   },
-  field: { flex: '1 1 160px', minWidth: 0 },
-  wide: { flex: '2 1 220px', minWidth: 0 },
+  filters: {
+    display: 'grid',
+    alignItems: 'end',
+    gap: `${cg.space[3]} ${cg.space[4]}`,
+    gridTemplateColumns: 'minmax(0, 1fr)',
+    '@media (min-width: 640px)': { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' },
+    '@media (min-width: 1100px)': { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' },
+  },
+  filterActions: { display: 'flex', alignItems: 'center', gap: cg.space[2] },
   status: { margin: 0, color: cg.textSecondary, fontSize: tokens.fontSizeBase300 },
-  list: { margin: 0, padding: 0, listStyle: 'none' },
+  list: { margin: 0, padding: 0, listStyleType: 'none' },
   row: {
     display: 'flex',
     flexDirection: 'column',
     gap: cg.space[1],
-    padding: `${cg.space[3]} ${cg.space[3]}`,
-    marginBottom: cg.space[2],
-    borderRadius: cg.radius.md,
-    border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surface,
+    padding: `${cg.space[3]} 0`,
+    borderBottom: `1px solid ${cg.borderSubtle}`,
     minWidth: 0,
   },
   head: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: cg.space[2] },
@@ -97,20 +99,20 @@ const useStyles = makeStyles({
   chip: { display: 'inline-flex', alignItems: 'center', gap: '2px' },
   link: { color: cg.textLink },
   more: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[3] },
-  verifyRow: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: cg.space[3] },
 });
 
 /** Estimated height of an audit row before it is measured. */
 const ESTIMATED_ROW = 132;
 
+const OUTCOME_BADGE = {
+  success: { status: 'productive', label: 'Success', title: 'The action went through.' },
+  denied: { status: 'unsupported', label: 'Denied', title: 'The action was refused.' },
+  failure: { status: 'unsupported', label: 'Failure', title: 'The action failed.' },
+} as const;
+
 function AuditRow({ event }: { event: AuditEvent }) {
   const styles = useStyles();
-  const outcome =
-    event.outcome === 'success'
-      ? ({ status: 'productive', label: 'Success' } as const)
-      : event.outcome === 'denied'
-        ? ({ status: 'unsupported', label: 'Denied' } as const)
-        : ({ status: 'unsupported', label: 'Failure' } as const);
+  const outcome = OUTCOME_BADGE[event.outcome];
   const role =
     event.actorRole === 'system'
       ? 'System'
@@ -123,10 +125,10 @@ function AuditRow({ event }: { event: AuditEvent }) {
       <div className={styles.head}>
         <span className={styles.seq}>#{event.sequence}</span>
         <span className={styles.action}>{event.action}</span>
-        <StatusBadge status={outcome.status} label={outcome.label} />
-        <time dateTime={event.occurredAt} className={styles.seq}>
-          {formatDateTimeUtc(event.occurredAt, { seconds: true })}
-        </time>
+        <StateBadge status={outcome.status} label={outcome.label} title={outcome.title} size="sm" />
+        <span className={styles.seq}>
+          <RelativeTime value={event.occurredAt} />
+        </span>
       </div>
       <p className={styles.meta}>
         <span>
@@ -164,7 +166,7 @@ function AuditRow({ event }: { event: AuditEvent }) {
           {event.correlationId}
           <CopyButton
             value={event.correlationId}
-            label={`Copy the correlation id of event ${event.sequence}`}
+            label={`Copy the reference of event ${event.sequence}`}
           />
         </span>
       </div>
@@ -172,68 +174,10 @@ function AuditRow({ event }: { event: AuditEvent }) {
   );
 }
 
-function ChainVerification() {
-  const styles = useStyles();
-  const auth = useAuth();
-  const query = useApiQuery('governance.auditVerify', undefined, {
-    enabled: auth.status === 'ready',
-  });
-  const result = query.data;
-  return (
-    <Panel
-      title="Hash-chain verification"
-      description="Every audit event is chained to the one before it, so a removed or edited event breaks the chain."
-      help="Each event stores the hash of the previous one and its own hash over its content. Verifying walks the whole chain and recomputes every hash: any gap, edit or reordering shows up as the first sequence number that no longer matches."
-      actions={
-        <Button
-          appearance="outline"
-          size="small"
-          icon={<ArrowSyncRegular />}
-          disabled={query.isFetching}
-          onClick={() => void query.refetch()}
-        >
-          {query.isFetching ? 'Verifying…' : 'Verify again'}
-        </Button>
-      }
-    >
-      {query.isPending ? (
-        <LoadingSkeleton variant="text" count={2} label="Verifying the audit chain" />
-      ) : query.isError || !result ? (
-        <QueryErrorState
-          error={query.error}
-          subject="The chain verification"
-          compact
-          onRetry={() => void query.refetch()}
-          retrying={query.isFetching}
-        />
-      ) : result.valid ? (
-        <div className={styles.verifyRow} role="status">
-          <StatusBadge status="productive" label="Chain intact" />
-          <span>
-            {result.detail} · checked {formatDateTimeUtc(result.checkedAt, { seconds: true })}
-          </span>
-        </div>
-      ) : (
-        <div role="alert">
-          <Notice variant="warning" title="The audit chain is broken">
-            {result.detail}
-            {result.firstInvalidSequence !== null
-              ? ` The first event that does not match is #${result.firstInvalidSequence}.`
-              : ''}{' '}
-            {result.eventsChecked} events were checked at{' '}
-            {formatDateTimeUtc(result.checkedAt, { seconds: true })}. Treat the log after that point
-            as untrusted and investigate.
-          </Notice>
-        </div>
-      )}
-    </Panel>
-  );
-}
-
 /**
- * Audit log (`governance.audit`, `governance.auditVerify`): append-only, hash-chained events, newest first, with
- * filters in the URL, a virtualised list that loads more as you scroll and the chain verification result. Reading the
- * log is itself audited, so nothing here refreshes by itself.
+ * Audit log (`governance.audit`): append-only, hash-chained events, newest first, with filters in the URL and a
+ * virtualised list that loads more as you scroll. Reading the log is itself audited, so nothing here refreshes by itself.
+ * The chain check sits in the summary at the top of the page.
  */
 export function AuditPanel() {
   const styles = useStyles();
@@ -286,35 +230,35 @@ export function AuditPanel() {
   );
 
   return (
-    <div className={styles.stack}>
-      <ChainVerification />
-      <Panel
-        title="Audit events"
-        description="Newest first. Filters narrow the list; the action and actor filters match exactly."
-        help="The audit log records who did what, to what, when and with what outcome: sign-ins that were refused, settings changed, roles assigned, exports, reviews, skill approvals and demo resets. Details hold ids and counters, never case text or secrets. The log is append-only."
-        actions={
-          <Button
-            appearance="outline"
-            size="small"
-            icon={<ArrowSyncRegular />}
-            disabled={!ready || pages.isFetching}
-            onClick={() => void pages.refetch()}
-          >
-            {pages.isFetching && !pages.isPending ? 'Refreshing…' : 'Refresh'}
-          </Button>
-        }
-      >
-        <Notice variant="info" compact title={null}>
+    <Panel
+      title="Audit events"
+      description="Newest first. Filters narrow the list; the action and actor filters match exactly."
+      help="The audit log records who did what, to what, when and with what outcome: sign-ins that were refused, settings changed, roles assigned, exports, reviews, skill approvals and demo resets. Details hold ids and counters, never case text or secrets. The log is append-only."
+      actions={
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<RefreshCwIcon />}
+          loading={pages.isFetching && !pages.isPending}
+          disabledFocusable={!ready || pages.isPending}
+          onClick={() => void pages.refetch()}
+        >
+          {pages.isFetching && !pages.isPending ? 'Refreshing…' : 'Refresh'}
+        </Button>
+      }
+    >
+      <div className={styles.stack}>
+        <p className={styles.caption}>
           Reading the audit log is itself recorded in the audit log, so this list does not refresh
           on its own.
-        </Notice>
+        </p>
         <form
           role="search"
           aria-label="Filter audit events"
           className={styles.filters}
           onSubmit={(event) => event.preventDefault()}
         >
-          <Field label="Action" className={styles.wide}>
+          <Field label="Action">
             <Input
               {...actionField.inputProps}
               list={listId}
@@ -327,14 +271,14 @@ export function AuditPanel() {
               <option key={action} value={action} />
             ))}
           </datalist>
-          <Field label="Actor id" className={styles.field}>
+          <Field label="Actor id">
             <Input {...actorField.inputProps} maxLength={120} placeholder="user_alex_admin" />
           </Field>
-          <Field label="Outcome" className={styles.field}>
+          <Field label="Outcome">
             <Select
               value={values.aout}
-              onChange={(_event, data) =>
-                update({ aout: data.value as (typeof OUTCOME_FILTERS)[number] })
+              onChange={(event) =>
+                update({ aout: event.target.value as (typeof OUTCOME_FILTERS)[number] })
               }
             >
               {OUTCOME_FILTERS.map((value) => (
@@ -344,7 +288,7 @@ export function AuditPanel() {
               ))}
             </Select>
           </Field>
-          <Field label="Case" className={styles.field}>
+          <Field label="Case">
             <CaseFilterSelect
               value={values.acase ?? ''}
               emptyLabel="Any case"
@@ -352,15 +296,17 @@ export function AuditPanel() {
               onChange={(value) => update({ acase: value || null })}
             />
           </Field>
-          <Field label="From (UTC date)" className={styles.field}>
+          <Field label="From (UTC date)">
             <Input type="date" {...fromField.inputProps} />
           </Field>
-          <Field label="To (UTC date)" className={styles.field}>
+          <Field label="To (UTC date)">
             <Input type="date" {...toField.inputProps} />
           </Field>
-          <Button appearance="subtle" disabled={active === 0} onClick={clear}>
-            Clear filters
-          </Button>
+          <div className={styles.filterActions}>
+            <Button variant="ghost" disabledFocusable={active === 0} onClick={clear}>
+              Clear filters
+            </Button>
+          </div>
         </form>
         {boundary.isPending ? (
           <LoadingSkeleton variant="list" count={4} label="Loading audit events" />
@@ -396,7 +342,7 @@ export function AuditPanel() {
             {events.length === 0 ? (
               <EmptyState
                 headingLevel={3}
-                icon={active > 0 ? <HistoryRegular /> : <ShieldCheckmarkRegular />}
+                icon={active > 0 ? <HistoryIcon /> : <ShieldCheckIcon />}
                 title={active > 0 ? 'No audit events match these filters' : 'No audit events yet'}
                 description={
                   active > 0
@@ -406,7 +352,7 @@ export function AuditPanel() {
                 {...(active > 0
                   ? {
                       action: (
-                        <Button appearance="primary" onClick={clear}>
+                        <Button variant="primary" onClick={clear}>
                           Clear filters
                         </Button>
                       ),
@@ -443,8 +389,8 @@ export function AuditPanel() {
               <div className={styles.more}>
                 <div ref={sentinel} aria-hidden="true" />
                 <Button
-                  appearance="outline"
-                  disabled={isFetchingNextPage}
+                  variant="secondary"
+                  loading={isFetchingNextPage}
                   onClick={() => void fetchNextPage()}
                 >
                   {isFetchingNextPage ? 'Loading…' : 'Load more events'}
@@ -453,7 +399,7 @@ export function AuditPanel() {
             ) : null}
           </>
         )}
-      </Panel>
-    </div>
+      </div>
+    </Panel>
   );
 }

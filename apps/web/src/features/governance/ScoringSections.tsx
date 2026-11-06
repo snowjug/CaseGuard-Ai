@@ -10,9 +10,9 @@ import {
   QualityConfigSchema,
   type GovernanceSettings,
 } from '@caseguard/schemas';
-import { cg, formatNumber } from '@caseguard/ui';
+import { Accordion, cg, formatNumber } from '@caseguard/ui';
 import { makeStyles, tokens } from '@fluentui/react-components';
-import { FieldGrid, FieldGroup, GroupError, NumberField, TextField, useEditor } from './fields';
+import { FieldGroup, FieldRows, GroupError, NumberField, TextField, useEditor } from './fields';
 import { getIn } from './messages';
 import { SectionEditor } from './SectionEditor';
 
@@ -71,21 +71,13 @@ export function QualitySection({ envelope }: { envelope: GovernanceSettings['qua
       effectNote="Used when a case is analysed. Results already stored are not recalculated; analyse the case again to apply a change."
       extraErrors={bandsMustDescend}
     >
-      <FieldGroup title="Version">
-        <FieldGrid columns={2}>
-          <TextField
-            path="version"
-            label="Version label"
-            maxLength={40}
-            hint="Free text, shown with scores."
-          />
-        </FieldGrid>
-      </FieldGroup>
-      <FieldGroup
-        title="Dimension weights"
-        description="How much each dimension counts towards the composite, from 0 to 1."
-      >
-        <FieldGrid>
+      <Accordion>
+        <FieldGroup
+          title="Dimension weights"
+          description="How much each dimension counts towards the composite, from 0 to 1."
+          paths={['weights']}
+          defaultOpen
+        >
           {QUALITY_DIMENSIONS.map((key) => (
             <NumberField
               key={key}
@@ -96,14 +88,13 @@ export function QualitySection({ envelope }: { envelope: GovernanceSettings['qua
               step={0.05}
             />
           ))}
-        </FieldGrid>
-        <WeightSum paths={QUALITY_WEIGHT_PATHS} subject="dimension weights" />
-      </FieldGroup>
-      <FieldGroup
-        title="Penalty points"
-        description="Points deducted for each kind of process problem, from 0 to 30."
-      >
-        <FieldGrid>
+          <WeightSum paths={QUALITY_WEIGHT_PATHS} subject="dimension weights" />
+        </FieldGroup>
+        <FieldGroup
+          title="Penalty points"
+          description="Points deducted for each kind of process problem, from 0 to 30."
+          paths={['penaltyPoints', 'penaltyCap']}
+        >
           {PENALTY_KEYS.map((key) => (
             <NumberField
               key={key}
@@ -123,19 +114,26 @@ export function QualitySection({ envelope }: { envelope: GovernanceSettings['qua
             unit="pts"
             hint="The most that can be deducted in total."
           />
-        </FieldGrid>
-      </FieldGroup>
-      <FieldGroup
-        title="Score bands"
-        description="Lower bounds, from 0 to 100. They must descend: strong, then adequate, then needs attention."
-      >
-        <FieldGrid>
+        </FieldGroup>
+        <FieldGroup
+          title="Score bands"
+          description="Lower bounds, from 0 to 100. They must descend: strong, then adequate, then needs attention."
+          paths={['bands']}
+        >
           <NumberField path="bands.strong" label="Strong from" min={0} max={100} />
           <NumberField path="bands.adequate" label="Adequate from" min={0} max={100} />
           <NumberField path="bands.needsAttention" label="Needs attention from" min={0} max={100} />
-        </FieldGrid>
-        <GroupError path="bands" />
-      </FieldGroup>
+          <GroupError path="bands" />
+        </FieldGroup>
+      </Accordion>
+      <FieldRows>
+        <TextField
+          path="version"
+          label="Version label"
+          maxLength={40}
+          hint="Free text, shown with scores."
+        />
+      </FieldRows>
     </SectionEditor>
   );
 }
@@ -153,21 +151,13 @@ export function ActionValueSection({ envelope }: { envelope: GovernanceSettings[
       effect="enforced"
       effectNote="Used when a case is analysed. Results already stored are not recalculated; analyse the case again to apply a change."
     >
-      <FieldGroup title="Version">
-        <FieldGrid columns={2}>
-          <TextField
-            path="version"
-            label="Version label"
-            maxLength={40}
-            hint="Free text, shown with rankings."
-          />
-        </FieldGrid>
-      </FieldGroup>
-      <FieldGroup
-        title="Cost weights"
-        description="How much each kind of cost counts, from 0 to 1."
-      >
-        <FieldGrid>
+      <Accordion>
+        <FieldGroup
+          title="Cost weights"
+          description="How much each kind of cost counts, from 0 to 1."
+          paths={['weights']}
+          defaultOpen
+        >
           <NumberField path="weights.time" label="Time" min={0} max={1} step={0.05} />
           <NumberField path="weights.token" label="Tokens" min={0} max={1} step={0.05} />
           <NumberField
@@ -178,14 +168,13 @@ export function ActionValueSection({ envelope }: { envelope: GovernanceSettings[
             step={0.05}
           />
           <NumberField path="weights.risk" label="Operational risk" min={0} max={1} step={0.05} />
-        </FieldGrid>
-        <WeightSum paths={ACTION_WEIGHT_PATHS} subject="cost weights" />
-      </FieldGroup>
-      <FieldGroup
-        title="Normalisation"
-        description="The values that count as the maximum, so different costs can be compared."
-      >
-        <FieldGrid>
+          <WeightSum paths={ACTION_WEIGHT_PATHS} subject="cost weights" />
+        </FieldGroup>
+        <FieldGroup
+          title="Normalisation"
+          description="The values that count as the maximum, so different costs can be compared."
+          paths={['normalization']}
+        >
           <NumberField path="normalization.maxTimeMinutes" label="Max time" unit="min" min={1} />
           <NumberField path="normalization.maxTokens" label="Max tokens" min={1} />
           <NumberField
@@ -195,13 +184,12 @@ export function ActionValueSection({ envelope }: { envelope: GovernanceSettings[
             min={0.1}
             step={0.1}
           />
-        </FieldGrid>
-      </FieldGroup>
-      <FieldGroup
-        title="Customer effort scale"
-        description="How heavy each effort level counts, from 0 to 1."
-      >
-        <FieldGrid>
+        </FieldGroup>
+        <FieldGroup
+          title="Customer effort scale"
+          description="How heavy each effort level counts, from 0 to 1."
+          paths={['effortScale']}
+        >
           {EFFORT_LEVELS.map((level) => (
             <NumberField
               key={level}
@@ -212,10 +200,11 @@ export function ActionValueSection({ envelope }: { envelope: GovernanceSettings[
               step={0.05}
             />
           ))}
-        </FieldGrid>
-      </FieldGroup>
-      <FieldGroup title="Safety and sensitivity">
-        <FieldGrid>
+        </FieldGroup>
+        <FieldGroup
+          title="Safety and sensitivity"
+          paths={['epsilon', 'riskCeiling', 'sensitivityDelta']}
+        >
           <NumberField
             path="epsilon"
             label="Cost floor (epsilon)"
@@ -240,8 +229,16 @@ export function ActionValueSection({ envelope }: { envelope: GovernanceSettings[
             step={0.05}
             hint="How far each weight is nudged to show how stable a ranking is."
           />
-        </FieldGrid>
-      </FieldGroup>
+        </FieldGroup>
+      </Accordion>
+      <FieldRows>
+        <TextField
+          path="version"
+          label="Version label"
+          maxLength={40}
+          hint="Free text, shown with rankings."
+        />
+      </FieldRows>
     </SectionEditor>
   );
 }

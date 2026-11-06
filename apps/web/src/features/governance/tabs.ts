@@ -12,7 +12,7 @@ export interface GovernanceTab {
 const ADMIN = 'Administrators';
 const REVIEW = 'Reviewers and administrators';
 
-/** The sections of the Governance page, in the order of the section list. */
+/** The sections of Settings and audit, in the order of the section list. */
 export const GOVERNANCE_TABS = [
   { id: 'model', label: 'Model', permission: 'governance:read', grantedTo: ADMIN },
   { id: 'prompts', label: 'Prompts', permission: 'governance:read', grantedTo: ADMIN },

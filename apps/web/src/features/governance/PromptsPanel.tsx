@@ -2,35 +2,35 @@
 
 import { AGENT_LABELS, AGENT_NAMES, type PromptVersion } from '@caseguard/schemas';
 import {
+  Accordion,
+  AccordionItem,
+  Badge,
   CopyButton,
   EmptyState,
-  KeyValueList,
+  HelpButton,
   LoadingSkeleton,
-  Notice,
   Panel,
-  StatusBadge,
+  RelativeTime,
   cg,
-  formatDateTimeUtc,
   type BadgeStatus,
 } from '@caseguard/ui';
 import { makeStyles, tokens } from '@fluentui/react-components';
-import { DocumentTextRegular } from '@fluentui/react-icons';
+import { FileTextIcon, LockIcon } from 'lucide-react';
 import { QueryErrorState } from '../../components/common/QueryErrorState';
+import { FactList, StateBadge } from '../../lib/advanced-view-parts';
 import { useApiQuery } from '../../lib/api/hooks';
 import { useAuth } from '../../lib/auth/context';
 import { ExpandableText } from './ExpandableText';
 
 const useStyles = makeStyles({
-  wrap: { display: 'flex', flexDirection: 'column', gap: cg.space[4] },
-  list: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: cg.space[4],
+  stack: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
+  note: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: cg.space[2] },
+  noteText: {
     margin: 0,
-    padding: 0,
-    listStyle: 'none',
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase300,
+    color: cg.textSecondary,
   },
-  head: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: cg.space[2] },
   hash: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -38,30 +38,25 @@ const useStyles = makeStyles({
     fontFamily: cg.font.mono,
     fontSize: tokens.fontSizeBase200,
   },
+  body: { display: 'flex', flexDirection: 'column', gap: cg.space[4] },
 });
 
-const STATUS: Record<PromptVersion['status'], { label: string; status: BadgeStatus }> = {
-  active: { label: 'Active', status: 'productive' },
-  draft: { label: 'Draft', status: 'uncertain' },
-  retired: { label: 'Retired', status: 'missing' },
+const STATUS: Record<
+  PromptVersion['status'],
+  { label: string; status: BadgeStatus; title: string }
+> = {
+  active: { label: 'Active', status: 'productive', title: 'The version the analysis uses now.' },
+  draft: { label: 'Draft', status: 'uncertain', title: 'Not in use yet.' },
+  retired: { label: 'Retired', status: 'missing', title: 'No longer used.' },
 };
 
-function PromptCard({ prompt }: { prompt: PromptVersion }) {
+function PromptDetails({ prompt }: { prompt: PromptVersion }) {
   const styles = useStyles();
-  const status = STATUS[prompt.status];
+  const label = AGENT_LABELS[prompt.agent];
   return (
-    <Panel
-      title={`${AGENT_LABELS[prompt.agent]} prompt`}
-      actions={
-        <span className={styles.head}>
-          <strong>Version {prompt.version}</strong>
-          <StatusBadge status={status.status} label={status.label} />
-        </span>
-      }
-    >
-      <KeyValueList
-        columns={2}
-        aria-label={`${AGENT_LABELS[prompt.agent]} prompt details`}
+    <div className={styles.body}>
+      <FactList
+        label={`${label} prompt details`}
         items={[
           {
             id: 'hash',
@@ -71,7 +66,7 @@ function PromptCard({ prompt }: { prompt: PromptVersion }) {
                 {prompt.templateHash.slice(0, 16)}…
                 <CopyButton
                   value={prompt.templateHash}
-                  label={`Copy the full hash of the ${AGENT_LABELS[prompt.agent]} prompt`}
+                  label={`Copy the full hash of the ${label} prompt`}
                 />
               </span>
             ),
@@ -80,19 +75,23 @@ function PromptCard({ prompt }: { prompt: PromptVersion }) {
           {
             id: 'by',
             label: 'Created',
-            value: `${formatDateTimeUtc(prompt.createdAt)} by ${prompt.createdBy}`,
+            value: (
+              <>
+                <RelativeTime value={prompt.createdAt} /> by {prompt.createdBy}
+              </>
+            ),
           },
           { id: 'note', label: 'Change note', value: prompt.changeNote || 'none' },
         ]}
       />
       <ExpandableText text={prompt.template} limit={320} mono />
-    </Panel>
+    </div>
   );
 }
 
 /**
- * Prompt versions (`governance.prompts`): the exact instructions each analysis agent runs with. They are defined in the
- * application's code, so this view is read-only; every model execution records the hash of the prompt it used.
+ * Prompt versions (`governance.prompts`): the exact instructions each analysis step runs with. They are defined in the
+ * application's code, so this view is read-only; every model call records the hash of the prompt it used.
  */
 export function PromptsPanel() {
   const styles = useStyles();
@@ -117,29 +116,55 @@ export function PromptsPanel() {
       a.version.localeCompare(b.version, 'en', { numeric: true }),
   );
   return (
-    <div className={styles.wrap}>
-      <Notice variant="info" title="Read-only">
-        Prompt versions are defined in the application&apos;s code and reviewed like any other
-        change, so they cannot be edited here. Each model execution records the hash of the prompt
-        it used, so any result can be traced to the exact instructions. Prompts tell the models to
-        describe process quality and never to rank or judge people.
-      </Notice>
-      {prompts.length === 0 ? (
-        <EmptyState
-          headingLevel={2}
-          icon={<DocumentTextRegular />}
-          title="No prompt versions"
-          description="The API returned no prompts. The prompt catalogue is created when the API starts."
-        />
-      ) : (
-        <ul className={styles.list} aria-label="Prompt versions">
-          {prompts.map((prompt) => (
-            <li key={prompt.id}>
-              <PromptCard prompt={prompt} />
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <Panel
+      title="Prompt versions"
+      description="The exact instructions each analysis step runs with."
+    >
+      <div className={styles.stack}>
+        <div className={styles.note}>
+          <Badge tone="neutral" icon={<LockIcon />} title="Prompts are changed in code, not here.">
+            Read-only
+          </Badge>
+          <p className={styles.noteText}>
+            Prompt versions are defined in the application&apos;s code and reviewed like any other
+            change, so they cannot be edited here.
+          </p>
+          <HelpButton label="About prompt versions" title="Prompt versions">
+            Each model call records the hash of the prompt it used, so any result can be traced to
+            the exact instructions. Prompts tell the models to describe process quality and never to
+            rank or judge people.
+          </HelpButton>
+        </div>
+        {prompts.length === 0 ? (
+          <EmptyState
+            headingLevel={3}
+            icon={<FileTextIcon />}
+            title="No prompt versions"
+            description="The API returned no prompts. The prompt catalogue is created when the API starts."
+          />
+        ) : (
+          <Accordion>
+            {prompts.map((prompt, index) => {
+              const status = STATUS[prompt.status];
+              return (
+                <AccordionItem
+                  key={prompt.id}
+                  headingLevel={3}
+                  icon={<FileTextIcon />}
+                  title={`${AGENT_LABELS[prompt.agent]} prompt`}
+                  subtitle={`Version ${prompt.version}`}
+                  badge={
+                    <StateBadge status={status.status} label={status.label} title={status.title} />
+                  }
+                  defaultOpen={index === 0}
+                >
+                  <PromptDetails prompt={prompt} />
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
+        )}
+      </div>
+    </Panel>
   );
 }

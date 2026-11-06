@@ -203,6 +203,7 @@ describe('[FR-GOV-20] versioned section editor', () => {
       },
     });
     renderApp(<GovernancePage />, { api: fake });
+    await user.click(await screen.findByRole('button', { name: /^Custom patterns/ }));
     await user.click(await screen.findByRole('button', { name: 'Add a pattern' }));
     await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Order id');
     const pattern = screen.getByRole('textbox', { name: 'Pattern' });
@@ -365,14 +366,18 @@ describe('[FR-GOV-22] scoring, redaction and export controls', () => {
     const user = userEvent.setup();
     open('redaction');
     renderApp(<GovernancePage />, { api: api() });
-    const credentials = await screen.findByRole('group', { name: 'Credentials (always redacted)' });
+    // Personal data is the first group, so it is open; the other groups open from their headers.
+    const personal = await screen.findByRole('region', { name: /^Personal data \(your choice\)/ });
+    await user.click(screen.getByRole('button', { name: /^Credentials \(always redacted\)/ }));
+    const credentials = await screen.findByRole('region', {
+      name: /^Credentials \(always redacted\)/,
+    });
     const locked = within(credentials).getAllByRole('switch');
     expect(locked).toHaveLength(8);
     for (const item of locked) {
       expect(item).toBeChecked();
       expect(item).toBeDisabled();
     }
-    const personal = screen.getByRole('group', { name: 'Personal data (your choice)' });
     const phone = within(personal).getByRole('switch', { name: 'Phone numbers' });
     expect(phone).toBeChecked();
     await user.click(phone);
@@ -383,26 +388,23 @@ describe('[FR-GOV-22] scoring, redaction and export controls', () => {
   });
 
   it('explains that custom patterns can be refused as unsafe or time out, and that an incomplete redaction refuses the payload', async () => {
+    const user = userEvent.setup();
     open('redaction');
     renderApp(<GovernancePage />, { api: api() });
-    const caveat = (await screen.findByText('Custom patterns can be refused')).closest(
-      '[role="note"]',
-    ) as HTMLElement;
-    expect(within(caveat).getByText(/backtrack/)).toBeInTheDocument();
-    expect(
-      within(caveat).getByText(/unsafe or too slow is refused with the reason/),
-    ).toBeInTheDocument();
-    expect(
-      within(caveat).getByText(/runs out of time, means redaction would be incomplete/),
-    ).toBeInTheDocument();
-    expect(
-      within(caveat).getByText(
-        /the whole payload is refused instead of being stored partly redacted/,
-      ),
-    ).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: /^Custom patterns/ }));
+    const caveat = await screen.findByText(/^Custom patterns can be refused\./);
+    expect(caveat).toHaveTextContent(/backtrack/);
+    expect(caveat).toHaveTextContent(/or is too slow is refused with the reason/);
+    expect(caveat).toHaveTextContent(
+      /runs out of time at ingestion, redaction would be incomplete/,
+    );
+    expect(caveat).toHaveTextContent(
+      /the whole payload is refused instead of being stored partly redacted/,
+    );
     expect(
       screen.getByText('No custom patterns. The built-in categories above still apply.'),
     ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Other/ }));
     expect(
       screen.getByRole('switch', { name: 'Redact before model calls' }),
     ).toHaveAccessibleDescription(
