@@ -52,7 +52,7 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
-import { DeleteRegular, FolderRegular } from '@fluentui/react-icons';
+import { FolderIcon, Trash2Icon } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
 import {
   SAMPLE_ACTUAL_TRACK,
@@ -599,7 +599,7 @@ export function DesignLab() {
           <EmptyState
             title="No cases yet"
             description="Load the synthetic sample from Cases to see an analysed investigation."
-            icon={<FolderRegular />}
+            icon={<FolderIcon />}
             action={<Button appearance="primary">Open Cases</Button>}
           />
           <ErrorState
@@ -706,7 +706,7 @@ export function DesignLab() {
           </ConfirmDialog>
           <ConfirmDialog
             trigger={
-              <Button appearance="outline" icon={<DeleteRegular />}>
+              <Button appearance="outline" icon={<Trash2Icon />}>
                 Open a destructive confirmation with a reason
               </Button>
             }

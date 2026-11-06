@@ -17,7 +17,6 @@
     "@caseguard/schemas": "workspace:*",
     "@caseguard/ui": "workspace:*",
     "@fluentui/react-components": "^9.75.0",
-    "@fluentui/react-icons": "^2.0.344",
     "@hookform/resolvers": "^5.9.2",
     "@tanstack/react-query": "^5.104.5",
     "cmdk": "^1.1.1",
