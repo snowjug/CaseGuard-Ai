@@ -1,24 +1,52 @@
 'use client';
 
+import type { SkillDetail, SkillValidation, SkillVersion } from '@caseguard/schemas';
 import {
-  SKILL_LIFECYCLE_LABELS,
-  type SkillDetail,
-  type SkillValidation,
-  type SkillVersion,
-} from '@caseguard/schemas';
-import { Notice, Panel, StatusBadge, formatDateTimeUtc } from '@caseguard/ui';
-import { Button, Field, Select } from '@fluentui/react-components';
+  BentoGrid,
+  BentoItem,
+  Button,
+  Field,
+  Panel,
+  RelativeTime,
+  Select,
+  cg,
+} from '@caseguard/ui';
+import { makeStyles } from '@fluentui/react-components';
 import { useMemo, useState } from 'react';
+import { ExpandableText } from '../../components/case/ExpandableText';
 import { JobProgress } from '../../components/common/JobProgress';
 import { useApiMutation } from '../../lib/api/hooks';
 import { useToast } from '../../lib/toast';
 import { useActorLabel, useCurrentUserId } from '../quality/actors';
-import { ClampedText } from '../quality/ClampedText';
 import { explainFailure, failureText, needsReload } from '../quality/failure';
 import { GatedConfirm } from '../quality/GatedConfirm';
-import { useInsightStyles } from '../quality/styles';
+import { StatusPill } from './Hints';
 import { SKILL_INVALIDATES, useAnalysedCases, useRefreshSkills } from './hooks';
-import { VALIDATION_KIND_LABELS, VALIDATION_OUTCOMES, isWithdrawn } from './labels';
+import {
+  LIFECYCLE_LABELS,
+  VALIDATION_KIND_LABELS,
+  VALIDATION_OUTCOMES,
+  isWithdrawn,
+} from './labels';
+import { useSkillStyles } from './styles';
+
+const useStyles = makeStyles({
+  fill: { height: '100%', boxSizing: 'border-box' },
+  summary: { color: cg.textSecondary },
+  gates: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[2],
+    margin: 0,
+    padding: cg.space[4],
+    listStyle: 'none',
+    borderRadius: cg.radius.md,
+    backgroundColor: cg.surfaceSunken,
+  },
+  gate: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
+  controls: { display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: cg.space[3] },
+  field: { flex: '1 1 220px', minWidth: 0 },
+});
 
 /** The newest validation of a kind for one version, or undefined. */
 export function latestFor(
@@ -38,20 +66,19 @@ function GateLine({
   validation: SkillValidation | undefined;
   kind: SkillValidation['kind'];
 }) {
-  const styles = useInsightStyles();
+  const styles = useSkillStyles();
+  const own = useStyles();
   if (!validation) {
     return (
-      <li>
-        {VALIDATION_KIND_LABELS[kind]}:{' '}
-        <StatusBadge status="missing" label="Not run" size="small" />
+      <li className={own.gate}>
+        {VALIDATION_KIND_LABELS[kind]}: <StatusPill status="missing" label="Not run" />
       </li>
     );
   }
   const outcome = VALIDATION_OUTCOMES[validation.outcome];
   return (
-    <li>
-      {VALIDATION_KIND_LABELS[kind]}:{' '}
-      <StatusBadge status={outcome.status} label={outcome.label} size="small" />{' '}
+    <li className={own.gate}>
+      {VALIDATION_KIND_LABELS[kind]}: <StatusPill status={outcome.status} label={outcome.label} />{' '}
       <span className={styles.meta}>
         {validation.scope === 'case' ? 'one case only' : 'full run'}
       </span>
@@ -85,7 +112,8 @@ function ProposedVersion({
   proposed: SkillVersion;
   onReload: () => void;
 }) {
-  const styles = useInsightStyles();
+  const styles = useSkillStyles();
+  const own = useStyles();
   const toast = useToast();
   const actor = useActorLabel();
   const me = useCurrentUserId();
@@ -129,37 +157,45 @@ function ProposedVersion({
       title={`Proposed version ${proposed.version}`}
       description="A change learned from another case. It is never applied on its own."
       help="A proposed change waits for a decision. Approving needs someone other than the skill's creator and the author of the proposal, and the new content must have passed a full simulation test and the regression suite. Rejecting needs only a reason. Nothing changes until someone decides."
-      actions={<StatusBadge status="uncertain" label="Waiting for a decision" />}
+      actions={<StatusPill status="uncertain" label="Waiting for a decision" size="md" />}
     >
-      <ClampedText text={proposed.changeSummary} lines={4} label="summary of the proposed change" />
+      <ExpandableText
+        text={proposed.changeSummary}
+        lines={4}
+        label="summary of the proposed change"
+        className={own.summary}
+      />
       <p className={styles.meta}>
-        Proposed by {actor(proposed.createdBy)} on {formatDateTimeUtc(proposed.createdAt)}; it
+        Proposed by {actor(proposed.createdBy)} <RelativeTime value={proposed.createdAt} />; it
         builds on version{' '}
         {detail.versions.find((version) => version.id === proposed.parentVersionId)?.version ??
           'unknown'}
         .
       </p>
-      <p className={styles.itemTitle}>Checks on this version</p>
-      <ul className={styles.bullets} aria-label="Validations of the proposed version">
-        <GateLine
-          validation={latestFor(detail.validations, proposed.id, 'simulation_test')}
-          kind="simulation_test"
-        />
-        <GateLine
-          validation={latestFor(detail.validations, proposed.id, 'regression')}
-          kind="regression"
-        />
-      </ul>
-      <Notice variant="info" compact title="Who can decide">
-        Approval needs someone other than {actor(skill.createdBy)} (who created the skill) and{' '}
-        {actor(proposed.createdBy)} (who proposed this change). Run the simulation test and the
-        regression suite on this version first (Validation tab).
-      </Notice>
+      <div className={styles.tight}>
+        <p className={styles.title}>Checks on this version</p>
+        <ul className={own.gates} aria-label="Validations of the proposed version">
+          <GateLine
+            validation={latestFor(detail.validations, proposed.id, 'simulation_test')}
+            kind="simulation_test"
+          />
+          <GateLine
+            validation={latestFor(detail.validations, proposed.id, 'regression')}
+            kind="regression"
+          />
+        </ul>
+      </div>
+      <p className={styles.caption}>
+        <span className={styles.strong}>Who can decide.</span> Approval needs someone other than{' '}
+        {actor(skill.createdBy)} (who created the skill) and {actor(proposed.createdBy)} (who
+        proposed this change). Run the simulation test and the regression suite on this version
+        first (Validation tab).
+      </p>
       <div className={styles.actions}>
         <GatedConfirm
           permission="skill:approve"
           blockedReason={approveBlocked}
-          trigger={<Button appearance="primary">Approve version {proposed.version}</Button>}
+          trigger={<Button variant="secondary">Approve version {proposed.version}</Button>}
           title={`Approve version ${proposed.version}?`}
           confirmLabel="Approve"
           reason={{
@@ -173,14 +209,14 @@ function ProposedVersion({
             Version {proposed.version} becomes the current version of this skill. The previous
             version is kept in the history and can be restored.
             {skill.lifecycle === 'expert_reviewed'
-              ? ' Because the skill was expert reviewed, it goes back to Simulation Tested so the new content is reviewed again.'
+              ? ' Because the skill was already reviewed, it goes back to the Tested step so the new content is reviewed again.'
               : ''}
           </p>
         </GatedConfirm>
         <GatedConfirm
           permission="skill:approve"
           blockedReason={rejectBlocked}
-          trigger={<Button appearance="outline">Reject version {proposed.version}</Button>}
+          trigger={<Button variant="secondary">Reject version {proposed.version}</Button>}
           title={`Reject version ${proposed.version}?`}
           confirmLabel="Reject"
           tone="danger"
@@ -199,7 +235,8 @@ function ProposedVersion({
 }
 
 function ProposeChange({ detail }: { detail: SkillDetail }) {
-  const styles = useInsightStyles();
+  const styles = useSkillStyles();
+  const own = useStyles();
   const toast = useToast();
   const refresh = useRefreshSkills();
   const { analysed } = useAnalysedCases();
@@ -221,14 +258,15 @@ function ProposeChange({ detail }: { detail: SkillDetail }) {
       title="Propose a change from another case"
       description="Learn from a case the skill was not built on. The result is a proposal, never an automatic change."
       help="The engine compares how another analysed case went with the skill and, where it found something worth adding (a trigger, a step, a failure mode), writes a proposed new version. Someone else then approves or rejects it."
+      className={own.fill}
     >
-      <div className={styles.toolbar}>
-        <Field label="Learn from this case" className={styles.field}>
+      <div className={own.controls}>
+        <Field label="Learn from this case" className={own.field}>
           <Select
             className={styles.select}
             value={chosen}
             disabled={candidates.length === 0}
-            onChange={(_event, next) => setSource(next.value)}
+            onChange={(event) => setSource(event.target.value)}
           >
             {candidates.map((item) => (
               <option key={item.id} value={item.id}>
@@ -240,7 +278,7 @@ function ProposeChange({ detail }: { detail: SkillDetail }) {
         <GatedConfirm
           permission="skill:mutate"
           blockedReason={blocked}
-          trigger={<Button appearance="outline">Propose a change</Button>}
+          trigger={<Button variant="secondary">Propose a change</Button>}
           title="Propose a change from this case?"
           confirmLabel="Start the proposal"
           onConfirm={async () => {
@@ -283,7 +321,8 @@ function ProposeChange({ detail }: { detail: SkillDetail }) {
 }
 
 function Rollback({ detail, onReload }: { detail: SkillDetail; onReload: () => void }) {
-  const styles = useInsightStyles();
+  const styles = useSkillStyles();
+  const own = useStyles();
   const toast = useToast();
   const rollback = useApiMutation('skills.rollback', { invalidate: SKILL_INVALIDATES });
   const [target, setTarget] = useState('');
@@ -302,19 +341,20 @@ function Rollback({ detail, onReload }: { detail: SkillDetail; onReload: () => v
       title="Roll back to an earlier version"
       description="Restores earlier content by creating a new version. Nothing is deleted or rewritten."
       help="A rollback adds a new version whose content equals an earlier one, and the version it replaces stays in the history. Only a version the current one was built from can be restored; a version that an earlier rollback withdrew has to be proposed again as a new version with its own approval."
+      className={own.fill}
     >
-      <div className={styles.toolbar}>
-        <Field label="Restore the content of" className={styles.field}>
+      <div className={own.controls}>
+        <Field label="Restore the content of" className={own.field}>
           <Select
             className={styles.select}
             value={chosen}
             disabled={options.length === 0}
-            onChange={(_event, next) => setTarget(next.value)}
+            onChange={(event) => setTarget(event.target.value)}
           >
             {options.map((version) => (
               <option key={version.id} value={version.id}>
-                Version {version.version} ({SKILL_LIFECYCLE_LABELS[version.lifecycleAtCreation]}{' '}
-                when created)
+                Version {version.version} ({LIFECYCLE_LABELS[version.lifecycleAtCreation]} when
+                created)
               </option>
             ))}
           </Select>
@@ -322,7 +362,7 @@ function Rollback({ detail, onReload }: { detail: SkillDetail; onReload: () => v
         <GatedConfirm
           permission="skill:rollback"
           blockedReason={blocked}
-          trigger={<Button appearance="outline">Roll back</Button>}
+          trigger={<Button variant="secondary">Roll back</Button>}
           title={chosenVersion ? `Roll back to version ${chosenVersion.version}?` : 'Roll back?'}
           confirmLabel="Roll back"
           tone="danger"
@@ -372,11 +412,14 @@ export function ProposalSection({ detail, onReload }: ChangesPanelsProps) {
 
 /** The two other ways a skill's content can change: proposing a change from a case, and rollback. */
 export function ManageSection({ detail, onReload }: ChangesPanelsProps) {
-  const styles = useInsightStyles();
   return (
-    <div className={styles.band}>
-      <ProposeChange detail={detail} />
-      <Rollback detail={detail} onReload={onReload} />
-    </div>
+    <BentoGrid>
+      <BentoItem span={12} spanLg={6}>
+        <ProposeChange detail={detail} />
+      </BentoItem>
+      <BentoItem span={12} spanLg={6}>
+        <Rollback detail={detail} onReload={onReload} />
+      </BentoItem>
+    </BentoGrid>
   );
 }

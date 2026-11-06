@@ -1,5 +1,5 @@
 import { SYNTHETIC_EFFECTIVENESS_NOTICE, type Permission } from '@caseguard/schemas';
-import { configure, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, configure, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -38,6 +38,7 @@ import { latestFor, restorableVersions } from './ChangesPanels';
 import { furthestReached } from './LifecycleStepper';
 import { presentApproval } from './labels';
 import { joinReferences, precedentHeadline, precedentTitle } from './precedent';
+import { skillSummary, usedOnText } from './SkillCard';
 import { SkillDetailPage } from './SkillDetailPage';
 import { SkillLibraryPage } from './SkillLibraryPage';
 import { timeComparison, tokenSavingsText } from './UsageTab';
@@ -173,7 +174,7 @@ describe('[FR-SK-01] Skill presentation helpers', () => {
         fromState: 'expert_reviewed',
         toState: 'simulation_tested',
       }).sentence('Casey'),
-    ).toContain('the skill went back to Simulation Tested so the new content is reviewed again');
+    ).toContain('the skill went back to the Tested step so the new content is reviewed again');
   });
 
   it('shows how far a withdrawn skill got along the path', () => {
@@ -306,13 +307,30 @@ describe('[FR-SK-01] Skill presentation helpers', () => {
       /^Compared with the case the skill came from: /,
     );
   });
+
+  it('gives a card the part of a description that helps to choose, and says how often a skill was used', () => {
+    // The sentence about where the skill came from belongs to the skill's own page.
+    expect(
+      skillSummary('Distilled from CG-SYN-1001 (synthetic). Collect the minimum scoping data.'),
+    ).toBe('Collect the minimum scoping data.');
+    // A description that is only that sentence is shown as it is, and other text is never cut.
+    expect(skillSummary('Distilled from CG-SYN-1001 (synthetic).')).toBe(
+      'Distilled from CG-SYN-1001 (synthetic).',
+    );
+    expect(skillSummary('  Rule out   cheap causes first.  ')).toBe('Rule out cheap causes first.');
+    expect(usedOnText(0)).toBe('No cases yet');
+    expect(usedOnText(1)).toBe('1 case');
+    expect(usedOnText(12)).toBe('12 cases');
+  });
 });
 
-describe('[FR-SK-02] SkillDNA Library', () => {
-  it('shows a skeleton, then each skill with its lifecycle, version, estimated confidence and validation', async () => {
+describe('[FR-SK-02] Skills library', () => {
+  it('shows a skeleton, then each skill as a card with its status, estimated success and use', async () => {
     renderApp(<SkillLibraryPage />, { api: api() });
-    expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
-    expect(screen.getByRole('heading', { level: 1, name: 'SkillDNA Library' })).toBeInTheDocument();
+    const loading = screen.getAllByRole('status')[0] as HTMLElement;
+    expect(loading).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('heading', { level: 1, name: 'Skills' })).toBeInTheDocument();
+    expect(screen.getByText('Reuse fixes that worked before.')).toBeInTheDocument();
 
     const list = await screen.findByRole('list', { name: 'Skills' });
     const card = within(list)
@@ -324,23 +342,46 @@ describe('[FR-SK-02] SkillDNA Library', () => {
     );
     expect(within(card).getByText('Published')).toBeInTheDocument();
     expect(within(card).getByText('Change proposed')).toBeInTheDocument();
-    expect(within(card).getByText('Demo data')).toBeInTheDocument();
-    expect(within(card).getByText('version 1.0.0')).toBeInTheDocument();
-    expect(within(card).getByText('Confidence (estimate)')).toBeInTheDocument();
-    expect(within(card).getByText('60%')).toBeInTheDocument();
-    expect(within(card).getByText('Validated')).toBeInTheDocument();
     expect(within(card).getByText('Microsoft Teams · teams-authentication')).toBeInTheDocument();
-    expect(screen.getByText(/A skill is never published automatically/)).toBeInTheDocument();
+    // The estimate says it is one, in words, and the use says how often.
+    expect(within(card).getByText('Estimated success')).toBeInTheDocument();
+    expect(within(card).getByText('60%')).toBeInTheDocument();
+    expect(within(card).getByText('Used on')).toBeInTheDocument();
+    expect(within(card).getByText('1 case')).toBeInTheDocument();
+    // One tab stop per card: the title's link. Status and estimate explain themselves on hover only.
+    expect(within(card).getAllByRole('link')).toHaveLength(1);
+    expect(within(card).queryByRole('button')).toBeNull();
   });
 
-  it('filters on the server by lifecycle state and writes the choice to the address', async () => {
+  it('explains the status and the estimate on hover, and keeps the long sentences out of the page', async () => {
+    renderApp(<SkillLibraryPage />, { api: api() });
+    const list = await screen.findByRole('list', { name: 'Skills' });
+    await userEvent.hover(within(list).getByText('Published'));
+    const status = await screen.findByRole('tooltip');
+    expect(status).toHaveTextContent(/Live for matching\. Publication is always a human decision/);
+    expect(status).toHaveTextContent(
+      'Stages: Discovered, draft, tested, reviewed, pilot, validated, published.',
+    );
+    await userEvent.unhover(within(list).getByText('Published'));
+    await userEvent.hover(within(list).getByText('60%'));
+    const estimate = await waitFor(() => {
+      const tip = screen.getByRole('tooltip');
+      expect(tip).toHaveTextContent('A model estimate of how well this fix is likely to work');
+      return tip;
+    });
+    expect(estimate).toHaveTextContent('1 source case');
+    expect(estimate).toHaveTextContent('Demo data');
+    // No banner above the grid: the sentences about estimates and approval live in the help popover.
+    expect(screen.queryByText(/A skill is never published automatically/)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'About Skills' }));
+    expect(await screen.findByText(/A skill is never published automatically/)).toBeInTheDocument();
+  });
+
+  it('filters on the server by status and writes the choice to the address', async () => {
     const fake = api();
     renderApp(<SkillLibraryPage />, { api: fake });
     await screen.findByRole('list', { name: 'Skills' });
-    await userEvent.selectOptions(
-      screen.getByRole('combobox', { name: 'Lifecycle state' }),
-      'draft',
-    );
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Status' }), 'draft');
     await waitFor(() => expect(window.location.search).toContain('lifecycle=draft'));
     await waitFor(() =>
       expect(callsOf(fake, 'skills.list').at(-1)).toMatchObject({
@@ -427,7 +468,7 @@ describe('[FR-SK-02] SkillDNA Library', () => {
           : { items: [], nextCursor: null },
     });
     renderApp(<SkillLibraryPage />, { api: fake });
-    expect(await screen.findByText('No skill matches the filters')).toBeInTheDocument();
+    expect(await screen.findByText('No skills match')).toBeInTheDocument();
     const box = screen.getByRole('searchbox', { name: 'Search' });
     await user.clear(box);
     expect(box).toHaveValue('');
@@ -444,9 +485,9 @@ describe('[FR-SK-02] SkillDNA Library', () => {
     navigateTo('/skills?lifecycle=retired');
     const fake = api({ 'skills.list': () => ({ items: [], nextCursor: null }) });
     renderApp(<SkillLibraryPage />, { api: fake });
-    expect(await screen.findByText('No skill matches the filters')).toBeInTheDocument();
+    expect(await screen.findByText('No skills match')).toBeInTheDocument();
     expect(callsOf(fake, 'skills.list')[0]).toMatchObject({ query: { lifecycle: 'retired' } });
-    expect(screen.getByRole('combobox', { name: 'Lifecycle state' })).toHaveValue('retired');
+    expect(screen.getByRole('combobox', { name: 'Status' })).toHaveValue('retired');
     await userEvent.click(
       screen.getAllByRole('button', { name: 'Clear filters' }).at(-1) as HTMLElement,
     );
@@ -477,8 +518,24 @@ describe('[FR-SK-02] SkillDNA Library', () => {
       api: api({ 'skills.list': () => ({ items: [], nextCursor: null }) }),
     });
     expect(await screen.findByText('No skills yet')).toBeInTheDocument();
-    expect(screen.getByText(/accepted in the Counterfactual Lab/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open Cases' })).toHaveAttribute('href', '/cases');
+    expect(screen.getByText(/Skills appear after a case is reviewed/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open cases' })).toHaveAttribute('href', '/cases');
+  });
+
+  it('points to the What if page of the remembered case when there are no skills yet', async () => {
+    document.cookie = 'cg-case=case_1; Path=/';
+    try {
+      renderApp(<SkillLibraryPage />, {
+        api: api({ 'skills.list': () => ({ items: [], nextCursor: null }) }),
+      });
+      expect(await screen.findByText('No skills yet')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Open What if' })).toHaveAttribute(
+        'href',
+        '/cases/case_1/counterfactual',
+      );
+    } finally {
+      document.cookie = 'cg-case=; Path=/; Max-Age=0';
+    }
   });
 
   it('shows an error with Retry and recovers', async () => {
@@ -498,9 +555,7 @@ describe('[FR-SK-02] SkillDNA Library', () => {
         },
       }),
     });
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'The skill library could not be loaded',
-    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('Skills could not be loaded');
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByRole('list', { name: 'Skills' })).toBeInTheDocument();
   });
@@ -508,9 +563,7 @@ describe('[FR-SK-02] SkillDNA Library', () => {
   it('explains a role without skill access and asks for nothing', async () => {
     const fake = api({}, ['case:read']);
     renderApp(<SkillLibraryPage />, { api: fake });
-    expect(
-      await screen.findByText('You do not have access to the SkillDNA Library'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('You do not have access to skills')).toBeInTheDocument();
     expect(screen.getByText(/does not include the "skill:read" permission/)).toBeInTheDocument();
     expect(callsOf(fake, 'skills.list')).toHaveLength(0);
   });
@@ -530,21 +583,94 @@ describe('[FR-SK-02] SkillDNA Library', () => {
   );
 });
 
-describe('[FR-SK-03] Skill detail: lifecycle and overview', () => {
-  it('shows a skeleton, then the lifecycle with the current step said in words', async () => {
+describe('[FR-SK-03] Skill detail: status and overview', () => {
+  it('shows a skeleton, then the status path with the current step said in words', async () => {
     renderApp(<SkillDetailPage skillId={SKILL_ID} />, { api: api() });
     expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
     expect(await screen.findByRole('heading', { level: 1, name: NAME })).toBeInTheDocument();
-    expect(screen.getAllByText('Estimated confidence').length).toBeGreaterThan(0);
 
-    const steps = await screen.findByRole('list', { name: 'Skill lifecycle' });
+    const steps = await screen.findByRole('list', { name: 'Skill status' });
     expect(steps).toHaveTextContent('Draft: reached');
     expect(steps).toHaveTextContent('Published: current step');
     expect(steps).toHaveTextContent('Deprecated: withdrawn path, not used');
     expect(steps.querySelector('[aria-current="step"]')).toHaveTextContent('Published');
+    // The stages use plain words, and every one of them is a step of the list.
+    expect(steps).toHaveTextContent('Tested: reached');
+    expect(steps).toHaveTextContent('Reviewed: reached');
+    expect(steps).not.toHaveTextContent(/Simulation Tested|Expert Reviewed/);
     expect(
       screen.getByText(/Live for matching\. Publication is always a human decision/),
     ).toBeInTheDocument();
+    // The four banners are gone: one inline note is left, because it asks for a decision.
+    expect(screen.getAllByRole('note')).toHaveLength(1);
+  });
+
+  it('puts the status and the demo-data marker in pills that open their explanation', async () => {
+    renderApp(<SkillDetailPage skillId={SKILL_ID} />, { api: api() });
+    const status = await screen.findByRole('button', { name: 'Published: what this means' });
+    expect(status).toHaveTextContent('Published');
+    await userEvent.click(status);
+    const popover = await screen.findByRole('group', { name: 'Status: Published' });
+    expect(popover).toHaveTextContent(/Live for matching\./);
+    expect(popover).toHaveTextContent(
+      'Stages: Discovered, draft, tested, reviewed, pilot, validated, published.',
+    );
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByRole('group', { name: 'Status: Published' })).toBeNull(),
+    );
+    // A keyboard gets the same explanation: the pill is a button.
+    await act(async () => status.focus());
+    await userEvent.keyboard('{Enter}');
+    expect(await screen.findByRole('group', { name: 'Status: Published' })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByRole('group', { name: 'Status: Published' })).toBeNull(),
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Demo data in this skill: what this means' }),
+    );
+    expect(await screen.findByText(SYNTHETIC_EFFECTIVENESS_NOTICE)).toBeInTheDocument();
+  });
+
+  it('shows the expected benefit as one large figure that says it is an estimate', async () => {
+    renderApp(<SkillDetailPage skillId={SKILL_ID} />, { api: api() });
+    const benefit = await screen.findByRole('group', { name: 'Expected benefit' });
+    // 2,799 minutes, in the way every duration of the app is written.
+    await waitFor(() => expect(within(benefit).getByText('1 d 22 h')).toBeInTheDocument());
+    expect(within(benefit).getByText('saved on the way to a diagnosis')).toBeInTheDocument();
+    const range = within(benefit).getByRole('img');
+    expect(range).toHaveAccessibleName(
+      'Estimated time saved: estimate 1 d 22 h, range 1 d 20 h to 1 d 23 h, scale 0 min to 2 d 4 h',
+    );
+    expect(within(benefit).getByText('Range 1 d 20 h to 1 d 23 h')).toBeInTheDocument();
+    expect(within(benefit).getByText('Customer effort saved')).toBeInTheDocument();
+    expect(within(benefit).getByText('6 h 30 min')).toBeInTheDocument();
+    expect(within(benefit).getByText('Tokens saved')).toBeInTheDocument();
+    expect(within(benefit).getByText('35,550')).toBeInTheDocument();
+    await userEvent.click(
+      within(benefit).getByRole('button', { name: 'Estimated: what this means' }),
+    );
+    const basis = await screen.findByRole('group', { name: 'Estimated' });
+    expect(basis).toHaveTextContent('Replay at the source decision point');
+    expect(basis).toHaveTextContent('Estimated, not measured: nothing was executed.');
+  });
+
+  it('says so, quietly, when a skill has no estimate of its benefit yet', async () => {
+    const withoutBenefit = skillDetail();
+    const content = { ...withoutBenefit.currentVersion.content, expectedBenefit: undefined };
+    renderApp(<SkillDetailPage skillId={SKILL_ID} />, {
+      api: api({
+        'skills.get': () => ({
+          ...withoutBenefit,
+          currentVersion: { ...withoutBenefit.currentVersion, content },
+        }),
+      }),
+    });
+    const benefit = await screen.findByRole('group', { name: 'Expected benefit' });
+    expect(within(benefit).getByText(/No estimate yet/)).toBeInTheDocument();
+    expect(within(benefit).queryByRole('img')).toBeNull();
   });
 
   it('shows how far a withdrawn skill got and where it ended', async () => {
@@ -567,7 +693,7 @@ describe('[FR-SK-03] Skill detail: lifecycle and overview', () => {
           }),
       }),
     });
-    const steps = await screen.findByRole('list', { name: 'Skill lifecycle' });
+    const steps = await screen.findByRole('list', { name: 'Skill status' });
     expect(steps).toHaveTextContent('Published: reached');
     expect(steps).toHaveTextContent('Deprecated: current step');
     expect(steps.querySelector('[aria-current="step"]')).toHaveTextContent('Deprecated');
@@ -594,34 +720,84 @@ describe('[FR-SK-03] Skill detail: lifecycle and overview', () => {
       'aria-selected',
       'true',
     );
+    // The order people read in: what it is, where it was used, how it was checked, how it changed, who decided.
+    expect(
+      within(screen.getByRole('tablist', { name: 'Skill sections' }))
+        .getAllByRole('tab')
+        .map((tab) => tab.textContent),
+    ).toEqual(['Overview', 'Cases', 'Validation', 'Versions', 'Governance']);
     await userEvent.click(screen.getByRole('tab', { name: 'Validation' }));
     await waitFor(() => expect(window.location.search).toContain('tab=validation'));
     expect(await screen.findByRole('group', { name: 'Recorded runs' })).toBeInTheDocument();
   });
 
-  it('describes the skill, its estimated benefit and where it came from, with hindsight kept apart', async () => {
+  it('describes the skill, where it applies and where it came from, with hindsight kept apart', async () => {
     renderApp(<SkillDetailPage skillId={SKILL_ID} />, { api: api() });
     const about = await screen.findByRole('group', { name: 'About this skill' });
+    expect(within(about).getByText('Estimated success')).toBeInTheDocument();
     expect(within(about).getByText('60%')).toBeInTheDocument();
     expect(
       within(about).getByText(/Microsoft Teams: failures are intermittent/),
     ).toBeInTheDocument();
-
-    const benefit = screen.getByRole('group', { name: 'Expected benefit' });
-    expect(within(benefit).getByText('Estimated')).toBeInTheDocument();
-    expect(within(benefit).getByText('Simulated')).toBeInTheDocument();
+    // Dates are in words, and the exact UTC time is one hover away.
+    const created = within(about).getByText('Created').closest('div')?.querySelector('time');
+    expect(created).toHaveAttribute('title', '14 Mar 2025, 09:00 UTC');
+    expect(created).toHaveAttribute('datetime', '2025-03-14T09:00:00.000Z');
 
     const origin = screen.getByRole('group', { name: 'Where it came from' });
+    // The detail is folded, with a summary line that says whether hindsight was used.
+    expect(within(origin).getByRole('button', { name: /What was known when/ })).toHaveTextContent(
+      '2 parts were derived with hindsight',
+    );
     const hindsight = within(origin).getByRole('group', { name: 'Derived with hindsight' });
     expect(
       within(hindsight).getByText(/derived with knowledge of the recorded resolution/),
     ).toBeInTheDocument();
     expect(within(hindsight).getByText('triggerConditions.trg-dns')).toBeInTheDocument();
     expect(within(origin).getByText('triggerConditions.trg-intermittent')).toBeInTheDocument();
-    expect(screen.getAllByText(SYNTHETIC_EFFECTIVENESS_NOTICE).length).toBeGreaterThan(0);
+    expect(within(origin).getByRole('link', { name: 'CG-SYN-1001' })).toHaveAttribute(
+      'href',
+      '/cases/case_1',
+    );
+    expect(
+      within(origin).getByRole('link', { name: 'Accepted simulated path' }),
+    ).toBeInTheDocument();
+    expect(within(origin).getByRole('link', { name: 'Key decision' })).toBeInTheDocument();
   });
 
-  it('shows the decision-time probability and the hindsight one in separate blocks', async () => {
+  it('keeps the notes of the API in one place, folded, and never as banners', async () => {
+    renderApp(<SkillDetailPage skillId={SKILL_ID} />, { api: api() });
+    const about = await screen.findByRole('group', { name: 'About this skill' });
+    const notes = within(about).getByRole('button', { name: /Notes on this skill/ });
+    expect(notes).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(notes);
+    expect(notes).toHaveAttribute('aria-expanded', 'true');
+    const list = within(about).getByRole('list', { name: 'Notes on this skill' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+    expect(list).toHaveTextContent('An AI-generated skill is never published automatically');
+    expect(list).toHaveTextContent('model estimates, not measurements');
+    const how = within(about).getByRole('button', { name: /How the benefit was estimated/ });
+    await userEvent.click(how);
+    expect(within(about).getByRole('list', { name: 'Caveats' })).toHaveTextContent(
+      'Estimated, not measured: nothing was executed.',
+    );
+  });
+
+  it('opens the two parts of the definition that matter most, and folds the rest in accordions', async () => {
+    renderApp(<SkillDetailPage skillId={SKILL_ID} />, { api: api() });
+    const detail = await screen.findByRole('group', { name: 'The skill in detail' });
+    const part = (name: RegExp) => within(detail).getByRole('button', { name });
+    expect(part(/^Trigger conditions/)).toHaveAttribute('aria-expanded', 'true');
+    expect(part(/^Decision sequence/)).toHaveAttribute('aria-expanded', 'true');
+    expect(part(/^Exclusions/)).toHaveAttribute('aria-expanded', 'false');
+    // The titles are headings of the page outline: h1 skill, h2 section, h3 part, h4 step.
+    expect(within(detail).getAllByRole('heading', { level: 3 }).length).toBeGreaterThanOrEqual(10);
+    expect(within(detail).getAllByRole('heading', { level: 4 })[0]).toHaveTextContent(/^1\./);
+    await userEvent.click(part(/^Exclusions/));
+    expect(part(/^Exclusions/)).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('shows the decision-time probability and the hindsight one on separate lines, with the rule said once', async () => {
     renderApp(<SkillDetailPage skillId={SKILL_ID} />, { api: api() });
     const detail = await screen.findByRole('group', { name: 'The skill in detail' });
     expect(
@@ -634,10 +810,10 @@ describe('[FR-SK-03] Skill detail: lifecycle and overview', () => {
       within(detail).getByText(/87% given the recorded root cause of the source case/),
     ).toBeInTheDocument();
     expect(
-      within(detail).getByText(
+      within(detail).getAllByText(
         /does not count towards a match or towards the steps the skill recommends/,
       ),
-    ).toBeInTheDocument();
+    ).toHaveLength(1);
     expect(within(detail).queryByText(/never used to match/)).toBeNull();
     expect(within(detail).getAllByText('Learned with hindsight')).toHaveLength(1);
   });
@@ -656,10 +832,7 @@ describe('[FR-SK-03] Skill detail: lifecycle and overview', () => {
       }),
     });
     expect(await screen.findByText('We could not find that skill')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open the SkillDNA Library' })).toHaveAttribute(
-      'href',
-      '/skills',
-    );
+    expect(screen.getByRole('link', { name: 'Browse skills' })).toHaveAttribute('href', '/skills');
   });
 
   it('shows an error with Retry and recovers', async () => {
@@ -681,15 +854,13 @@ describe('[FR-SK-03] Skill detail: lifecycle and overview', () => {
     });
     expect(await screen.findByRole('alert')).toHaveTextContent('The skill could not be loaded');
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
-    expect(await screen.findByRole('list', { name: 'Skill lifecycle' })).toBeInTheDocument();
+    expect(await screen.findByRole('list', { name: 'Skill status' })).toBeInTheDocument();
   });
 
   it('explains a role without skill access and asks for nothing', async () => {
     const fake = api({}, ['case:read']);
     renderApp(<SkillDetailPage skillId={SKILL_ID} />, { api: fake });
-    expect(
-      await screen.findByText('You do not have access to the SkillDNA Library'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('You do not have access to skills')).toBeInTheDocument();
     expect(callsOf(fake, 'skills.get')).toHaveLength(0);
   });
 });
@@ -1098,10 +1269,16 @@ describe('[FR-SK-05] Skill detail: versions, proposals and rollback', () => {
     });
     const triggers = screen.getByRole('region', { name: 'Trigger conditions' });
     expect(within(triggers).getByText('Added')).toBeInTheDocument();
-    const confidence = screen.getByRole('region', { name: 'Confidence' });
+    const confidence = screen.getByRole('region', { name: 'Estimated success' });
     expect(within(confidence).getByText('Changed')).toBeInTheDocument();
     expect(within(confidence).getByText('Before')).toBeInTheDocument();
     expect(within(confidence).getByText('0.7')).toBeInTheDocument();
+    // The summary says it in words; the details by section are folded until asked for.
+    const details = screen.getByRole('button', { name: /Every change, by section/ });
+    expect(details).toHaveAttribute('aria-expanded', 'false');
+    expect(details).toHaveTextContent('2 changes in 2 sections');
+    await userEvent.click(details);
+    expect(details).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('compares the two versions named in the address', async () => {
@@ -1331,6 +1508,37 @@ describe('[FR-SK-06] Skill detail: validation', () => {
     expect(within(runs).queryByText('One case only')).toBeNull();
   });
 
+  it('folds the checks of a run behind a count, and opens them when one failed', async () => {
+    navigateTo(VALIDATION);
+    renderApp(<SkillDetailPage skillId={SKILL_ID} />, {
+      api: api({
+        'skills.get': () =>
+          skillDetail({
+            validations: [
+              skillValidation({ id: 'skval_ok' }),
+              skillValidation({
+                id: 'skval_bad',
+                kind: 'regression',
+                outcome: 'failed',
+                caseId: null,
+                checks: [
+                  { id: 'a', passed: true, detail: 'The first check held.' },
+                  { id: 'b', passed: false, detail: 'The second check did not hold.' },
+                ],
+              }),
+            ],
+          }),
+      }),
+    });
+    const held = await screen.findByRole('button', { name: '2 of 2 checks passed' });
+    expect(held).toHaveAttribute('aria-expanded', 'false');
+    const failed = screen.getByRole('button', { name: '1 of 2 checks passed' });
+    expect(failed).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText(/The second check did not hold/)).toBeInTheDocument();
+    await userEvent.click(held);
+    expect(held).toHaveAttribute('aria-expanded', 'true');
+  });
+
   it('says what is missing when nothing was validated yet', async () => {
     navigateTo(VALIDATION);
     renderApp(<SkillDetailPage skillId={SKILL_ID} />, {
@@ -1349,7 +1557,7 @@ describe('[FR-SK-06] Skill detail: validation', () => {
     );
     expect(within(dialog).getByText(/on every case in its set/)).toBeInTheDocument();
     expect(
-      within(dialog).getByText(/A full run can open or fail a lifecycle gate/),
+      within(dialog).getByText(/A full run can open or fail a status gate/),
     ).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Run simulation test' }));
     await waitFor(() =>
@@ -1378,7 +1586,7 @@ describe('[FR-SK-06] Skill detail: validation', () => {
       'Run the simulation test?',
     );
     expect(within(dialog).getByText(/on the chosen case only/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/it does not satisfy a lifecycle gate/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/it does not satisfy a status gate/)).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Run simulation test' }));
     await waitFor(() =>
       expect(callsOf(fake, 'skills.simulationTest')[0]).toMatchObject({
@@ -1698,8 +1906,7 @@ describe('[FR-SK-07] Skill detail: cases, effectiveness and applying a skill', (
     expect(within(list).getByText('Match score 75% (estimate)')).toBeInTheDocument();
   });
 
-  it('applies the skill to a chosen analysed case after a confirmation', async () => {
-    navigateTo(CASES);
+  it('applies the skill to a chosen analysed case from the page action, after a confirmation', async () => {
     const fake = api({
       'skills.apply': () =>
         skillMatch({
@@ -1709,16 +1916,15 @@ describe('[FR-SK-07] Skill detail: cases, effectiveness and applying a skill', (
         }),
     });
     renderApp(<SkillDetailPage skillId={SKILL_ID} />, { api: fake });
-    const panel = await screen.findByRole('group', { name: 'Apply to a case' });
-    const select = within(panel).getByRole('combobox', { name: 'Case' });
+    // The action is on the page whichever tab is open (this is the overview), and it is the page's one primary button.
+    // It is busy while the cases load, so it never says "no case" before the list has arrived.
+    const apply = await screen.findByRole('button', { name: 'Apply to a case' });
+    await waitFor(() => expect(apply).not.toHaveAttribute('aria-disabled'));
+    const dialog = await openDialog(apply, 'Apply this skill to a case?');
+    const select = within(dialog).getByRole('combobox', { name: 'Case' });
     await waitFor(() => expect(within(select).getAllByRole('option')).toHaveLength(2));
     expect(within(select).queryByRole('option', { name: /CG-SYN-1003/ })).toBeNull();
     await userEvent.selectOptions(select, OTHER_CASE_ID);
-
-    const dialog = await openDialog(
-      within(panel).getByRole('button', { name: 'Apply to this case' }),
-      'Apply this skill to the case?',
-    );
     expect(
       within(dialog).getByText(/does not run anything or change the case/),
     ).toBeInTheDocument();
@@ -1729,13 +1935,16 @@ describe('[FR-SK-07] Skill detail: cases, effectiveness and applying a skill', (
         body: { skillId: SKILL_ID },
       }),
     );
+    // The page moves to the tab that shows where the skill was applied, with what was recorded first.
+    await waitFor(() => expect(window.location.search).toContain('tab=cases'));
     const recorded = await screen.findByRole('list', { name: 'The match that was recorded' });
-    expect(within(recorded).getByText(/Applied 15 Apr 2026, 09:00 UTC by you/)).toBeInTheDocument();
+    expect(within(recorded).getByText(/^Applied/)).toHaveTextContent('by you');
+    expect(within(recorded).getByTitle('15 Apr 2026, 09:00 UTC')).toBeInTheDocument();
     expect(within(recorded).getByText('Estimated match')).toBeInTheDocument();
+    expect(screen.getByText('Recorded on CG-SYN-1002.')).toBeInTheDocument();
   });
 
   it('explains the recomputation limit and shows how long to wait when applying is throttled', async () => {
-    navigateTo(CASES);
     renderApp(<SkillDetailPage skillId={SKILL_ID} />, {
       api: api({
         'skills.apply': () => {
@@ -1751,34 +1960,54 @@ describe('[FR-SK-07] Skill detail: cases, effectiveness and applying a skill', (
         },
       }),
     });
-    const panel = await screen.findByRole('group', { name: 'Apply to a case' });
-    await waitFor(() => expect(within(panel).getAllByRole('option').length).toBeGreaterThan(0));
-    const dialog = await openDialog(
-      within(panel).getByRole('button', { name: 'Apply to this case' }),
-      'Apply this skill to the case?',
-    );
+    const apply = await screen.findByRole('button', { name: 'Apply to a case' });
+    await waitFor(() => expect(apply).not.toHaveAttribute('aria-disabled'));
+    const dialog = await openDialog(apply, 'Apply this skill to a case?');
+    await waitFor(() => expect(within(dialog).getAllByRole('option').length).toBeGreaterThan(0));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Apply skill' }));
     const alert = await within(dialog).findByRole('alert');
     expect(alert).toHaveTextContent('limits how many of those it does in a short time');
     expect(alert).toHaveTextContent('Try again in 7 seconds');
   });
 
-  it('says a withdrawn skill can no longer be applied', async () => {
-    navigateTo(CASES);
+  it('says a withdrawn skill can no longer be applied, in the tooltip of the disabled action', async () => {
     renderApp(<SkillDetailPage skillId={SKILL_ID} />, {
       api: api({
         'skills.get': () =>
           skillDetail({ skill: skillDna({ lifecycle: 'deprecated' }), transitions: [] }),
       }),
     });
-    const panel = await screen.findByRole('group', { name: 'Apply to a case' });
-    expect(within(panel).getByRole('button', { name: 'Apply to this case' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
+    const button = await screen.findByRole('button', { name: 'Apply to a case' });
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    expect(button).toHaveAccessibleDescription('A deprecated skill can no longer be applied.');
+    await userEvent.click(button);
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+
+  it('says there is nothing to apply it to when no case has been analysed', async () => {
+    renderApp(<SkillDetailPage skillId={SKILL_ID} />, {
+      api: api({ 'cases.list': () => ({ items: [], nextCursor: null }) }),
+    });
+    // The button is busy while the cases load and is rebuilt when the reason arrives, so a cheap query waits for the
+    // reason and the exact assertion is made once, on the button that is there then.
+    await waitFor(() =>
+      expect(screen.getByText('Apply to a case').closest('button')).toHaveAttribute(
+        'aria-describedby',
+      ),
     );
-    expect(
-      within(panel).getByText('A deprecated skill can no longer be applied.'),
-    ).toBeInTheDocument();
+    const button = screen.getByRole('button', { name: 'Apply to a case' });
+    expect(button).toHaveAccessibleDescription('There is no analysed case to apply it to.');
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('offers "Apply to a case" only to a role that may apply skills', async () => {
+    const fake = api({}, READER);
+    renderApp(<SkillDetailPage skillId={SKILL_ID} />, { api: fake });
+    expect(await screen.findByRole('heading', { level: 1, name: NAME })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Apply to a case' })).toBeNull();
+    // Nothing is asked of the case list for an action that is not offered.
+    expect(callsOf(fake, 'cases.list')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
   });
 
   it('says plainly when no case has matched yet', async () => {
@@ -1920,7 +2149,7 @@ describe('[FR-SK-09] The skills that fit a case, at a moment', () => {
     });
     expect(await screen.findByText('Earlier views are limited')).toBeInTheDocument();
     expect(
-      screen.getByText(/so the SkillDNA matches could not be computed for this moment just now/),
+      screen.getByText(/so the skill matches could not be computed for this moment just now/),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Retry in \d+ s/ })).toBeDisabled();
     expect(screen.queryByText('Too many requests right now')).toBeNull();
