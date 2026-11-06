@@ -2,9 +2,9 @@
 
 import type { Evidence } from '@caseguard/schemas';
 import { EVIDENCE_CATEGORY_LABELS } from '@caseguard/schemas';
-import { BadgeShell, CopyButton, UiLink, cg, formatDateTimeUtc, formatNumber } from '@caseguard/ui';
+import { Badge, CopyButton, UiLink, cg, formatDateTimeUtc, formatNumber } from '@caseguard/ui';
 import { makeStyles, tokens } from '@fluentui/react-components';
-import { CheckmarkCircleRegular, DismissCircleRegular, InfoRegular } from '@fluentui/react-icons';
+import { CircleCheckIcon, CircleXIcon, InfoIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { evidenceLinkHref } from '../../lib/deep-links';
 import { shortId } from '../../lib/format';
@@ -81,19 +81,9 @@ export interface EvidenceItemProps {
 }
 
 const BEARING = {
-  supports: {
-    label: 'Supports',
-    tone: 'productive',
-    pattern: 'solid',
-    icon: CheckmarkCircleRegular,
-  },
-  contradicts: {
-    label: 'Contradicts',
-    tone: 'unsupported',
-    pattern: 'crosshatch',
-    icon: DismissCircleRegular,
-  },
-  neutral: { label: 'Neutral', tone: 'neutral', pattern: 'outline', icon: InfoRegular },
+  supports: { label: 'Supports', tone: 'productive', icon: CircleCheckIcon },
+  contradicts: { label: 'Contradicts', tone: 'unsupported', icon: CircleXIcon },
+  neutral: { label: 'Neutral', tone: 'neutral', icon: InfoIcon },
 } as const;
 
 /**
@@ -109,32 +99,17 @@ export function EvidenceItem({ evidence, caseId, bearing, note }: EvidenceItemPr
       <div className={styles.head}>
         <span className={styles.label}>{evidence.label}</span>
         {meta ? (
-          <BadgeShell
-            tone={meta.tone}
-            pattern={meta.pattern}
-            icon={<meta.icon />}
-            label={meta.label}
-            size="small"
-          />
+          <Badge tone={meta.tone} icon={<meta.icon />} size="sm">
+            {meta.label}
+          </Badge>
         ) : null}
-        <BadgeShell
-          tone="neutral"
-          pattern="outline"
-          icon={<InfoRegular />}
-          label={STRENGTH_LABELS[evidence.strength]}
-          size="small"
-          outlined
-        />
+        <Badge tone="neutral" icon={<InfoIcon />} size="sm" outlined>
+          {STRENGTH_LABELS[evidence.strength]}
+        </Badge>
         {evidence.kind === 'absence' ? (
-          <BadgeShell
-            tone="missing"
-            pattern="outline"
-            icon={<InfoRegular />}
-            label="Absence: not found"
-            size="small"
-            outlined
-            borderStyle="dashed"
-          />
+          <Badge tone="missing" icon={<InfoIcon />} size="sm" outlined dashed>
+            Absence: not found
+          </Badge>
         ) : null}
       </div>
       {evidence.excerpt ? (
