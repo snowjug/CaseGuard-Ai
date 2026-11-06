@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { join, relative } from 'node:path';
 import { palettes } from '@caseguard/ui/server';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
@@ -10,8 +10,8 @@ import { describe, expect, it } from 'vitest';
  * that way.
  */
 
-// Vitest runs from the package directory (`apps/web`), two levels below the repository root.
-const ROOT = resolve(process.cwd(), '../..');
+// This file is `apps/web/src/design-tokens.test.ts`: the repository root is three levels up, wherever vitest is started.
+const ROOT = join(import.meta.dirname, '../../..');
 
 function sources(dir: string): string[] {
   const found: string[] = [];
