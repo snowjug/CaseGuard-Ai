@@ -1,24 +1,25 @@
 import type { BrandVariants } from '@fluentui/react-components';
 
 /**
- * CaseGuard brand ramp: a confident indigo-blue. Shade 80 (#4B55C9) is the anchor and keeps 6.1:1 with white,
- * so primary buttons (white text on `colorBrandBackground`) meet WCAG AA in the light theme; the dark theme uses 70/80.
+ * CaseGuard brand ramp: one calm violet-indigo (hue 249). Shade 80 (#5B46D6) is the anchor and keeps 6.4:1 with white,
+ * so primary buttons (white text on `colorBrandBackground`) meet WCAG AA in the light theme; the dark theme replaces the
+ * brand backgrounds with lighter shades (see `themes.ts`) so the filled shape stays visible against dark surfaces.
  */
 export const caseguardBrand: BrandVariants = {
-  10: '#060710',
-  20: '#0E0F24',
-  30: '#171A3C',
-  40: '#212558',
-  50: '#2C3175',
-  60: '#363D91',
-  70: '#4149AD',
-  80: '#4B55C9',
-  90: '#6169CF',
-  100: '#7880D7',
-  110: '#8E94DD',
-  120: '#A1A7E3',
-  130: '#BBBEEA',
-  140: '#D0D3F1',
-  150: '#E6E7F7',
-  160: '#F4F5FC',
+  10: '#090718',
+  20: '#100B2D',
+  30: '#191046',
+  40: '#211660',
+  50: '#2A1C7D',
+  60: '#35239F',
+  70: '#422BC5',
+  80: '#5B46D6',
+  90: '#725FE3',
+  100: '#8C7BEA',
+  110: '#A79AEF',
+  120: '#BEB4F3',
+  130: '#D5CFF7',
+  140: '#E5E1F9',
+  150: '#F0EEFC',
+  160: '#F8F7FD',
 };
