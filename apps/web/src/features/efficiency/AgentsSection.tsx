@@ -1,23 +1,25 @@
 'use client';
 
 import { AGENT_LABELS, type EfficiencyOverview } from '@caseguard/schemas';
-import { DataTable, Panel, type DataTableColumn } from '@caseguard/ui';
+import { HelpButton, formatNumber, formatProbability } from '@caseguard/ui';
 import { ProgressBar } from '@fluentui/react-components';
-import { formatNumber, formatProbability } from '../../lib/format';
-import { ReadableTable } from '../quality/ReadableTable';
+import { ResponsiveTable, type ResponsiveColumn } from '../../lib/advanced-view-parts';
 import { PROVIDER_LABELS } from '../../lib/labels';
 import { tokensText } from './model';
+import { useUsageStyles } from './styles';
 
 type AgentRow = EfficiencyOverview['byAgent'][number];
 type ModelRow = EfficiencyOverview['byModel'][number];
 
 const HELP =
-  'Usage per analysis agent (a step of the analysis that asks the model for help) and per model. "Typical request" compares the average input of one call with the per-request input limit, so a value near 100% means calls are close to being refused for size. No figure here is about a person.';
+  'Usage per analysis step (an analysis agent: a step of the analysis that asks the model for help) and per model. "Typical request" compares the average input of one call with the per-request input limit, so a value near 100% means calls are close to being refused for size. No figure here is about a person.';
 
 function AgentUse({ row }: { row: AgentRow }) {
+  const styles = useUsageStyles();
   return (
-    <div>
+    <div className={styles.use}>
       <ProgressBar
+        className={styles.useBar}
         value={row.budgetUtilization}
         max={1}
         aria-label={`${AGENT_LABELS[row.agent]}: a typical request uses ${Math.round(row.budgetUtilization * 100)} percent of the per-request input limit`}
@@ -28,10 +30,12 @@ function AgentUse({ row }: { row: AgentRow }) {
   );
 }
 
-const AGENT_COLUMNS: readonly DataTableColumn<AgentRow>[] = [
+const ms = (value: number): string => `${formatNumber(value, { maximumFractionDigits: 1 })} ms`;
+
+const AGENT_COLUMNS: readonly ResponsiveColumn<AgentRow>[] = [
   {
     id: 'agent',
-    header: 'Agent',
+    header: 'Analysis step',
     rowHeader: true,
     cell: (row) => AGENT_LABELS[row.agent],
     sortValue: (row) => AGENT_LABELS[row.agent],
@@ -44,18 +48,11 @@ const AGENT_COLUMNS: readonly DataTableColumn<AgentRow>[] = [
     sortValue: (row) => row.executions,
   },
   {
-    id: 'prompt',
-    header: 'Prompt tokens',
+    id: 'tokens',
+    header: 'Tokens (in / out)',
     align: 'end',
-    cell: (row) => tokensText(row.promptTokens),
-    sortValue: (row) => row.promptTokens,
-  },
-  {
-    id: 'completion',
-    header: 'Completion tokens',
-    align: 'end',
-    cell: (row) => tokensText(row.completionTokens),
-    sortValue: (row) => row.completionTokens,
+    cell: (row) => `${tokensText(row.promptTokens)} / ${tokensText(row.completionTokens)}`,
+    sortValue: (row) => row.promptTokens + row.completionTokens,
   },
   {
     id: 'cached',
@@ -68,7 +65,7 @@ const AGENT_COLUMNS: readonly DataTableColumn<AgentRow>[] = [
     id: 'latency',
     header: 'Average latency',
     align: 'end',
-    cell: (row) => `${formatNumber(row.avgLatencyMs, { maximumFractionDigits: 1 })} ms`,
+    cell: (row) => ms(row.avgLatencyMs),
     sortValue: (row) => row.avgLatencyMs,
   },
   {
@@ -95,12 +92,13 @@ const AGENT_COLUMNS: readonly DataTableColumn<AgentRow>[] = [
   {
     id: 'use',
     header: 'Typical request vs limit',
+    width: '176px',
     cell: (row) => <AgentUse row={row} />,
     sortValue: (row) => row.budgetUtilization,
   },
 ];
 
-const MODEL_COLUMNS: readonly DataTableColumn<ModelRow>[] = [
+const MODEL_COLUMNS: readonly ResponsiveColumn<ModelRow>[] = [
   {
     id: 'model',
     header: 'Model',
@@ -132,44 +130,45 @@ const MODEL_COLUMNS: readonly DataTableColumn<ModelRow>[] = [
     id: 'latency',
     header: 'Average latency',
     align: 'end',
-    cell: (row) => `${formatNumber(row.avgLatencyMs, { maximumFractionDigits: 1 })} ms`,
+    cell: (row) => ms(row.avgLatencyMs),
     sortValue: (row) => row.avgLatencyMs,
   },
 ];
 
-export interface AgentsPanelProps {
+export interface AgentsSectionProps {
   byAgent: readonly AgentRow[];
   byModel: readonly ModelRow[];
 }
 
-/** Usage by analysis agent and by model: where the tokens go, never who spent them. */
-export function AgentsPanel({ byAgent, byModel }: AgentsPanelProps) {
+/** Usage by analysis step and by model: where the tokens go, never who spent them. */
+export function AgentsSection({ byAgent, byModel }: AgentsSectionProps) {
+  const styles = useUsageStyles();
   return (
-    <Panel
-      title="Usage by agent and model"
-      help={HELP}
-      description="Where the tokens go: by analysis step and by model."
-    >
-      <ReadableTable columns={AGENT_COLUMNS.length}>
-        <DataTable
-          caption="Usage by agent"
-          columns={AGENT_COLUMNS}
-          rows={byAgent}
-          getRowId={(row) => row.agent}
-          dense
-          empty="No agent has run yet."
-        />
-      </ReadableTable>
-      <ReadableTable columns={MODEL_COLUMNS.length}>
-        <DataTable
-          caption="Usage by model"
-          columns={MODEL_COLUMNS}
-          rows={byModel}
-          getRowId={(row) => `${row.provider}:${row.model}`}
-          dense
-          empty="No model has run yet."
-        />
-      </ReadableTable>
-    </Panel>
+    <div className={styles.stack}>
+      <div className={styles.head}>
+        <p className={styles.text}>Where the tokens go: by analysis step and by model.</p>
+        <HelpButton label="About usage by step and model" title="Usage by step and model">
+          {HELP}
+        </HelpButton>
+      </div>
+      <ResponsiveTable
+        caption="Usage by analysis step"
+        minWidth={1040}
+        columns={AGENT_COLUMNS}
+        rows={byAgent}
+        getRowId={(row) => row.agent}
+        dense
+        empty="No analysis step has run yet."
+      />
+      <ResponsiveTable
+        caption="Usage by model"
+        minWidth={520}
+        columns={MODEL_COLUMNS}
+        rows={byModel}
+        getRowId={(row) => `${row.provider}:${row.model}`}
+        dense
+        empty="No model has run yet."
+      />
+    </div>
   );
 }

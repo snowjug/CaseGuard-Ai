@@ -1,36 +1,35 @@
 'use client';
 
 import type { EfficiencyOverview } from '@caseguard/schemas';
-import { KeyValueList, Panel, UiLink } from '@caseguard/ui';
+import { HelpButton, UiLink } from '@caseguard/ui';
 import { ProgressBar } from '@fluentui/react-components';
-import { useInsightStyles } from '../quality/styles';
+import { FactList } from '../../lib/advanced-view-parts';
 import { NO_LIMIT, dailyShare, tokenLimitText, tokensText, usdText } from './model';
+import { useUsageStyles } from './styles';
 
 const HELP =
   'Limits that keep model use predictable. A limit that is not configured says "No limit set": it is never shown as zero and never replaced by a default. The per-request limit is the most input tokens one model call may carry; the token governor refuses a larger call instead of silently cutting it.';
 
-export interface BudgetsPanelProps {
+export interface BudgetsSectionProps {
   budgets: EfficiencyOverview['budgets'];
 }
 
 /** The configured limits and today's use, with unset limits stated as unset. */
-export function BudgetsPanel({ budgets }: BudgetsPanelProps) {
-  const styles = useInsightStyles();
+export function BudgetsSection({ budgets }: BudgetsSectionProps) {
+  const styles = useUsageStyles();
   const share = dailyShare(budgets);
   return (
-    <Panel
-      title="Budgets and limits"
-      help={HELP}
-      description="What the token governor enforces, and today's consumption."
-      footer={
-        <UiLink href="/governance" className={styles.link}>
-          Change limits in Governance
-        </UiLink>
-      }
-    >
-      <KeyValueList
-        aria-label="Budgets and limits"
-        layout="inline"
+    <div className={styles.stack}>
+      <div className={styles.head}>
+        <p className={styles.text}>
+          The most one model call, one case or one day may use, and what has been used today.
+        </p>
+        <HelpButton label="About budgets and limits" title="Budgets and limits">
+          {HELP}
+        </HelpButton>
+      </div>
+      <FactList
+        label="Budgets and limits"
         items={[
           {
             id: 'per-request',
@@ -38,16 +37,8 @@ export function BudgetsPanel({ budgets }: BudgetsPanelProps) {
             value: tokenLimitText(budgets.perRequestMaxTokens),
             hint: 'Largest context one model call may carry',
           },
-          {
-            id: 'per-case',
-            label: 'Per case',
-            value: tokenLimitText(budgets.perCaseMaxTokens),
-          },
-          {
-            id: 'per-day',
-            label: 'Per day',
-            value: tokenLimitText(budgets.perDayMaxTokens),
-          },
+          { id: 'per-case', label: 'Per case', value: tokenLimitText(budgets.perCaseMaxTokens) },
+          { id: 'per-day', label: 'Per day', value: tokenLimitText(budgets.perDayMaxTokens) },
           {
             id: 'cost-day',
             label: 'Cost per day',
@@ -65,7 +56,7 @@ export function BudgetsPanel({ budgets }: BudgetsPanelProps) {
         ]}
       />
       {share !== null && budgets.perDayMaxTokens !== null ? (
-        <>
+        <div className={styles.stack}>
           <ProgressBar
             value={share}
             max={1}
@@ -76,8 +67,11 @@ export function BudgetsPanel({ budgets }: BudgetsPanelProps) {
             {Math.round(share * 100)}% of the {tokensText(budgets.perDayMaxTokens)} token daily
             limit.
           </p>
-        </>
+        </div>
       ) : null}
-    </Panel>
+      <UiLink href="/governance?tab=model" className={styles.link}>
+        Change limits in Settings and audit
+      </UiLink>
+    </div>
   );
 }

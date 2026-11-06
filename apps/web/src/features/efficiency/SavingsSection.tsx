@@ -1,20 +1,21 @@
 'use client';
 
 import type { EfficiencyOverview } from '@caseguard/schemas';
-import { KeyValueList, Notice, Panel, ProvenanceBadge, StackedBar } from '@caseguard/ui';
-import { useInsightStyles } from '../quality/styles';
+import { HelpButton, ProvenanceBadge, StackedBar } from '@caseguard/ui';
+import { FactList } from '../../lib/advanced-view-parts';
 import { tokensText } from './model';
+import { useUsageStyles } from './styles';
 
 const HELP =
-  'Estimated tokens the analysis did not have to send or generate: trimming the context to what matters (which includes dropping duplicate notes), reusing a cached answer, and stopping early once more work could not change the result. These are estimates per execution, never measured savings, and each execution also records its own estimated effect on quality.';
+  'Estimated tokens the analysis did not have to send or generate: trimming the context to what matters (which includes dropping duplicate notes), reusing a cached answer, and stopping early once more work could not change the result. These are estimates per call, never measured savings, and each call also records its own estimated effect on quality.';
 
-export interface SavingsPanelProps {
+export interface SavingsSectionProps {
   savings: EfficiencyOverview['savings'];
 }
 
 /** Estimated savings by mechanism, with the honest statement about their effect on quality. */
-export function SavingsPanel({ savings }: SavingsPanelProps) {
-  const styles = useInsightStyles();
+export function SavingsSection({ savings }: SavingsSectionProps) {
+  const styles = useUsageStyles();
   const rows = [
     {
       key: 'compression',
@@ -42,16 +43,17 @@ export function SavingsPanel({ savings }: SavingsPanelProps) {
     },
   ];
   return (
-    <Panel
-      title="Estimated savings"
-      help={HELP}
-      description="Tokens the analysis avoided, by mechanism."
-      actions={<ProvenanceBadge kind="estimated" />}
-    >
-      <p className={styles.tileValue}>
-        {tokensText(savings.totalTokens)} tokens
-        <span className={styles.meta}> estimated saved in total</span>
-      </p>
+    <div className={styles.stack}>
+      <div className={styles.head}>
+        <p className={styles.figure}>
+          {tokensText(savings.totalTokens)} tokens
+          <span className={styles.meta}> estimated saved in total</span>
+        </p>
+        <ProvenanceBadge kind="estimated" />
+        <HelpButton label="About estimated savings" title="Estimated savings">
+          {HELP}
+        </HelpButton>
+      </div>
       {savings.totalTokens > 0 ? (
         <StackedBar
           title="Where the estimated token savings come from"
@@ -62,9 +64,8 @@ export function SavingsPanel({ savings }: SavingsPanelProps) {
             .map((row) => ({ key: row.key, label: row.label, value: row.value }))}
         />
       ) : null}
-      <KeyValueList
-        aria-label="Estimated savings by mechanism"
-        layout="inline"
+      <FactList
+        label="Estimated savings by mechanism"
         items={rows.map((row) => ({
           id: row.key,
           label: row.label,
@@ -72,9 +73,9 @@ export function SavingsPanel({ savings }: SavingsPanelProps) {
           hint: row.hint,
         }))}
       />
-      <Notice variant="model-estimate" compact title="Effect on quality">
-        {savings.estimatedQualityImpact}
-      </Notice>
-    </Panel>
+      <p className={styles.text}>
+        <span className={styles.strong}>Effect on quality.</span> {savings.estimatedQualityImpact}
+      </p>
+    </div>
   );
 }
