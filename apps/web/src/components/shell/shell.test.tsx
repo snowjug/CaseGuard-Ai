@@ -117,13 +117,16 @@ describe('[UX-SHELL-01] application shell landmarks', () => {
     );
   });
 
-  it('says in the account menu that the identity is a development persona', async () => {
+  it('keeps a development-identity badge in the banner, and says so again in the account menu', async () => {
     const user = userEvent.setup();
     mount();
+    expect(
+      within(screen.getByRole('banner')).getByText('Development identity'),
+    ).toBeInTheDocument();
     await user.click(
       await screen.findByRole('button', { name: /Ada Reviewer\s*Support Quality Reviewer/ }),
     );
-    expect((await screen.findAllByText('Development identity')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('Development identity')).length).toBeGreaterThan(1);
   });
 
   it('has no accessibility violations', async () => {
@@ -136,7 +139,7 @@ describe('[UX-SHELL-02] top bar controls', () => {
   it('switches the theme from the top bar and persists it to the cg-theme cookie', async () => {
     const user = userEvent.setup();
     mount();
-    await user.click(screen.getByRole('button', { name: 'Theme' }));
+    await user.click(screen.getByRole('button', { name: 'Theme: Light' }));
     await user.click(await screen.findByRole('menuitemradio', { name: 'Dark' }));
     await waitFor(() => expect(document.cookie).toContain('cg-theme=dark'));
     expect(document.documentElement.dataset.cgTheme).toBe('dark');

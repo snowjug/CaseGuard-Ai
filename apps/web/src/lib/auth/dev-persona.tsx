@@ -2,27 +2,18 @@
 
 import { ROLE_LABELS, type Persona } from '@caseguard/schemas';
 import {
-  BadgeShell,
+  Badge,
+  Dialog,
   EmptyState,
   ErrorState,
   LoadingSkeleton,
-  Notice,
+  borderColors,
   cg,
   createPersistedStore,
   type PersistedStore,
 } from '@caseguard/ui';
-import {
-  Button,
-  Dialog,
-  DialogBody,
-  DialogContent,
-  DialogSurface,
-  DialogTitle,
-  makeStyles,
-  mergeClasses,
-  tokens,
-} from '@fluentui/react-components';
-import { DismissRegular, PersonWarningRegular } from '@fluentui/react-icons';
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { CheckIcon, UserRoundCogIcon } from 'lucide-react';
 import { useCallback, useMemo, useSyncExternalStore, type ReactNode } from 'react';
 import { describeError } from '../api/errors';
 import { useApiQuery } from '../api/hooks';
@@ -111,15 +102,15 @@ export function DevPersonaAuthProvider({
 /** Badge that makes the development identity impossible to miss. */
 export function DevIdentityBadge({ size = 'small' }: { size?: 'small' | 'medium' }) {
   return (
-    <BadgeShell
+    <Badge
       tone="uncertain"
-      pattern="dots"
-      icon={<PersonWarningRegular />}
-      label="Development identity"
-      size={size}
-      borderStyle="dashed"
+      dashed
+      icon={<UserRoundCogIcon />}
+      size={size === 'small' ? 'sm' : 'md'}
       title="Development identity: personas are synthetic and not real authentication"
-    />
+    >
+      Development identity
+    </Badge>
   );
 }
 
@@ -134,20 +125,59 @@ const useStyles = makeStyles({
   },
   option: {
     display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: cg.space[1],
+    alignItems: 'center',
+    gap: cg.space[3],
+    boxSizing: 'border-box',
     width: '100%',
-    textAlign: 'left',
+    minHeight: '64px',
     padding: `${cg.space[3]} ${cg.space[4]}`,
-    height: 'auto',
+    border: `1px solid ${cg.glassBorder}`,
+    borderRadius: cg.radius.lg,
+    backgroundColor: cg.surface,
+    color: cg.text,
+    fontFamily: 'inherit',
+    textAlign: 'start',
+    cursor: 'pointer',
+    transitionProperty: 'border-color, background-color',
+    transitionDuration: cg.motion.fast,
+    ':hover': { backgroundColor: cg.surfaceRaised, ...borderColors(cg.borderControl) },
+    ':focus-visible': { outline: `2px solid ${cg.focus}`, outlineOffset: '2px' },
   },
+  chosen: {
+    backgroundColor: cg.tone.brand.tint,
+    ...borderColors(cg.tone.brand.border),
+    ':hover': { backgroundColor: cg.tone.brand.tint, ...borderColors(cg.tone.brand.border) },
+  },
+  avatar: {
+    display: 'inline-flex',
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '36px',
+    height: '36px',
+    borderRadius: cg.radius.pill,
+    backgroundImage: cg.gradientAccent,
+    color: cg.tone.brand.onSolid,
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightSemibold,
+    '::before': { content: 'attr(data-initials)' },
+  },
+  text: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: '1 1 auto' },
   name: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300 },
   meta: { color: cg.textSecondary, fontSize: tokens.fontSizeBase200 },
-  // The chosen persona is a filled (primary) button: the muted text colour has 1.4:1 contrast on it.
-  metaOnBrand: { color: 'inherit' },
+  check: { flexShrink: 0, color: cg.tone.brand.fg, fontSize: tokens.fontSizeBase500 },
   content: { display: 'flex', flexDirection: 'column', gap: cg.space[3] },
+  note: { margin: 0, color: cg.textSecondary, fontSize: tokens.fontSizeBase300 },
 });
+
+const initialsOf = (name: string): string =>
+  name
+    .replace(/\s*\(.*\)\s*$/, '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('') || '?';
 
 /** Dialog that lists the seeded personas (`dev.personas`) and switches the identity. Render it once in the shell. */
 export function PersonaPickerDialog() {
@@ -161,83 +191,77 @@ export function PersonaPickerDialog() {
   return (
     <Dialog
       open={open}
-      onOpenChange={(_event, data) => (data.open ? dev.openPicker() : dev.closePicker())}
+      onOpenChange={(next) => (next ? dev.openPicker() : dev.closePicker())}
+      title="Choose a development identity"
     >
-      <DialogSurface aria-describedby={undefined}>
-        <DialogBody>
-          <DialogTitle
-            action={
-              <Button
-                appearance="subtle"
-                aria-label="Close"
-                icon={<DismissRegular />}
-                onClick={dev.closePicker}
-              />
-            }
-          >
-            Choose a development identity
-          </DialogTitle>
-          <DialogContent className={styles.content}>
-            <Notice variant="warning" title="Development identity" compact>
-              These personas are synthetic and exist only for local demos. Switching persona changes
-              what you are allowed to do; it is not real sign-in.
-            </Notice>
-            {personas.isPending ? (
-              <LoadingSkeleton variant="list" count={3} label="Loading personas" />
-            ) : null}
-            {personas.isError ? (
-              <ErrorState
-                title="Personas could not be loaded"
-                description={describeError(personas.error)}
-                error={{
-                  status: personas.error.status,
-                  code: personas.error.code,
-                  correlationId: personas.error.correlationId,
-                }}
-                onRetry={() => void personas.refetch()}
-                retrying={personas.isFetching}
-                compact
-              />
-            ) : null}
-            {personas.data && !personas.data.enabled ? (
-              <EmptyState
-                title="Development identity is disabled"
-                description={personas.data.notice}
-                compact
-              />
-            ) : null}
-            {personas.data?.enabled ? (
-              <>
-                {personas.data.notice ? (
-                  <p className={styles.meta}>{personas.data.notice}</p>
-                ) : null}
-                <ul className={styles.list} aria-label="Personas">
-                  {personas.data.items.map((persona: Persona) => {
-                    const chosen = persona.id === dev.personaId;
-                    const meta = mergeClasses(styles.meta, chosen && styles.metaOnBrand);
-                    return (
-                      <li key={persona.id}>
-                        <Button
-                          className={styles.option}
-                          appearance={chosen ? 'primary' : 'outline'}
-                          aria-pressed={chosen}
-                          onClick={() => dev.selectPersona(persona.id)}
-                        >
-                          <span className={styles.name}>
-                            {persona.displayName} · {ROLE_LABELS[persona.role]}
-                          </span>
-                          <span className={meta}>{persona.description}</span>
-                          <span className={meta}>Tenant: {persona.tenantId}</span>
-                        </Button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </>
-            ) : null}
-          </DialogContent>
-        </DialogBody>
-      </DialogSurface>
+      <div className={styles.content}>
+        <p className={styles.note}>
+          <DevIdentityBadge /> These personas are demo identities. Switching changes what you are
+          allowed to do; it is not real sign-in.
+        </p>
+        {personas.isPending ? (
+          <LoadingSkeleton variant="list" count={3} label="Loading personas" />
+        ) : null}
+        {personas.isError ? (
+          <ErrorState
+            title="Personas could not be loaded"
+            description={describeError(personas.error)}
+            error={{
+              status: personas.error.status,
+              code: personas.error.code,
+              correlationId: personas.error.correlationId,
+            }}
+            onRetry={() => void personas.refetch()}
+            retrying={personas.isFetching}
+            compact
+          />
+        ) : null}
+        {personas.data && !personas.data.enabled ? (
+          <EmptyState
+            title="Development identity is disabled"
+            description={personas.data.notice}
+            compact
+          />
+        ) : null}
+        {personas.data?.enabled ? (
+          <>
+            {personas.data.notice ? <p className={styles.note}>{personas.data.notice}</p> : null}
+            <ul className={styles.list} aria-label="Personas">
+              {personas.data.items.map((persona: Persona) => {
+                const chosen = persona.id === dev.personaId;
+                return (
+                  <li key={persona.id}>
+                    <button
+                      type="button"
+                      className={mergeClasses(styles.option, chosen && styles.chosen)}
+                      aria-pressed={chosen}
+                      onClick={() => dev.selectPersona(persona.id)}
+                    >
+                      <span
+                        className={styles.avatar}
+                        aria-hidden="true"
+                        data-initials={initialsOf(persona.displayName)}
+                      />
+                      <span className={styles.text}>
+                        <span className={styles.name}>
+                          {persona.displayName} · {ROLE_LABELS[persona.role]}
+                        </span>
+                        <span className={styles.meta}>{persona.description}</span>
+                        <span className={styles.meta}>Tenant: {persona.tenantId}</span>
+                      </span>
+                      {chosen ? (
+                        <span className={styles.check} aria-hidden="true">
+                          <CheckIcon />
+                        </span>
+                      ) : null}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        ) : null}
+      </div>
     </Dialog>
   );
 }

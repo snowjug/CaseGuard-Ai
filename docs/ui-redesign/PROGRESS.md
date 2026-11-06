@@ -94,3 +94,42 @@ palette, toasts, page title and favicon), then Phase 4 screens one commit each.
 
 - `@fluentui/react-icons` is still imported by `apps/web` (migrated screen by screen); the dependency goes when the last
   import does. Fluent `Button` is still used in `apps/web` and moves to the kit `Button` with each screen.
+
+## 2026-11-06 - Phase 3: shell and navigation
+
+**Done** (commits `02e6629`, `6a0b3aa`, and the persona picker and theme label that follow)
+
+- Shell: slim sidebar (208 px; icon rail under 1024 px; hidden under 768 px) with Home, Cases, Quality, Skills and
+  Advanced, a top bar (search hint `Ctrl K` / `⌘ K`, demo data pill, development identity pill, theme), a bottom bar
+  on a phone, an aurora wash behind the page, breadcrumbs only where depth exists (a case, a skill, Add a case, an
+  Advanced view). The header case selector and the 13-item navigation are gone.
+- Command palette rebuilt on cmdk: Actions (Add a case, Try a sample case), Go to, Cases, Preferences, Advanced,
+  Account. Typing ranks every command (compact matches only) and appends the server search results (two characters,
+  debounced, grouped, links checked with `safeInternalHref`). `/` and the search button open it. The old global search
+  box is removed.
+- New Advanced page: four view cards with live figures (demo progress, system status), appearance (theme, reduced
+  motion), keyboard (single-key shortcuts, shortcut help) and presentation mode; Design lab link in development only.
+- Persona picker, shortcut help, presenter strip and toasts restyled on the kit; favicon is the new shield mark; page
+  description rewritten in plain language.
+- Renderer fix: Griffel sorted media queries as text, so a 640 px rule overrode a 1024 px one on a desktop. The app now
+  uses `createCaseGuardRenderer` (min-width ascending, max-width descending), with a test.
+- Tests: shell, palette (27), nav model, badges, presenter, shortcuts, 404, Advanced and persona tests updated or added
+  with the same strength; `contrast.test.ts` gained the text-on-accent-tint pairs used by selected rows.
+
+**Next**: Phase 4, one commit per screen, starting with the case workspace chrome, Home, Cases and Add a case, then
+Review (the hero screen). End-to-end specs that name old labels (headings, the drawer, "Theme: ...") are updated in the
+tests phase, after the screens, so they are changed once.
+
+**Decisions**
+
+- Five navigation items only; the other nine destinations stay reachable from case tabs, the Advanced page and the
+  palette (`g` shortcuts kept for all 14).
+- The shell no longer polls the guided demo; only the Advanced page reads its progress.
+- `Try a sample case` opens `/cases/new?mode=sample`; the page picks it up (UI only, no API change).
+- cmdk selects the first row from inside an effect, which leaves `aria-activedescendant` and the scroll position one
+  step behind after typing. The palette corrects both (`ActiveOptionSync`, scroll to top) and a test covers it.
+
+**Open issues**
+
+- jsdom cannot show the bottom bar (its media query is not evaluated), so unit tests read it from the DOM; Playwright
+  covers it on a phone viewport.

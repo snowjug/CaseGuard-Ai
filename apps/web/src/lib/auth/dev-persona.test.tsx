@@ -162,7 +162,7 @@ describe('[AUTH-DEV-02] persona picker dialog', () => {
     await waitFor(() => expect(opener).toHaveFocus());
   });
 
-  it('keeps the muted lines of the chosen persona readable: they take the button colour, not the grey that fails on the filled button', async () => {
+  it('marks the chosen persona, and only that one (its tinted state is covered by the contrast guard)', async () => {
     const user = userEvent.setup();
     const api = fakeApi({
       'dev.personas': () => ({ enabled: true, notice: '', items: personas }),
@@ -176,15 +176,13 @@ describe('[AUTH-DEV-02] persona picker dialog', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Open picker' }));
     const list = await screen.findByRole('list', { name: 'Personas' });
-    const chosen = within(list).getByRole('button', { name: /Rae Reviewer/ });
-    const other = within(list).getByRole('button', { name: /Eli Engineer/ });
-    expect(chosen).toHaveAttribute('aria-pressed', 'true');
-    const mutedLine = (option: HTMLElement): HTMLElement => within(option).getByText(/^Tenant:/);
-    // The style sheet is updated after the render that marks the choice, so wait for the cascade instead of reading it once.
-    await waitFor(() =>
-      expect(getComputedStyle(mutedLine(chosen)).color).not.toBe(
-        getComputedStyle(mutedLine(other)).color,
-      ),
+    expect(within(list).getByRole('button', { name: /Rae Reviewer/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(within(list).getByRole('button', { name: /Eli Engineer/ })).toHaveAttribute(
+      'aria-pressed',
+      'false',
     );
   });
 

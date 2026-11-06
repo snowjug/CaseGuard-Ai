@@ -66,7 +66,7 @@ export function ThemeToggle({ variant = 'segmented' }: ThemeToggleProps) {
       <MenuTrigger disableButtonEnhancement>
         <IconButton
           icon={resolved === 'dark' ? <MoonIcon /> : <SunIcon />}
-          label="Theme"
+          label={`Theme: ${OPTIONS.find((option) => option.value === mode)?.label ?? 'System'}`}
           tooltip={false}
         />
       </MenuTrigger>

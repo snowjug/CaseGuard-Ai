@@ -143,6 +143,11 @@ export function getContrastPairs(theme: ThemeName): ContrastPair[] {
       pairs.push(textPair(`tone.${tone}.fg on ${surfaceName}`, t.fg, surface));
     }
     pairs.push(textPair(`tone.${tone}.fg on tint`, t.fg, t.tint));
+    if (tone === 'brand') {
+      // The accent tint is the selected state of rows (palette, persona picker, navigation): primary and secondary text sit on it.
+      pairs.push(textPair('text.primary on tone.brand.tint', p.text.primary, t.tint));
+      pairs.push(textPair('text.secondary on tone.brand.tint', p.text.secondary, t.tint));
+    }
     pairs.push(textPair(`tone.${tone}.onSolid on solid`, t.onSolid, t.solid));
     for (const surfaceName of ['canvas', 'surface', 'raised'] as const) {
       pairs.push(

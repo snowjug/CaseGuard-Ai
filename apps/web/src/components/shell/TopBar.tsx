@@ -10,8 +10,11 @@ import {
   cg,
   layout,
 } from '@caseguard/ui';
-import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { makeStyles, tokens } from '@fluentui/react-components';
 import { SearchIcon } from 'lucide-react';
+import { useAuth } from '../../lib/auth/context';
+import { DevIdentityBadge } from '../../lib/auth/dev-persona';
+import { usePresentation } from '../../lib/presentation';
 import { useShellUi } from '../../lib/shell-ui';
 import { useIsMac } from '../../lib/use-is-mac';
 import { AccountMenu } from './AccountMenu';
@@ -66,12 +69,26 @@ const useStyles = makeStyles({
   searchText: { flex: '1 1 auto', textAlign: 'start' },
   right: { display: 'flex', alignItems: 'center', gap: cg.space[2], marginInlineStart: 'auto' },
   phoneOnly: { display: 'none', [phone]: { display: 'inline-flex' } },
+  tabletUp: { display: 'inline-flex', [phone]: { display: 'none' } },
 });
 
 /** The shortcut hint: Cmd K on a Mac, Ctrl K elsewhere (server and first paint show Ctrl K). */
 function ShortcutHint() {
   const mac = useIsMac();
   return <Kbd aria-hidden="true">{mac ? '⌘ K' : 'Ctrl K'}</Kbd>;
+}
+
+/** Says, beside the demo-data pill, that the person signed in is a development persona (never shown while presenting). */
+function DevIdentityPill() {
+  const styles = useStyles();
+  const auth = useAuth();
+  const { enabled: presenting } = usePresentation();
+  if (auth.mode !== 'dev' || presenting) return null;
+  return (
+    <span className={styles.tabletUp}>
+      <DevIdentityBadge />
+    </span>
+  );
 }
 
 /**
@@ -100,11 +117,12 @@ export function TopBar() {
         </button>
         <div className={styles.right}>
           <DemoDataPill />
+          <DevIdentityPill />
           <span className={styles.phoneOnly}>
             <IconButton icon={<SearchIcon />} label="Search" onClick={() => setPaletteOpen(true)} />
           </span>
           <ThemeToggle variant="icon" />
-          <span className={mergeClasses(styles.phoneOnly)}>
+          <span className={styles.phoneOnly}>
             <AccountMenu compact />
           </span>
         </div>
