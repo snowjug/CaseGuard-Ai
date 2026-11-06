@@ -55,6 +55,23 @@ const useStyles = makeStyles({
   text: { display: 'flex', flexDirection: 'column', gap: cg.space[1], minWidth: 0 },
   label: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300 },
   hint: { fontSize: tokens.fontSizeBase200, color: cg.textSecondary },
+  // On a phone the steps shrink to a row of three, so the result stays near the top of Home.
+  listCompact: {
+    '@media (max-width: 639px)': {
+      gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+      gap: cg.space[2],
+    },
+  },
+  stepCompact: {
+    '@media (max-width: 639px)': {
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: cg.space[1],
+      padding: `${cg.space[2]} ${cg.space[1]}`,
+      textAlign: 'center',
+    },
+  },
+  hintCompact: { '@media (max-width: 639px)': { display: 'none' } },
 });
 
 export const FLOW_STEPS = [
@@ -68,12 +85,16 @@ export type FlowStage = 1 | 2 | 3 | 4;
 
 /**
  * The whole product in three steps, always on Home: the current one is lit, finished ones carry a check. It is a plain
- * ordered list; the current step is named in text for screen readers.
+ * ordered list; the current step is named in text for screen readers. `compact` keeps the three steps in one row
+ * without their hints on a phone (Home, where the result comes first); the first visit and the empty states keep them.
  */
-export function FlowSteps({ stage }: { stage: FlowStage }) {
+export function FlowSteps({ stage, compact = false }: { stage: FlowStage; compact?: boolean }) {
   const styles = useStyles();
   return (
-    <ol className={styles.list} aria-label="How CaseGuard works">
+    <ol
+      className={mergeClasses(styles.list, compact && styles.listCompact)}
+      aria-label="How CaseGuard works"
+    >
       {FLOW_STEPS.map((step, index) => {
         const number = index + 1;
         const done = number < stage;
@@ -81,7 +102,11 @@ export function FlowSteps({ stage }: { stage: FlowStage }) {
         return (
           <li
             key={step.label}
-            className={mergeClasses(styles.step, current && styles.current)}
+            className={mergeClasses(
+              styles.step,
+              current && styles.current,
+              compact && styles.stepCompact,
+            )}
             aria-current={current ? 'step' : undefined}
           >
             <span
@@ -100,7 +125,9 @@ export function FlowSteps({ stage }: { stage: FlowStage }) {
                 {done ? <span className="cg-sr-only"> (done)</span> : null}
                 {current ? <span className="cg-sr-only"> (you are here)</span> : null}
               </span>
-              <span className={styles.hint}>{step.hint}</span>
+              <span className={mergeClasses(styles.hint, compact && styles.hintCompact)}>
+                {step.hint}
+              </span>
             </span>
           </li>
         );

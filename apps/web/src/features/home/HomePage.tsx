@@ -104,7 +104,7 @@ function Content({ data, isRefreshing, selectedId, onChooseCase }: ContentProps)
       aria-busy={isRefreshing}
     >
       <BlurFade index={0}>
-        <FlowSteps stage={stageOf(data)} />
+        <FlowSteps stage={stageOf(data)} compact />
       </BlurFade>
       <BentoGrid>
         <BentoItem span={12} spanLg={activeCase && analysed ? 7 : 12}>
