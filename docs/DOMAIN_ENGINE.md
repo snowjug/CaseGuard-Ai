@@ -10,6 +10,10 @@ here.
 Related: [ARCHITECTURE.md](ARCHITECTURE.md) (where the engine sits), [EVALUATION.md](EVALUATION.md) (calibration on the two
 synthetic cases, tests, benchmark), [RESPONSIBLE_AI.md](RESPONSIBLE_AI.md) (limits of every score).
 
+**Page names.** The engine keeps its own terms. In the web app a hypothesis is a possible cause, a decision fork is a key decision,
+a counterfactual scenario is a simulated path (the What if page), the avoidable-effort estimate is the time that could have been
+saved and the quality score is the Score of a case.
+
 Package dependencies: `@caseguard/schemas` (contracts) and `zod`. `package.json` also declares `@caseguard/security`, but
 nothing under `packages/domain/src` imports it today.
 
@@ -151,7 +155,7 @@ belief of a view  =  the prior folded through update() over the belief-affecting
 
 There is exactly one update path (`updateBelief`). The belief timeline, `analyzeView(view).belief` and the prefix
 analyser all fold it, so the belief of any view is, bit for bit, the last step of that view's timeline (and an empty view
-is the prior). The Hypothesis Arena, the action ranking, a fork's posterior at the decision and the start of every
+is the prior). The Possible causes page, the action ranking, a fork's posterior at the decision and the start of every
 simulated path therefore agree with the timeline overlay.
 
 - `L(signal | h)` is the pack's likelihood, or the signal's `neutral` value when the pack states none for `h`. Weak signals

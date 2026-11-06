@@ -8,6 +8,13 @@ Related: [EVALUATION.md](EVALUATION.md) (the engine, the temporal-integrity evid
 test inventory), [ACCESSIBILITY.md](ACCESSIBILITY.md), [PERFORMANCE.md](PERFORMANCE.md), [SECURITY.md](SECURITY.md),
 [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md#9-tests), [CI_CD.md](CI_CD.md).
 
+**Page names.** The interface redesign renamed the pages: Command Center is now Home, Case Timeline is Timeline, Evidence Ledger is
+Evidence, Hypothesis Arena is Possible causes, Counterfactual Lab is What if, Quality Review is Score (one case) and Quality (all
+cases), SkillDNA Library is Skills, Efficiency Monitor is Usage and cost, Governance is Settings and audit, System Health is System
+status and Demo Guide is Guided demo. This document uses the new names, also for the records of past runs and findings, which were
+made under the old ones. Spec file names are unchanged, except that `pages/command-center.spec.ts`, as it is named in the recorded
+run below, is now `pages/home.spec.ts`.
+
 ## 1. The tiers
 
 | Tier                 | Command                                             | Lives in                                                                                  | What it proves                                                                                                                                                            | What it does not prove                                                                                                                                    |
@@ -35,7 +42,7 @@ web 70 files, 1,303; ai 51 files, 1,120; security 21 files, 847; observability 1
 check, the generated API reference check (78 routes) and the secret scan are clean. The domain suite includes the sample digests,
 the ReDoS probe and the new static pass behind look-arounds. Three timing tests (the ReDoS probe over derived inputs, the claim bound and one skill-condition test) failed once, when the
 load average on the shared machine reached 14; they pass at normal load, and the pattern probe is measured in CPU time. **Not run:** Docker, a real PostgreSQL server (every API test ran on PGlite), the full Playwright
-suite (focused specs only, for the evidence ledger and the record-findings panel: 10 of 10, axe in both themes, and a
+suite (focused specs only, for Evidence and its record-findings panel ("What the record itself shows"): 10 of 10, axe in both themes, and a
 phone-width check), and anything that needs Azure. The evaluation commands (`eval:check`, `eval:dev`, `eval:validation`, and the
 single `eval:locked`) are described in [EVALUATION.md](EVALUATION.md#10-wave-2-the-evaluation-sets-the-protocol-the-verdict-criteria-and-the-result).
 
@@ -43,7 +50,7 @@ single `eval:locked`) are described in [EVALUATION.md](EVALUATION.md#10-wave-2-t
 after it change documents and the tolerance of one property test) passed all 8 jobs: **6,152 unit tests** (256 files; 4 more are expected failures that pin
 known defects of the signal detectors), **1,033 integration tests on PostgreSQL 16** (56 files) and **374 Playwright tests**
 (desktop and mobile, axe checks included, 15.5 minutes), plus the compose smoke test (12 checks), the secret scan with gitleaks
-and the dependency audit. The 374 are the 342 of the run described below, the 29 of `pages/review.spec.ts` (the guided review and
+and the dependency audit. The 374 are the 342 of the run described below, the 29 of `pages/review.spec.ts` (the review and
 the report) and three phone-width checks of the review and the report added to `mobile.spec.ts`. **Locally** on the Linux VM of
 the wave (4 shared vCPU, the bundled Chromium, one worker) the review spec and the 26 phone-width tests ran twice: 62 of 63 passed
 the first time (the one failure was a locator that the report strip's new named region made ambiguous, fixed and seen to pass),
@@ -97,8 +104,8 @@ the sum of the tests; the rest of the wall time is the web build and the servers
   `resilience.spec.ts` (the engine-budget notice) looked for the notice by an exact title: fixed in the test. `mobile.spec.ts`
   (the cases as cards) saw a stray case that the upload test of `security-http.spec.ts` had left behind: fixed in the test helpers.
 - After those fixes the three tests and the specs next to the changed pages were run again against the rebuilt production build:
-  13 tests (the three, and the new not-found states of the Case Timeline and the Evidence Ledger in both themes), then 77 (timeline,
-  ledger, cases, hypothesis arena, the whole mobile spec and the demo flow). All passed.
+  13 tests (the three, and the new not-found states of Timeline and Evidence in both themes), then 77 (timeline,
+  evidence, cases, possible causes, the whole mobile spec and the demo flow). All passed.
 - The **second** full run, above, failed one test: the engine-budget test of `security-http.spec.ts` served 29 instants where it
   asked for 30 or more, which a fast machine can do (section 7). The bounds were relaxed, and `security-http.spec.ts` and
   `pages/system-health.spec.ts` were run again on fresh servers: 37 of 37 passed. **There was no third full run**, so the final
@@ -157,16 +164,16 @@ with `Retry-After` and the reason `engine_budget`), so specs space those reads o
 
 **The specs.**
 
-| Spec                                              | Covers                                                                                                                                                                                                                                                                                                                                                                         |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `smoke.spec.ts`                                   | The web tier forwards the API probes and serves the shell for the signed-in persona                                                                                                                                                                                                                                                                                            |
-| `security-http.spec.ts`                           | Black box, with Playwright's `request` and a second web and API instance of its own; see below                                                                                                                                                                                                                                                                                 |
-| `resilience.spec.ts`                              | 401/403/404/409/422/429/503 shown with code and request id, Retry that recovers, the engine-budget notice, an API that is down, idempotency and optimistic locking                                                                                                                                                                                                             |
-| `demo-flow.spec.ts`                               | The whole story, persona by persona, from an empty workspace: import Case One, timeline, ledger, hypotheses, the earliest fork, the counterfactual, quality, SkillDNA through to a skill published by a different administrator, Case Two, the comparison, 13 of 13                                                                                                            |
-| `a11y.spec.ts`, `mobile.spec.ts`, `theme.spec.ts` | [ACCESSIBILITY.md](ACCESSIBILITY.md); no sideways scroll, the drawer, tables on a phone; light, dark and system, the cookie, no flash of the wrong theme                                                                                                                                                                                                                       |
-| `pages/*.spec.ts` (14 files)                      | One spec per page: Command Center, Cases (and the case overview, deletion, tenant isolation), Case Timeline, Evidence Ledger, Hypothesis Arena, Counterfactual Lab, Case Quality Review and the portfolio, SkillDNA Library, Efficiency Monitor, Governance, System Health, Demo Guide, Ingestion (including text with injected instructions staying inert), Presentation Mode |
-| `perf/timeline-render.spec.ts` (`@perf`)          | Case Timeline render time for Case One: first row visible and largest contentful paint, ten loads                                                                                                                                                                                                                                                                              |
-| `screenshots/screenshots.spec.ts`                 | The 18 PNGs of the documentation                                                                                                                                                                                                                                                                                                                                               |
+| Spec                                              | Covers                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `smoke.spec.ts`                                   | The web tier forwards the API probes and serves the shell for the signed-in persona                                                                                                                                                                                                                             |
+| `security-http.spec.ts`                           | Black box, with Playwright's `request` and a second web and API instance of its own; see below                                                                                                                                                                                                                  |
+| `resilience.spec.ts`                              | 401/403/404/409/422/429/503 shown with code and request id, Retry that recovers, the engine-budget notice, an API that is down, idempotency and optimistic locking                                                                                                                                              |
+| `demo-flow.spec.ts`                               | The whole story, persona by persona, from an empty workspace: add Case One, Timeline, Evidence, Possible causes, the earliest key decision, What if, Score, Create skill (SkillDNA) through to a skill published by a different administrator, Case Two, the comparison, 13 of 13                               |
+| `a11y.spec.ts`, `mobile.spec.ts`, `theme.spec.ts` | [ACCESSIBILITY.md](ACCESSIBILITY.md); no sideways scroll, the drawer, tables on a phone; light, dark and system, the cookie, no flash of the wrong theme                                                                                                                                                        |
+| `pages/*.spec.ts` (14 files)                      | One spec per page: Home, Cases (and Case details, deletion, tenant isolation), Timeline, Evidence, Possible causes, What if, Score and Quality, Skills, Usage and cost, Settings and audit, System status, Guided demo, Add a case (including text with injected instructions staying inert), Presentation mode |
+| `perf/timeline-render.spec.ts` (`@perf`)          | Timeline render time for Case One: first row visible and largest contentful paint, ten loads                                                                                                                                                                                                                    |
+| `screenshots/screenshots.spec.ts`                 | The 18 PNGs of the documentation                                                                                                                                                                                                                                                                                |
 
 **The security spec** asserts, against the real production web server and the real API: a per-request nonce CSP in which every script
 uses the nonce; the browser header set on pages, the not-found page and static assets, and nothing that names the framework;
@@ -268,8 +275,8 @@ Stop what you started: a run that is killed can leave the API and the web server
 - **Other browsers and devices.** Chromium only (Microsoft Edge here); the phone layout is an emulated 390x844 viewport.
 - **Scale and load.** One user at a time on one machine. [PERFORMANCE.md](PERFORMANCE.md) says what the benchmarks do and do not measure.
 - **Visual regression.** The screenshots are looked at by a person; nothing diffs them.
-- **Demo numbers are not all asserted.** The case sizes, the evidence counts, the Case Quality Index and the first fork are the same in
-  every fresh seed and the specs assert them; the **Avoidable Support Effort of Case One is a sampled estimate**, steady since engine
+- **Demo numbers are not all asserted.** The case sizes, the evidence counts, the Case Quality Index and the first key decision are the same in
+  every fresh seed and the specs assert them; the **time that could have been saved in Case One (Avoidable Support Effort) is a sampled estimate**, steady since engine
   2026.3.0 but never asserted by value (section 7, finding 3).
 
 ## 7. Findings
@@ -279,12 +286,12 @@ it passes now.
 
 **Fixed** (the lead commits these files):
 
-| Finding                                                                                                                                                                                                 | Change                                                                                                                                                                                                                                                                                                                        |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Focus fell to the page body after closing a controlled dialog (command palette, shortcuts, navigation drawer, persona picker)                                                                           | `apps/web/src/lib/use-overlay-state.ts` (new), used by `lib/shell-ui.tsx` and `lib/auth/dev-persona.tsx`; test `use-overlay-state.test.tsx`                                                                                                                                                                                   |
-| The chosen option of the persona picker had muted lines at 1.4:1 contrast                                                                                                                               | `apps/web/src/lib/auth/dev-persona.tsx` (`metaOnBrand`); test in `dev-persona.test.tsx`                                                                                                                                                                                                                                       |
-| Command Center metric cards showed the trend twice ("+63.1 +63.1 points compared with ...")                                                                                                             | `packages/ui/src/primitives/MetricCard.tsx` (`trendText`); test `metric-trend.test.tsx`. The cause is in the data, see the open list                                                                                                                                                                                          |
-| An unknown case id on the Case Timeline and the Evidence Ledger showed an error alert **and** a "Loading what was known..." skeleton that stayed `aria-busy` for ever (the first full run failed on it) | `apps/web/src/components/case/CaseNotFoundState.tsx` (new), returned by `features/timeline/TimelinePage.tsx` and `features/evidence/EvidenceLedgerPage.tsx` when the case is not found, as the overview and the quality page already did; tests in `timeline.test.tsx` and `evidence.test.tsx`, which fail without the change |
+| Finding                                                                                                                                                                                       | Change                                                                                                                                                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Focus fell to the page body after closing a controlled dialog (command palette, shortcuts, navigation drawer, persona picker)                                                                 | `apps/web/src/lib/use-overlay-state.ts` (new), used by `lib/shell-ui.tsx` and `lib/auth/dev-persona.tsx`; test `use-overlay-state.test.tsx`                                                                                                                                                                                   |
+| The chosen option of the persona picker had muted lines at 1.4:1 contrast                                                                                                                     | `apps/web/src/lib/auth/dev-persona.tsx` (`metaOnBrand`); test in `dev-persona.test.tsx`                                                                                                                                                                                                                                       |
+| Home metric cards showed the trend twice ("+63.1 +63.1 points compared with ...")                                                                                                             | `packages/ui/src/primitives/MetricCard.tsx` (`trendText`); test `metric-trend.test.tsx`. The cause is in the data, see the open list                                                                                                                                                                                          |
+| An unknown case id on the Timeline and Evidence pages showed an error alert **and** a "Loading what was known..." skeleton that stayed `aria-busy` for ever (the first full run failed on it) | `apps/web/src/components/case/CaseNotFoundState.tsx` (new), returned by `features/timeline/TimelinePage.tsx` and `features/evidence/EvidenceLedgerPage.tsx` when the case is not found, as the overview and the quality page already did; tests in `timeline.test.tsx` and `evidence.test.tsx`, which fail without the change |
 
 **Test-side findings** (fixed in the suite, nothing to change in the product): the upload test in `security-http.spec.ts` deleted
 its case while the analysis that an upload starts was still running, which the API refuses with 409 `job_active`, so a stray case
@@ -294,7 +301,7 @@ text; the notice is a `note` whose title is followed by a colon, and the sentenc
 hidden `status`, so it now finds the note by role and the status by its exact sentence. The engine-budget test of
 `security-http.spec.ts` demanded 30 served instants, but the bucket (30 units, one more every two seconds) may have lost a unit to
 the set-up read, so on a fast machine it served 29 once (the second full run): the bounds are now at least 25 and at most 30 plus
-what the loop could have earned in the time it took. One `waitForTimeout` (System Health, "Refresh reads the counters again") was
+what the loop could have earned in the time it took. One `waitForTimeout` (System status, "Refresh reads the counters again") was
 replaced by a wait on the condition.
 
 **Findings of the guided-review wave** (all fixed; each is a way a test or a guard went wrong, not a defect of the engine):
@@ -327,40 +334,40 @@ replaced by a wait on the condition.
 
 **Open** (reproductions; the lead routes them):
 
-1. **A case id that does not exist, on the Hypothesis Arena and the Counterfactual Lab.** Persona engineer, open
-   `/cases/case_does_not_exist/hypotheses` (or `/counterfactual`). Expected: the same "We could not find that case" state as the
-   overview, the quality page, and now the timeline and the ledger. Actual: a generic error with a Retry that cannot succeed.
+1. **A case id that does not exist, on Possible causes and What if (then the Hypothesis Arena and the Counterfactual Lab).** Persona engineer, open
+   `/cases/case_does_not_exist/hypotheses` (or `/counterfactual`). Expected: the same "We could not find that case" state as
+   Case details, Score, and now Timeline and Evidence. Actual: a generic error with a Retry that cannot succeed.
 2. **Text typed with no pause into a field that keeps its value in the URL can lose characters.** Persona engineer, `/cases`, focus
    the search box and type `xyz` with no delay between keys (Playwright `keyboard.type` with `delay: 0`): the field ends up with
    `xz` in 3 of 6 runs here, and 5 of 6 on another page; with 20 ms between keys it was 0 of 6. The value shown comes from
    `useSearchParams`, which updates after the key press. Matters for dictation and assistive input. Affects the Cases and SkillDNA
    searches and every field built on `useUrlState`.
-3. **The Avoidable Support Effort of Case One differed between fresh seeds (addressed by `ENGINE_VERSION` 2026.3.0).** Before it,
+3. **The time that could have been saved in Case One (Avoidable Support Effort) differed between fresh seeds (addressed by `ENGINE_VERSION` 2026.3.0).** Before it,
    five starts of the API with the seeded demo (the global
    setup prints the figure) gave 62.8, 56.3, 58.1, 61.5 and 62.8 percent; four creations of Case One's bundle under new references
    gave 57.2, 56.4, 56.4 and 57.2, and the same case analysed again three times gave 57.2 each time. The engine seeds its rollouts
    from the input hash (`computeInputHash` in `apps/api/src/services/analysis/inputs.ts`, which covers the stored payload and the
    skill library with their ids), so any difference in those inputs moved the figure. Since 2026.3.0 the rollout seed no longer
    contains the generated fork id ([EVALUATION.md](EVALUATION.md#3-engine-calibration-on-the-two-synthetic-cases)), and the figure read 55 percent
-   (plausible range 44 to 83, low confidence) on each of the two fresh local starts made after that, in the guided review; the
+   (plausible range 44 to 83, low confidence) on each of the two fresh local starts made after that, in the review; the
    evaluation tables give 55.3 (43.7 to 83.3). The specs never assert the value, only that the UI equals the API.
-4. **System Health lists `database` as a configured service, not as simulated**, although it is PGlite running in the API process
+4. **System status (then System Health) lists `database` as a configured service, not as simulated**, although it is PGlite running in the API process
    (`apps/api/src/container.ts`, `registerStandard('database')` has no `simulated` flag).
 5. **The API's trend labels already contain the signed change** ("+63.1 points compared with ..."), while the UI contract treats a
    label as the comparison only. The component now guards against the duplicate; the cause is in the domain labels.
-6. **The trend arrow of a metric card shrinks to a few pixels and sits in the middle of the wrapped line** ("Command Center",
+6. **The trend arrow of a metric card shrinks to a few pixels and sits in the middle of the wrapped line** ("Home",
    manager, 1440 px: see `docs/assets/screenshots/command-center.png`). The icon is a flex item that may shrink beside a long
    text; `flexShrink: 0` on the icon and `alignItems: 'flex-start'` on `trend` in `packages/ui/src/primitives/MetricCard.tsx` would
    fix it. Layout only, so no unit test can guard it.
-7. **Presentation Mode outlines "Cases" in the navigation for every case-scoped step.** `usePresenterHighlight`
+7. **Presentation mode outlines "Cases" in the navigation for every case-scoped step.** `usePresenterHighlight`
    (`apps/web/src/lib/presentation/index.tsx`) also matches a link whose path is a prefix of the target, so on the last step, whose
-   target is the comparison on Case Two's quality page, "Cases" is outlined and no other item is (the manager's "Quality Review" link
+   target is the comparison on Case Two's Score page, "Cases" is outlined and no other item is (the manager's "Quality" link
    goes to the portfolio). The outlined button in the presenter strip is right.
-8. The decision-marker circles on the timeline and hypothesis charts overlap slightly where two decisions are close (visual).
+8. The decision-marker circles on the Timeline and Possible causes charts overlap slightly where two decisions are close (visual).
 9. The route `/design-lab` (the component showcase) exists in the production build.
 
 No test is quarantined or skipped. The tests that were timing-sensitive (the two engine-budget tests above, the one-second clock of
-System Health, typing into URL-synced fields) were fixed rather than retried, and focus indicators are measured by comparing
+System status, typing into URL-synced fields) were fixed rather than retried, and focus indicators are measured by comparing
 pixels, not by reading styles. Local retries stay off; CI retries a failed test once.
 
 ## 8. Not run, and not verifiable

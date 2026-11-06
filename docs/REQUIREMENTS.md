@@ -3,13 +3,15 @@
 Requirement IDs are referenced from test names (for example `[FR-CF-03]`) so verification is traceable.
 **Verification key:** U = unit · I = integration · E = end-to-end (Playwright) · A = automated accessibility · S = security test · M = documented manual check.
 
+**Page names.** The requirements keep the engine's terms. In the web app a hypothesis is a possible cause, a decision fork is a key decision, a counterfactual path is a simulated path (What if), the evidence ledger is Evidence, the digital twin is the case structure (Case details), a circuit breaker is a safety limit and Avoidable Support Effort is the time that could have been saved.
+
 ## 1. Functional requirements
 
 ### 1.1 Ingestion and digital twin
 
 | ID         | Requirement                                                                                                                                                                                                      | Verif. |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| FR-ING-01  | Ingest a case by pasting text, uploading a structured file, uploading a synthetic JSON bundle, or loading a built-in sample                                                                                      | U I E  |
+| FR-ING-01  | Add (ingest) a case by pasting text, uploading a structured file, uploading a synthetic JSON bundle, or loading a built-in sample                                                                                | U I E  |
 | FR-ING-02  | Validate payloads against a versioned schema; show friendly field-level errors                                                                                                                                   | U I E  |
 | FR-ING-03  | Preview normalized content, redaction summary and injection findings **before** analysis                                                                                                                         | I E    |
 | FR-ING-04  | Redact secret-like and PII-like values (tokens, keys, connection strings, e-mail, IPs, phone) before persistence and before any model call                                                                       | U S    |
@@ -87,20 +89,20 @@ Requirement IDs are referenced from test names (for example `[FR-CF-03]`) so ver
 | FR-TK-03 | Simulated provider values are deterministic and labelled                                                                                                                                                                        | U E    |
 | FR-AN-01 | Privacy-safe analytics: trends, evidence integrity, fork categories, missing evidence, avoidable effort, skill adoption/effectiveness, token efficiency, counterfactual acceptance, reviewer disagreement, frequent assumptions | I E    |
 | FR-AN-02 | No individual employee ranking; responsible-use notice shown                                                                                                                                                                    | E M    |
-| FR-GV-01 | Governance center: model config, prompt versions, scoring & action-value config, skill approvals, roles, audit viewer, retention, redaction, feature flags, export controls, demo reset, health, provider status                | I E    |
+| FR-GV-01 | Governance (Settings and audit): model config, prompt versions, scoring & action-value config, skill approvals, roles, audit viewer, retention, redaction, feature flags, export controls, demo reset, health, provider status  | I E    |
 | FR-GV-02 | Configuration changes are versioned, audited and role-restricted                                                                                                                                                                | I S    |
 
 ### 1.7 Experience
 
-| ID       | Requirement                                                                                                                                                                                                   | Verif. |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| FR-UX-01 | Twelve destinations: Command Center, Cases, Case Timeline, Evidence Ledger, Hypothesis Arena, Counterfactual Lab, Quality Review, SkillDNA Library, Efficiency Monitor, Governance, System Health, Demo Guide | E      |
-| FR-UX-02 | Investigation graph with keyboard navigation, text alternative, zoom/focus, side panel, actual-vs-counterfactual comparison                                                                                   | E A    |
-| FR-UX-03 | Dark/light themes with persistence, reduced motion, skeletons, empty/error/retry states, toasts, contextual help                                                                                              | E A    |
-| FR-UX-04 | Command palette, global search, shortcuts, breadcrumbs, deep links, shareable filters                                                                                                                         | E      |
-| FR-UX-05 | Confirmation for consequential actions; undo where appropriate                                                                                                                                                | E      |
-| FR-UX-06 | Presentation mode with presenter notes, next-action highlight and reset; works with the deterministic provider only                                                                                           | E      |
-| FR-UX-07 | Every metric card explains its definition and links to underlying evidence; nothing is presented as production data                                                                                           | E M    |
+| ID       | Requirement                                                                                                                                                                                  | Verif. |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| FR-UX-01 | Twelve destinations: Home, Cases, Timeline, Evidence, Possible causes, What if, Score (and Quality across all cases), Skills, Usage and cost, Settings and audit, System status, Guided demo | E      |
+| FR-UX-02 | Investigation graph with keyboard navigation, text alternative, zoom/focus, side panel, actual-vs-counterfactual comparison                                                                  | E A    |
+| FR-UX-03 | Dark/light themes with persistence, reduced motion, skeletons, empty/error/retry states, toasts, contextual help                                                                             | E A    |
+| FR-UX-04 | Command palette, global search, shortcuts, breadcrumbs, deep links, shareable filters                                                                                                        | E      |
+| FR-UX-05 | Confirmation for consequential actions; undo where appropriate                                                                                                                               | E      |
+| FR-UX-06 | Presentation mode with presenter notes, next-action highlight and reset; works with the deterministic provider only                                                                          | E      |
+| FR-UX-07 | Every metric card explains its definition and links to underlying evidence; nothing is presented as production data                                                                          | E M    |
 
 ## 2. Non-functional requirements
 
