@@ -2,12 +2,17 @@
 
 import { ACTION_KIND_LABELS, type ActionValueBreakdown } from '@caseguard/schemas';
 import {
+  Accordion,
+  AccordionItem,
+  Button,
+  Card,
   ConfirmDialog,
   DataTable,
   EmptyState,
+  Field,
+  HelpButton,
+  Input,
   KeyValueList,
-  Notice,
-  Panel,
   ProvenanceBadge,
   StatusBadge,
   cg,
@@ -18,18 +23,8 @@ import {
   useRestoreFocusTarget,
   type DataTableColumn,
 } from '@caseguard/ui';
-import {
-  Accordion,
-  AccordionHeader,
-  AccordionItem,
-  AccordionPanel,
-  Button,
-  Field,
-  Input,
-  makeStyles,
-  tokens,
-} from '@fluentui/react-components';
-import { ArrowSortRegular, ShieldProhibitedRegular } from '@fluentui/react-icons';
+import { makeStyles, tokens } from '@fluentui/react-components';
+import { InfoIcon, ListOrderedIcon, ArrowUpDownIcon, ShieldBanIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useApiMutation } from '../../lib/api/hooks';
 import { GatedAction } from '../../lib/auth/session';
@@ -42,7 +37,8 @@ import { hasNothingToRank, overrideEntries, type RankingView } from './model';
 import { OverridesList } from './OverridesList';
 
 const useStyles = makeStyles({
-  stack: { display: 'flex', flexDirection: 'column', gap: cg.space[3], minWidth: 0 },
+  stack: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
+  section: { display: 'flex', flexDirection: 'column', gap: cg.space[2], minWidth: 0 },
   meta: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
   muted: { margin: 0, fontSize: tokens.fontSizeBase200, color: cg.textMuted },
   text: {
@@ -52,7 +48,27 @@ const useStyles = makeStyles({
     color: cg.textSecondary,
     overflowWrap: 'anywhere',
   },
-  h3: { margin: 0, fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
+  caption: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: cg.space[2],
+    margin: 0,
+    fontSize: tokens.fontSizeBase200,
+    color: cg.textSecondary,
+  },
+  captionIcon: { display: 'inline-flex', flexShrink: 0, marginTop: '2px', color: cg.textMuted },
+  callout: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[1],
+    padding: cg.space[3],
+    borderRadius: cg.radius.md,
+    backgroundColor: cg.tone.brand.tint,
+    color: cg.text,
+    fontSize: tokens.fontSizeBase300,
+  },
+  calloutTitle: { margin: 0, fontWeight: tokens.fontWeightSemibold },
+  h4: { margin: 0, fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
   header: {
     display: 'grid',
     alignItems: 'center',
@@ -99,6 +115,7 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase200,
     color: cg.textSecondary,
     fontVariantNumeric: 'tabular-nums',
+    fontWeight: tokens.fontWeightRegular,
   },
   facts: {
     display: 'flex',
@@ -107,39 +124,21 @@ const useStyles = makeStyles({
     gap: `${cg.space[1]} ${cg.space[2]}`,
     fontSize: tokens.fontSizeBase200,
     color: cg.textSecondary,
+    fontWeight: tokens.fontWeightRegular,
   },
-  body: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: cg.space[3],
-    padding: `${cg.space[2]} ${cg.space[2]} ${cg.space[3]}`,
-  },
+  body: { display: 'flex', flexDirection: 'column', gap: cg.space[4] },
   overrideBox: {
     display: 'flex',
     flexDirection: 'column',
     gap: cg.space[1],
-    padding: `${cg.space[2]} ${cg.space[3]}`,
+    padding: cg.space[3],
     borderRadius: cg.radius.md,
     border: `1px dashed ${cg.tone.brand.border}`,
     backgroundColor: cg.tone.brand.tint,
   },
-  details: {
-    borderRadius: cg.radius.md,
-    border: `1px solid ${cg.borderSubtle}`,
-    padding: `${cg.space[1]} ${cg.space[3]}`,
-    backgroundColor: cg.surface,
-  },
-  summary: {
-    cursor: 'pointer',
-    minHeight: '32px',
-    display: 'flex',
-    alignItems: 'center',
-    fontWeight: tokens.fontWeightSemibold,
-    fontSize: tokens.fontSizeBase300,
-  },
   formula: {
     display: 'block',
-    margin: `${cg.space[2]} 0`,
+    margin: 0,
     padding: `${cg.space[2]} ${cg.space[3]}`,
     borderRadius: cg.radius.sm,
     backgroundColor: cg.surfaceSunken,
@@ -153,15 +152,14 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     gap: '2px',
-    padding: `${cg.space[2]} ${cg.space[3]}`,
-    borderRadius: cg.radius.md,
-    border: `1px solid ${cg.borderSubtle}`,
+    paddingLeft: cg.space[3],
+    borderLeft: `2px solid ${cg.borderSubtle}`,
     listStyle: 'none',
   },
   list: {
     display: 'flex',
     flexDirection: 'column',
-    gap: cg.space[2],
+    gap: cg.space[3],
     margin: 0,
     padding: 0,
     listStyle: 'none',
@@ -170,7 +168,7 @@ const useStyles = makeStyles({
 });
 
 const HELP =
-  'Ranks the diagnostic actions that could be taken next with a configurable decision-support heuristic: expected information × relevance × confidence, divided by time, tokens, customer effort and operational risk, every term scaled to 0–1. It is not a scientific law. Actions the safety policy blocks are never recommended, whatever their score. A reviewer can record an override of a rank, with a reason: it is audited, listed under the ranking and shown next to the machine rank, which is never replaced. An earlier view lists only the overrides recorded, and about a moment, by its end, and always says that those recorded after it are not shown. When the last event has nothing left to rank, the ranking just before the earliest meaningful decision fork is shown instead.';
+  'Ranks the diagnostic actions that could be taken next with a configurable decision-support heuristic: expected information × relevance × confidence, divided by time, tokens, customer effort and operational risk, every term scaled to 0–1. It is not a scientific law. Actions the safety policy blocks are never recommended, whatever their score. A reviewer can record an override of a rank, with a reason: it is audited, listed under the ranking and shown next to the machine rank, which is never replaced. An earlier view lists only the overrides recorded, and about a moment, by its end, and always says that those recorded after it are not shown. When the last event has nothing left to rank, the ranking just before the first key decision is shown instead.';
 
 interface TermRow {
   id: string;
@@ -294,9 +292,9 @@ function OverrideAction({
     <>
       <GatedAction permission="actionvalue:override">
         <Button
-          size="small"
-          appearance="outline"
-          icon={<ArrowSortRegular />}
+          size="sm"
+          variant="secondary"
+          icon={<ArrowUpDownIcon />}
           onClick={() => setOpen(true)}
           {...restoreFocus}
         >
@@ -349,7 +347,7 @@ function OverrideAction({
             min={1}
             max={count}
             value={rank}
-            onChange={(_event, data) => setRank(data.value)}
+            onChange={(event) => setRank(event.target.value)}
           />
         </Field>
       </ConfirmDialog>
@@ -363,12 +361,16 @@ function RankRow({
   rankingAsOf,
   count,
   windowed,
+  open,
+  onOpenChange,
 }: {
   item: ActionValueBreakdown;
   caseId: string;
   rankingAsOf: string;
   count: number;
   windowed: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const styles = useStyles();
   const actorLabel = useActorLabel();
@@ -378,8 +380,11 @@ function RankRow({
       ? `${sensitivity.minRank}`
       : `${sensitivity.minRank}–${sensitivity.maxRank}`;
   return (
-    <AccordionItem value={item.actionKey}>
-      <AccordionHeader>
+    <AccordionItem
+      headingLevel={3}
+      open={open}
+      onOpenChange={onOpenChange}
+      title={
         <span className={styles.header}>
           <span className={styles.rank}>#{item.rank}</span>{' '}
           <span className={styles.label}>
@@ -419,126 +424,106 @@ function RankRow({
             ) : null}
           </span>
         </span>
-      </AccordionHeader>
-      <AccordionPanel>
-        <div className={styles.body}>
-          <p className={styles.text}>{item.explanation}</p>
-          {item.requiresFirst.length > 0 ? (
-            <p className={styles.text}>Needs first: {item.requiresFirst.join('; ')}.</p>
-          ) : null}
-          <section
-            className={styles.stack}
-            aria-label={`How the score of ${item.label} is calculated`}
-          >
-            <h3 className={styles.h3}>How this score was calculated</h3>
+      }
+    >
+      <div className={styles.body}>
+        <p className={styles.text}>{item.explanation}</p>
+        {item.requiresFirst.length > 0 ? (
+          <p className={styles.text}>Needs first: {item.requiresFirst.join('; ')}.</p>
+        ) : null}
+        <section
+          className={styles.section}
+          aria-label={`How the score of ${item.label} is calculated`}
+        >
+          <h4 className={styles.h4}>How this score was calculated</h4>
+          <DataTable
+            caption={`Calculation of ${item.label}`}
+            columns={TERM_COLUMNS}
+            rows={calculationRows(item)}
+            getRowId={(row) => row.id}
+            dense
+          />
+          <p className={styles.text}>
+            Numerator{' '}
+            <span className={styles.num}>
+              {formatNumber(item.numerator, { maximumFractionDigits: 4 })}
+            </span>{' '}
+            ÷ denominator{' '}
+            <span className={styles.num}>
+              {formatNumber(item.denominator, { maximumFractionDigits: 4 })}
+            </span>{' '}
+            = score{' '}
+            <strong className={styles.num}>
+              {formatNumber(item.score, { maximumFractionDigits: 2 })}
+            </strong>
+            , which is {formatProbability(item.relativeScore)} of the best safe action.
+          </p>
+        </section>
+        <section className={styles.section} aria-label={`Sensitivity of ${item.label}`}>
+          <h4 className={styles.h4}>Sensitivity to the weights</h4>
+          <p className={styles.text}>
+            {sensitivity.rankStable
+              ? `The rank holds (${range}) when each weight changes by 25%.`
+              : `The rank changes (${range}) when a weight changes by 25%, so treat it as a close call.`}
+          </p>
+          {sensitivity.scenarios.length > 0 ? (
             <DataTable
-              caption={`Calculation of ${item.label}`}
-              columns={TERM_COLUMNS}
-              rows={calculationRows(item)}
-              getRowId={(row) => row.id}
+              caption={`Rank under changed weights for ${item.label}`}
+              columns={SCENARIO_COLUMNS}
+              rows={sensitivity.scenarios}
+              getRowId={(s) => s.label}
               dense
             />
-            <p className={styles.text}>
-              Numerator{' '}
-              <span className={styles.num}>
-                {formatNumber(item.numerator, { maximumFractionDigits: 4 })}
-              </span>{' '}
-              ÷ denominator{' '}
-              <span className={styles.num}>
-                {formatNumber(item.denominator, { maximumFractionDigits: 4 })}
-              </span>{' '}
-              = score{' '}
-              <strong className={styles.num}>
-                {formatNumber(item.score, { maximumFractionDigits: 2 })}
-              </strong>
-              , which is {formatProbability(item.relativeScore)} of the best safe action.
-            </p>
-          </section>
-          <section className={styles.stack} aria-label={`Sensitivity of ${item.label}`}>
-            <h3 className={styles.h3}>Sensitivity to the weights</h3>
-            <p className={styles.text}>
-              {sensitivity.rankStable
-                ? `The rank holds (${range}) when each weight changes by 25%.`
-                : `The rank changes (${range}) when a weight changes by 25%, so treat it as a close call.`}
-            </p>
-            {sensitivity.scenarios.length > 0 ? (
-              <DataTable
-                caption={`Rank under changed weights for ${item.label}`}
-                columns={SCENARIO_COLUMNS}
-                rows={sensitivity.scenarios}
-                getRowId={(s) => s.label}
-                dense
-              />
-            ) : null}
-          </section>
-          <section className={styles.stack} aria-label={`Reviewer override for ${item.label}`}>
-            <h3 className={styles.h3}>Reviewer override</h3>
-            {item.override ? (
-              <div className={styles.overrideBox}>
-                <span className={styles.text}>
-                  <strong>Override: rank {item.override.rank}</strong>, machine rank {item.rank}
-                </span>
-                <span className={styles.muted}>
-                  By {actorLabel(item.override.by)} on {formatDateTimeUtc(item.override.at)}: “
-                  {item.override.reason}”
-                </span>
-              </div>
-            ) : (
-              <p className={styles.muted}>
-                {windowed
-                  ? 'No reviewer override had been recorded by this moment.'
-                  : 'No reviewer has overridden this rank.'}
-              </p>
-            )}
-            <div>
-              <OverrideAction
-                caseId={caseId}
-                item={item}
-                rankingAsOf={rankingAsOf}
-                count={count}
-                windowed={windowed}
-              />
+          ) : null}
+        </section>
+        <section className={styles.section} aria-label={`Reviewer override for ${item.label}`}>
+          <h4 className={styles.h4}>Reviewer override</h4>
+          {item.override ? (
+            <div className={styles.overrideBox}>
+              <span className={styles.text}>
+                <strong>Override: rank {item.override.rank}</strong>, machine rank {item.rank}
+              </span>
+              <span className={styles.muted}>
+                By {actorLabel(item.override.by)} on {formatDateTimeUtc(item.override.at)}: “
+                {item.override.reason}”
+              </span>
             </div>
-          </section>
-        </div>
-      </AccordionPanel>
+          ) : (
+            <p className={styles.muted}>
+              {windowed
+                ? 'No reviewer override had been recorded by this moment.'
+                : 'No reviewer has overridden this rank.'}
+            </p>
+          )}
+          <div>
+            <OverrideAction
+              caseId={caseId}
+              item={item}
+              rankingAsOf={rankingAsOf}
+              count={count}
+              windowed={windowed}
+            />
+          </div>
+        </section>
+      </div>
     </AccordionItem>
   );
 }
 
-const LAST_EVENT_RESOLVED =
-  'The case is resolved: at its last event there is nothing left to rank. Choose an earlier decision point.';
-const LAST_EVENT_PLAIN =
-  'At its last event there is nothing left to rank. Choose an earlier decision point.';
-
-export interface ActionValuePanelProps {
+/** The candidate actions as rows that open one at a time (the best one open to begin with). */
+function Candidates({
+  caseId,
+  view,
+  initialOpen,
+}: {
   caseId: string;
-  /** What to show: the ranking, which overrides it lists and whether it is an earlier view. */
   view: RankingView;
-  /** Leaves an earlier view for the whole record, where every override is listed. */
-  onShowLatest?: () => void;
-}
-
-/**
- * The ranked next actions with the whole calculation visible: inputs, scaled values, sensitivity to the weights, the
- * safety verdict and a gated, audited reviewer override, then the list of reviewer overrides. It is a heuristic and says
- * so. An earlier view lists only the overrides recorded (and about a moment) by its end and always says that those
- * recorded after it are not shown (no count); an override may still be recorded on it, about its moment, and then
- * appears in the whole record. A ranking whose every score is zero (a resolved case at its last event) is never
- * presented as a recommendation: the panel says so, and the page shows the ranking just before the earliest meaningful
- * decision fork instead when it has one.
- */
-export function ActionValuePanel({ caseId, view, onShowLatest }: ActionValuePanelProps) {
-  const styles = useStyles();
-  const { ranking, windowed, decisionFork } = view;
-  const nothingToRank = hasNothingToRank(ranking);
-  const lastEventNote = view.caseResolved ? LAST_EVENT_RESOLVED : LAST_EVENT_PLAIN;
-  const candidates = (
-    <Accordion
-      collapsible
-      multiple={false}
-      defaultOpenItems={nothingToRank ? [] : (ranking.candidates[0]?.actionKey ?? [])}
-    >
+  initialOpen: string | null;
+}) {
+  const { ranking, windowed } = view;
+  const [openKey, setOpenKey] = useState<string | null>(initialOpen);
+  return (
+    <Accordion>
       {ranking.candidates.map((item) => (
         <RankRow
           key={item.actionKey}
@@ -547,122 +532,194 @@ export function ActionValuePanel({ caseId, view, onShowLatest }: ActionValuePane
           rankingAsOf={ranking.asOf}
           count={ranking.candidates.length}
           windowed={windowed}
+          open={openKey === item.actionKey}
+          onOpenChange={(next) => setOpenKey(next ? item.actionKey : null)}
         />
       ))}
     </Accordion>
   );
+}
+
+const LAST_EVENT_RESOLVED =
+  'The case is resolved: at its last event there is nothing left to rank. Choose an earlier key decision.';
+const LAST_EVENT_PLAIN =
+  'At its last event there is nothing left to rank. Choose an earlier key decision.';
+
+export interface ActionValuePanelProps {
+  caseId: string;
+  /** What to show: the ranking, which overrides it lists and whether it is an earlier view. */
+  view: RankingView;
+  /** Leaves an earlier view for the whole record, where every override is listed. */
+  onShowLatest?: () => void;
+  /** Whether the row is open: the page opens it from "How it ranks". */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+/**
+ * "What to test next", one row that opens: the ranked next actions with the whole calculation visible (inputs, scaled
+ * values, sensitivity to the weights, the safety verdict and a gated, audited reviewer override), then the list of
+ * reviewer overrides. It is a heuristic and says so. An earlier view lists only the overrides recorded (and about a moment)
+ * by its end and always says that those recorded after it are not shown (no count); an override may still be recorded on
+ * it, about its moment, and then appears in the whole record. A ranking whose every score is zero (a resolved case at its
+ * last event) is never presented as a recommendation: the panel says so, and the page shows the ranking just before the
+ * first key decision instead when it has one.
+ */
+export function ActionValuePanel({
+  caseId,
+  view,
+  onShowLatest,
+  open,
+  onOpenChange,
+}: ActionValuePanelProps) {
+  const styles = useStyles();
+  const { ranking, windowed, decisionFork } = view;
+  const nothingToRank = hasNothingToRank(ranking);
+  const lastEventNote = view.caseResolved ? LAST_EVENT_RESOLVED : LAST_EVENT_PLAIN;
+  const best = ranking.candidates[0];
+  const candidates = (
+    <Candidates
+      caseId={caseId}
+      view={view}
+      initialOpen={nothingToRank ? null : (best?.actionKey ?? null)}
+    />
+  );
   return (
-    <Panel
-      title="Next best action"
-      description="Which diagnostic action the heuristic ranks first at this time, and exactly why."
-      help={HELP}
-      accent="brand"
-    >
-      <div className={styles.meta}>
-        <ProvenanceBadge kind="estimated" label="Estimated scores" />
-        <span className={styles.muted}>
-          Ranked as of {formatInstant(ranking.asOf)}
-          {decisionFork ? ', just before the earliest meaningful decision fork' : ''} ·
-          configuration v{ranking.configVersion}
-        </span>
-      </div>
-      <Notice variant="model-estimate" compact title="Heuristic">
-        {ranking.notice}
-      </Notice>
-      <details className={styles.details}>
-        <summary className={styles.summary}>The formula</summary>
-        <code className={styles.formula}>{ranking.formula}</code>
-      </details>
-      {decisionFork ? (
-        <Notice variant="info" compact title="Nothing left to rank at the last event">
-          <span>{lastEventNote}</span>{' '}
-          <span>
-            Showing the ranking just before the earliest meaningful decision fork (“
-            {decisionFork.title}”, decided {formatInstant(decisionFork.at)}) instead. Move the time
-            cursor to choose another moment.
-          </span>
-        </Notice>
-      ) : nothingToRank ? (
-        <Notice
-          variant="info"
-          compact
-          title={
-            view.atLastEvent
-              ? 'Nothing left to rank at the last event'
-              : 'Nothing left to rank at this moment'
+    <Card padding="sm">
+      <Accordion>
+        <AccordionItem
+          title="What to test next"
+          subtitle={
+            nothingToRank
+              ? 'Nothing is left to rank at this moment.'
+              : best
+                ? `Best next step: ${best.label}`
+                : 'No safe action to rank.'
           }
+          icon={<ListOrderedIcon />}
+          headingLevel={2}
+          open={open}
+          onOpenChange={onOpenChange}
         >
-          <span>
-            {view.atLastEvent
-              ? lastEventNote
-              : 'No candidate action is expected to add information at this moment, so there is nothing left to rank. Choose an earlier decision point.'}
-          </span>{' '}
-          <span>
-            Move the time cursor back to an earlier moment to see a ranking that can still be acted
-            on.
-          </span>
-        </Notice>
-      ) : null}
-
-      {ranking.candidates.length === 0 ? (
-        <EmptyState
-          compact
-          icon={<ArrowSortRegular />}
-          title="No safe action to rank"
-          description="Every candidate action is blocked by the safety policy at this time."
-        />
-      ) : nothingToRank ? (
-        <details className={styles.details}>
-          <summary className={styles.summary}>
-            Candidate actions ({ranking.candidates.length}): every score is 0, so none is a
-            recommendation
-          </summary>
-          {candidates}
-        </details>
-      ) : (
-        candidates
-      )}
-
-      <OverridesList
-        entries={overrideEntries(view.overrides, ranking)}
-        windowed={windowed}
-        onShowWholeRecord={onShowLatest}
-      />
-
-      <details className={styles.details}>
-        <summary className={styles.summary}>
-          Blocked by the safety policy ({ranking.blocked.length}): never recommended
-        </summary>
-        {ranking.blocked.length === 0 ? (
-          <p className={styles.text}>The safety policy blocks nothing at this time.</p>
-        ) : (
-          <ul className={styles.list}>
-            {ranking.blocked.map((item) => (
-              <li key={item.actionKey} className={styles.blocked}>
-                <span className={styles.label}>
-                  <StatusBadge status="unsupported" label="Blocked" size="small" /> {item.label}
-                </span>
-                {item.safety.blockedReasons.map((reason) => (
-                  <span key={reason} className={styles.muted}>
-                    <ShieldProhibitedRegular aria-hidden="true" /> {reason}
+          <div className={styles.stack} role="group" aria-label="What to test next">
+            <div className={styles.meta}>
+              <ProvenanceBadge kind="estimated" label="Estimated scores" />
+              <span className={styles.muted}>
+                Ranked as of {formatInstant(ranking.asOf)}
+                {decisionFork ? ', just before the first key decision' : ''} · configuration v
+                {ranking.configVersion}
+              </span>
+              <HelpButton label="About what to test next" title="What to test next">
+                {HELP}
+              </HelpButton>
+            </div>
+            <p className={styles.caption}>
+              <span aria-hidden="true" className={styles.captionIcon}>
+                <InfoIcon size={16} />
+              </span>
+              <span>{ranking.notice}</span>
+            </p>
+            {decisionFork ? (
+              <div className={styles.callout}>
+                <p className={styles.calloutTitle}>Nothing left to rank at the last event</p>
+                <p className={styles.text}>
+                  <span>{lastEventNote}</span>{' '}
+                  <span>
+                    Showing the ranking just before the first key decision (“{decisionFork.title}”,
+                    decided {formatInstant(decisionFork.at)}) instead. Move the time cursor to
+                    choose another moment.
                   </span>
-                ))}
-              </li>
-            ))}
-          </ul>
-        )}
-      </details>
-      <details className={styles.details}>
-        <summary className={styles.summary}>Confidence this ranking is based on</summary>
-        <KeyValueList
-          columns={2}
-          items={ranking.posterior.map((p) => ({
-            id: p.hypothesisId,
-            label: p.name,
-            value: `${formatProbability(p.confidence)} (model estimate)`,
-          }))}
-        />
-      </details>
-    </Panel>
+                </p>
+              </div>
+            ) : nothingToRank ? (
+              <div className={styles.callout}>
+                <p className={styles.calloutTitle}>
+                  {view.atLastEvent
+                    ? 'Nothing left to rank at the last event'
+                    : 'Nothing left to rank at this moment'}
+                </p>
+                <p className={styles.text}>
+                  <span>
+                    {view.atLastEvent
+                      ? lastEventNote
+                      : 'No candidate action is expected to add information at this moment, so there is nothing left to rank. Choose an earlier key decision.'}
+                  </span>{' '}
+                  <span>
+                    Move the time cursor back to an earlier moment to see a ranking that can still
+                    be acted on.
+                  </span>
+                </p>
+              </div>
+            ) : null}
+
+            {ranking.candidates.length === 0 ? (
+              <EmptyState
+                compact
+                icon={<ArrowUpDownIcon />}
+                title="No safe action to rank"
+                description="Every candidate action is blocked by the safety policy at this time."
+              />
+            ) : nothingToRank ? (
+              <Accordion>
+                <AccordionItem
+                  headingLevel={3}
+                  title={`Candidate actions (${ranking.candidates.length}): every score is 0, so none is a recommendation`}
+                >
+                  {candidates}
+                </AccordionItem>
+              </Accordion>
+            ) : (
+              candidates
+            )}
+
+            <OverridesList
+              entries={overrideEntries(view.overrides, ranking)}
+              windowed={windowed}
+              onShowWholeRecord={onShowLatest}
+            />
+
+            <Accordion>
+              <AccordionItem headingLevel={3} title="The formula">
+                <code className={styles.formula}>{ranking.formula}</code>
+              </AccordionItem>
+              <AccordionItem
+                headingLevel={3}
+                title={`Blocked by the safety policy (${ranking.blocked.length}): never recommended`}
+              >
+                {ranking.blocked.length === 0 ? (
+                  <p className={styles.text}>The safety policy blocks nothing at this time.</p>
+                ) : (
+                  <ul className={styles.list}>
+                    {ranking.blocked.map((item) => (
+                      <li key={item.actionKey} className={styles.blocked}>
+                        <span className={styles.label}>
+                          <StatusBadge status="unsupported" label="Blocked" size="small" />{' '}
+                          {item.label}
+                        </span>
+                        {item.safety.blockedReasons.map((reason) => (
+                          <span key={reason} className={styles.muted}>
+                            <ShieldBanIcon aria-hidden="true" size={14} /> {reason}
+                          </span>
+                        ))}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </AccordionItem>
+              <AccordionItem headingLevel={3} title="Confidence this ranking is based on">
+                <KeyValueList
+                  columns={2}
+                  items={ranking.posterior.map((p) => ({
+                    id: p.hypothesisId,
+                    label: p.name,
+                    value: `${formatProbability(p.confidence)} (model estimate)`,
+                  }))}
+                />
+              </AccordionItem>
+            </Accordion>
+          </div>
+        </AccordionItem>
+      </Accordion>
+    </Card>
   );
 }

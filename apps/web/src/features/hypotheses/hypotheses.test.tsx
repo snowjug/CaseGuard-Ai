@@ -27,8 +27,8 @@ import { ApiError } from '../../lib/api/errors';
 import { HypothesisArenaPage } from './HypothesisArenaPage';
 
 // The page chains several reads (identity, case, instants, hypotheses, forks, ranking); a loaded machine needs room.
-configure({ asyncUtilTimeout: 8000 });
-vi.setConfig({ testTimeout: 90_000 });
+configure({ asyncUtilTimeout: 30_000 });
+vi.setConfig({ testTimeout: 120_000 });
 
 const REVIEWER = [
   'case:read',
@@ -79,85 +79,151 @@ function api(overrides: FakeHandlers = {}, role: 'reviewer' | 'engineer' = 'revi
 const renderArena = (handler = api()) =>
   renderApp(<HypothesisArenaPage caseId={CASE_ID} />, { api: handler });
 
-const list = () => screen.findByRole('list', { name: 'Hypotheses ranked by confidence' });
-const detailOf = (name: string) => screen.getByRole('group', { name });
+const list = (options: { hidden?: boolean } = {}) =>
+  screen.findByRole('list', { name: 'Possible causes ranked by confidence', ...options });
+/** The drawer of a possible cause, named by the cause. */
+const drawerOf = (name: string) => screen.findByRole('dialog', { name });
+/** The leading cause, shown as the hero above the list. */
+const heroOf = (name: string) => screen.findByRole('region', { name });
 
-describe('[FR-HY-01] Hypothesis Arena', () => {
-  it('shows a skeleton, then every hypothesis ranked with its estimated range and the model-estimate notice', async () => {
+/** "What was known then" is a collapsed bar: open it to reach the time cursor and the counts of the moment. */
+async function openKnownBar(): Promise<HTMLElement> {
+  const bar = await screen.findByRole('button', { name: /^What was known then/ });
+  if (bar.getAttribute('aria-expanded') !== 'true') await userEvent.setup().click(bar);
+  return screen.findByRole('group', { name: 'Time cursor' });
+}
+
+/** "What to test next" is one row that opens: the ranking is read at once, its body is shown on request. */
+async function openRanking(): Promise<HTMLElement> {
+  const trigger = await screen.findByRole('button', { name: /^What to test next/ });
+  if (trigger.getAttribute('aria-expanded') !== 'true') await userEvent.setup().click(trigger);
+  return screen.findByRole('group', { name: 'What to test next' });
+}
+
+describe('[FR-HY-01] Possible causes', () => {
+  it('shows a skeleton, then the leading cause with its estimated confidence and the others ranked with their ranges', async () => {
     renderArena();
-    expect(screen.getAllByText(/Loading the confidence chart/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Loading the possible causes/).length).toBeGreaterThan(0);
 
+    // The leading cause is the hero; the list holds the causes after it.
     const rows = within(await list()).getAllByRole('listitem');
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(2);
+    const hero = within(await heroOf('DNS resolution failure for sign-in endpoints'));
+    expect(hero.getByText('Most likely cause')).toBeInTheDocument();
+    expect(await hero.findByText('73%')).toBeInTheDocument();
+    expect(hero.getByText('Estimated')).toBeInTheDocument();
+    expect(hero.getByRole('img', { name: /estimate 73%, range 55% to 84%/ })).toBeInTheDocument();
+    expect(hero.getByText(/Rose from 18% to 73%/)).toBeInTheDocument();
+    expect(hero.getByText('Best next test')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Possible causes' })).toBeInTheDocument();
+
     expect(
       within(rows[0] as HTMLElement).getByRole('button', {
-        name: /DNS resolution failure for sign-in endpoints/,
+        name: /Egress proxy or TLS-inspection node failure/,
       }),
-    ).toHaveAttribute('aria-pressed', 'true');
-    expect(
-      within(rows[0] as HTMLElement).getByRole('img', { name: /estimate 73%, range 55% to 84%/ }),
     ).toBeInTheDocument();
-    expect(within(rows[2] as HTMLElement).getByText('Ruled out')).toBeInTheDocument();
+    expect(
+      within(rows[0] as HTMLElement).getByRole('img', { name: /estimate 18%, range 6% to 33%/ }),
+    ).toBeInTheDocument();
+    expect(within(rows[1] as HTMLElement).getByText('Ruled out')).toBeInTheDocument();
+    expect(
+      within(rows[1] as HTMLElement).getByText(/Moved .* points at the last event \(estimate\)/),
+    ).toBeInTheDocument();
     expect(screen.getAllByText(/not statistical truth/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Model estimates').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Estimated').length).toBeGreaterThan(0);
     expect(await screen.findByText('Demo data')).toBeInTheDocument();
   });
 
-  it('draws the confidence chart with a text alternative and the actions and forks as numbered markers', async () => {
+  it('says so when only one possible cause has been scored', async () => {
+    const base = hypothesesResponse();
+    const [first] = base.items;
+    if (!first) throw new Error('fixture has hypotheses');
+    renderArena(api({ 'hypotheses.list': () => ({ ...base, items: [first] }) }));
+    await heroOf('DNS resolution failure for sign-in endpoints');
+    expect(screen.getByText('Only one possible cause has been scored so far.')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Possible causes ranked by confidence' })).toBeNull();
+  });
+
+  it('lists the first five of the other causes, and the rest on request', async () => {
+    const user = userEvent.setup();
+    const base = hypothesesResponse();
+    const [, second] = base.items;
+    if (!second) throw new Error('fixture has hypotheses');
+    const extra = Array.from({ length: 6 }, (_, index) => ({
+      ...second,
+      id: `hyp_extra_${index}`,
+      key: `hyp.extra-${index}`,
+      name: `Extra cause ${index + 1}`,
+    }));
+    renderArena(api({ 'hypotheses.list': () => ({ ...base, items: [...base.items, ...extra] }) }));
+    const items = within(await list());
+    expect(items.getAllByRole('listitem')).toHaveLength(5);
+    await user.click(screen.getByRole('button', { name: 'Show 3 more possible causes' }));
+    expect(items.getAllByRole('listitem')).toHaveLength(8);
+    await user.click(screen.getByRole('button', { name: 'Show fewer' }));
+    expect(items.getAllByRole('listitem')).toHaveLength(5);
+  });
+
+  it('draws the confidence chart with a text alternative and the actions and key decisions as numbered markers', async () => {
     renderArena();
     await list();
     const chart = await screen.findByRole('img', {
-      name: /Model-estimated confidence in each hypothesis over time/,
+      name: /Model-estimated confidence in each possible cause over time/,
     });
     expect(chart).toBeInTheDocument();
     await waitFor(() =>
-      expect(screen.getAllByText(/Decision fork: Heavy customer request/).length).toBeGreaterThan(
-        0,
-      ),
+      expect(screen.getAllByText(/Key decision: Heavy customer request/).length).toBeGreaterThan(0),
     );
     expect(screen.getAllByText(/Action: Request HAR and Fiddler traces/).length).toBeGreaterThan(0);
   });
 
-  it('opens the leading hypothesis with its evidence for and against, missing evidence, assumptions and cheapest safe action', async () => {
+  it('opens the leading cause with its evidence for and against, missing evidence, assumptions and cheapest safe action', async () => {
+    const user = userEvent.setup();
     renderArena();
     await list();
-    const detail = detailOf('DNS resolution failure for sign-in endpoints');
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'See the evidence for DNS resolution failure for sign-in endpoints',
+      }),
+    );
+    await waitFor(() => expect(window.location.search).toBe('?sel=hyp_dns'));
+    const detail = within(await drawerOf('DNS resolution failure for sign-in endpoints'));
     expect(
-      within(detail).getByRole('heading', { name: 'Evidence that supports it (2)' }),
+      detail.getByRole('heading', { name: 'Evidence that supports it (2)' }),
     ).toBeInTheDocument();
-    expect(
-      within(detail).getByText('Client reports a name-resolution failure'),
-    ).toBeInTheDocument();
-    expect(within(detail).getByText(/ERR_NAME_NOT_RESOLVED/)).toBeInTheDocument();
-    const [firstLink] = within(detail).getAllByRole('link', { name: /Source event e04/ });
+    expect(detail.getByText('Client reports a name-resolution failure')).toBeInTheDocument();
+    expect(detail.getByText(/ERR_NAME_NOT_RESOLVED/)).toBeInTheDocument();
+    const [firstLink] = detail.getAllByRole('link', { name: /Source event e04/ });
     expect(firstLink).toHaveAttribute('href', '/cases/case_1/timeline?sel=e04');
     expect(
-      within(detail).getByRole('heading', { name: 'Evidence that contradicts it (0)' }),
+      detail.getByRole('heading', { name: 'Evidence that contradicts it (0)' }),
     ).toBeInTheDocument();
 
+    expect(detail.getByRole('heading', { name: 'Missing evidence (1)' })).toBeInTheDocument();
     expect(
-      within(detail).getByRole('heading', { name: 'Missing evidence (1)' }),
+      detail.getByText('Network path check (DNS or proxy) from an affected site'),
     ).toBeInTheDocument();
     expect(
-      within(detail).getByText('Network path check (DNS or proxy) from an affected site'),
-    ).toBeInTheDocument();
-    expect(
-      within(detail).getByText(/Already collected: Exact client error code or text/),
+      detail.getByText(/Already collected: Exact client error code or text/),
     ).toBeInTheDocument();
 
-    expect(within(detail).getByRole('heading', { name: 'Assumptions (1)' })).toBeInTheDocument();
-    const action = within(detail).getByRole('region', { name: 'Cheapest safe validating action' });
+    // The assumptions are a closed row: they open on request.
+    await user.click(detail.getByRole('button', { name: 'Assumptions (1)' }));
+    expect(
+      await detail.findByText('Affected clients alternate between at least two resolvers.'),
+    ).toBeInTheDocument();
+    const action = detail.getByRole('region', { name: 'Cheapest safe validating action' });
     expect(
       within(action).getByText('Ask about recent identity, network or policy changes'),
     ).toBeInTheDocument();
     expect(within(action).getByText('0.24 bits')).toBeInTheDocument();
     expect(within(action).getByText('Estimated')).toBeInTheDocument();
 
-    const changes = within(detail).getByRole('list', { name: 'Promotions and demotions' });
+    const changes = detail.getByRole('list', { name: 'Promotions and demotions' });
     expect(within(changes).getByText(/Still possible → Leading/)).toBeInTheDocument();
   });
 
-  it('explains why a hypothesis moved and keeps contradictions visible', async () => {
+  it('explains why a possible cause moved and keeps contradictions visible', async () => {
     const user = userEvent.setup();
     renderArena();
     const rows = within(await list());
@@ -165,26 +231,47 @@ describe('[FR-HY-01] Hypothesis Arena', () => {
       rows.getByRole('button', { name: /Conditional Access or MFA policy enforcement/ }),
     );
     await waitFor(() => expect(window.location.search).toBe('?sel=hyp_ca'));
-    const detail = detailOf('Conditional Access or MFA policy enforcement');
+    const detail = within(await drawerOf('Conditional Access or MFA policy enforcement'));
     expect(
-      within(detail).getByRole('heading', { name: 'Evidence that contradicts it (1)' }),
+      detail.getByRole('heading', { name: 'Evidence that contradicts it (1)' }),
     ).toBeInTheDocument();
     expect(
-      within(detail).getByText('Policy-related log events do not coincide with the failures'),
+      detail.getByText('Policy-related log events do not coincide with the failures'),
     ).toBeInTheDocument();
-    expect(within(detail).getAllByText(/Contradicts/).length).toBeGreaterThan(0);
-    expect(within(detail).getByText(/Nothing more needs testing/)).toBeInTheDocument();
-    expect(within(detail).getAllByText(/Ruled out/).length).toBeGreaterThan(0);
+    expect(detail.getAllByText(/Contradicts/).length).toBeGreaterThan(0);
+    expect(detail.getByText(/Nothing more needs testing/)).toBeInTheDocument();
+    expect(detail.getAllByText(/Ruled out/).length).toBeGreaterThan(0);
+  });
+
+  it('closes the drawer from its close button and drops the selection from the URL', async () => {
+    const user = userEvent.setup();
+    navigateTo('/?sel=hyp_ca');
+    renderArena();
+    const detail = within(await drawerOf('Conditional Access or MFA policy enforcement'));
+    await user.click(detail.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(window.location.search).toBe(''));
   });
 
   it('shares the selection through the URL, by record id or by key', async () => {
     navigateTo('/?sel=hyp.conditional-access');
     renderArena();
-    await list();
-    expect(detailOf('Conditional Access or MFA policy enforcement')).toBeInTheDocument();
+    expect(await drawerOf('Conditional Access or MFA policy enforcement')).toBeInTheDocument();
   });
 
-  it('can draw every hypothesis instead of the contenders, and keeps that choice in the URL', async () => {
+  it('jumps from the leading cause to the ranking of what to test next', async () => {
+    const user = userEvent.setup();
+    renderArena();
+    await list();
+    expect(screen.queryByRole('group', { name: 'What to test next' })).toBeNull();
+    await user.click(await screen.findByRole('button', { name: 'How it ranks' }));
+    expect(await screen.findByRole('group', { name: 'What to test next' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^What to test next/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+  });
+
+  it('can draw every possible cause instead of the contenders, and keeps that choice in the URL', async () => {
     const user = userEvent.setup();
     const base = hypothesesResponse();
     const [first] = base.items;
@@ -213,20 +300,34 @@ describe('[FR-HY-01] Hypothesis Arena', () => {
         /Showing the 3 that reached at least 10% at some point; 1 stayed below\./,
       ),
     ).toBeInTheDocument();
-    await user.click(screen.getByRole('checkbox', { name: 'Show every hypothesis (4)' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Show every possible cause (4)' }));
     await waitFor(() => expect(window.location.search).toBe('?chart=all'));
-    expect(screen.getByText('Showing all 4 hypotheses.')).toBeInTheDocument();
+    expect(screen.getByText('Showing all 4 possible causes.')).toBeInTheDocument();
   });
 
-  it('says it is showing all of them when every hypothesis is a contender', async () => {
+  it('says it is showing all of them when every possible cause is a contender', async () => {
     renderArena();
     await list();
-    expect(await screen.findByText('Showing all 3 hypotheses.')).toBeInTheDocument();
+    expect(await screen.findByText('Showing all 3 possible causes.')).toBeInTheDocument();
   });
 
   it('has no accessibility violations when loaded', async () => {
     const { container } = renderArena();
     await list();
+    await openKnownBar();
+    await expectNoAxeViolations(container);
+  }, 120_000);
+
+  it('has no accessibility violations with a cause open and the ranking opened', async () => {
+    navigateTo('/?sel=hyp_dns');
+    const { container } = renderArena();
+    const drawer = await drawerOf('DNS resolution failure for sign-in endpoints');
+    await within(drawer).findByRole('heading', { name: 'Evidence that supports it (2)' });
+    // The drawer is outside the page's own container: it is checked as well.
+    await expectNoAxeViolations(drawer);
+    await userEvent.setup().click(within(drawer).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await openRanking();
     await expectNoAxeViolations(container);
   }, 120_000);
 });
@@ -238,15 +339,13 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
     renderArena(handler);
     await list();
     expect(
-      (await screen.findAllByText('Known as of 9 Mar 2026, 09:30 UTC')).length,
-    ).toBeGreaterThan(0);
-    expect(
-      await screen.findByText('29 later events are withheld from this view.'),
-    ).toBeInTheDocument();
-    expect(
       await screen.findByText(
         'Showing the case as of 9 Mar 2026, 09:30 UTC, the last event recorded by the moment you chose.',
       ),
+    ).toBeInTheDocument();
+    await openKnownBar();
+    expect(
+      await screen.findByText('29 later events are withheld from this view.'),
     ).toBeInTheDocument();
     const known = await screen.findByLabelText('Known as of 9 Mar 2026, 09:30 UTC');
     expect(within(known).getByText('Evidence items')).toBeInTheDocument();
@@ -267,23 +366,22 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
     expect(
       calls.filter(([, input]) => asOfOf(input) !== null && asOfOf(input) !== BEFORE_FORK_EVENT),
     ).toEqual([]);
-    // No quick jump into the future: the fork does not exist yet at this boundary.
-    expect(
-      screen.queryByRole('button', { name: /Just before the earliest meaningful decision fork/ }),
-    ).toBeNull();
+    // No quick jump into the future: the key decision does not exist yet at this boundary.
+    expect(screen.queryByRole('button', { name: /Just before the first key decision/ })).toBeNull();
   });
 
-  it('jumps to the event just before the earliest meaningful fork and limits everything to it', async () => {
+  it('jumps to the event just before the first key decision and limits everything to it', async () => {
     const user = userEvent.setup();
     const handler = api();
     renderArena(handler);
     const jump = await screen.findByRole('button', {
-      name: 'Just before the earliest meaningful decision fork',
+      name: 'Just before the first key decision',
     });
     expect(
       screen.getByRole('link', { name: /Simulate a safer path from 9 Mar 2026, 09:41 UTC/ }),
     ).toHaveAttribute('href', '/cases/case_1/counterfactual?sel=fork_1');
     // The cursor knows the event instants once its previous/next buttons exist.
+    await openKnownBar();
     await screen.findByRole('button', { name: 'Previous event' });
     await user.click(jump);
     await waitFor(() =>
@@ -296,8 +394,10 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
       ),
     );
     expect(
-      (await screen.findAllByText('Known as of 9 Mar 2026, 09:30 UTC')).length,
-    ).toBeGreaterThan(0);
+      await screen.findByText(
+        'Showing the case as of 9 Mar 2026, 09:30 UTC, the last event recorded by the moment you chose.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('shows the boundary the server reports, which can be earlier than the one asked for', async () => {
@@ -316,9 +416,20 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
         'Showing the case as of 9 Mar 2026, 09:12 UTC, the last event recorded by the moment you chose.',
       ),
     ).toBeInTheDocument();
+    await openKnownBar();
     expect(
       await screen.findByText('7 later events are withheld from this view.'),
     ).toBeInTheDocument();
+  });
+
+  it('goes back to the latest from the bar, without opening it', async () => {
+    const user = userEvent.setup();
+    navigateTo(`/?asOf=${BEFORE_FORK_EVENT}`);
+    renderArena();
+    await list();
+    expect(screen.getByText('Earlier view')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Back to latest' }));
+    await waitFor(() => expect(window.location.search).toBe(''));
   });
 
   it('lists the overrides an earlier view may show, and always says that those recorded after it are not shown', async () => {
@@ -338,7 +449,7 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
           }),
       }),
     );
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     const overrides = await within(ranking).findByRole('group', { name: 'Reviewer overrides (1)' });
     expect(within(overrides).getByText(LATER_OVERRIDES)).toBeInTheDocument();
     expect(within(overrides).getByText(/Wait for the customer reply\./)).toBeInTheDocument();
@@ -355,7 +466,7 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
         'actionValue.rank': (input) => actionRanking({ asOf: asOfOf(input) ?? BEFORE_FORK_EVENT }),
       }),
     );
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     const overrides = await within(ranking).findByRole('group', { name: 'Reviewer overrides (0)' });
     expect(within(overrides).getByText(LATER_OVERRIDES)).toBeInTheDocument();
     expect(
@@ -386,7 +497,7 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
         }),
     });
     renderArena(handler);
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     await waitFor(() =>
       expect(
         within(ranking).getByRole('button', { name: 'Override this rank' }),
@@ -442,7 +553,7 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
 
   it('does not add the note to the whole-record view, where every override is listed', async () => {
     renderArena();
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     expect(within(ranking).queryByText(LATER_OVERRIDES)).toBeNull();
     expect(within(ranking).queryByText(/recorded after this moment/)).toBeNull();
     expect(within(ranking).queryByText(LATER_DECISIONS)).toBeNull();
@@ -471,7 +582,7 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
             title: 'Too many requests',
             message:
               'Too many views were recomputed in a short time. Views already computed stay available; retry shortly.',
-            retryAfterMs: 1000,
+            retryAfterMs: 8000,
           });
         return hypothesesResponse();
       },
@@ -482,23 +593,24 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
     const explanation = screen.getByText(
       /Computing earlier views is limited to keep the service responsive/,
     );
-    expect(explanation).toHaveTextContent(/the hypothesis view/);
+    expect(explanation).toHaveTextContent(/the possible causes/);
     expect(explanation).toHaveTextContent(/Views you already opened stay available\./);
-    // The page stays: the cursor is still there so another (already computed) moment can be chosen.
-    expect(screen.getByRole('slider', { name: 'Time cursor' })).toBeInTheDocument();
-    expect(screen.queryByText('The Hypothesis Arena could not be loaded')).toBeNull();
     const retry = screen.getByRole('button', { name: /Retry in \d+ s/ });
     expect(retry).toBeDisabled();
+    // The page stays: the cursor is still there so another (already computed) moment can be chosen.
+    await openKnownBar();
+    expect(screen.getByRole('slider', { name: 'Time cursor' })).toBeInTheDocument();
+    expect(screen.queryByText('The possible causes could not be loaded')).toBeNull();
     await expectNoAxeViolations(container);
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled(), {
-      timeout: 20_000,
+      timeout: 30_000,
     });
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await list()).toBeInTheDocument();
     expect(attempts).toBe(2);
     expect(screen.queryByText('Earlier views are limited')).toBeNull();
-  }, 60_000);
+  }, 120_000);
 
   it('offers the whole record, which is never limited, when an earlier view is refused', async () => {
     const user = userEvent.setup();
@@ -544,7 +656,7 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
     expect(screen.getByText(/Computing earlier views is limited/)).toHaveTextContent(
       /the action ranking/,
     );
-    expect(screen.getByRole('heading', { name: 'Competing hypotheses' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Other possible causes' })).toBeInTheDocument();
   });
 
   it('answers the API general limit (a 429 that names no reason) the same calm way', async () => {
@@ -581,7 +693,7 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
         },
       }),
     );
-    expect(await screen.findByText('The Hypothesis Arena could not be loaded')).toBeInTheDocument();
+    expect(await screen.findByText('The possible causes could not be loaded')).toBeInTheDocument();
     expect(screen.queryByText('Earlier views are limited')).toBeNull();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
@@ -604,6 +716,7 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
       }),
     );
     await waitFor(() => expect(signals.has('2026-03-09T11:05:00Z')).toBe(true));
+    await openKnownBar();
     await user.click(await screen.findByRole('button', { name: 'Previous event' }));
     await waitFor(() => expect(signals.get('2026-03-09T11:05:00Z')?.aborted).toBe(true));
     expect(await list()).toBeInTheDocument();
@@ -613,6 +726,7 @@ describe('[FR-HY-02] decision-time view (as-of)', () => {
     const handler = api();
     renderArena(handler);
     await list();
+    await openKnownBar();
     const slider = await screen.findByRole('slider', { name: 'Time cursor' });
     // Three positions in quick succession: 09:32, 09:37 and 09:42 (the last lands on the 09:41 event).
     fireEvent.change(slider, { target: { value: '20' } });
@@ -649,7 +763,8 @@ describe('[FR-HY-02] only the chosen moment is ever on screen', () => {
       api({ 'hypotheses.list': (input) => (asOfOf(input) ? never() : hypothesesResponse()) }),
     );
     await list();
-    await screen.findByRole('group', { name: 'Next best action' });
+    await screen.findByRole('button', { name: /^What to test next/ });
+    await openKnownBar();
     await user.click(await screen.findByRole('button', { name: 'Previous event' }));
 
     expect(
@@ -657,18 +772,22 @@ describe('[FR-HY-02] only the chosen moment is ever on screen', () => {
     ).toBeInTheDocument();
     // Nothing of the whole record stays under the name of the moment that was chosen.
     await waitFor(() =>
-      expect(screen.queryByRole('list', { name: 'Hypotheses ranked by confidence' })).toBeNull(),
+      expect(
+        screen.queryByRole('list', { name: 'Possible causes ranked by confidence' }),
+      ).toBeNull(),
     );
-    expect(screen.queryByRole('heading', { name: 'Competing hypotheses' })).toBeNull();
-    expect(screen.queryByRole('group', { name: 'Next best action' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Other possible causes' })).toBeNull();
+    expect(screen.queryByText('Most likely cause')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^What to test next/ })).toBeNull();
     expect(screen.queryByText('DNS resolution failure for sign-in endpoints')).toBeNull();
     expect(screen.queryByText(/estimate 73%/)).toBeNull();
+    expect(screen.queryByText('73%')).toBeNull();
     expect(
-      screen.getAllByText(/Loading the confidence chart/)[0]?.closest('[aria-busy="true"]'),
+      screen.getAllByText(/Loading the possible causes/)[0]?.closest('[aria-busy="true"]'),
     ).not.toBeNull();
   });
 
-  it('says which moment it is looking up once, whether only the hypotheses or also the counts of the moment are pending', async () => {
+  it('says which moment it is looking up once, whether only the possible causes or also the counts of the moment are pending', async () => {
     const user = userEvent.setup();
     renderArena(
       api({
@@ -677,14 +796,15 @@ describe('[FR-HY-02] only the chosen moment is ever on screen', () => {
       }),
     );
     await list();
+    await openKnownBar();
     await user.click(await screen.findByRole('button', { name: 'Previous event' }));
-    // The "What was known" panel says it while its counts load; the page says it only when that panel does not.
+    // The "What was known then" bar says it while its counts load; the page says it only when that bar does not.
     await waitFor(() =>
       expect(
         screen.getAllByText(/Looking up what was known at 11 Mar 2026, 11:50 UTC/),
       ).toHaveLength(1),
     );
-    expect(screen.queryByRole('list', { name: 'Hypotheses ranked by confidence' })).toBeNull();
+    expect(screen.queryByRole('list', { name: 'Possible causes ranked by confidence' })).toBeNull();
   });
 
   it('shows the ranking as loading, not the ranking of the moment before, while only its answer is pending', async () => {
@@ -692,12 +812,13 @@ describe('[FR-HY-02] only the chosen moment is ever on screen', () => {
     renderArena(
       api({ 'actionValue.rank': (input) => (asOfOf(input) ? never() : actionRanking()) }),
     );
-    await screen.findByRole('group', { name: 'Next best action' });
+    await screen.findByRole('button', { name: /^What to test next/ });
+    await openKnownBar();
     await user.click(await screen.findByRole('button', { name: 'Previous event' }));
 
     expect(await screen.findByText(/Loading the action ranking/)).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Next best action' })).toBeNull();
-    expect(screen.queryByText('Ask for minimal scoping data')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^What to test next/ })).toBeNull();
+    expect(screen.queryByText(/Best next step: Ask for minimal scoping data/)).toBeNull();
     expect(
       screen.getByText(/Loading the action ranking/).closest('[aria-busy="true"]'),
     ).not.toBeNull();
@@ -719,10 +840,12 @@ describe('[FR-HY-02] only the chosen moment is ever on screen', () => {
       }),
     );
     await list();
+    await openKnownBar();
     await user.click(await screen.findByRole('button', { name: 'Previous event' }));
     expect(await screen.findByText('Earlier views are limited')).toBeInTheDocument();
-    expect(screen.queryByRole('list', { name: 'Hypotheses ranked by confidence' })).toBeNull();
-    expect(screen.queryByRole('group', { name: 'Next best action' })).toBeNull();
+    expect(screen.queryByRole('list', { name: 'Possible causes ranked by confidence' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^What to test next/ })).toBeNull();
+    expect(screen.queryByText('Most likely cause')).toBeNull();
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled(), {
       timeout: 20_000,
@@ -731,8 +854,8 @@ describe('[FR-HY-02] only the chosen moment is ever on screen', () => {
     expect(
       await screen.findByText('Looking up what was known at 11 Mar 2026, 11:50 UTC…'),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('list', { name: 'Hypotheses ranked by confidence' })).toBeNull();
-    expect(screen.queryByRole('group', { name: 'Next best action' })).toBeNull();
+    expect(screen.queryByRole('list', { name: 'Possible causes ranked by confidence' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^What to test next/ })).toBeNull();
     expect(asked).toBe(2);
   }, 60_000);
 
@@ -746,15 +869,16 @@ describe('[FR-HY-02] only the chosen moment is ever on screen', () => {
         },
       }),
     );
-    await screen.findByRole('group', { name: 'Next best action' });
+    await screen.findByRole('button', { name: /^What to test next/ });
+    await openKnownBar();
     await user.click(await screen.findByRole('button', { name: 'Previous event' }));
     expect(await screen.findByText('Earlier views are limited')).toBeInTheDocument();
     expect(screen.getByText(/Computing earlier views is limited/)).toHaveTextContent(
       /the action ranking/,
     );
-    expect(screen.queryByRole('group', { name: 'Next best action' })).toBeNull();
-    expect(screen.queryByText('Ask for minimal scoping data')).toBeNull();
-    expect(screen.getByRole('heading', { name: 'Competing hypotheses' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^What to test next/ })).toBeNull();
+    expect(screen.queryByText(/Best next step: Ask for minimal scoping data/)).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Other possible causes' })).toBeInTheDocument();
   });
 });
 
@@ -763,7 +887,7 @@ describe('[FR-HY-03] action-value ranking', () => {
     const user = userEvent.setup();
     renderArena();
     await list();
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     expect(within(ranking).getByText(/not a scientific measurement/)).toBeInTheDocument();
     expect(within(ranking).getByText('Estimated scores')).toBeInTheDocument();
 
@@ -801,7 +925,7 @@ describe('[FR-HY-03] action-value ranking', () => {
     const user = userEvent.setup();
     renderArena();
     await list();
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     await user.click(within(ranking).getByRole('button', { name: /#3 Request HAR/ }));
     expect(within(ranking).getByText(/The rank changes \(3–4\)/)).toBeInTheDocument();
   });
@@ -810,7 +934,7 @@ describe('[FR-HY-03] action-value ranking', () => {
     const user = userEvent.setup();
     const handler = api({ 'actionValue.override': () => actionRanking() });
     renderArena(handler);
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     // The permission check settles after the first paint and replaces the button, so look it up again.
     await waitFor(() =>
       expect(
@@ -871,7 +995,7 @@ describe('[FR-HY-03] action-value ranking', () => {
       ),
     });
     renderArena(api({ 'actionValue.rank': () => withOverride }));
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     expect(await within(ranking).findByText('Reviewer override: rank 1')).toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(within(ranking).getByRole('button', { name: /#2 Ask about recent identity/ }));
@@ -899,7 +1023,7 @@ describe('[FR-HY-03] action-value ranking', () => {
       ),
     });
     renderArena(api({ 'actionValue.rank': () => mine }));
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     expect(await within(ranking).findByText(/By you on/)).toBeInTheDocument();
   });
 
@@ -931,7 +1055,7 @@ describe('[FR-HY-03] action-value ranking', () => {
           }),
       }),
     );
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     const overrides = await within(ranking).findByRole('group', { name: 'Reviewer overrides (2)' });
     const items = within(
       within(overrides).getByRole('list', { name: 'Reviewer overrides' }),
@@ -969,7 +1093,7 @@ describe('[FR-HY-03] action-value ranking', () => {
       }),
     );
     renderArena(api({ 'actionValue.rank': () => actionRanking({ reviewerOverrides: many }) }));
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     const overrides = await within(ranking).findByRole('group', {
       name: 'Reviewer overrides (10)',
     });
@@ -1018,7 +1142,7 @@ describe('[FR-HY-03] action-value ranking', () => {
       },
     });
     renderArena(handler);
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     expect(
       within(ranking).getByRole('group', { name: 'Reviewer overrides (0)' }),
     ).toBeInTheDocument();
@@ -1068,7 +1192,7 @@ describe('[FR-HY-03] action-value ranking', () => {
         },
       }),
     );
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     await waitFor(() =>
       expect(
         within(ranking).getByRole('button', { name: 'Override this rank' }),
@@ -1095,7 +1219,7 @@ describe('[FR-HY-03] action-value ranking', () => {
     const user = userEvent.setup();
     const handler = api({}, 'engineer');
     renderArena(handler);
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     const button = await within(ranking).findByRole('button', { name: 'Override this rank' });
     await waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'true'));
     await user.click(button);
@@ -1125,15 +1249,15 @@ describe('[FR-HY-03] action-value ranking', () => {
     renderArena(handler);
     await list();
     expect(await screen.findByText('The action ranking could not be loaded')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Competing hypotheses' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Other possible causes' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Retry/ }));
-    expect(await screen.findByRole('group', { name: 'Next best action' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^What to test next/ })).toBeInTheDocument();
   });
 });
 
 describe('[FR-HY-03] a resolved case has nothing left to rank at its last event', () => {
   const NOTHING_LEFT =
-    'The case is resolved: at its last event there is nothing left to rank. Choose an earlier decision point.';
+    'The case is resolved: at its last event there is nothing left to rank. Choose an earlier key decision.';
   const noForks = () => ({ items: [], earliestMeaningfulForkId: null });
   /** The whole record is the last event, all zeros; every earlier moment is a real ranking. */
   const rankings =
@@ -1143,7 +1267,7 @@ describe('[FR-HY-03] a resolved case has nothing left to rank at its last event'
       return asOf ? actionRanking({ asOf }) : zeroScoreRanking({ reviewerOverrides: listed });
     };
 
-  it('shows the ranking just before the earliest meaningful decision fork instead, and says why', async () => {
+  it('shows the ranking just before the first key decision instead, and says why', async () => {
     const handler = api({
       'actionValue.rank': rankings([
         reviewerOverride({
@@ -1155,19 +1279,17 @@ describe('[FR-HY-03] a resolved case has nothing left to rank at its last event'
       ]),
     });
     renderArena(handler);
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     expect(await within(ranking).findByText(NOTHING_LEFT)).toBeInTheDocument();
     expect(within(ranking).getByText('Nothing left to rank at the last event')).toBeInTheDocument();
     expect(
-      within(ranking).getByText(
-        /Showing the ranking just before the earliest meaningful decision fork/,
-      ),
+      within(ranking).getByText(/Showing the ranking just before the first key decision/),
     ).toHaveTextContent(
       /Heavy customer request when a lighter ask was available.*decided 9 Mar 2026, 09:41 UTC/,
     );
     expect(
       within(ranking).getByText(
-        /Ranked as of 9 Mar 2026, 09:30 UTC, just before the earliest meaningful decision fork/,
+        /Ranked as of 9 Mar 2026, 09:30 UTC, just before the first key decision/,
       ),
     ).toBeInTheDocument();
     expect(handler.call).toHaveBeenCalledWith(
@@ -1213,7 +1335,7 @@ describe('[FR-HY-03] a resolved case has nothing left to rank at its last event'
       },
     });
     renderArena(handler);
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     await waitFor(() =>
       expect(
         within(ranking).getByRole('button', { name: 'Override this rank' }),
@@ -1245,25 +1367,27 @@ describe('[FR-HY-03] a resolved case has nothing left to rank at its last event'
     const overrides = await within(ranking).findByRole('group', { name: 'Reviewer overrides (1)' });
     expect(overrides).toHaveTextContent('Reviewer rank 2, machine rank 1');
     expect(within(ranking).getByText('Reviewer override: rank 2')).toBeInTheDocument();
-    // Still the ranking before the fork: the whole record has not been asked to answer again for this to show.
+    // Still the ranking before the first key decision: the whole record has not been asked to answer again for this to show.
     expect(within(ranking).getByText(NOTHING_LEFT)).toBeInTheDocument();
   });
 
-  it('says so plainly, and folds the zero scores away, when there is no decision point to show instead', async () => {
+  it('says so plainly, and folds the zero scores away, when there is no key decision to show instead', async () => {
+    const user = userEvent.setup();
     renderArena(api({ 'forks.list': noForks, 'actionValue.rank': () => zeroScoreRanking() }));
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     expect(within(ranking).getByText('Nothing left to rank at the last event')).toBeInTheDocument();
     expect(within(ranking).getByText(NOTHING_LEFT)).toBeInTheDocument();
     expect(
       within(ranking).getByText(/Move the time cursor back to an earlier moment/),
     ).toBeInTheDocument();
-    const folded = within(ranking)
-      .getByText(/Candidate actions \(3\): every score is 0, so none is a recommendation/)
-      .closest('details');
-    expect(folded).not.toBeNull();
-    expect(folded).not.toHaveAttribute('open');
-    const firstRow = within(ranking).getByRole('button', { name: /#1 /, hidden: true });
-    expect(firstRow).not.toBeVisible();
+    const folded = within(ranking).getByRole('button', {
+      name: /^Candidate actions \(3\): every score is 0, so none is a recommendation/,
+    });
+    expect(folded).toHaveAttribute('aria-expanded', 'false');
+    // Closed, the zero scores are not even in the page: no row can be read as a recommendation.
+    expect(within(ranking).queryByRole('button', { name: /#1 /, hidden: true })).toBeNull();
+    await user.click(folded);
+    expect(await within(ranking).findByRole('button', { name: /#1 / })).toBeInTheDocument();
   });
 
   it('does not call the case resolved when it is still open', async () => {
@@ -1274,10 +1398,10 @@ describe('[FR-HY-03] a resolved case has nothing left to rank at its last event'
         'actionValue.rank': () => zeroScoreRanking(),
       }),
     );
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     expect(
       await within(ranking).findByText(
-        'At its last event there is nothing left to rank. Choose an earlier decision point.',
+        'At its last event there is nothing left to rank. Choose an earlier key decision.',
       ),
     ).toBeInTheDocument();
     expect(within(ranking).queryByText(/The case is resolved/)).toBeNull();
@@ -1289,11 +1413,9 @@ describe('[FR-HY-03] a resolved case has nothing left to rank at its last event'
       'actionValue.rank': (input) => zeroScoreRanking({ asOf: asOfOf(input) ?? LAST_EVENT }),
     });
     renderArena(handler);
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     expect(await within(ranking).findByText(NOTHING_LEFT)).toBeInTheDocument();
-    expect(
-      within(ranking).queryByText(/just before the earliest meaningful decision fork/),
-    ).toBeNull();
+    expect(within(ranking).queryByText(/just before the first key decision/)).toBeNull();
     expect(handler.call).not.toHaveBeenCalledWith(
       'actionValue.rank',
       expect.objectContaining({ query: { asOf: BEFORE_FORK_EVENT } }),
@@ -1305,10 +1427,10 @@ describe('[FR-HY-03] a resolved case has nothing left to rank at its last event'
     const moment = '2026-03-11T11:50:00Z';
     navigateTo(`/?asOf=${moment}`);
     renderArena(api({ 'actionValue.rank': () => zeroScoreRanking({ asOf: moment }) }));
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     expect(
       await within(ranking).findByText(
-        'No candidate action is expected to add information at this moment, so there is nothing left to rank. Choose an earlier decision point.',
+        'No candidate action is expected to add information at this moment, so there is nothing left to rank. Choose an earlier key decision.',
       ),
     ).toBeInTheDocument();
     expect(within(ranking).getByText('Nothing left to rank at this moment')).toBeInTheDocument();
@@ -1317,18 +1439,20 @@ describe('[FR-HY-03] a resolved case has nothing left to rank at its last event'
 
   it('shows no zero-score note for a ranking with scores', async () => {
     renderArena();
-    const ranking = await screen.findByRole('group', { name: 'Next best action' });
+    const ranking = await openRanking();
     expect(within(ranking).queryByText(/nothing left to rank/i)).toBeNull();
     expect(within(ranking).queryByText(/every score is 0/)).toBeNull();
   });
 });
 
-describe('[FR-HY-04] Hypothesis Arena states', () => {
-  it('offers a next step when there are no hypotheses yet', async () => {
+describe('[FR-HY-04] Possible causes states', () => {
+  it('offers a next step when there are no possible causes yet', async () => {
     const { container } = renderArena(
       api({ 'hypotheses.list': () => hypothesesResponse({ items: [] }) }),
     );
-    expect(await screen.findByRole('heading', { name: 'No hypotheses yet' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'No possible causes yet' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open the case' })).toHaveAttribute(
       'href',
       '/cases/case_1',
@@ -1358,7 +1482,7 @@ describe('[FR-HY-04] Hypothesis Arena states', () => {
     await expectNoAxeViolations(container);
     await user.click(screen.getByRole('button', { name: /Retry/ }));
     expect(
-      await screen.findByRole('heading', { name: 'Competing hypotheses' }),
+      await screen.findByRole('heading', { name: 'Other possible causes' }),
     ).toBeInTheDocument();
     expect(attempts).toBe(2);
   });
@@ -1391,16 +1515,16 @@ describe('[FR-HY-04] Hypothesis Arena states', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Browse cases' })).toHaveAttribute('href', '/cases');
     // Not the generic failure of the page, whose Retry could never succeed.
-    expect(screen.queryByText('The Hypothesis Arena could not be loaded')).toBeNull();
+    expect(screen.queryByText('The possible causes could not be loaded')).toBeNull();
     expect(screen.queryByRole('button', { name: /Retry/ })).toBeNull();
-    expect(screen.queryByRole('group', { name: 'Next best action' })).toBeNull();
-    expect(screen.queryByText(/Loading the confidence chart/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /^What to test next/ })).toBeNull();
+    expect(screen.queryByText(/Loading the possible causes/)).toBeNull();
     // Nothing is left busy: a screen reader would otherwise announce a page that is loading for ever.
     expect(document.querySelector('[aria-busy="true"]')).toBeNull();
     await expectNoAxeViolations(container);
   });
 
-  it('does not wait for the hypotheses of a case that does not exist', async () => {
+  it('does not wait for the possible causes of a case that does not exist', async () => {
     renderApp(<HypothesisArenaPage caseId="case_gone" />, {
       api: api({
         'cases.get': missing,
@@ -1410,7 +1534,7 @@ describe('[FR-HY-04] Hypothesis Arena states', () => {
     expect(
       await screen.findByRole('heading', { name: 'We could not find that case' }),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/Loading the confidence chart/)).toBeNull();
+    expect(screen.queryByText(/Loading the possible causes/)).toBeNull();
     expect(document.querySelector('[aria-busy="true"]')).toBeNull();
   });
 
@@ -1423,13 +1547,19 @@ describe('[FR-HY-04] Hypothesis Arena states', () => {
     expect(quiet.call).not.toHaveBeenCalledWith('hypotheses.list', expect.anything());
   });
 
-  it('registers the case reference as the breadcrumb label and links to the Counterfactual Lab', async () => {
+  it('starts with its own header and links to What if, without repeating the case header', async () => {
     renderArena();
     await list();
-    expect(screen.getByRole('link', { name: 'Counterfactual Lab' })).toHaveAttribute(
+    expect(screen.getByRole('heading', { level: 1, name: 'Possible causes' })).toBeInTheDocument();
+    expect(
+      screen.getByText('Compare explanations and decide what to test next.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'What if' })).toHaveAttribute(
       'href',
       '/cases/case_1/counterfactual',
     );
-    expect(await screen.findByText('CG-SYN-1001')).toBeInTheDocument();
+    // The reference, title and tabs belong to the case header above the page: the page does not repeat them.
+    expect(screen.queryByText('CG-SYN-1001')).toBeNull();
+    expect(screen.queryByRole('navigation', { name: /breadcrumb/i })).toBeNull();
   });
 });

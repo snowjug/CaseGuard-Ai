@@ -28,6 +28,7 @@ import {
   overrideEntries,
   peakConfidence,
   sameInstant,
+  standingReason,
   statusChanges,
   withListedOverrides,
 } from './model';
@@ -100,7 +101,7 @@ describe('hypothesis model: chart markers', () => {
       ['2026-03-11T11:50:00.000Z', 'action'],
     ]);
     expect(markers[0]?.label).toBe(
-      'Action: Request HAR and Fiddler traces, full user list and Conditional Access export · Decision fork: Heavy customer request when a lighter ask was available',
+      'Action: Request HAR and Fiddler traces, full user list and Conditional Access export · Key decision: Heavy customer request when a lighter ask was available',
     );
   });
 
@@ -153,6 +154,26 @@ describe('hypothesis model: status and selection', () => {
   it('reads the newest point as the state at the boundary', () => {
     expect(latestPoint(dns)?.confidence).toBeCloseTo(0.73);
     expect(latestPoint({ ...dns, timeline: [] })).toBeNull();
+  });
+
+  it('explains a position by the latest update that moved it, not by an update that changed nothing', () => {
+    expect(standingReason(dns)).toBe(latestPoint(dns)?.reason);
+    const [first, last] = dns.timeline as [
+      (typeof dns.timeline)[number],
+      (typeof dns.timeline)[number],
+    ];
+    const settled = {
+      ...dns,
+      timeline: [first, last, { ...last, delta: 0, reason: 'No material change (73%).' }],
+    };
+    expect(standingReason(settled)).toBe(last.reason);
+    // When nothing ever moved it, the newest reason is all there is.
+    const still = {
+      ...dns,
+      timeline: [{ ...first, delta: 0, reason: 'No material change (18%).' }],
+    };
+    expect(standingReason(still)).toBe('No material change (18%).');
+    expect(standingReason({ ...dns, timeline: [] })).toBeNull();
   });
 
   it('finds a hypothesis by record id or by knowledge-pack key and ignores anything else', () => {

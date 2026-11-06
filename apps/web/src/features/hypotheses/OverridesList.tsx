@@ -1,8 +1,8 @@
 'use client';
 
-import { Notice, cg, formatDateTimeUtc } from '@caseguard/ui';
-import { Button, makeStyles, tokens } from '@fluentui/react-components';
-import { HistoryRegular } from '@fluentui/react-icons';
+import { Button, cg, formatDateTimeUtc } from '@caseguard/ui';
+import { makeStyles, tokens } from '@fluentui/react-components';
+import { HistoryIcon } from 'lucide-react';
 import { useId, useState } from 'react';
 import { formatInstant } from '../reasoning/format';
 import { useActorLabel } from '../reasoning/hooks';
@@ -21,12 +21,12 @@ const LATER_OVERRIDES_NOTE =
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: cg.space[2], minWidth: 0 },
-  h3: { margin: 0, fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
+  h4: { margin: 0, fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold },
   muted: { margin: 0, fontSize: tokens.fontSizeBase200, color: cg.textMuted },
   list: {
     display: 'flex',
     flexDirection: 'column',
-    gap: cg.space[2],
+    gap: cg.space[3],
     margin: 0,
     padding: 0,
     listStyle: 'none',
@@ -36,10 +36,8 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     gap: cg.space[1],
     minWidth: 0,
-    padding: `${cg.space[2]} ${cg.space[3]}`,
-    borderRadius: cg.radius.md,
-    border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surface,
+    paddingLeft: cg.space[3],
+    borderLeft: `2px solid ${cg.borderSubtle}`,
   },
   head: {
     display: 'flex',
@@ -62,7 +60,12 @@ const useStyles = makeStyles({
     color: cg.textSecondary,
     overflowWrap: 'anywhere',
   },
-  noteAction: { marginTop: cg.space[1] },
+  windowed: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: cg.space[2],
+  },
   more: { alignSelf: 'flex-start' },
 });
 
@@ -90,9 +93,9 @@ export function OverridesList({ entries, windowed, onShowWholeRecord }: Override
 
   return (
     <div className={styles.root} role="group" aria-labelledby={headingId}>
-      <h3 id={headingId} className={styles.h3}>
+      <h4 id={headingId} className={styles.h4}>
         Reviewer overrides ({entries.length})
-      </h3>
+      </h4>
       <p className={styles.muted}>
         {windowed
           ? 'The overrides recorded, and about a moment, by the end of this view, newest decision first.'
@@ -100,21 +103,19 @@ export function OverridesList({ entries, windowed, onShowWholeRecord }: Override
         An override never replaces the machine rank.
       </p>
       {windowed ? (
-        <Notice variant="info" compact title={null}>
-          {LATER_OVERRIDES_NOTE}
+        <div className={styles.windowed}>
+          <p className={styles.muted}>{LATER_OVERRIDES_NOTE}</p>
           {onShowWholeRecord ? (
-            <div className={styles.noteAction}>
-              <Button
-                size="small"
-                appearance="outline"
-                icon={<HistoryRegular />}
-                onClick={onShowWholeRecord}
-              >
-                Show the whole record
-              </Button>
-            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={<HistoryIcon />}
+              onClick={onShowWholeRecord}
+            >
+              Show the whole record
+            </Button>
           ) : null}
-        </Notice>
+        </div>
       ) : null}
       {entries.length === 0 ? (
         <p className={styles.muted}>
@@ -147,8 +148,8 @@ export function OverridesList({ entries, windowed, onShowWholeRecord }: Override
       )}
       {entries.length > OVERRIDES_SHOWN ? (
         <Button
-          size="small"
-          appearance="outline"
+          size="sm"
+          variant="secondary"
           className={styles.more}
           aria-expanded={all}
           onClick={() => setAll((value) => !value)}
