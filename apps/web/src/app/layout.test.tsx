@@ -63,7 +63,7 @@ describe('[UX-THEME-01] root layout reads the cg-theme cookie on the server', ()
     expect(providersProps(await renderLayout({})).initialCaseId).toBeNull();
   });
 
-  it('passes only a well-formed remembered persona to the client, so a returning person is signed in from the first byte', async () => {
+  it('passes only a well-formed remembered persona to the client, so a returning person gets a skeleton and not the first-visit page', async () => {
     expect(
       providersProps(await renderLayout({ 'cg-persona': 'user_ava_engineer' })).initialPersonaId,
     ).toBe('user_ava_engineer');

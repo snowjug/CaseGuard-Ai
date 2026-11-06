@@ -86,7 +86,7 @@ describe('[AUTH-DEV-01] DevPersonaAuth', () => {
     expect(window.localStorage.getItem('cg-persona')).toBeNull();
   });
 
-  it('renders a returning person signed in on the server, from the persona cookie, and signed out without one', () => {
+  it('renders a returning person as loading on the server (not as the first-visit page), and signed out without a cookie', () => {
     const page = (initialPersonaId?: string | null) =>
       renderToString(
         <DevPersonaAuthProvider
@@ -96,8 +96,8 @@ describe('[AUTH-DEV-01] DevPersonaAuth', () => {
           <Capture onAuth={() => undefined} />
         </DevPersonaAuthProvider>,
       );
-    expect(page('persona_manager')).toContain('status:<!-- -->ready');
-    expect(page('persona_manager')).toContain('key:<!-- -->dev:persona_manager');
+    expect(page('persona_manager')).toContain('status:<!-- -->loading');
+    expect(page('persona_manager')).toContain('key:<!-- -->dev:none');
     expect(page(null)).toContain('status:<!-- -->unauthenticated');
     expect(page()).toContain('status:<!-- -->unauthenticated');
   });

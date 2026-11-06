@@ -155,7 +155,8 @@ export function AccountMenu({ compact = false, railHidesText = false }: AccountM
   }
 
   const name =
-    session?.user.displayName ?? (isLoading ? 'Loading…' : (auth.dev?.personaId ?? 'Signed in'));
+    session?.user.displayName ??
+    (isLoading || auth.status === 'loading' ? 'Loading…' : (auth.dev?.personaId ?? 'Signed in'));
   const role = session?.user.roles[0] ? ROLE_LABELS[session.user.roles[0]] : null;
   const settings = [...(motion === 'reduce' ? ['motion'] : []), ...(presenting ? ['present'] : [])];
 

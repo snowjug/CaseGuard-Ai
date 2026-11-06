@@ -45,7 +45,7 @@ export interface ProvidersProps {
   initialThemeMode: ThemeMode;
   /** Last case remembered in the `cg-case` cookie. */
   initialCaseId: string | null;
-  /** The development persona remembered in the `cg-persona` cookie (the page renders signed in from the first byte). */
+  /** The development persona remembered in the `cg-persona` cookie (the first paint shows a skeleton, not the first-visit page). */
   initialPersonaId?: string | null;
   children: ReactNode;
 }

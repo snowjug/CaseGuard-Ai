@@ -11,7 +11,7 @@ export function AuthProviderRoot({
   initialPersonaId = null,
 }: {
   children: ReactNode;
-  /** The development persona from the cookie, so the server renders the signed-in state (not used with Entra). */
+  /** The development persona from the cookie: until the browser takes over, pages show their skeleton (not used with Entra). */
   initialPersonaId?: string | null;
 }) {
   if (publicEnv.authMode === 'entra') return <EntraRoot>{children}</EntraRoot>;

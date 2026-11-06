@@ -48,8 +48,9 @@ function writePersonaCookie(personaId: string | null): void {
 export interface DevPersonaAuthProviderProps {
   children: ReactNode;
   /**
-   * The persona the server knows from the cookie. It is what the first paint and the hydration render use, so a returning
-   * person's page is in its signed-in state from the first byte; the browser's own choice takes over once hydrated.
+   * The persona the server knows from the cookie. It is not the identity (the browser's own choice is); it only tells the
+   * server render and the hydration render that someone was signed in, so pages show their skeleton instead of the
+   * first-visit page for the moment before the browser takes over.
    */
   initialPersonaId?: string | null;
   /** Injected for tests. */
@@ -57,9 +58,19 @@ export interface DevPersonaAuthProviderProps {
   writeCookie?: (personaId: string | null) => void;
 }
 
+/** `useSyncExternalStore` source for "has the browser taken over from the server yet": false on the server and while hydrating. */
+const subscribeNever = (): (() => void) => () => undefined;
+const isHydrated = (): boolean => true;
+const isNotHydrated = (): boolean => false;
+
 /**
  * Development identity: the person picks one of the seeded synthetic personas and every API call carries
  * `x-cg-persona`. The API only honours it in local/test environments; production uses Entra ID.
+ *
+ * The server and the hydration render cannot read localStorage, so they cannot know who is signed in. When the cookie says
+ * someone was, the status is `loading` (every page shows its skeleton) instead of `unauthenticated` (the first-visit page)
+ * until the browser's own choice takes over; nothing is requested for that identity before then, so the server's HTML and
+ * the first client render stay identical.
  */
 export function DevPersonaAuthProvider({
   children,
@@ -67,7 +78,8 @@ export function DevPersonaAuthProvider({
   store = defaultStore,
   writeCookie = writePersonaCookie,
 }: DevPersonaAuthProviderProps) {
-  const personaId = useSyncExternalStore(store.subscribe, store.get, () => initialPersonaId);
+  const personaId = useSyncExternalStore(store.subscribe, store.get, () => null);
+  const hydrated = useSyncExternalStore(subscribeNever, isHydrated, isNotHydrated);
   const [pickerOpen, setPickerOpen] = useOverlayState();
 
   const selectPersona = useCallback(
@@ -88,13 +100,26 @@ export function DevPersonaAuthProvider({
   const value = useMemo<AuthContextValue>(
     () => ({
       mode: 'dev',
-      status: personaId ? 'ready' : 'unauthenticated',
+      status: personaId
+        ? 'ready'
+        : !hydrated && initialPersonaId !== null
+          ? 'loading'
+          : 'unauthenticated',
       identityKey: personaId ? `dev:${personaId}` : 'dev:none',
       getAuthHeaders,
       signOut: async () => selectPersona(null),
       dev: { personaId, selectPersona, pickerOpen, openPicker, closePicker },
     }),
-    [personaId, getAuthHeaders, selectPersona, pickerOpen, openPicker, closePicker],
+    [
+      personaId,
+      hydrated,
+      initialPersonaId,
+      getAuthHeaders,
+      selectPersona,
+      pickerOpen,
+      openPicker,
+      closePicker,
+    ],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -26,7 +26,7 @@ export const viewport: Viewport = {
 
 /**
  * Root layout (Server Component). It reads the `cg-theme`, `cg-case` and `cg-persona` cookies so the first paint already
- * has the right theme, remembered case and signed-in state (a returning person never sees the first-visit page flash by).
+ * has the right theme and remembered case, and shows a returning person's skeleton instead of the first-visit page.
  * Reading cookies makes every route dynamic, which the per-request CSP nonce needs anyway.
  */
 export default async function RootLayout({ children }: { children: ReactNode }) {

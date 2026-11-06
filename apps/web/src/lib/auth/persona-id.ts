@@ -1,7 +1,7 @@
 /**
  * Server-safe helpers for the development identity (the root layout reads its cookie; no React or browser APIs here).
- * The choice lives in localStorage and, alongside it, in a first-party cookie, so the server can render a returning
- * person's page in its signed-in state instead of flashing the first-visit page until the browser has hydrated.
+ * The choice lives in localStorage and, alongside it, in a first-party cookie, so the server can tell that a returning
+ * person is about to be signed in and render a skeleton instead of the first-visit page until the browser has hydrated.
  */
 
 export const PERSONA_STORAGE_KEY = 'cg-persona';
