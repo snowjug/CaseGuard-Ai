@@ -1,8 +1,8 @@
 'use client';
 
-import { CopyButton, VisuallyHidden, cg } from '@caseguard/ui';
-import { Button, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
-import { ErrorCircleRegular, InfoRegular } from '@fluentui/react-icons';
+import { Button, CopyButton, VisuallyHidden, cg } from '@caseguard/ui';
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { ArrowRightIcon, CircleAlertIcon, InfoIcon, RotateCwIcon } from 'lucide-react';
 import { LinkButton } from '../../components/common/LinkButton';
 import type { IngestProblem } from './ingest-errors';
 
@@ -10,25 +10,39 @@ const useStyles = makeStyles({
   root: {
     display: 'flex',
     alignItems: 'flex-start',
-    gap: cg.space[3],
+    gap: cg.space[4],
     padding: cg.space[4],
     borderRadius: cg.radius.lg,
-    border: `1px solid ${cg.tone.unsupported.border}`,
-    backgroundColor: cg.tone.unsupported.tint,
+    border: `1px solid color-mix(in srgb, ${cg.tone.unsupported.border} 40%, transparent)`,
+    backgroundColor: `color-mix(in srgb, ${cg.tone.unsupported.tint} 70%, transparent)`,
     color: cg.text,
   },
   rootInfo: {
-    borderTopColor: cg.tone.evidence.border,
-    borderRightColor: cg.tone.evidence.border,
-    borderBottomColor: cg.tone.evidence.border,
-    borderLeftColor: cg.tone.evidence.border,
-    backgroundColor: cg.tone.evidence.tint,
+    border: `1px solid color-mix(in srgb, ${cg.tone.neutral.border} 40%, transparent)`,
+    backgroundColor: `color-mix(in srgb, ${cg.tone.neutral.tint} 70%, transparent)`,
   },
-  icon: { flexShrink: 0, display: 'inline-flex', fontSize: '24px', color: cg.tone.unsupported.fg },
-  iconInfo: { color: cg.tone.evidence.fg },
-  body: { minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: cg.space[2] },
+  icon: {
+    flexShrink: 0,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '40px',
+    height: '40px',
+    borderRadius: cg.radius.pill,
+    fontSize: '20px',
+    color: cg.tone.unsupported.fg,
+    backgroundColor: cg.tone.unsupported.tint,
+  },
+  iconInfo: { color: cg.tone.neutral.fg, backgroundColor: cg.tone.neutral.tint },
+  body: { minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: cg.space[3] },
   statement: { display: 'flex', flexDirection: 'column', gap: cg.space[2], minWidth: 0 },
-  title: { margin: 0, fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold },
+  title: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase400,
+    lineHeight: tokens.lineHeightBase400,
+    fontWeight: tokens.fontWeightSemibold,
+    letterSpacing: '-0.01em',
+  },
   text: { margin: 0, fontSize: tokens.fontSizeBase300, overflowWrap: 'anywhere' },
   advice: { margin: 0, fontSize: tokens.fontSizeBase300, color: cg.textSecondary },
   issues: {
@@ -49,7 +63,7 @@ const useStyles = makeStyles({
     color: cg.textMuted,
     fontSize: tokens.fontSizeBase200,
   },
-  actions: { display: 'flex', flexWrap: 'wrap', gap: cg.space[2], marginTop: cg.space[1] },
+  actions: { display: 'flex', flexWrap: 'wrap', gap: cg.space[2] },
 });
 
 export interface ProblemViewProps {
@@ -82,13 +96,15 @@ function problemLinks(problem: IngestProblem): { href: string; label: string }[]
 }
 
 /**
- * An ingestion failure in plain language: what happened (with the API's own message and limits), what to do next, the
- * field-level issues with their paths, a countdown when the server rate-limited the request, and the correlation id.
+ * An adding failure in plain language: what happened (with the API's own message and limits), what to do next, the
+ * field-level issues with their paths, a countdown when the server rate-limited the request, and the support reference.
  * A request that is merely still running is shown as a calm notice, not as an error.
  *
  * Only the statement of the problem is a live region, and it never changes while the problem is shown. The countdown in
- * the Try again button ticks outside it (inside, a screen reader would read the whole problem out again every second);
+ * the retry button ticks outside it (inside, a screen reader would read the whole problem out again every second);
  * one static sentence announces the wait, and one announces that the wait is over.
+ *
+ * The retry button is always secondary: the step's own primary button ("Check case", "Create and analyse") is on screen.
  */
 export function ProblemView({
   problem,
@@ -105,11 +121,11 @@ export function ProblemView({
   return (
     <div className={mergeClasses(styles.root, calm && styles.rootInfo)}>
       <span aria-hidden="true" className={mergeClasses(styles.icon, calm && styles.iconInfo)}>
-        {calm ? <InfoRegular /> : <ErrorCircleRegular />}
+        {calm ? <InfoIcon /> : <CircleAlertIcon />}
       </span>
       <div className={styles.body}>
         <div role={calm ? 'status' : 'alert'} className={styles.statement}>
-          <h4 className={styles.title}>{problem.title}</h4>
+          <h3 className={styles.title}>{problem.title}</h3>
           <p className={styles.text}>{problem.message}</p>
           <p className={styles.advice}>{problem.advice}</p>
           {problem.issues.length > 0 ? (
@@ -138,12 +154,24 @@ export function ProblemView({
         {links.length > 0 || canRetry ? (
           <div className={styles.actions}>
             {canRetry ? (
-              <Button appearance="primary" onClick={onRetry} disabled={retryIn > 0 || retrying}>
+              <Button
+                variant="secondary"
+                icon={<RotateCwIcon />}
+                onClick={onRetry}
+                disabled={retryIn > 0}
+                loading={retrying}
+              >
                 {retryIn > 0 ? `${retryLabel} in ${retryIn} s` : retryLabel}
               </Button>
             ) : null}
             {links.map((link) => (
-              <LinkButton key={link.href} href={link.href} appearance="outline">
+              <LinkButton
+                key={link.href}
+                href={link.href}
+                appearance="outline"
+                icon={<ArrowRightIcon />}
+                iconPosition="after"
+              >
                 {link.label}
               </LinkButton>
             ))}

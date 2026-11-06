@@ -1,4 +1,4 @@
-import { configure, screen, waitFor, within } from '@testing-library/react';
+import { configure, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { session } from '../../../test/fixtures';
@@ -18,6 +18,7 @@ import {
   type FakeHandlers,
 } from '../../../test/harness';
 import { liveRegionOf, watchChanges } from '../../../test/live-region';
+import { installMatchMedia } from '../../../test/media';
 import { navigateTo, router, setNavigationLatency } from '../../../test/next-navigation';
 import { ApiError } from '../../lib/api/errors';
 import {
@@ -81,10 +82,25 @@ async function press(
   await user.click(screen.getByRole('button', { name }));
 }
 
+/**
+ * Renders the wizard on the built-in samples. The page opens on Paste, so a test that starts from a sample asks for it
+ * the way the app's "Try a sample case" links do: with `?source=sample` in the address.
+ */
+function renderSample(options: Parameters<typeof renderApp>[1]) {
+  navigateTo('/cases/new?source=sample');
+  return renderApp(<NewCasePage />, options);
+}
+
+/** The radios of the built-in samples (the segments of the source switch are radios too, in a group of their own). */
+async function sampleRadios(): Promise<HTMLElement[]> {
+  const group = await screen.findByRole('radiogroup', { name: 'Built-in sample' });
+  return within(group).findAllByRole('radio');
+}
+
 async function openReview(user: ReturnType<typeof userEvent.setup>) {
-  await screen.findAllByRole('radio');
-  await press(user, 'Validate and preview');
-  await screen.findByRole('heading', { name: /Step 2 of 4/ });
+  await sampleRadios();
+  await press(user, 'Check case');
+  await screen.findByRole('heading', { name: 'Check what will be created' });
 }
 
 /**
@@ -99,7 +115,7 @@ afterEach(() => {
 });
 
 describe('[FR-ING-01] the ingestion wizard, end to end', () => {
-  it('walks sample → review → confirm → create → analysis, then offers the case without opening it by itself', async () => {
+  it('walks sample → check → create → analysis, then offers the review without opening it by itself', async () => {
     const user = userEvent.setup();
     let polls = 0;
     const handler = api({
@@ -108,33 +124,31 @@ describe('[FR-ING-01] the ingestion wizard, end to end', () => {
         return polls < 2 ? job() : finishedJob();
       },
     });
-    renderApp(<NewCasePage />, { api: handler });
+    renderSample({ api: handler });
 
-    expect(
-      await screen.findByRole('heading', { name: 'Step 1 of 4: Choose a source' }),
-    ).toBeInTheDocument();
-    const radios = await screen.findAllByRole('radio');
+    expect(await screen.findByRole('heading', { name: 'Add your case' })).toBeInTheDocument();
+    const radios = await sampleRadios();
     expect(radios).toHaveLength(2);
     expect(radios[0]).toBeChecked();
 
-    await press(user, 'Validate and preview');
-    await screen.findByRole('heading', { name: 'Step 2 of 4: Review what will be created' });
+    await press(user, 'Check case');
+    await screen.findByRole('heading', { name: 'Check what will be created' });
     expect(handler.call).toHaveBeenCalledWith(
       'ingestion.preview',
       expect.objectContaining({
         body: { source: { type: 'sample', sampleId: 'case-one-teams-signin-dns' } },
       }),
     );
-    expect(screen.getByText('Ready to ingest')).toBeInTheDocument();
+    expect(screen.getByText('Ready to create')).toBeInTheDocument();
     expect(screen.getByText('This record is immutable')).toBeInTheDocument();
     expect(screen.getByText('CG-SYN-1001')).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Preview of the first events' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Continue to confirm' }));
-    await screen.findByRole('heading', { name: 'Step 3 of 4: Confirm and create' });
-    await user.click(screen.getByRole('button', { name: 'Create case' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByRole('heading', { name: 'Create the case' });
+    await user.click(screen.getByRole('button', { name: 'Create and analyse' }));
 
-    await screen.findByRole('heading', { name: 'Step 4 of 4: Create and analyse' });
+    await screen.findByRole('heading', { name: 'Creating your case' });
     expect(handler.call).toHaveBeenCalledWith(
       'cases.create',
       expect.objectContaining({
@@ -147,22 +161,21 @@ describe('[FR-ING-01] the ingestion wizard, end to end', () => {
     );
     expect(await screen.findByText('Load the case record')).toBeInTheDocument();
     expect(screen.getByText('Save results')).toBeInTheDocument();
-    const finished = await screen.findByText(
-      'The analysis finished. The guided review is ready to open.',
-    );
+    const finished = await screen.findByText('The analysis finished. The review is ready to open.');
     expect(finished).toHaveAttribute('role', 'status');
-    // One primary action, the guided review; the case page stays one link away.
-    const open = screen.getByRole('link', { name: 'Open guided review' });
+    // One primary action, the review; the case page stays one link away.
+    const open = screen.getByRole('link', { name: 'Open review' });
     expect(open).toHaveAttribute('href', `/cases/${CASE_ID}/review`);
     expect(screen.getByRole('link', { name: 'Open the case' })).toHaveAttribute(
       'href',
       `/cases/${CASE_ID}`,
     );
+    expect(screen.getByRole('button', { name: 'Add another case' })).toBeInTheDocument();
     await waitFor(() => expect(open).toHaveFocus());
     // Nothing navigates by itself (WCAG 2.2.1): the old wizard moved on 1.8 s after the analysis finished.
     await new Promise((resolve) => setTimeout(resolve, 2200));
     expect(router.push).not.toHaveBeenCalled();
-    expect(screen.getByRole('heading', { name: 'Step 4 of 4: Create and analyse' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Your case is ready' })).toBeVisible();
     await user.click(open);
     expect(router.push).toHaveBeenCalledWith(`/cases/${CASE_ID}/review`);
   });
@@ -170,15 +183,22 @@ describe('[FR-ING-01] the ingestion wizard, end to end', () => {
   it('keeps the chosen source in the address', async () => {
     const user = userEvent.setup();
     renderApp(<NewCasePage />, { api: api() });
-    await user.click(await screen.findByRole('tab', { name: 'Paste text' }));
-    await waitFor(() => expect(window.location.search).toBe('?source=paste'));
+    await user.click(await screen.findByRole('radio', { name: 'Upload' }));
+    await waitFor(() => expect(window.location.search).toBe('?source=file'));
+    expect(await screen.findByLabelText('Choose a file')).toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: 'Sample' }));
+    await waitFor(() => expect(window.location.search).toBe('?source=sample'));
+    expect(await sampleRadios()).toHaveLength(2);
+    // Paste is the default, so it is the one choice that leaves the address clean.
+    await user.click(screen.getByRole('radio', { name: 'Paste' }));
+    await waitFor(() => expect(window.location.search).toBe(''));
     expect(await screen.findByLabelText(/Case text/)).toBeInTheDocument();
   });
 
   it('opens on the source named in the address and the sample it names', async () => {
     navigateTo('/cases/new?source=sample&sample=case-two-teams-signin-proxy');
     renderApp(<NewCasePage />, { api: api() });
-    const radios = await screen.findAllByRole('radio');
+    const radios = await sampleRadios();
     expect(radios[1]).toBeChecked();
   });
 
@@ -188,7 +208,7 @@ describe('[FR-ING-01] the ingestion wizard, end to end', () => {
     setNavigationLatency(80);
     const user = userEvent.setup();
     const handler = api();
-    renderApp(<NewCasePage />, { api: handler });
+    renderSample({ api: handler });
     const first = await screen.findByRole('radio', { name: /^CG-SYN-1001:/ });
     const second = screen.getByRole('radio', { name: /^CG-SYN-1002:/ });
     expect(first).toBeChecked();
@@ -196,14 +216,14 @@ describe('[FR-ING-01] the ingestion wizard, end to end', () => {
     await user.click(second);
     expect(second).toBeChecked();
     expect(first).not.toBeChecked();
-    expect(window.location.search).toBe('?sample=case-two-teams-signin-proxy');
+    expect(window.location.search).toBe('?source=sample&sample=case-two-teams-signin-proxy');
     // The router's report of that write arrives later and changes nothing.
     await new Promise((resolve) => setTimeout(resolve, 150));
     expect(second).toBeChecked();
     expect(first).not.toBeChecked();
 
-    await press(user, 'Validate and preview');
-    await screen.findByRole('heading', { name: /Step 2 of 4/ });
+    await press(user, 'Check case');
+    await screen.findByRole('heading', { name: 'Check what will be created' });
     expect(handler.call).toHaveBeenCalledWith(
       'ingestion.preview',
       expect.objectContaining({
@@ -212,20 +232,253 @@ describe('[FR-ING-01] the ingestion wizard, end to end', () => {
     );
   });
 
-  it('has no accessibility violations on the source, review, confirm and progress steps', async () => {
+  it('has no accessibility violations on any source, or on the check, create and progress steps', async () => {
     const user = userEvent.setup();
-    const { container } = renderApp(<NewCasePage />, { api: api() });
-    await screen.findAllByRole('radio');
+    // The job runs until the test lets it finish, so the progress and the success view are each checked as they are.
+    let finish = false;
+    const { container } = renderApp(<NewCasePage />, {
+      api: api({ 'jobs.get': () => (finish ? finishedJob() : job()) }),
+    });
+    // Paste is the page's default.
+    await screen.findByLabelText(/Case text/);
+    await expectNoAxeViolations(container);
+    await user.click(screen.getByRole('radio', { name: 'Upload' }));
+    await screen.findByLabelText('Choose a file');
+    await expectNoAxeViolations(container);
+    await user.click(screen.getByRole('radio', { name: 'JSON' }));
+    await screen.findByLabelText(/Case bundle \(JSON\)/);
+    await expectNoAxeViolations(container);
+    await user.click(screen.getByRole('radio', { name: 'Sample' }));
+    await sampleRadios();
     await expectNoAxeViolations(container);
     await openReview(user);
     await expectNoAxeViolations(container);
-    await user.click(screen.getByRole('button', { name: 'Continue to confirm' }));
-    await screen.findByRole('heading', { name: /Step 3 of 4/ });
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByRole('heading', { name: 'Create the case' });
     await expectNoAxeViolations(container);
-    await user.click(screen.getByRole('button', { name: 'Create case' }));
-    await screen.findByRole('heading', { name: /Step 4 of 4/ });
+    await user.click(screen.getByRole('button', { name: 'Create and analyse' }));
+    await screen.findByRole('heading', { name: 'Creating your case' });
     await screen.findByText('Load the case record');
     await expectNoAxeViolations(container);
+    finish = true;
+    await screen.findByRole('heading', { name: 'Your case is ready' });
+    await expectNoAxeViolations(container);
+  });
+});
+
+describe('[FR-ING-07] one card, three phases, a sample shortcut', () => {
+  it('opens on Paste, with the sources Paste, Upload, Sample and JSON in one switch', async () => {
+    renderApp(<NewCasePage />, { api: api() });
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Add a case' }),
+    ).toBeInTheDocument();
+    const sources = screen.getByRole('radiogroup', { name: 'Case source' });
+    const segments = within(sources).getAllByRole('radio');
+    expect(segments.map((segment) => segment.textContent)).toEqual([
+      'Paste',
+      'Upload',
+      'Sample',
+      'JSON',
+    ]);
+    expect(within(sources).getByRole('radio', { name: 'Paste' })).toBeChecked();
+    // With room for them, every segment carries its icon.
+    expect(segments.every((segment) => segment.querySelector('svg') !== null)).toBe(true);
+    expect(await screen.findByLabelText(/Case text/)).toBeInTheDocument();
+    expect(screen.queryByRole('radiogroup', { name: 'Built-in sample' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Check case' })).toBeInTheDocument();
+  });
+
+  it('keeps the four sources reachable on a phone, where the switch drops its icons to fit', async () => {
+    installMatchMedia((query) => query.includes('max-width: 479px'));
+    const user = userEvent.setup();
+    renderApp(<NewCasePage />, { api: api() });
+    const sources = await screen.findByRole('radiogroup', { name: 'Case source' });
+    const segments = within(sources).getAllByRole('radio');
+    expect(segments.map((segment) => segment.textContent)).toEqual([
+      'Paste',
+      'Upload',
+      'Sample',
+      'JSON',
+    ]);
+    expect(segments.some((segment) => segment.querySelector('svg') !== null)).toBe(false);
+    await user.click(within(sources).getByRole('radio', { name: 'Sample' }));
+    expect(await sampleRadios()).toHaveLength(2);
+  });
+
+  it('opens the sample choice for ?source=sample, with the samples as cards that carry their facts', async () => {
+    navigateTo('/cases/new?source=sample');
+    renderApp(<NewCasePage />, { api: api() });
+    expect(await screen.findByRole('radio', { name: 'Sample' })).toBeChecked();
+    const group = await screen.findByRole('radiogroup', { name: 'Built-in sample' });
+    const [first, second] = await within(group).findAllByRole('radio');
+    // The first sample is preselected, as before; the card's name is its reference and title.
+    expect(first).toBeChecked();
+    expect(second).not.toBeChecked();
+    expect(first).toHaveAccessibleName(
+      'CG-SYN-1001: Intermittent Teams sign-in failures for about 140 branch users',
+    );
+    expect(within(group).getAllByText('Demo data')).toHaveLength(2);
+    expect(
+      within(group).getByText('teams-authentication · 31 events · first case of the story'),
+    ).toBeInTheDocument();
+    expect(
+      within(group).getByText('teams-authentication · 15 events · follow-up case'),
+    ).toBeInTheDocument();
+    expect(first).toHaveAccessibleDescription(
+      /Synthetic multi-site incident with a DNS root cause/,
+    );
+  });
+
+  it('shows three phases, and keeps the check and the confirmation both under "Check"', async () => {
+    const user = userEvent.setup();
+    renderSample({ api: api() });
+    const phases = (): HTMLElement[] =>
+      within(screen.getByRole('list', { name: 'Progress' })).getAllByRole('listitem');
+    await sampleRadios();
+    expect(phases()).toHaveLength(3);
+    expect(phases()[0]).toHaveAttribute('aria-current', 'step');
+    expect(phases()[0]).toHaveTextContent('Step 1 of 3, current: Add');
+    expect(phases()[1]).toHaveTextContent('Step 2 of 3, upcoming: Check');
+    expect(phases()[2]).toHaveTextContent('Step 3 of 3, upcoming: Create');
+
+    await openReview(user);
+    expect(phases()[0]).toHaveTextContent('Step 1 of 3, completed: Add');
+    expect(phases()[1]).toHaveAttribute('aria-current', 'step');
+    expect(phases()[1]).toHaveTextContent('Step 2 of 3, current: Check');
+
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByRole('heading', { name: 'Create the case' });
+    // The confirmation is a second step of the same phase.
+    expect(phases()[1]).toHaveAttribute('aria-current', 'step');
+    expect(phases()[1]).toHaveTextContent('Step 2 of 3, current: Check');
+    expect(phases()[2]).toHaveTextContent('Step 3 of 3, upcoming: Create');
+
+    await user.click(screen.getByRole('button', { name: 'Create and analyse' }));
+    await screen.findByRole('heading', { name: /Creating your case|Your case is ready/ });
+    expect(phases()[1]).toHaveTextContent('Step 2 of 3, completed: Check');
+    expect(phases()[2]).toHaveAttribute('aria-current', 'step');
+    expect(phases()[2]).toHaveTextContent('Step 3 of 3, current: Create');
+  });
+
+  it('moves to the sample choice from the shortcut under the paste area', async () => {
+    const user = userEvent.setup();
+    renderApp(<NewCasePage />, { api: api() });
+    await user.click(await screen.findByRole('button', { name: 'Try a sample case' }));
+    expect(screen.getByRole('radio', { name: 'Sample' })).toBeChecked();
+    expect(await sampleRadios()).toHaveLength(2);
+    expect(window.location.search).toBe('?source=sample');
+    expect(screen.queryByLabelText(/Case text/)).toBeNull();
+  });
+
+  it('folds the title and workload under "Details (optional)", and opens them when they hold something', async () => {
+    const user = userEvent.setup();
+    renderApp(<NewCasePage />, { api: api() });
+    const details = await screen.findByRole('button', { name: /Details \(optional\)/ });
+    expect(details).toHaveAttribute('aria-expanded', 'false');
+    await user.click(details);
+    expect(details).toHaveAttribute('aria-expanded', 'true');
+
+    // A title is in it, so after the check and the way back it is open and shows the title.
+    await user.type(screen.getByLabelText('Title (optional)'), 'Printer queue stalls');
+    await user.click(screen.getByLabelText(/Case text/));
+    await user.paste('Subject: Printer queue stalls\n\nIt is down.');
+    await press(user, 'Check case');
+    await screen.findByRole('heading', { name: 'Check what will be created' });
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await screen.findByRole('heading', { name: 'Add your case' });
+    expect(screen.getByRole('button', { name: /Details \(optional\)/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByLabelText('Title (optional)')).toHaveValue('Printer queue stalls');
+  });
+
+  it('keeps "Details (optional)" open while a title or workload has a problem to fix', async () => {
+    const user = userEvent.setup();
+    renderApp(<NewCasePage />, { api: api() });
+    const details = await screen.findByRole('button', { name: /Details \(optional\)/ });
+    await user.click(details);
+    await user.click(screen.getByLabelText('Workload'));
+    await user.paste('w'.repeat(81));
+    expect(
+      await screen.findByText(/A workload key is limited to 80 characters/),
+    ).toBeInTheDocument();
+    // The problem is in there: closing it would hide what the person has to fix.
+    await user.click(details);
+    expect(details).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText(/A workload key is limited to 80 characters/)).toBeVisible();
+
+    await user.clear(screen.getByLabelText('Workload'));
+    await user.click(details);
+    expect(details).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('counts the characters as they are typed and flags text that is too long, in words', async () => {
+    const user = userEvent.setup();
+    renderApp(<NewCasePage />, { api: api() });
+    const box = await screen.findByLabelText<HTMLTextAreaElement>(/Case text/);
+    expect(screen.getByText('0 of 200,000 characters')).toBeInTheDocument();
+    await user.click(box);
+    await user.paste('Hello');
+    expect(screen.getByText('5 of 200,000 characters')).toBeInTheDocument();
+    fireEvent.change(box, { target: { value: 'x'.repeat(200_001) } });
+    expect(screen.getByText('200,001 of 200,000 characters')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'This is over the limit of 200,000 characters. Shorten it or split the case.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Check case' })).toBeDisabled();
+  });
+
+  it('accepts a file dropped on the upload zone, with its name and size', async () => {
+    navigateTo('/cases/new?source=file');
+    renderApp(<NewCasePage />, { api: api() });
+    await screen.findByLabelText('Choose a file');
+    expect(screen.getByText(/\.json \.txt \.log \.md \.csv · up to 2 MB/)).toBeInTheDocument();
+    const zone = screen.getByText('Drop a file here').closest('label') as HTMLElement;
+    const file = new File(['id,time\n1,2026-04-02'], 'events.csv', { type: 'text/csv' });
+    fireEvent.dragOver(zone, { dataTransfer: { files: [file] } });
+    fireEvent.drop(zone, { dataTransfer: { files: [file] } });
+    expect(await screen.findByText(/events\.csv · /)).toBeInTheDocument();
+    expect(screen.getByText('File chosen')).toBeInTheDocument();
+    // A CSV cannot name its workload: the choice appears with the file.
+    expect(await screen.findByLabelText(/^Workload/)).toBeInTheDocument();
+  });
+
+  it('says what is wrong with the list of samples: loading, failed with a retry, or empty with a way on', async () => {
+    const user = userEvent.setup();
+    // Loading: the skeleton is a polite status, and the list is not there yet.
+    navigateTo('/cases/new?source=sample');
+    const loading = renderApp(<NewCasePage />, {
+      api: api({ 'samples.list': () => new Promise(() => undefined) }),
+    });
+    expect(await screen.findByText('Loading samples…')).toBeInTheDocument();
+    expect(screen.queryByRole('radiogroup', { name: 'Built-in sample' })).toBeNull();
+    loading.unmount();
+
+    // Failed: what happened, and Retry (which asks again).
+    let attempts = 0;
+    const failing = renderApp(<NewCasePage />, {
+      api: api({
+        'samples.list': () => {
+          attempts += 1;
+          if (attempts === 1)
+            throw new ApiError({ status: 503, code: 'upstream_unavailable', title: 'Unavailable' });
+          return { items: [sample()] };
+        },
+      }),
+    });
+    expect(await screen.findByText('The samples could not be loaded')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await sampleRadios()).toHaveLength(1);
+    failing.unmount();
+
+    // Empty: why, and the next thing to do.
+    renderApp(<NewCasePage />, { api: api({ 'samples.list': () => ({ items: [] }) }) });
+    expect(await screen.findByText('No built-in samples are available')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Paste text' }));
+    expect(await screen.findByLabelText(/Case text/)).toBeInTheDocument();
   });
 });
 
@@ -248,14 +501,15 @@ describe('[FR-ING-02] validation, redaction and injection preview', () => {
           ],
         }),
     });
-    renderApp(<NewCasePage />, { api: handler });
+    renderSample({ api: handler });
     await openReview(user);
+    // The format row opens by itself when there is something in it to read.
     const table = screen.getByRole('table', { name: 'Validation issues' });
     expect(within(table).getByText('events.3.participantId')).toBeInTheDocument();
     expect(within(table).getByText('Unknown participant "p-x"')).toBeInTheDocument();
-    expect(screen.getByText('Cannot be ingested yet')).toBeInTheDocument();
+    expect(screen.getByText('Cannot be created yet')).toBeInTheDocument();
     expect(screen.getByText('1 error · 1 warning')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continue to confirm' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
     expect(screen.getByText('Fix the errors above first.')).toBeInTheDocument();
   });
 
@@ -287,7 +541,7 @@ describe('[FR-ING-02] validation, redaction and injection preview', () => {
           },
         }),
     });
-    renderApp(<NewCasePage />, { api: handler });
+    renderSample({ api: handler });
     await openReview(user);
     const redaction = screen.getByRole('table', { name: 'Redactions by category' });
     expect(within(redaction).getByText('Bearer token')).toBeInTheDocument();
@@ -300,22 +554,62 @@ describe('[FR-ING-02] validation, redaction and injection preview', () => {
     expect(within(injection).getByText(/Ignore all previous instructions/)).toBeInTheDocument();
   });
 
-  it('says so when nothing was redacted or flagged (best-effort, not a guarantee)', async () => {
+  it('says so when nothing was redacted or flagged (best-effort, not a guarantee), one row at a time', async () => {
     const user = userEvent.setup();
-    renderApp(<NewCasePage />, { api: api() });
+    renderSample({ api: api() });
     await openReview(user);
+    // Three calm rows: the outcome in a word, the detail one click away.
+    expect(screen.getByText('No problems found')).toBeInTheDocument();
+    expect(screen.getByText('Nothing replaced')).toBeInTheDocument();
+    expect(screen.getByText('Nothing flagged')).toBeInTheDocument();
+    expect(screen.getAllByText('Passed')).toHaveLength(3);
+    const redactionRow = screen.getByRole('button', { name: /^Redaction/ });
+    expect(redactionRow).toHaveAttribute('aria-expanded', 'false');
+    await user.click(redactionRow);
+    expect(redactionRow).toHaveAttribute('aria-expanded', 'true');
     expect(
       screen.getByText(/Nothing that looks like a secret or personal data was found/),
     ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Injection screening/ }));
     expect(screen.getByText('No prompt-injection patterns were detected.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Format/ }));
+    expect(screen.getByText('No problems were found.')).toBeInTheDocument();
   });
 
-  it('points to the existing case when identical content was already ingested', async () => {
+  it('shows the first five events of the timeline preview, and the rest on request', async () => {
+    const user = userEvent.setup();
+    const events = Array.from({ length: 7 }, (_, index) => ({
+      id: `e0${index + 1}`,
+      timestamp: '2026-03-09T09:12:00Z',
+      type: 'customer_email' as const,
+      participantRole: 'customer_admin' as const,
+      title: `Event number ${index + 1}`,
+      bodyExcerpt: `Body of event ${index + 1}.`,
+    }));
+    renderSample({ api: api({ 'ingestion.preview': () => preview({ eventsPreview: events }) }) });
+    await openReview(user);
+    const list = screen.getByRole('list', { name: 'Preview of the first events' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(5);
+    expect(
+      screen.getByText('The first 5 of 7 events in time order, after redaction.'),
+    ).toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: 'Show all 7 events' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await user.click(toggle);
+    expect(within(list).getAllByRole('listitem')).toHaveLength(7);
+    expect(
+      screen.getByText('The first 7 events in time order, after redaction.'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Show fewer events' }));
+    expect(within(list).getAllByRole('listitem')).toHaveLength(5);
+  });
+
+  it('points to the existing case when identical content was already added', async () => {
     const user = userEvent.setup();
     const handler = api({
       'ingestion.preview': () => preview({ alreadyIngestedCaseId: 'case_9' }),
     });
-    renderApp(<NewCasePage />, { api: handler });
+    renderSample({ api: handler });
     await openReview(user);
     expect(screen.getByRole('link', { name: 'Open the existing case' })).toHaveAttribute(
       'href',
@@ -436,9 +730,9 @@ describe('[FR-ING-03] every API error is explained', () => {
         });
       },
     });
-    renderApp(<NewCasePage />, { api: handler });
-    await screen.findAllByRole('radio');
-    await press(user, 'Validate and preview');
+    renderSample({ api: handler });
+    await sampleRadios();
+    await press(user, 'Check case');
     const alert = await screen.findByRole('alert');
     expect(within(alert).getByText('The payload is not valid')).toBeInTheDocument();
     expect(within(alert).getByText('events.0.timestamp')).toBeInTheDocument();
@@ -448,7 +742,7 @@ describe('[FR-ING-03] every API error is explained', () => {
     // The correlation id is a support reference: "Reference" alone would read as the case reference.
     expect(box.getByText(/Support reference/)).toBeInTheDocument();
     expect(box.getByRole('button', { name: 'Copy support reference' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Step 1 of 4/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Add your case' })).toBeInTheDocument();
   });
 
   it('counts down the delay the server asked for before the request may be repeated (429)', async () => {
@@ -468,14 +762,14 @@ describe('[FR-ING-03] every API error is explained', () => {
         return preview();
       },
     });
-    renderApp(<NewCasePage />, { api: handler });
-    await screen.findAllByRole('radio');
-    await press(user, 'Validate and preview');
+    renderSample({ api: handler });
+    await sampleRadios();
+    await press(user, 'Check case');
     const alert = await screen.findByRole('alert');
     expect(within(alert).getByText('Too many requests')).toBeInTheDocument();
     expect(within(alert).getByText(/wait 2 seconds/)).toBeInTheDocument();
     const box = within(problemBox(alert));
-    const retry = box.getByRole('button', { name: /Validate again in/ });
+    const retry = box.getByRole('button', { name: /Check again in/ });
     expect(retry).toBeDisabled();
     // The label ticks down every second, so it is outside the alert (an alert is read out whole each time it changes).
     // One static sentence announces the wait, and one announces the end of it.
@@ -484,7 +778,7 @@ describe('[FR-ING-03] every API error is explained', () => {
     expect(announcement).toHaveAttribute('role', 'status');
     const watch = watchChanges(alert);
     const announced = watchChanges(announcement);
-    await waitFor(() => expect(box.getByRole('button', { name: 'Validate again' })).toBeEnabled(), {
+    await waitFor(() => expect(box.getByRole('button', { name: 'Check again' })).toBeEnabled(), {
       timeout: 4000,
     });
     expect(watch.count()).toBe(0);
@@ -492,8 +786,10 @@ describe('[FR-ING-03] every API error is explained', () => {
     expect(announced.count()).toBe(1);
     watch.stop();
     announced.stop();
-    await user.click(box.getByRole('button', { name: 'Validate again' }));
-    await screen.findByRole('heading', { name: /Step 2 of 4/ });
+    // The step's own primary button is on screen, so the retry is the secondary one.
+    expect(screen.getByRole('button', { name: 'Check case' })).toBeInTheDocument();
+    await user.click(box.getByRole('button', { name: 'Check again' }));
+    await screen.findByRole('heading', { name: 'Check what will be created' });
   });
 
   it('explains a reference that is already in use (409) when creating, and lets the person go back', async () => {
@@ -510,10 +806,10 @@ describe('[FR-ING-03] every API error is explained', () => {
         });
       },
     });
-    renderApp(<NewCasePage />, { api: handler });
+    renderSample({ api: handler });
     await openReview(user);
-    await user.click(screen.getByRole('button', { name: 'Continue to confirm' }));
-    await user.click(await screen.findByRole('button', { name: 'Create case' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(await screen.findByRole('button', { name: 'Create and analyse' }));
     const alert = await screen.findByRole('alert');
     expect(
       within(alert).getByText('A case with reference CG-SYN-1001 already exists'),
@@ -530,8 +826,10 @@ describe('[FR-ING-03] every API error is explained', () => {
       within(problemBox(alert)).getByRole('link', { name: 'Find that case in the Cases list' }),
     ).toHaveAttribute('href', '/cases?q=CG-SYN-1001');
     expect(within(problemBox(alert)).queryByRole('button', { name: /Try again/ })).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Back to review' }));
-    expect(await screen.findByRole('heading', { name: /Step 2 of 4/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Check what will be created' }),
+    ).toBeInTheDocument();
   });
 
   it('reuses one idempotency key when the same create is repeated, so a retry cannot duplicate the case', async () => {
@@ -551,13 +849,13 @@ describe('[FR-ING-03] every API error is explained', () => {
         return ingestResult();
       },
     });
-    renderApp(<NewCasePage />, { api: handler });
+    renderSample({ api: handler });
     await openReview(user);
-    await user.click(screen.getByRole('button', { name: 'Continue to confirm' }));
-    await user.click(await screen.findByRole('button', { name: 'Create case' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(await screen.findByRole('button', { name: 'Create and analyse' }));
     const alert = await screen.findByRole('alert');
     await user.click(within(problemBox(alert)).getByRole('button', { name: 'Try again' }));
-    await screen.findByRole('heading', { name: /Step 4 of 4/ });
+    await screen.findByRole('heading', { name: /Creating your case|Your case is ready/ });
     expect(keys).toHaveLength(2);
     expect(keys[0]).toBe(keys[1]);
   });
@@ -583,8 +881,8 @@ async function reviewPasted(
     await user.click(await screen.findByLabelText(/Case bundle \(JSON\)/));
     await user.paste('{"schemaVersion":"caseguard.case-bundle/1","events":[]}');
   }
-  await press(user, 'Validate and preview');
-  await screen.findByRole('heading', { name: /Step 2 of 4/ });
+  await press(user, 'Check case');
+  await screen.findByRole('heading', { name: 'Check what will be created' });
   return result;
 }
 
@@ -696,7 +994,7 @@ describe('[FR-ING-06] refusals are told apart and explained in words', () => {
       message:
         'The workspace\'s custom redaction pattern "Customer ids" could not be applied, so CaseGuard refuses the content rather than store it partly redacted.',
       advice:
-        'Ask an administrator to fix the pattern in Governance > Redaction, then validate again.',
+        'Ask an administrator to fix the pattern in Governance > Redaction, then check again.',
     });
     const several = explainIngestError(
       error(
@@ -791,7 +1089,7 @@ describe('[FR-ING-06] refusals are told apart and explained in words', () => {
       ok: false,
       issues: [{ path: 'case.reference', message: REFERENCE_TAKEN, severity: 'error' }],
     });
-    renderApp(<NewCasePage />, { api: api({ 'ingestion.preview': () => taken }) });
+    renderSample({ api: api({ 'ingestion.preview': () => taken }) });
     await openReview(user);
     const notice = screen
       .getByText('Reference CG-SYN-1001 is already in use')
@@ -806,8 +1104,8 @@ describe('[FR-ING-06] refusals are told apart and explained in words', () => {
     const table = screen.getByRole('table', { name: 'Validation issues' });
     expect(within(table).getByText('case.reference')).toBeInTheDocument();
     expect(within(table).getByText(REFERENCE_TAKEN)).toBeInTheDocument();
-    expect(screen.getByText('Cannot be ingested yet')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continue to confirm' })).toBeDisabled();
+    expect(screen.getByText('Cannot be created yet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
   });
 
   it('does not tell a person who pasted text to edit a payload they did not write', async () => {
@@ -850,7 +1148,7 @@ describe('[FR-ING-06] refusals are told apart and explained in words', () => {
       synthetic: false,
       issues: [{ path: 'redaction', message: REDACTION_REFUSED, severity: 'error' }],
     });
-    const { container } = renderApp(<NewCasePage />, {
+    const { container } = renderSample({
       api: api({ 'ingestion.preview': () => refused }),
     });
     await openReview(user);
@@ -880,7 +1178,7 @@ describe('[FR-ING-06] refusals are told apart and explained in words', () => {
       screen.queryByText(/Nothing that looks like a secret or personal data was found/),
     ).toBeNull();
     expect(screen.queryByText('No prompt-injection patterns were detected.')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Continue to confirm' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
     await expectNoAxeViolations(container);
   });
 
@@ -892,7 +1190,7 @@ describe('[FR-ING-06] refusals are told apart and explained in words', () => {
       eventsPreview: [],
       issues: [{ path: 'redaction', message: 'Refused.', severity: 'error' }],
     });
-    renderApp(<NewCasePage />, { api: api({ 'ingestion.preview': () => refused }) });
+    renderSample({ api: api({ 'ingestion.preview': () => refused }) });
     await openReview(user);
     const notice = screen
       .getByText('Redaction could not be completed')
@@ -921,7 +1219,7 @@ describe('[FR-ING-06] refusals are told apart and explained in words', () => {
         },
       ],
     });
-    renderApp(<NewCasePage />, { api: api({ 'ingestion.preview': () => tooLong }) });
+    renderSample({ api: api({ 'ingestion.preview': () => tooLong }) });
     await openReview(user);
     const notice = screen
       .getByText('Redaction made a value too long')
@@ -934,7 +1232,7 @@ describe('[FR-ING-06] refusals are told apart and explained in words', () => {
     expect(within(table).getByText('events[4].title')).toBeInTheDocument();
   });
 
-  it('offers to open the existing case when identical content was already ingested, even if the preview says not ok', async () => {
+  it('offers to open the existing case when identical content was already added, even if the preview says not ok', async () => {
     const user = userEvent.setup();
     const handler = api({
       'ingestion.preview': () =>
@@ -944,7 +1242,7 @@ describe('[FR-ING-06] refusals are told apart and explained in words', () => {
           issues: [{ path: '(input)', message: 'Something else is wrong too.', severity: 'error' }],
         }),
     });
-    renderApp(<NewCasePage />, { api: handler });
+    renderSample({ api: handler });
     await openReview(user);
     const notice = screen
       .getByText('Identical content already exists')
@@ -969,10 +1267,10 @@ describe('[FR-ING-06] refusals are told apart and explained in words', () => {
         });
       },
     });
-    renderApp(<NewCasePage />, { api: handler });
+    renderSample({ api: handler });
     await openReview(user);
-    await user.click(screen.getByRole('button', { name: 'Continue to confirm' }));
-    await user.click(await screen.findByRole('button', { name: 'Create case' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(await screen.findByRole('button', { name: 'Create and analyse' }));
     const heading = await screen.findByText('This request is already being processed');
     const statement = heading.closest('[role="status"]') as HTMLElement;
     expect(statement).not.toBeNull();
@@ -1009,10 +1307,10 @@ describe('[FR-ING-06] refusals are told apart and explained in words', () => {
         });
       },
     });
-    renderApp(<NewCasePage />, { api: handler });
+    renderSample({ api: handler });
     await openReview(user);
-    await user.click(screen.getByRole('button', { name: 'Continue to confirm' }));
-    await user.click(await screen.findByRole('button', { name: 'Create case' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(await screen.findByRole('button', { name: 'Create and analyse' }));
     const alert = await screen.findByRole('alert');
     expect(within(alert).getByText('Redaction could not be completed')).toBeInTheDocument();
     expect(
@@ -1042,24 +1340,28 @@ describe('[FR-ING-06] refusals are told apart and explained in words', () => {
         return ingestResult();
       },
     });
-    renderApp(<NewCasePage />, { api: handler });
+    renderSample({ api: handler });
     await openReview(user);
-    await user.click(screen.getByRole('button', { name: 'Continue to confirm' }));
-    await user.click(await screen.findByRole('button', { name: 'Create case' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(await screen.findByRole('button', { name: 'Create and analyse' }));
     const alert = await screen.findByRole('alert');
     expect(
       within(alert).getByText('That request key was already used for different content'),
     ).toBeInTheDocument();
     expect(within(alert).getByText(/not identical/)).toBeInTheDocument();
     await user.click(within(problemBox(alert)).getByRole('button', { name: 'Try again' }));
-    await screen.findByRole('heading', { name: /Step 4 of 4/ });
+    await screen.findByRole('heading', { name: /Creating your case|Your case is ready/ });
     expect(keys).toHaveLength(2);
     expect(keys[0]).not.toBe(keys[1]);
   });
 
   it('says how the date of pasted text decides whether pasting it again makes a new case', async () => {
+    const user = userEvent.setup();
     navigateTo('/cases/new?source=paste');
     renderApp(<NewCasePage />, { api: api() });
+    // The long explanation is one click away, next to the one short hint under the field.
+    expect(screen.queryByText(/Lines that carry only a time are dated/)).toBeNull();
+    await user.click(await screen.findByRole('button', { name: 'About pasted text' }));
     expect(
       await screen.findByText(/Lines that carry only a time are dated from the day you paste/),
     ).toBeInTheDocument();
@@ -1069,8 +1371,10 @@ describe('[FR-ING-06] refusals are told apart and explained in words', () => {
 
 describe('[FR-ING-04] paste, upload and bundle sources', () => {
   it('says the workload has to be stated unless the text names it, and lists the supported ones', async () => {
+    const user = userEvent.setup();
     navigateTo('/cases/new?source=paste');
     renderApp(<NewCasePage />, { api: api() });
+    await user.click(await screen.findByRole('button', { name: /Details \(optional\)/ }));
     const field = await screen.findByLabelText('Workload');
     expect(screen.queryByText('Workload (optional)')).not.toBeInTheDocument();
     // The supported workloads come from the samples, which load after the panel is shown.
@@ -1086,8 +1390,7 @@ describe('[FR-ING-04] paste, upload and bundle sources', () => {
     navigateTo('/cases/new?source=paste');
     const handler = api();
     renderApp(<NewCasePage />, { api: handler });
-    const validate = (): HTMLElement =>
-      screen.getByRole('button', { name: 'Validate and preview' });
+    const validate = (): HTMLElement => screen.getByRole('button', { name: 'Check case' });
     await screen.findByLabelText(/Case text/);
     await waitFor(() => expect(validate()).toBeDisabled());
 
@@ -1095,10 +1398,11 @@ describe('[FR-ING-04] paste, upload and bundle sources', () => {
     expect(screen.getByLabelText<HTMLTextAreaElement>(/Case text/).value).toContain(
       'Subject: Printer',
     );
+    await user.click(screen.getByRole('button', { name: /Details \(optional\)/ }));
     await user.type(screen.getByLabelText('Title (optional)'), 'Printer queue stalls');
     await waitFor(() => expect(validate()).toBeEnabled());
     await user.click(validate());
-    await screen.findByRole('heading', { name: /Step 2 of 4/ });
+    await screen.findByRole('heading', { name: 'Check what will be created' });
     expect(handler.call).toHaveBeenCalledWith(
       'ingestion.preview',
       expect.objectContaining({
@@ -1120,11 +1424,10 @@ describe('[FR-ING-04] paste, upload and bundle sources', () => {
     renderApp(<NewCasePage />, { api: handler });
     await user.click(await screen.findByLabelText(/Case text/));
     await user.paste('Some case text');
+    await user.click(screen.getByRole('button', { name: /Details \(optional\)/ }));
     await user.type(screen.getByLabelText('Title (optional)'), 'abc');
     expect(screen.getByText(/A title needs 5 to 200 characters/)).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Validate and preview' })).toBeDisabled(),
-    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Check case' })).toBeDisabled());
     expect(handler.call).not.toHaveBeenCalledWith('ingestion.preview', expect.anything());
   });
 
@@ -1137,16 +1440,14 @@ describe('[FR-ING-04] paste, upload and bundle sources', () => {
     await user.click(box);
     await user.paste('{ "schemaVersion": ');
     expect(await screen.findByText(/Not valid JSON/)).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Validate and preview' })).toBeDisabled(),
-    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Check case' })).toBeDisabled());
     expect(handler.call).not.toHaveBeenCalledWith('ingestion.preview', expect.anything());
 
     await user.clear(box);
     await user.click(box);
     await user.paste('{"schemaVersion":"caseguard.case-bundle/1","events":[]}');
-    await press(user, 'Validate and preview');
-    await screen.findByRole('heading', { name: /Step 2 of 4/ });
+    await press(user, 'Check case');
+    await screen.findByRole('heading', { name: 'Check what will be created' });
     expect(handler.call).toHaveBeenCalledWith(
       'ingestion.preview',
       expect.objectContaining({
@@ -1193,17 +1494,19 @@ describe('[FR-ING-04] paste, upload and bundle sources', () => {
     await user.upload(input, file);
     expect(screen.getByText(/events\.csv · /)).toBeInTheDocument();
     await user.selectOptions(await screen.findByLabelText(/^Workload/), 'teams-authentication');
-    await press(user, 'Validate and preview');
-    await screen.findByRole('heading', { name: /Step 2 of 4/ });
+    await press(user, 'Check case');
+    await screen.findByRole('heading', { name: 'Check what will be created' });
     const call = handler.call.mock.calls.find(([route]) => route === 'ingestion.previewFile');
     const form = (call?.[1] as { formData: FormData }).formData;
     expect((form.get('file') as File).name).toBe('events.csv');
     expect(form.get('workload')).toBe('teams-authentication');
 
-    await user.click(screen.getByRole('button', { name: 'Continue to confirm' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
     expect(await screen.findByRole('checkbox', { name: /Start the analysis/ })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: /Start the analysis/ })).toBeDisabled();
     expect(screen.getByText(/Uploaded files are always analysed on creation/)).toBeInTheDocument();
+    // An upload is always analysed, so the one primary button says so.
+    expect(screen.getByRole('button', { name: 'Create and analyse' })).toBeInTheDocument();
   });
 
   it('explains an uploaded file that the API refused (422 unsafe_content, file_refused), and offers no retry of the same file', async () => {
@@ -1225,7 +1528,7 @@ describe('[FR-ING-04] paste, upload and bundle sources', () => {
     const input = await screen.findByLabelText('Choose a file');
     await user.upload(input, new File(['x'], 'events.csv', { type: 'text/csv' }));
     await user.selectOptions(await screen.findByLabelText(/^Workload/), 'teams-authentication');
-    await press(user, 'Validate and preview');
+    await press(user, 'Check case');
     const alert = await screen.findByRole('alert');
     expect(within(alert).getByText('The file was refused for safety reasons')).toBeInTheDocument();
     expect(
@@ -1238,10 +1541,10 @@ describe('[FR-ING-04] paste, upload and bundle sources', () => {
     ).toBeInTheDocument();
     expect(within(problemBox(alert)).getByText('req_file_refused')).toBeInTheDocument();
     // The same file would be refused again, and no custom redaction pattern is involved.
-    expect(within(problemBox(alert)).queryByRole('button', { name: /Validate again/ })).toBeNull();
+    expect(within(problemBox(alert)).queryByRole('button', { name: /Check again/ })).toBeNull();
     expect(within(problemBox(alert)).queryByRole('link')).toBeNull();
     expect(screen.queryByText('Redaction could not be completed')).toBeNull();
-    expect(screen.getByRole('heading', { name: /Step 1 of 4/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Add your case' })).toBeInTheDocument();
     await expectNoAxeViolations(container);
   });
 
@@ -1254,9 +1557,7 @@ describe('[FR-ING-04] paste, upload and bundle sources', () => {
     expect(
       await screen.findByText(/Only \.json, \.txt, \.log, \.md, \.csv files are accepted/),
     ).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Validate and preview' })).toBeDisabled(),
-    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Check case' })).toBeDisabled());
   });
 
   it('asks for the workload of a CSV file, offers only the supported ones, and sends it before the file', async () => {
@@ -1286,13 +1587,11 @@ describe('[FR-ING-04] paste, upload and bundle sources', () => {
         /does not say which workload it belongs to, and CaseGuard does not guess/,
       ),
     );
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Validate and preview' })).toBeDisabled(),
-    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Check case' })).toBeDisabled());
 
     await user.selectOptions(workload, 'teams-authentication');
-    await press(user, 'Validate and preview');
-    await screen.findByRole('heading', { name: /Step 2 of 4/ });
+    await press(user, 'Check case');
+    await screen.findByRole('heading', { name: 'Check what will be created' });
     const call = handler.call.mock.calls.find(([route]) => route === 'ingestion.previewFile');
     const form = (call?.[1] as { formData: FormData }).formData;
     expect([...form.keys()]).toEqual(['workload', 'file']);
@@ -1312,8 +1611,8 @@ describe('[FR-ING-04] paste, upload and bundle sources', () => {
     const workload = await screen.findByLabelText(/^Workload/);
     expect(workload).toBeDisabled();
     await waitFor(() => expect(workload).toHaveAccessibleDescription(/states its own workload/));
-    await press(user, 'Validate and preview');
-    await screen.findByRole('heading', { name: /Step 2 of 4/ });
+    await press(user, 'Check case');
+    await screen.findByRole('heading', { name: 'Check what will be created' });
     const call = handler.call.mock.calls.find(([route]) => route === 'ingestion.previewFile');
     const form = (call?.[1] as { formData: FormData }).formData;
     expect(form.has('workload')).toBe(false);
@@ -1374,10 +1673,10 @@ describe('[FR-ING-05] analysis progress, replay and permissions', () => {
       'jobs.cancel': () =>
         job({ status: 'cancelled', cancellable: false, completedAt: '2025-03-14T09:00:00.000Z' }),
     });
-    renderApp(<NewCasePage />, { api: handler });
+    renderSample({ api: handler });
     await openReview(user);
-    await user.click(screen.getByRole('button', { name: 'Continue to confirm' }));
-    await user.click(await screen.findByRole('button', { name: 'Create case' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(await screen.findByRole('button', { name: 'Create and analyse' }));
     await screen.findByText('Classify evidence and rank hypotheses');
     const cancel = await screen.findByRole('button', { name: 'Cancel' });
     await waitFor(() => expect(cancel).toBeEnabled());
@@ -1397,11 +1696,12 @@ describe('[FR-ING-05] analysis progress, replay and permissions', () => {
     const handler = api({
       'cases.create': () => ingestResult({ created: false, analysisJob: null }),
       'analysis.start': () => ({ job: job(), runId: null, reused: false }),
+      'jobs.get': () => job(),
     });
-    renderApp(<NewCasePage />, { api: handler });
+    renderSample({ api: handler });
     await openReview(user);
-    await user.click(screen.getByRole('button', { name: 'Continue to confirm' }));
-    await user.click(await screen.findByRole('button', { name: 'Create case' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(await screen.findByRole('button', { name: 'Create and analyse' }));
     expect(await screen.findByText('This case already exists')).toBeInTheDocument();
     expect(
       screen.getByText(/the existing case was returned instead of creating a copy/),
@@ -1416,7 +1716,7 @@ describe('[FR-ING-05] analysis progress, replay and permissions', () => {
     expect(await screen.findByText('Analysing the case')).toBeInTheDocument();
   });
 
-  it('offers the guided review first when an identical case had already been analysed', async () => {
+  it('offers the review first when an identical case had already been analysed', async () => {
     const user = userEvent.setup();
     const handler = api({
       'cases.create': () =>
@@ -1426,12 +1726,12 @@ describe('[FR-ING-05] analysis progress, replay and permissions', () => {
           case: { ...ingestResult().case, analysisState: 'analyzed' },
         }),
     });
-    renderApp(<NewCasePage />, { api: handler });
+    renderSample({ api: handler });
     await openReview(user);
-    await user.click(screen.getByRole('button', { name: 'Continue to confirm' }));
-    await user.click(await screen.findByRole('button', { name: 'Create case' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(await screen.findByRole('button', { name: 'Create and analyse' }));
     expect(await screen.findByText('This case already exists')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open guided review' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Open review' })).toHaveAttribute(
       'href',
       `/cases/${CASE_ID}/review`,
     );
@@ -1448,28 +1748,59 @@ describe('[FR-ING-05] analysis progress, replay and permissions', () => {
           error: { code: 'analysis_failed', message: 'The provider timed out.' },
         }),
     });
-    renderApp(<NewCasePage />, { api: handler });
+    renderSample({ api: handler });
     await openReview(user);
-    await user.click(screen.getByRole('button', { name: 'Continue to confirm' }));
-    await user.click(await screen.findByRole('button', { name: 'Create case' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(await screen.findByRole('button', { name: 'Create and analyse' }));
     expect(await screen.findByText('The provider timed out.')).toBeInTheDocument();
     expect(screen.getByText('The analysis did not finish')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Your case is saved' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open the case' })).toBeInTheDocument();
-    // There is no analysis to review yet, so the guided review is not offered.
-    expect(screen.queryByRole('link', { name: 'Open guided review' })).not.toBeInTheDocument();
+    // There is no analysis to review yet, so the review is not offered.
+    expect(screen.queryByRole('link', { name: 'Open review' })).not.toBeInTheDocument();
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  it('disables validating and creating for a role without case:ingest, and says why', async () => {
-    renderApp(<NewCasePage />, {
-      api: api({ 'session.me': () => session('reviewer', ['case:read']) }),
+  it('creates without an analysis when that is switched off, and the button says so', async () => {
+    const user = userEvent.setup();
+    const handler = api({
+      'cases.create': () => ingestResult({ analysisJob: null }),
     });
-    expect(await screen.findByText('Your role cannot ingest cases')).toBeInTheDocument();
-    const validate = await screen.findByRole('button', { name: 'Validate and preview' });
-    await waitFor(() => expect(validate).toHaveAttribute('aria-disabled', 'true'));
+    renderSample({ api: handler });
+    await openReview(user);
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByRole('button', { name: 'Create and analyse' })).toBeInTheDocument();
+    await user.click(screen.getByRole('checkbox', { name: /Start the analysis/ }));
+    // Without the analysis the step only creates the case, so "analyse" is not in the button.
+    await user.click(await screen.findByRole('button', { name: 'Create case' }));
+    expect(await screen.findByRole('heading', { name: 'Your case is saved' })).toBeInTheDocument();
+    expect(handler.call).toHaveBeenCalledWith(
+      'cases.create',
+      expect.objectContaining({
+        body: {
+          source: { type: 'sample', sampleId: 'case-one-teams-signin-dns' },
+          options: { analyze: false },
+        },
+      }),
+    );
+    expect(screen.getByText('The analysis has not started')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start the analysis' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open the case' })).toBeInTheDocument();
+    // Another case starts again from the first step.
+    await user.click(screen.getByRole('button', { name: 'Add another case' }));
+    expect(await screen.findByRole('heading', { name: 'Add your case' })).toBeInTheDocument();
   });
 
-  it('downloads the schemas and examples with the caller identity', async () => {
+  it('disables checking and creating for a role without case:ingest, and says why', async () => {
+    renderSample({
+      api: api({ 'session.me': () => session('reviewer', ['case:read']) }),
+    });
+    expect(await screen.findByText('Your role cannot add cases')).toBeInTheDocument();
+    const check = await screen.findByRole('button', { name: 'Check case' });
+    await waitFor(() => expect(check).toHaveAttribute('aria-disabled', 'true'));
+  });
+
+  it('downloads the schemas and examples with the caller identity, from the folded "More ways to add"', async () => {
     const user = userEvent.setup();
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
@@ -1479,6 +1810,9 @@ describe('[FR-ING-05] analysis progress, replay and permissions', () => {
       .spyOn(HTMLAnchorElement.prototype, 'click')
       .mockImplementation(() => undefined);
     renderApp(<NewCasePage />, { api: api() });
+    const more = await screen.findByRole('button', { name: /More ways to add/ });
+    expect(more).toHaveAttribute('aria-expanded', 'false');
+    await user.click(more);
     await user.click(
       await screen.findByRole('button', { name: 'Download Case bundle JSON Schema' }),
     );
