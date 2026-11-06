@@ -134,7 +134,14 @@ export function CaseChrome({ caseId, children }: { caseId: string; children: Rea
   const analysis = data ? ANALYSIS_STATE_BADGES[data.analysisState] : null;
 
   // A case that does not exist shows its own page ("Case not found"); tabs to pages that cannot load would only mislead.
-  if (detail.isError && detail.error.isNotFound) return <>{children}</>;
+  // The page keeps its place in the tree either way, so it is not remounted (and refetched) when the header goes away.
+  if (detail.isError && detail.error.isNotFound)
+    return (
+      <>
+        {null}
+        {children}
+      </>
+    );
 
   return (
     <>

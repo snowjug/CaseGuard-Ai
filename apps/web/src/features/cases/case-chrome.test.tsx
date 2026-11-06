@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import type { CaseDetail } from '@caseguard/schemas';
 import userEvent from '@testing-library/user-event';
+import { useEffect } from 'react';
 import { describe, expect, it } from 'vitest';
 import { CASE_ID, caseDetail } from '../../../test/case-fixtures';
 import { session } from '../../../test/fixtures';
@@ -76,6 +77,36 @@ describe('[UX-CASE-CHROME-01] the header and tabs every case page shares', () =>
     await waitFor(() =>
       expect(screen.queryByRole('navigation', { name: 'Case sections' })).toBeNull(),
     );
+  });
+
+  it('keeps the page mounted when the header goes away for a case that does not exist', async () => {
+    let mounts = 0;
+    function Page() {
+      useEffect(() => {
+        mounts += 1;
+      }, []);
+      return <h1>Page title</h1>;
+    }
+    navigateTo(`/cases/${CASE_ID}/review`);
+    renderApp(
+      <CaseChrome caseId={CASE_ID}>
+        <Page />
+      </CaseChrome>,
+      {
+        api: fakeApi({
+          'session.me': () => session('engineer', ['case:read']),
+          'cases.get': () => {
+            throw new ApiError({ status: 404, code: 'not_found', title: 'Not found' });
+          },
+        }),
+      },
+    );
+    await screen.findByRole('heading', { name: 'Page title' });
+    const before = mounts;
+    await waitFor(() =>
+      expect(screen.queryByRole('navigation', { name: 'Case sections' })).toBeNull(),
+    );
+    expect(mounts, 'a remount would refetch the missing case again and again').toBe(before);
   });
 
   it('has no accessibility violations', async () => {
