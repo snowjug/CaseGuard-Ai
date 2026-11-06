@@ -252,7 +252,7 @@ describe('[UX-PALETTE-02] command palette keyboard flow', () => {
     await user.type(input, 'sample case');
     await waitFor(() => expect(options()[0]).toHaveAccessibleName(/Try a sample case/));
     await user.keyboard('{Enter}');
-    expect(router.push).toHaveBeenLastCalledWith('/cases/new?mode=sample');
+    expect(router.push).toHaveBeenLastCalledWith('/cases/new?source=sample');
   });
 });
 

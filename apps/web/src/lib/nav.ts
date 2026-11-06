@@ -25,7 +25,7 @@ export interface NavContext {
 
 export const ADD_CASE_HREF = '/cases/new';
 /** Opens the add-a-case page on its sample tab, so a first-time user can see a review without any data of their own. */
-export const SAMPLE_CASE_HREF = '/cases/new?mode=sample';
+export const SAMPLE_CASE_HREF = '/cases/new?source=sample';
 
 /** The views that live under "Advanced": settings and audit, usage and cost, system status, the guided demo. */
 export const ADVANCED_PATHS = [

@@ -46,7 +46,7 @@ describe('[UX-PALETTE-03] entries for pages and sections', () => {
     expect([add?.group, sample?.group]).toEqual(['Actions', 'Actions']);
     add?.run();
     sample?.run();
-    expect(navigate.mock.calls).toEqual([['/cases/new'], ['/cases/new?mode=sample']]);
+    expect(navigate.mock.calls).toEqual([['/cases/new'], ['/cases/new?source=sample']]);
   });
 });
 
