@@ -93,7 +93,13 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase200,
     color: cg.textSecondary,
   },
-  captionIcon: { display: 'inline-flex', flexShrink: 0, marginTop: '2px', color: cg.textMuted },
+  captionIcon: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    flexShrink: 0,
+    height: tokens.lineHeightBase200,
+    color: cg.textMuted,
+  },
   links: {
     display: 'flex',
     flexWrap: 'wrap',

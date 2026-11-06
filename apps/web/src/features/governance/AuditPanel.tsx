@@ -96,7 +96,7 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase200,
     color: cg.textMuted,
   },
-  chip: { display: 'inline-flex', alignItems: 'center', gap: '2px' },
+  chip: { display: 'inline-flex', alignItems: 'center', gap: cg.space[1] },
   link: { color: cg.textLink },
   more: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[3] },
 });

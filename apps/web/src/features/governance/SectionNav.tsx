@@ -8,7 +8,7 @@ const useStyles = makeStyles({
   list: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '2px',
+    gap: cg.space[1],
     padding: cg.space[1],
     borderRadius: cg.radius.lg,
     backgroundColor: cg.surfaceSunken,

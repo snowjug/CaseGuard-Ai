@@ -72,7 +72,7 @@ const useStyles = makeStyles({
   change: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '2px',
+    gap: cg.space[1],
     minWidth: 0,
     paddingLeft: cg.space[3],
     borderLeft: `2px solid ${cg.borderSubtle}`,

@@ -27,8 +27,8 @@ const useStyles = makeStyles({
     top: '-5px',
     width: '4px',
     height: '18px',
-    marginLeft: '-2px',
-    borderRadius: '2px',
+    transform: 'translateX(-50%)',
+    borderRadius: cg.radius.pill,
   },
   caption: {
     display: 'flex',

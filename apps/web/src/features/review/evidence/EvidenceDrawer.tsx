@@ -71,7 +71,7 @@ const useStyles = makeStyles({
     overflowWrap: 'anywhere',
   },
   mark: {
-    padding: '0 2px',
+    padding: `0 ${cg.space[1]}`,
     borderRadius: cg.radius.sm,
     backgroundColor: cg.tone.uncertain.tint,
     color: cg.text,

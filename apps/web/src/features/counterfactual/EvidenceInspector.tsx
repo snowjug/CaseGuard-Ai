@@ -42,7 +42,7 @@ const useStyles = makeStyles({
   stepButton: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '2px',
+    gap: cg.space[1],
     width: '100%',
     boxSizing: 'border-box',
     textAlign: 'start',

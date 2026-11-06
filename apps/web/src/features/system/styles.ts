@@ -49,7 +49,7 @@ export const useSystemStyles = makeStyles({
   },
   bulletName: { color: cg.text, fontWeight: tokens.fontWeightSemibold },
   mono: { fontFamily: cg.font.mono, fontSize: tokens.fontSizeBase200, overflowWrap: 'anywhere' },
-  cellStack: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 },
+  cellStack: { display: 'flex', flexDirection: 'column', gap: cg.space[1], minWidth: 0 },
   cellMuted: { fontSize: tokens.fontSizeBase200, color: cg.textMuted },
   detail: {
     fontSize: tokens.fontSizeBase200,

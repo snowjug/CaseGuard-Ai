@@ -56,7 +56,13 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase200,
     color: cg.textSecondary,
   },
-  captionIcon: { display: 'inline-flex', flexShrink: 0, marginTop: '2px', color: cg.textMuted },
+  captionIcon: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    flexShrink: 0,
+    height: tokens.lineHeightBase200,
+    color: cg.textMuted,
+  },
   callout: {
     display: 'flex',
     flexDirection: 'column',
@@ -96,7 +102,7 @@ const useStyles = makeStyles({
     color: cg.textMuted,
     fontWeight: 400,
   },
-  score: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 },
+  score: { display: 'flex', flexDirection: 'column', gap: cg.space[1], minWidth: 0 },
   track: {
     display: 'block',
     height: '8px',
@@ -151,7 +157,7 @@ const useStyles = makeStyles({
   blocked: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '2px',
+    gap: cg.space[1],
     paddingLeft: cg.space[3],
     borderLeft: `2px solid ${cg.borderSubtle}`,
     listStyle: 'none',

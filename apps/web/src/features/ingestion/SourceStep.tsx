@@ -167,7 +167,7 @@ const useStyles = makeStyles({
     justifyContent: 'center',
     width: '20px',
     height: '20px',
-    marginTop: '2px',
+    alignSelf: 'center',
     borderRadius: cg.radius.pill,
     border: `1px solid ${cg.borderControl}`,
     backgroundColor: cg.surfaceSunken,

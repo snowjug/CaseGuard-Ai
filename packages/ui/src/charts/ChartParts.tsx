@@ -132,7 +132,7 @@ export function ChartLegend({
           <span>
             {entry.label}
             {entry.value ? (
-              <strong style={{ marginLeft: 4, color: cg.text, fontWeight: 600 }}>
+              <strong style={{ marginLeft: cg.space[1], color: cg.text, fontWeight: 600 }}>
                 {entry.value}
               </strong>
             ) : null}
@@ -275,7 +275,7 @@ export const useChartStyles = makeStyles({
     fontVariantNumeric: 'tabular-nums',
     whiteSpace: 'nowrap',
   },
-  tooltipTitle: { fontWeight: tokens.fontWeightSemibold, marginBottom: '2px' },
+  tooltipTitle: { fontWeight: tokens.fontWeightSemibold, marginBottom: cg.space[1] },
   inspector: {
     position: 'absolute',
     inset: 0,

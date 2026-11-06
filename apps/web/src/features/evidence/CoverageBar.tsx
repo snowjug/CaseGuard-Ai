@@ -63,7 +63,7 @@ const useStyles = makeStyles({
   unit: { fontSize: tokens.fontSizeBase300, color: cg.textSecondary },
   bar: {
     display: 'flex',
-    gap: '3px',
+    gap: cg.space[1],
     height: '20px',
     margin: 0,
     padding: 0,
@@ -76,7 +76,7 @@ const useStyles = makeStyles({
     height: '100%',
     padding: 0,
     border: '1px solid transparent',
-    borderRadius: '6px',
+    borderRadius: cg.radius.sm,
     cursor: 'pointer',
     transitionProperty: 'opacity, transform',
     transitionDuration: cg.motion.fast,
@@ -88,7 +88,7 @@ const useStyles = makeStyles({
   empty: {
     height: '100%',
     flex: 1,
-    borderRadius: '6px',
+    borderRadius: cg.radius.sm,
     border: `1px dashed ${cg.borderControl}`,
   },
   legend: {
@@ -132,7 +132,7 @@ const useStyles = makeStyles({
     height: '14px',
     boxSizing: 'border-box',
     border: '1px solid transparent',
-    borderRadius: '4px',
+    borderRadius: cg.radius.sm,
   },
   count: {
     color: cg.text,

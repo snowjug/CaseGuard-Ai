@@ -42,7 +42,7 @@ import { explainRoleRefusal } from './refusals';
 
 const useStyles = makeStyles({
   stack: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
-  cell: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 },
+  cell: { display: 'flex', flexDirection: 'column', gap: cg.space[1], minWidth: 0 },
   muted: { fontSize: tokens.fontSizeBase200, color: cg.textMuted, overflowWrap: 'anywhere' },
   text: {
     margin: 0,

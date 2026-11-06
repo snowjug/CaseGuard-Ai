@@ -10,6 +10,10 @@ import { PersonaPickerDialog } from '../../lib/auth/dev-persona';
 import { BreadcrumbLabelsProvider } from '../../lib/breadcrumbs';
 import { NAV_ITEMS, navContext } from '../../lib/nav';
 import { usePresentation } from '../../lib/presentation';
+import {
+  PRESENTER_HEIGHT_FALLBACK_PX,
+  PRESENTER_HEIGHT_VAR,
+} from '../../lib/presentation/presenter-height';
 import { ShellUiProvider, useShellUi } from '../../lib/shell-ui';
 import { useShortcut } from '../../lib/shortcuts';
 import { BottomBar } from './BottomBar';
@@ -77,7 +81,9 @@ const useStyles = makeStyles({
       paddingBottom: `calc(${layout.bottomBarHeight}px + env(safe-area-inset-bottom) + ${cg.space[6]})`,
     },
   },
-  presenting: { paddingBottom: 'var(--cg-presenter-height, 104px)' },
+  presenting: {
+    paddingBottom: `var(${PRESENTER_HEIGHT_VAR}, ${PRESENTER_HEIGHT_FALLBACK_PX}px)`,
+  },
 });
 
 /** `g` then the destination's key (for example `g c` for Cases). One component per item because hooks cannot run in a loop. */

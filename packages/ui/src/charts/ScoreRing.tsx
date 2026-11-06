@@ -181,7 +181,7 @@ export function ScoreRing({
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 4,
+            gap: cg.space[1],
             color: tone.fg,
             fontWeight: 600,
           }}

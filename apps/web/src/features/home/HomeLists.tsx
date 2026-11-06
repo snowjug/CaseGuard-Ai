@@ -56,7 +56,13 @@ const useStyles = makeStyles({
     ':hover': { backgroundColor: cg.surfaceSunken },
     ':focus-visible': { outline: `2px solid ${cg.focus}`, outlineOffset: '-2px' },
   },
-  main: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: '1 1 auto' },
+  main: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[1],
+    minWidth: 0,
+    flex: '1 1 auto',
+  },
   reference: {
     fontFamily: cg.font.mono,
     fontSize: tokens.fontSizeBase200,
@@ -73,7 +79,7 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-end',
-    gap: '2px',
+    gap: cg.space[1],
     flexShrink: 0,
   },
   score: {

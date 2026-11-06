@@ -101,7 +101,7 @@ const useStyles = makeStyles({
   badge: {
     marginInlineStart: 'auto',
     minWidth: '22px',
-    padding: '0 6px',
+    padding: `0 ${cg.space[2]}`,
     borderRadius: cg.radius.pill,
     textAlign: 'center',
     fontSize: tokens.fontSizeBase100,

@@ -1,11 +1,13 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { palettes } from '@caseguard/ui/server';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 /**
  * One source of truth for colour: `packages/ui/src/tokens/palette.ts`. Components read it through `cg.*`; nothing else
- * may carry a colour of its own. These checks keep it that way.
+ * may carry a colour of its own. Spacing and corner radii are the same: `cg.space` and `cg.radius`. These checks keep it
+ * that way.
  */
 
 // Vitest runs from the package directory (`apps/web`), two levels below the repository root.
@@ -90,5 +92,74 @@ describe('[UI-TOKENS-02] the stylesheet repeats no colour the palette does not h
     };
     expectChrome(block('--cg-canvas: #'), 'light');
     expectChrome(block(":root[data-cg-theme='dark']"), 'dark');
+  });
+});
+
+/** A fixed length (`4px`, `0.5rem`) written in a style value. Relative units (`em`, `%`) are layout, not spacing. */
+const LENGTH = /-?(?:\d+\.?\d*|\.\d+)(?:px|rem)\b/g;
+const SPACING = /^(?:gap|rowGap|columnGap|padding\w*|margin\w*)$/;
+const RADIUS = /^borderRadius$/;
+
+/** Every `gap`, `padding*`, `margin*` and `borderRadius` in the style objects of a source file that holds a fixed length. */
+function fixedLengths(file: string): string[] {
+  const text = readFileSync(join(ROOT, file), 'utf8');
+  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const found: string[] = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isPropertyAssignment(node) &&
+      (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name))
+    ) {
+      const name = node.name.text;
+      const radius = RADIUS.test(name);
+      if (radius || SPACING.test(name)) {
+        const initializer = node.initializer;
+        const lengths: string[] = [];
+        const collect = (inner: ts.Node): void => {
+          if (ts.isStringLiteralLike(inner)) lengths.push(...(inner.text.match(LENGTH) ?? []));
+          else if (
+            ts.isTemplateHead(inner) ||
+            ts.isTemplateMiddle(inner) ||
+            ts.isTemplateTail(inner)
+          )
+            lengths.push(...(inner.text.match(LENGTH) ?? []));
+          else if (
+            ts.isNumericLiteral(inner) &&
+            Number(inner.text) !== 0 &&
+            ts.isPropertyAssignment(inner.parent)
+          )
+            lengths.push(inner.text);
+          ts.forEachChild(inner, collect);
+        };
+        collect(initializer);
+        // A one-pixel overlap or offset (a hairline) is not a spacing decision; a corner radius never is one.
+        const real = lengths.filter(
+          (length) =>
+            radius || !/^-?(?:0|1)(?:\.0+)?px$/.test(length) || !name.startsWith('margin'),
+        );
+        if (real.length > 0) {
+          const { line } = source.getLineAndCharacterOfPosition(node.getStart());
+          found.push(`${file}:${line + 1} ${node.getText()}`);
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found;
+}
+
+describe('[UI-TOKENS-03] spacing and corner radii come from the scales', () => {
+  // The investigation graph is positioned in SVG user units, which are not CSS lengths.
+  const SVG_UNITS = new Set(['packages/ui/src/graph/layout.ts']);
+
+  it('has no fixed gap, padding, margin or corner radius in any component or page', () => {
+    const files = [
+      ...sources(join(ROOT, 'apps/web/src')),
+      ...sources(join(ROOT, 'packages/ui/src')),
+    ]
+      .map((path) => relative(ROOT, path))
+      .filter((file) => !SVG_UNITS.has(file));
+    expect(files.flatMap(fixedLengths)).toEqual([]);
   });
 });

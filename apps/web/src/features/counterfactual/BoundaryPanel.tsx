@@ -10,7 +10,14 @@ const useStyles = makeStyles({
   stack: { display: 'flex', flexDirection: 'column', gap: cg.space[3], minWidth: 0 },
   head: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
   lead: { display: 'flex', alignItems: 'flex-start', gap: cg.space[2] },
-  leadIcon: { flexShrink: 0, marginTop: '2px', color: cg.textSecondary, fontSize: '18px' },
+  leadIcon: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    flexShrink: 0,
+    height: tokens.lineHeightBase300,
+    color: cg.textSecondary,
+    fontSize: '18px',
+  },
   text: {
     margin: 0,
     fontSize: tokens.fontSizeBase300,

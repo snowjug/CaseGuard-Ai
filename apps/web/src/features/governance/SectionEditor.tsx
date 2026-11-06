@@ -49,7 +49,7 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase300,
     display: 'flex',
     flexDirection: 'column',
-    gap: '2px',
+    gap: cg.space[1],
   },
   code: { fontFamily: cg.font.mono, fontSize: tokens.fontSizeBase200 },
 });

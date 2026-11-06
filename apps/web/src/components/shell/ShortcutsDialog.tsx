@@ -17,7 +17,7 @@ const useStyles = makeStyles({
   setting: { display: 'flex', flexDirection: 'column', gap: cg.space[1] },
   settingText: {
     margin: 0,
-    paddingLeft: '44px',
+    paddingLeft: `calc(${cg.space[10]} + ${cg.space[1]})`,
     fontSize: tokens.fontSizeBase200,
     color: cg.textSecondary,
   },
