@@ -206,10 +206,20 @@ export function AccountMenu({ compact = false, railHidesText = false }: AccountM
               Switch persona…
             </MenuItem>
           ) : null}
-          <MenuItemCheckbox name="settings" value="motion" icon={<WindIcon />}>
+          <MenuItemCheckbox
+            name="settings"
+            value="motion"
+            icon={<WindIcon />}
+            persistOnClick={false}
+          >
             Reduce motion
           </MenuItemCheckbox>
-          <MenuItemCheckbox name="settings" value="present" icon={<PresentationIcon />}>
+          <MenuItemCheckbox
+            name="settings"
+            value="present"
+            icon={<PresentationIcon />}
+            persistOnClick={false}
+          >
             Presentation mode
           </MenuItemCheckbox>
           <MenuItem icon={<KeyboardIcon />} onClick={() => setShortcutsOpen(true)}>
