@@ -9,7 +9,6 @@ import { makeStyles, tokens } from '@fluentui/react-components';
  */
 export const useSkillStyles = makeStyles({
   page: { display: 'flex', flexDirection: 'column', gap: cg.space[6], minWidth: 0 },
-  busy: { opacity: 0.72 },
   stack: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
   tight: { display: 'flex', flexDirection: 'column', gap: cg.space[2], minWidth: 0 },
   row: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },

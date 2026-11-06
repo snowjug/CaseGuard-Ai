@@ -110,10 +110,8 @@ export const useUsageStyles = makeStyles({
     color: cg.text,
     overflowWrap: 'anywhere',
   },
-  mono: { fontFamily: cg.font.mono, fontSize: tokens.fontSizeBase200, overflowWrap: 'anywhere' },
   cellStack: { display: 'flex', flexDirection: 'column', gap: cg.space[1], minWidth: 0 },
   cellMuted: { fontSize: tokens.fontSizeBase200, color: cg.textMuted },
-  inline: { display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: cg.space[2] },
   use: { display: 'flex', alignItems: 'center', gap: cg.space[2], minWidth: '120px' },
   useBar: { flex: '1 1 auto', minWidth: 0 },
   footer: {

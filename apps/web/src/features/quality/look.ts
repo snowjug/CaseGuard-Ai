@@ -3,10 +3,7 @@
 import { cg } from '@caseguard/ui';
 import { makeStyles, tokens } from '@fluentui/react-components';
 
-/**
- * Text and layout pieces shared by the redesigned Score and Quality screens. (`useInsightStyles` in `styles.ts` is the
- * older set that the Skills and Usage and cost screens still use; it is left as it is.)
- */
+/** Text and layout pieces shared by the Score and Quality screens. */
 export const useLook = makeStyles({
   page: { display: 'flex', flexDirection: 'column', gap: cg.space[6], minWidth: 0 },
   stack: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
@@ -61,5 +58,4 @@ export const useLook = makeStyles({
   },
   mono: { fontFamily: cg.font.mono, fontSize: tokens.fontSizeBase200, overflowWrap: 'anywhere' },
   fill: { height: '100%', boxSizing: 'border-box' },
-  numeric: { fontVariantNumeric: 'tabular-nums' },
 });
