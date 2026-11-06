@@ -47,7 +47,7 @@ is recorded here (CodeQL runs on pushes and pull requests to `main`, which does 
 
 | Group       | Sections                                                                                                                                                                                                                                                                                                                                                           |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| The product | [Overview](#thirty-second-overview) · [Problem](#problem) · [Why existing approaches fall short](#why-existing-approaches-are-insufficient) · [Solution](#solution) · [Key innovation](#key-innovation) · [Screenshots](#product-screenshots) · [Capabilities](#main-capabilities) · [End-to-end use case](#end-to-end-use-case)                                   |
+| The product | [Overview](#thirty-second-overview) · [Problem](#problem) · [Why existing approaches fall short](#why-existing-approaches-are-insufficient) · [Solution](#solution) · [Key innovation](#key-innovation) · [UI](#ui) · [Screenshots](#product-screenshots) · [Capabilities](#main-capabilities) · [End-to-end use case](#end-to-end-use-case)                       |
 | The ideas   | [Counterfactual analysis](#counterfactual-analysis) · [Evidence integrity](#evidence-integrity-model) · [Case Quality Index](#case-quality-index) · [Avoidable Support Effort](#avoidable-support-effort) · [SkillDNA](#skilldna) · [Token and compute efficiency](#token-and-compute-efficiency) · [Trust and responsible AI](#trust-security-and-responsible-ai) |
 | The system  | [Architecture](#architecture) · [Diagrams](#architecture-diagram) ([data flow](#data-flow-diagram), [sequence](#sequence-diagram), [domain model](#domain-model)) · [Azure resources](#azure-resources)                                                                                                                                                            |
 | Run it      | [Local development](#local-development) · [Environment variables](#environment-variables) · [Mock AI](#running-with-mock-ai) · [Azure OpenAI](#running-with-azure-openai) · [Tests](#running-tests) · [Deploying to Azure](#deploying-to-azure) · [CI/CD](#cicd)                                                                                                   |
@@ -123,6 +123,36 @@ every skill approval. Nothing closes a case automatically and nothing ranks a pe
    using only what was known at that case's first email.
 4. **Honest by construction.** Every score carries a range, a basis and a label (estimated, simulated, measured, synthetic), and the
    interface says so on every page.
+
+## UI
+
+The interface answers one question in five seconds: how did this case go, and what should I fix first.
+
+![Home in the dark theme: the latest review as a score ring with one line of why, the first fixes beside it, and the three steps](docs/screenshots/home-dark.png)
+
+- **Three steps:** add a case, see the review, fix what matters. Home always shows them, with the score ring and the first
+  fix, and the empty states say what to do next, including "Try a sample case".
+- **Five navigation items:** Home, Cases, Quality, Skills and Advanced. A case opens as tabs (Review, Score, Evidence, What if,
+  Timeline, and More for Possible causes, Case details and Report); settings, usage and cost, system status and the guided
+  demo live under Advanced. `Ctrl` or `⌘` + `K` opens a command palette that jumps to any page, starts a new case, switches the
+  theme and opens Advanced.
+- **Result first:** a verdict or a big figure, one line of why, then the first three fixes with one-click copy. Detail opens on
+  demand (accordions, drawers, tabs), and every score keeps its range, its basis and its label (Estimated, Simulated or Demo data).
+- **Dark and light themes** that follow the system on the first visit, are remembered, and never flash the wrong colours. Colour,
+  spacing and corner radii are defined once in `packages/ui/src/tokens`; a test fails on a literal that bypasses them. Motion is
+  short, never blocks a task, never loops on content and is off under reduced motion.
+- **Accessible and responsive:** axe finds no violation on the 19 views and 42 states of the end-to-end suite in either theme at
+  1440 px, nor on the nine key pages at 390 px. Controls are at least 44 px tall on a touch screen (the small event marks that
+  the Timeline chart draws are the exception; every event also has a full-size row), and no page scrolls sideways from 320 to
+  1920 px (a bottom bar replaces the sidebar on a phone).
+
+![The review in the light theme: the verdict ring beside the first fix, with the section links above](docs/screenshots/review-light.png)
+
+More screenshots (twelve, dark and light, desktop and phone) are in [docs/screenshots](docs/screenshots/). The spec, the log
+of the redesign, the baseline and the screenshots from before it are in [docs/ui-redesign](docs/ui-redesign/):
+[DESIGN.md](docs/ui-redesign/DESIGN.md), [PROGRESS.md](docs/ui-redesign/PROGRESS.md), [baseline.md](docs/ui-redesign/baseline.md)
+and the [before screenshots](docs/ui-redesign/before/). The decision to build the kit on Fluent is
+[ADR 0013](docs/adr/0013-ui-kit-on-fluent.md).
 
 ## Product screenshots
 
