@@ -216,6 +216,18 @@ svg.lucide {
   animation-delay: calc(var(--cg-stagger, 0) * 40ms);
 }
 
+/* The arc of a score ring draws itself once (the path has `pathLength="100"`). */
+@keyframes cg-ring-sweep {
+  from {
+    stroke-dashoffset: 100;
+  }
+}
+
+.cg-ring-arc {
+  stroke-dasharray: 100 100;
+  animation: cg-ring-sweep var(--cg-motion-slow) var(--cg-motion-easing) both;
+}
+
 /* The primary button's glint: one pass across the button on hover or focus, never a loop. */
 @keyframes cg-glint {
   from {
