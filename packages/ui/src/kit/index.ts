@@ -8,6 +8,7 @@ export * from './Drawer';
 export * from './Field';
 export * from './Kbd';
 export * from './Logo';
+export * from './RelativeTime';
 export * from './SegmentedControl';
 export * from './Skeleton';
 export * from './StatCard';

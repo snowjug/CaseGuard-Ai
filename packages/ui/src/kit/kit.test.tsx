@@ -20,6 +20,7 @@ import {
   IconButton,
   Input,
   Logo,
+  RelativeTime,
   SegmentedControl,
   Select,
   Skeleton,
@@ -29,6 +30,7 @@ import {
   Tabs,
   Textarea,
   ThemeToggle,
+  formatRelative,
 } from '.';
 
 afterEach(() => reducedMotionStore.set('system'));
@@ -220,6 +222,35 @@ describe('Accordion', () => {
     await userEvent.click(trigger);
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(region).toHaveAttribute('inert');
+  });
+});
+
+describe('RelativeTime', () => {
+  it('says how long ago in words, keeps the exact UTC time in the tooltip and for screen readers, and rounds a week or more to the date', () => {
+    const now = Date.parse('2026-11-06T12:00:00.000Z');
+    expect(formatRelative(new Date('2026-11-06T11:59:40.000Z'), now)).toBe('just now');
+    expect(formatRelative(new Date('2026-11-06T11:15:00.000Z'), now)).toBe('45 minutes ago');
+    expect(formatRelative(new Date('2026-11-06T09:00:00.000Z'), now)).toBe('3 hours ago');
+    expect(formatRelative(new Date('2026-11-05T12:00:00.000Z'), now)).toBe('yesterday');
+    expect(formatRelative(new Date('2026-11-08T12:00:00.000Z'), now)).toBe('in 2 days');
+    expect(formatRelative(new Date('2026-10-01T08:00:00.000Z'), now)).toBe('1 Oct 2026');
+
+    const value = new Date(Date.now() - 3 * 3_600_000).toISOString();
+    renderWithTheme(<RelativeTime value={value} />);
+    const time = screen.getByText(/3 hours ago/).closest('time');
+    expect(time).toHaveAttribute('datetime', value);
+    expect(time).toHaveAttribute('title', expect.stringMatching(/UTC$/));
+    expect(time).toHaveTextContent(/\(.+UTC\)/);
+  });
+
+  it('shows a dash for a missing or invalid value', () => {
+    renderWithTheme(
+      <>
+        <RelativeTime value={null} />
+        <RelativeTime value="not a date" />
+      </>,
+    );
+    expect(screen.getAllByText('—')).toHaveLength(2);
   });
 });
 
