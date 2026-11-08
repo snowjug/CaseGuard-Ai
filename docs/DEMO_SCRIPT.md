@@ -315,8 +315,8 @@ micro-benchmarks on one machine, not a service-level objective.
 **How was it tested, and is it accessible?**
 Unit, property, integration and end-to-end tests, with axe checks on every page in light and dark themes: in CI run 41546529865,
 6,152 unit tests passed and none failed, 1,033 integration tests passed and none failed, and all 374 Playwright tests passed (the axe
-checks are among them; no separate count was recorded). That run is on an unmerged branch, and the 27 runs before the foundation
-work all failed, so the default branch has no green run. The
+checks are among them; no separate count was recorded). That run is on the branch `build/wave-1`, and the 27 runs before the foundation
+work all failed; pull request #14, which brought the work to `main`, was fully green too, but `ci.yml` does not run on pushes to `main`. The
 integration tests ran on PostgreSQL 16 in CI; locally the suites that use a database run on PGlite.
 
 **What is the licence, and what is built on what?**
@@ -325,7 +325,7 @@ Fluent UI, Fastify, Zod, PGlite, Playwright, and others, listed in the README). 
 agents under the owner's direction.
 
 **What would you do next?**
-Merge the green foundation work so the default branch is green (CI has been green only on unmerged branches); deploy a dev environment and validate Entra, Blob and AI Search for real; evaluate a
+Start CI on `main` and keep it green (the foundation work is on `main`; CI has been green on the build branches and on pull request #14); deploy a dev environment and validate Entra, Blob and AI Search for real; evaluate a
 real model against the harness; build a human-labelled evaluation set; then a durable job queue and enforced retention
 ([ROADMAP.md](ROADMAP.md)).
 
@@ -340,7 +340,7 @@ Say at least the first four before anyone asks.
 - **Reading a case review or exporting a report is not audited** (PL-15).
 - **Every score is an estimate** from authored priors; none has been validated against real cases or by human labellers.
 - **No real language model has been called**; Azure OpenAI, Entra, Blob, AI Search and Monitor were validated against mocks only.
-- **Nothing has been deployed to Azure**, no Docker image was built locally (CI builds them), and CI is green only on unmerged branches.
+- **Nothing has been deployed to Azure**, no Docker image was built locally (CI builds them), and CI ran green on the build branches and on pull request #14, not on pushes to `main`.
 - PostgreSQL ran only in the CI integration job (1,033 passed, 0 failed); no Azure Database for PostgreSQL was used, so
   row-level-security parity on a managed server is unverified.
 - One workload (Microsoft Teams sign-in); redaction is pattern-based; malware scanning is a stub; prompt-injection screening

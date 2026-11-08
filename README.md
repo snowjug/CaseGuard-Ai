@@ -19,11 +19,14 @@ The logo is the name in text plus the web app's own mark ([`apps/web/src/app/ico
 nodes for evidence, a decision fork and a hypothesis); besides the screenshots below, no other image asset is shipped. The badges
 are the workflows in [`.github/workflows`](.github/workflows) (`ci`, `codeql`, `dependency-review` and the manual `deploy`;
 `deploy-environment` is the reusable part of `deploy` and has no badge of its own). **A badge reports the latest run of its workflow
-on the default branch.** Before the foundation work all 27 CI runs failed; the first fully green run
-(41495498658) is on the unmerged branch `build/p0-foundation`, and `build/wave-1` is green too (for example run 41546529865), so
-the CI badge cannot show a pass until that work reaches the default branch. Dependency review (13 runs, all failed) fails because the repository's
-Dependency graph setting is off. No CodeQL or Deploy run
-is recorded here (CodeQL runs on pushes and pull requests to `main`, which does not exist yet, on a weekly schedule and on demand), so those two badges say nothing yet.
+on the default branch, which is `main`.** `main` was created on 8 November 2026, at the owner's request, from the tip of the
+interface redesign branch, so it holds all the work of the build branches and of the redesign; the earlier default branch,
+`feat/caseguard-ai-platform`, is unchanged. Before the foundation work all 27 CI runs failed; the first fully green run
+(41495498658) is on the branch `build/p0-foundation`, `build/wave-1` is green too (for example run 41546529865), and so is pull
+request #14, which brought the work to `main` (run 42299024612, 8 of 8 jobs). `ci.yml` does not run on pushes to `main`, only on pull
+requests, on other branches and by hand, so the CI badge shows a pass only after a run on `main`. Dependency review (14 runs, all
+failed) fails because the repository's Dependency graph setting is off. CodeQL runs on pushes and pull requests to `main`, on a weekly
+schedule and on demand; no CodeQL or Deploy run was recorded before `main` was created, so those two badges may say nothing yet.
 
 **Hackathon track: C+AI Hack for Quality.**
 
@@ -34,10 +37,11 @@ is recorded here (CodeQL runs on pushes and pull requests to `main`, which does 
 > smoke-tests them (run 41546529865: both were built and the compose smoke test passed 12 checks). The data tier is exercised on
 > **PGlite** locally and on PostgreSQL 16 in the CI integration job.
 > **CI was never fully green until the foundation branch**: all 27 earlier runs failed (the one on `2ecb454`, run 41182982903,
-> had only the production build fully green). The first fully green run is 41495498658 on the unmerged branch
+> had only the production build fully green). The first fully green run is 41495498658 on the branch
 > `build/p0-foundation`; run 41546529865 on `build/wave-1` is fully green too (8 of 8 jobs: 6,152 unit tests, 1,033 integration tests on
-> PostgreSQL 16 and 374 end-to-end tests passed, none failed; see [Running tests](#running-tests)). None of this has reached the
-> default branch.
+> PostgreSQL 16 and 374 end-to-end tests passed, none failed; see [Running tests](#running-tests)), and so is run 42299024612 on pull
+> request #14 (the interface redesign and everything before it). All of this has been on `main`, the default branch, since 8 November
+> 2026; `ci.yml` does not run on pushes to `main` (it runs on pull requests, on other branches and by hand).
 > Every score is an **estimate**, shown with its basis and range. CaseGuard AI is not a Microsoft product.
 > The repository is **UNLICENSED** (the owner has to choose a license). One known HIGH advisory (`@azure/msal-node`, reached through
 > `@azure/identity`) is carried as a time-boxed exception until 2027-01-15 and needs a human to accept the risk or upgrade.
@@ -395,16 +399,16 @@ simulated better path, an estimated saving of 80.7 percent.
 
 ## Trust, security, and responsible AI
 
-| Control                  | What it does                                                                                                                                                                               | Status                                                                                                                             |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Tenant isolation         | The tenant comes from the credential only; tenant-scoped repositories, composite keys and forced row-level security                                                                        | Tested on PGlite; CI on PostgreSQL 16: 1,011 passed, 0 failed; **not verified on a managed server**                                |
-| Identity                 | Development persona login only for `APP_ENV` local or test (refused elsewhere); Microsoft Entra JWT validation for deployed environments                                                   | Persona login tested. Entra validation tested with locally generated keys only, never against a live tenant                        |
-| Authorization            | Five roles, 30 permissions, one declared permission per route, checked before the body is parsed                                                                                           | Implemented and tested                                                                                                             |
-| Input handling           | Size and type checks from the bytes, redaction of secrets and personal data (a tenant pattern that cannot be applied fails closed), prompt-injection screening that flags and never blocks | Redaction is pattern-based. The malware scanner is a stub (`not_scanned`): nothing scans uploads for malware                       |
-| AI boundary              | Minimised, redacted, delimited context; no tools; strict JSON; seven validators; repair once, then the deterministic result; a circuit breaker and token budgets                           | Tested with the deterministic provider and a mock Azure server; **no real model was ever called**                                  |
-| Audit                    | Per-tenant append-only hash chain, verified from the Settings and audit page                                                                                                               | Tamper-evident, not tamper-proof (no external anchor)                                                                              |
-| Web and API hardening    | Nonce-based CSP in the web tier, security headers, CORS allow-list, rate limits applied before authentication, idempotency keys                                                            | Tested locally; the client address behind the web tier is tested with simulated headers only                                       |
-| Secrets and supply chain | No secrets in the repository (scanner in the pre-commit hook and CI, gitleaks in CI), managed identity by design, CodeQL, dependency review and an audit gate in CI                        | CI is green only on unmerged branches; one time-boxed advisory exception for `@azure/msal-node` that needs a human risk acceptance |
+| Control                  | What it does                                                                                                                                                                               | Status                                                                                                                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tenant isolation         | The tenant comes from the credential only; tenant-scoped repositories, composite keys and forced row-level security                                                                        | Tested on PGlite; CI on PostgreSQL 16: 1,011 passed, 0 failed; **not verified on a managed server**                                                                                                      |
+| Identity                 | Development persona login only for `APP_ENV` local or test (refused elsewhere); Microsoft Entra JWT validation for deployed environments                                                   | Persona login tested. Entra validation tested with locally generated keys only, never against a live tenant                                                                                              |
+| Authorization            | Five roles, 30 permissions, one declared permission per route, checked before the body is parsed                                                                                           | Implemented and tested                                                                                                                                                                                   |
+| Input handling           | Size and type checks from the bytes, redaction of secrets and personal data (a tenant pattern that cannot be applied fails closed), prompt-injection screening that flags and never blocks | Redaction is pattern-based. The malware scanner is a stub (`not_scanned`): nothing scans uploads for malware                                                                                             |
+| AI boundary              | Minimised, redacted, delimited context; no tools; strict JSON; seven validators; repair once, then the deterministic result; a circuit breaker and token budgets                           | Tested with the deterministic provider and a mock Azure server; **no real model was ever called**                                                                                                        |
+| Audit                    | Per-tenant append-only hash chain, verified from the Settings and audit page                                                                                                               | Tamper-evident, not tamper-proof (no external anchor)                                                                                                                                                    |
+| Web and API hardening    | Nonce-based CSP in the web tier, security headers, CORS allow-list, rate limits applied before authentication, idempotency keys                                                            | Tested locally; the client address behind the web tier is tested with simulated headers only                                                                                                             |
+| Secrets and supply chain | No secrets in the repository (scanner in the pre-commit hook and CI, gitleaks in CI), managed identity by design, CodeQL, dependency review and an audit gate in CI                        | CI ran green on the build branches and on pull request #14, not on pushes to `main`, which `ci.yml` ignores; one time-boxed advisory exception for `@azure/msal-node` that needs a human risk acceptance |
 
 **Responsible AI.** Synthetic data only: the product says so everywhere, a tenant flagged synthetic refuses a payload declaring
 `"synthetic": false`, and redaction runs as a safety net, but nothing can prove that a payload is fictional (it is self-attested).
@@ -895,7 +899,7 @@ deterministic results, retrying every 60 seconds. Full rules: [AI_ORCHESTRATION.
 
 Everything below runs offline. Counts, timings and coverage are not repeated here from memory: each result cell is the outcome of
 [GitHub Actions run 41546529865](https://github.com/snowjug/CaseGuard-Ai/actions/runs/41546529865) (the CI workflow on commit
-`69c4c85` of the unmerged branch `build/wave-1`, 2026-11-02, fully green; the commits after it change documents and the tolerance
+`69c4c85` of the branch `build/wave-1`, 2026-11-02, fully green; the commits after it change documents and the tolerance
 of one property test, see [CI_CD.md](docs/CI_CD.md#9-what-was-and-was-not-validated)), a local measurement that says so, or "NOT RUN in CI". The 27 runs before the foundation work
 all failed; run 41182982903 on `2ecb454` is the last one whose counts were recorded, and run 41495498658 on `build/p0-foundation`
 (5,843 unit, 1,011 integration and 342 end-to-end tests) was the first fully green
@@ -941,12 +945,13 @@ cases are in [docs/runbooks](docs/runbooks/README.md).
 
 ## CI/CD
 
-Five workflows exist in [`.github/workflows`](.github/workflows). **Two have run on GitHub; CI is green only on the unmerged
-branches**: `ci.yml` ran 27 times before the foundation work and every run failed. Since then it has been fully green on
-`build/p0-foundation` (run 41495498658) and on `build/wave-1` (for example run 41546529865: 8 jobs, all green); the wave's own failed
+Five workflows exist in [`.github/workflows`](.github/workflows). **Two have run on GitHub; CI is green on the build branches and on
+pull request #14, and has no run of its own on `main`**: `ci.yml` ran 27 times before the foundation work and every run failed. Since
+then it has been fully green on `build/p0-foundation` (run 41495498658), on `build/wave-1` (for example run 41546529865: 8 jobs, all
+green) and on pull request #14 (run 42299024612: 8 jobs, all green; it does not run on pushes to `main`); the wave's own failed
 and cancelled runs, among them two whose unit job found a counterexample to a property test on a documents-only commit (test-side
-flaws, fixed), are accounted for in [CI_CD.md](docs/CI_CD.md#9-what-was-and-was-not-validated). `dependency-review.yml` has run 13 times and failed every
-time because the repository's Dependency graph setting is off. No CodeQL or deploy run is recorded here, so every statement about
+flaws, fixed), are accounted for in [CI_CD.md](docs/CI_CD.md#9-what-was-and-was-not-validated). `dependency-review.yml` has run 14 times and failed every
+time because the repository's Dependency graph setting is off. No CodeQL or deploy run was recorded when this was written, so every statement about
 those two is a reading of the configuration, not an observed result ([CI_CD.md](docs/CI_CD.md#9-what-was-and-was-not-validated)).
 
 | Workflow                                             | Trigger                                                                        | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -1060,7 +1065,7 @@ The complete, graded list is [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md). 
 
 - **No real language model has ever been called**; the Azure OpenAI provider was exercised only against a local mock server.
 - **Microsoft Entra ID, Azure Blob Storage and Azure AI Search were validated against fakes only**; **nothing has been deployed to
-  Azure**, no Docker image was built locally (CI builds them), and CI is green only on unmerged branches, not on the default branch.
+  Azure**, no Docker image was built locally (CI builds them), and no CI run is recorded on `main` itself (CI ran green on the build branches and on pull request #14).
 - **PostgreSQL ran only in the CI integration job**: local database tests run on PGlite (one connection), and CI run 41546529865 ran
   the integration tests on PostgreSQL 16 (1,033 passed, 0 failed), including the two-connection ingestion race (added in run
   41502284661), and a subset of the API suites also passed on a local PostgreSQL 16.15 server. No Azure Database for PostgreSQL was
@@ -1083,7 +1088,7 @@ The complete, graded list is [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md). 
 
 [ROADMAP.md](docs/ROADMAP.md) orders the work by what removes the largest unknown first. In short:
 
-1. **Prove what exists**: merge the green foundation work so the default branch is green (it is green only on unmerged branches); deploy a dev environment from the Bicep; validate Entra, Blob and AI Search for real;
+1. **Prove what exists**: start CI on `main` and keep it green (the foundation work is on `main`, and CI ran green on the build branches and on pull request #14); deploy a dev environment from the Bicep; validate Entra, Blob and AI Search for real;
    evaluate a real model; build a human-labelled evaluation set; observe the telemetry (and bridge the AI package's own metrics into
    the product registry).
 2. **Remove single points of failure**: a durable job queue with separate workers, shared limiters and caches, finished tenant
