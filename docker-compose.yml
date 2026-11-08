@@ -15,7 +15,7 @@ name: caseguard
 
 services:
   postgres:
-    image: postgres:16
+    image: postgres:18
     environment:
       POSTGRES_USER: caseguard
       # DEV ONLY default. Override with POSTGRES_PASSWORD in your shell or a local .env file
