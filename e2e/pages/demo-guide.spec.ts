@@ -1,7 +1,19 @@
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from '../support/fixtures';
 import { completedSteps, demoState, ensurePortfolioDemo, type DemoState } from '../support/api';
 import { confirmDialog } from '../support/flows';
-import { navLink, openPage, settle } from '../support/ui';
+import { mainRegion, openPage, settle } from '../support/ui';
+
+/**
+ * Opens a collapsed section of the page from its heading button and returns its content region. A closed section keeps
+ * its content mounted but clipped, so Playwright would call it visible: what proves it is open is `aria-expanded`.
+ */
+async function openSection(page: Page, name: RegExp): Promise<Locator> {
+  const trigger = page.getByRole('heading', { name }).getByRole('button');
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  return page.getByRole('region', { name });
+}
 
 const STEP_TITLES = [
   'Import Case One',
@@ -19,7 +31,7 @@ const STEP_TITLES = [
   'Outcomes compared',
 ] as const;
 
-test.describe('[FR-DEMO-01] Demo Guide: the 13-step story, derived from stored data', () => {
+test.describe('[FR-DEMO-01] Guided demo: the 13-step story, derived from stored data', () => {
   test('progress, the demo data and the next step come from the API, not from ticks', async ({
     page,
     demo,
@@ -28,7 +40,7 @@ test.describe('[FR-DEMO-01] Demo Guide: the 13-step story, derived from stored d
     const state = await api('engineer').getOk<DemoState>('/demo/state');
     expect(completedSteps(state)).toBe(13);
     await openPage(page, '/demo');
-    await expect(page.getByRole('heading', { level: 1, name: 'Demo Guide' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Guided demo' })).toBeVisible();
     const progress = page.getByRole('group', { name: 'Progress' });
     await expect(
       progress.getByRole('progressbar', { name: 'Demo progress: 13 of 13 steps complete' }),
@@ -36,7 +48,7 @@ test.describe('[FR-DEMO-01] Demo Guide: the 13-step story, derived from stored d
     await expect(progress).toContainText('13 of 13 steps complete');
     await expect(progress.getByText('Synthetic demonstration data')).toBeVisible();
 
-    const data = progress.locator('dl[aria-label="Demo data"]');
+    const data = progress.locator('dl[aria-label="Demo environment"]');
     await expect(data).toContainText('Deterministic');
     await expect(data.getByRole('link', { name: 'Open Case One' })).toHaveAttribute(
       'href',
@@ -62,7 +74,11 @@ test.describe('[FR-DEMO-01] Demo Guide: the 13-step story, derived from stored d
       'href',
       last!.route,
     );
-    await expect(navLink(page, 'Demo Guide')).toContainText('13 of 13');
+    // The navigation no longer lists the demo: the Advanced page does, with the same progress.
+    await openPage(page, '/advanced');
+    await expect(mainRegion(page).getByRole('link', { name: /^Guided demo/ })).toContainText(
+      '13 of 13',
+    );
   });
 
   test('the honest labels say what is synthetic, simulated and estimated', async ({
@@ -71,6 +87,7 @@ test.describe('[FR-DEMO-01] Demo Guide: the 13-step story, derived from stored d
   }) => {
     const state = await api('engineer').getOk<DemoState>('/demo/state');
     await openPage(page, '/demo');
+    await openSection(page, /^What is synthetic, simulated or estimated/);
     const labels = page.getByRole('list', { name: 'What is synthetic, simulated or estimated' });
     await expect(labels.getByRole('listitem')).toHaveCount(state.notices.length);
     await expect(labels).toContainText('The AI provider is the deterministic offline engine');
@@ -145,6 +162,8 @@ test.describe('[FR-DEMO-02] seeding and resetting are for administrators, and as
     page,
   }) => {
     await openPage(page, '/demo');
+    // The controls are in the section "Demo data tools", closed until it is opened.
+    await openSection(page, /^Demo data tools/);
     for (const name of ['Play the whole story', 'Start from step 1', 'Reset demo data']) {
       const control = page.getByRole('group', { name }).getByRole('button', { name });
       await expect(control, name).toBeDisabled();
@@ -166,6 +185,7 @@ test.describe('[FR-DEMO-02] seeding and resetting are for administrators, and as
       api,
     }) => {
       await openPage(page, '/demo');
+      await openSection(page, /^Demo data tools/);
       const before = completedSteps(await api('admin').getOk<DemoState>('/demo/state'));
       const cases: readonly (readonly [string, string, string])[] = [
         [
@@ -176,7 +196,7 @@ test.describe('[FR-DEMO-02] seeding and resetting are for administrators, and as
         [
           'Start from step 1',
           'Erase case data and start from step 1?',
-          'Users, governance settings and the audit trail are kept.',
+          'Users, settings and the audit trail are kept.',
         ],
         [
           'Reset demo data',
@@ -203,7 +223,7 @@ test.describe('[FR-DEMO-02] seeding and resetting are for administrators, and as
   });
 });
 
-test.describe('[FR-DEMO-03] the whole story can be played from the Demo Guide, and starts from step 1 again', () => {
+test.describe('[FR-DEMO-03] the whole story can be played from the Guided demo, and starts from step 1 again', () => {
   test.use({ persona: 'admin' });
   test.setTimeout(900_000);
   test.describe.configure({ mode: 'serial' });
@@ -217,6 +237,7 @@ test.describe('[FR-DEMO-03] the whole story can be played from the Demo Guide, a
     api,
   }) => {
     await openPage(page, '/demo');
+    await openSection(page, /^Demo data tools/);
     await page
       .getByRole('group', { name: 'Start from step 1' })
       .getByRole('button', { name: 'Start from step 1' })
@@ -243,6 +264,7 @@ test.describe('[FR-DEMO-03] the whole story can be played from the Demo Guide, a
   }) => {
     expect(completedSteps(await demoState())).toBe(0);
     await openPage(page, '/demo');
+    await openSection(page, /^Demo data tools/);
     await page
       .getByRole('group', { name: 'Play the whole story' })
       .getByRole('button', { name: 'Play the whole story' })

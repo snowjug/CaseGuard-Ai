@@ -1,11 +1,11 @@
 import {
-  CheckmarkCircleRegular,
-  DismissCircleRegular,
-  InfoRegular,
-  QuestionCircleRegular,
-  WarningRegular,
-  type FluentIcon,
-} from '@fluentui/react-icons';
+  CircleCheckIcon,
+  CircleHelpIcon,
+  CircleXIcon,
+  InfoIcon,
+  TriangleAlertIcon,
+  type LucideIcon,
+} from 'lucide-react';
 import type { ToneName } from '../tokens/palette';
 import type { PatternKind } from './patterns';
 
@@ -15,46 +15,47 @@ export type BadgeStatus = 'productive' | 'uncertain' | 'unsupported' | 'missing'
 export interface StatusMeta {
   label: string;
   tone: ToneName;
-  icon: FluentIcon;
+  icon: LucideIcon;
+  /** Texture used where several statuses share a chart or the graph; badges rely on icon and word instead. */
   pattern: PatternKind;
   /** One-line meaning, used by legends and screen-reader text. */
   description: string;
 }
 
-/** Grammar from UI_SPEC section 1: colour + icon + label + pattern for every status. */
+/** Grammar of every status: colour plus icon plus word (and a texture in charts), so colour is never alone. */
 export const STATUS_META: Record<BadgeStatus, StatusMeta> = {
   productive: {
     label: 'Productive',
     tone: 'productive',
-    icon: CheckmarkCircleRegular,
+    icon: CircleCheckIcon,
     pattern: 'solid',
     description: 'Advanced the investigation with supporting evidence',
   },
   uncertain: {
     label: 'Uncertain',
     tone: 'uncertain',
-    icon: WarningRegular,
+    icon: TriangleAlertIcon,
     pattern: 'dots',
     description: 'Outcome or support is not yet established',
   },
   unsupported: {
     label: 'Unsupported',
     tone: 'unsupported',
-    icon: DismissCircleRegular,
+    icon: CircleXIcon,
     pattern: 'crosshatch',
     description: 'Not supported by the available evidence',
   },
   missing: {
     label: 'Missing',
     tone: 'missing',
-    icon: QuestionCircleRegular,
+    icon: CircleHelpIcon,
     pattern: 'outline',
     description: 'Expected evidence has not been collected',
   },
   neutral: {
     label: 'Neutral',
     tone: 'neutral',
-    icon: InfoRegular,
+    icon: InfoIcon,
     pattern: 'solid',
     description: 'No quality judgement attached',
   },

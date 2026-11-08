@@ -1,168 +1,172 @@
 'use client';
 
-import { PARTICIPANT_ROLE_LABELS, type Claim, EVIDENCE_CATEGORY_LABELS } from '@caseguard/schemas';
+import { PARTICIPANT_ROLE_LABELS, EVIDENCE_CATEGORY_LABELS, type Claim } from '@caseguard/schemas';
 import {
+  Badge,
+  Button,
   ProvenanceBadge,
   StatusBadge,
   UiLink,
   cg,
   formatDateTimeUtc,
-  formatProbability,
 } from '@caseguard/ui';
-import { Button, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
-import { SearchRegular } from '@fluentui/react-icons';
-import { CategoryBadge } from '../../components/case/CategoryBadge';
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { ChevronRightIcon, CircleDashedIcon } from 'lucide-react';
 import { ExpandableText } from '../../components/case/ExpandableText';
-import { METHOD_LABELS, REVIEW_STATE_LABELS } from '../../components/case/labels';
+import { REVIEW_STATE_LABELS } from '../../components/case/labels';
 import { evidenceLinkHref } from '../../lib/deep-links';
 import { clipText } from '../../lib/text';
+import { EvidenceCategoryBadge } from './category-meta';
 import { CLAIM_FLAG_LABELS, isCorrected } from './ledger-filters';
 
 const useStyles = makeStyles({
-  card: {
+  row: {
     display: 'flex',
     flexDirection: 'column',
     gap: cg.space[2],
-    padding: cg.space[3],
-    borderRadius: cg.radius.lg,
-    border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surface,
+    boxSizing: 'border-box',
     minWidth: 0,
-    marginBottom: cg.space[3],
+    padding: `${cg.space[4]} ${cg.space[6]}`,
+    transitionProperty: 'background-color',
+    transitionDuration: cg.motion.fast,
+    ':hover': { backgroundColor: `color-mix(in srgb, ${cg.text} 4%, transparent)` },
+    '@media (max-width: 639px)': { padding: cg.space[4] },
   },
   selected: {
-    boxShadow: `inset 4px 0 0 ${cg.tone.brand.solid}`,
+    boxShadow: `inset 3px 0 0 ${cg.tone.brand.solid}`,
     backgroundColor: cg.tone.brand.tint,
+    ':hover': { backgroundColor: cg.tone.brand.tint },
   },
-  head: {
+  top: {
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: `${cg.space[1]} ${cg.space[3]}`,
-    color: cg.textSecondary,
-    fontSize: tokens.fontSizeBase200,
+    justifyContent: 'space-between',
+    gap: `${cg.space[2]} ${cg.space[3]}`,
   },
-  time: {
-    color: cg.text,
-    fontWeight: tokens.fontWeightSemibold,
-    fontVariantNumeric: 'tabular-nums',
+  badges: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: cg.space[2],
+    minWidth: 0,
   },
-  badges: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[1] },
   note: { margin: 0, color: cg.textSecondary, fontSize: tokens.fontSizeBase200 },
-  chips: {
+  bottom: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: cg.space[1],
-    margin: 0,
-    padding: 0,
-    listStyle: 'none',
-  },
-  chip: {
-    display: 'inline-flex',
     alignItems: 'center',
-    minHeight: '22px',
-    padding: `0 ${cg.space[2]}`,
-    borderRadius: cg.radius.pill,
-    border: `1px solid ${cg.borderControl}`,
-    backgroundColor: cg.surface,
+    justifyContent: 'space-between',
+    gap: `${cg.space[1]} ${cg.space[3]}`,
+  },
+  source: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: `${cg.space[1]} ${cg.space[2]}`,
+    margin: 0,
+    minWidth: 0,
     color: cg.textSecondary,
     fontSize: tokens.fontSizeBase200,
   },
+  time: { fontVariantNumeric: 'tabular-nums' },
   link: {
     display: 'inline-flex',
     alignItems: 'center',
     minHeight: '24px',
     color: cg.textLink,
+    fontWeight: tokens.fontWeightSemibold,
     textDecorationLine: 'none',
     ':hover': { textDecorationLine: 'underline' },
+    '@media (pointer: coarse)': { minHeight: '44px' },
   },
 });
+
+/** Where a claim stands with the reviewers: a quiet outline until someone has decided, then the decision in a status colour. */
+export function ReviewStateBadge({ state }: { state: Claim['reviewState'] }) {
+  const review = REVIEW_STATE_LABELS[state];
+  if (state === 'pending') {
+    return (
+      <Badge tone="neutral" size="sm" outlined icon={<CircleDashedIcon />}>
+        {review.label}
+      </Badge>
+    );
+  }
+  return <StatusBadge status={review.status} label={review.label} size="small" />;
+}
 
 export interface ClaimRowProps {
   caseId: string;
   claim: Claim;
   selected: boolean;
   asOf: string | null;
-  hypothesisName: (id: string) => string;
   onSelect: (claimId: string) => void;
 }
 
-/** One claim of the ledger: its category (and the original AI classification if a reviewer changed it), text and context. */
-export function ClaimRow({
-  caseId,
-  claim,
-  selected,
-  asOf,
-  hypothesisName,
-  onSelect,
-}: ClaimRowProps) {
+/**
+ * One claim of the list, kept to what answers "what is this based on?" at a glance: its category (and a quality flag, if
+ * it has one), the claim, where it came from, and whether a reviewer has decided. Everything else is in the drawer.
+ */
+export function ClaimRow({ caseId, claim, selected, asOf, onSelect }: ClaimRowProps) {
   const styles = useStyles();
-  const review = REVIEW_STATE_LABELS[claim.reviewState];
   const corrected = isCorrected(claim);
   const eventQuery = asOf ? `&asOf=${encodeURIComponent(asOf)}` : '';
   return (
     <article
       aria-label={`${EVIDENCE_CATEGORY_LABELS[claim.category]}: ${clipText(claim.text, 80)}`}
       aria-current={selected ? 'true' : undefined}
-      className={mergeClasses(styles.card, selected && styles.selected)}
+      className={mergeClasses(styles.row, selected && styles.selected)}
     >
-      <div className={styles.head}>
-        <CategoryBadge category={claim.category} />
-        {claim.simulated ? <ProvenanceBadge kind="simulated" /> : null}
-        <time className={styles.time} dateTime={claim.timestamp}>
-          {formatDateTimeUtc(claim.timestamp)}
-        </time>
-        {claim.authorRole ? <span>{PARTICIPANT_ROLE_LABELS[claim.authorRole]}</span> : null}
-        {claim.eventId ? (
-          <UiLink
-            href={`${evidenceLinkHref(caseId, { type: 'event', id: claim.eventId })}${eventQuery}`}
-            className={styles.link}
-          >
-            Event {claim.eventId}
-          </UiLink>
-        ) : null}
+      <div className={styles.top}>
+        <div className={styles.badges}>
+          <EvidenceCategoryBadge category={claim.category} />
+          {claim.simulated ? <ProvenanceBadge kind="simulated" /> : null}
+          {claim.flags.map((flag) => (
+            <StatusBadge
+              key={flag}
+              status="unsupported"
+              size="small"
+              label={CLAIM_FLAG_LABELS[flag]}
+            />
+          ))}
+        </div>
+        {claim.reviewState !== 'pending' ? <ReviewStateBadge state={claim.reviewState} /> : null}
       </div>
       <ExpandableText text={claim.text} lines={3} label="claim text" />
-      <div className={styles.badges}>
-        <span className={styles.note}>
-          Confidence {formatProbability(claim.confidence)} (estimate)
-        </span>
-        <span className={styles.note}>{METHOD_LABELS[claim.method]}</span>
-        {claim.reviewState !== 'pending' ? (
-          <StatusBadge status={review.status} label={review.label} size="small" />
-        ) : null}
-        {corrected ? (
-          <span className={styles.note}>
-            Originally classified by the AI as {EVIDENCE_CATEGORY_LABELS[claim.aiCategory]}
-          </span>
-        ) : null}
-        {claim.flags.map((flag) => (
-          <StatusBadge
-            key={flag}
-            status="unsupported"
-            size="small"
-            label={CLAIM_FLAG_LABELS[flag]}
-          />
-        ))}
-      </div>
-      {claim.relatedHypothesisIds.length > 0 ? (
-        <ul className={styles.chips} aria-label="Related hypotheses">
-          {claim.relatedHypothesisIds.slice(0, 4).map((id) => (
-            <li key={id} className={styles.chip}>
-              {hypothesisName(id)}
-            </li>
-          ))}
-          {claim.relatedHypothesisIds.length > 4 ? (
-            <li className={styles.chip}>+{claim.relatedHypothesisIds.length - 4} more</li>
-          ) : null}
-        </ul>
+      {corrected ? (
+        <p className={styles.note}>
+          Originally classified by the AI as {EVIDENCE_CATEGORY_LABELS[claim.aiCategory]}
+        </p>
       ) : null}
-      <div>
+      <div className={styles.bottom}>
+        <p className={styles.source}>
+          {claim.eventId ? (
+            <UiLink
+              href={`${evidenceLinkHref(caseId, { type: 'event', id: claim.eventId })}${eventQuery}`}
+              className={styles.link}
+            >
+              Event {claim.eventId}
+            </UiLink>
+          ) : (
+            <span>Not tied to one event</span>
+          )}
+          {claim.authorRole ? (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>{PARTICIPANT_ROLE_LABELS[claim.authorRole]}</span>
+            </>
+          ) : null}
+          <span aria-hidden="true">·</span>
+          <time className={styles.time} dateTime={claim.timestamp}>
+            {formatDateTimeUtc(claim.timestamp)}
+          </time>
+        </p>
         <Button
-          size="small"
-          appearance={selected ? 'primary' : 'outline'}
-          icon={<SearchRegular />}
-          aria-pressed={selected}
+          size="sm"
+          variant="ghost"
+          icon={<ChevronRightIcon />}
+          iconPosition="end"
+          aria-haspopup="dialog"
           aria-label={`Details of this claim: ${clipText(claim.text, 60)}`}
           onClick={() => onSelect(claim.id)}
         >

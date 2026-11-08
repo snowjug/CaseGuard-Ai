@@ -1,13 +1,31 @@
 'use client';
 
-import { EmptyState, LoadingSkeleton, Notice, Panel, ProvenanceBadge } from '@caseguard/ui';
-import { MoleculeRegular } from '@fluentui/react-icons';
-import { mergeClasses } from '@fluentui/react-components';
-import { LinkButton } from '../../components/common/LinkButton';
+import {
+  ButtonLink,
+  EmptyState,
+  LoadingSkeleton,
+  Notice,
+  Panel,
+  ProvenanceBadge,
+  cg,
+} from '@caseguard/ui';
+import { makeStyles, mergeClasses } from '@fluentui/react-components';
+import { PuzzleIcon } from 'lucide-react';
 import { useSkillMatchesAt } from '../quality/case-hooks';
 import { PanelBoundary } from '../quality/PanelBoundary';
-import { useInsightStyles } from '../quality/styles';
 import { SkillMatchCard } from './SkillMatchCard';
+
+const useStyles = makeStyles({
+  list: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[3],
+    margin: 0,
+    padding: 0,
+    listStyle: 'none',
+  },
+  busy: { opacity: 0.72 },
+});
 
 const HELP =
   'SkillDNA is a governed, reusable investigation plan distilled from a validated case. A match says how well a skill fits this case using only the evidence available at the time shown; the score is a model estimate. With the time cursor set, the match is recomputed from what was known then, and a skill extracted from this very case is not offered at an earlier moment (its conditions were learned partly from what happened later).';
@@ -22,9 +40,9 @@ export interface CaseSkillMatchesProps {
 }
 
 /**
- * The "SkillDNA" tab of a case: the skills that fit it at the time cursor, with the evidence for each fit. The matches
- * of another moment never stay on screen while the chosen one loads (they would claim a fit the evidence of this moment
- * does not support): the panel shows its loading state instead.
+ * The skills that fit a case at the time cursor, with the evidence for each fit (the "Skills" tab of a case's Score page).
+ * The matches of another moment never stay on screen while the chosen one loads (they would claim a fit the evidence of
+ * this moment does not support): the panel shows its loading state instead.
  */
 export function CaseSkillMatches({
   caseId,
@@ -32,7 +50,7 @@ export function CaseSkillMatches({
   ready = true,
   onWholeRecord,
 }: CaseSkillMatchesProps) {
-  const styles = useInsightStyles();
+  const styles = useStyles();
   const query = useSkillMatchesAt(caseId, asOf, ready);
   return (
     <Panel
@@ -45,9 +63,9 @@ export function CaseSkillMatches({
       help={HELP}
       actions={<ProvenanceBadge kind="estimated" />}
       footer={
-        <LinkButton href="/skills" appearance="outline">
-          Open the SkillDNA Library
-        </LinkButton>
+        <ButtonLink href="/skills" variant="secondary" icon={<PuzzleIcon />}>
+          Browse skills
+        </ButtonLink>
       }
     >
       {asOf ? (
@@ -59,7 +77,7 @@ export function CaseSkillMatches({
       ) : null}
       <PanelBoundary
         query={query}
-        subject="The SkillDNA matches"
+        subject="The skill matches"
         asOf={asOf}
         onWholeRecord={onWholeRecord}
         skeleton={<LoadingSkeleton variant="list" count={2} label="Loading SkillDNA matches" />}
@@ -68,12 +86,12 @@ export function CaseSkillMatches({
           <EmptyState
             compact
             headingLevel={3}
-            icon={<MoleculeRegular />}
+            icon={<PuzzleIcon />}
             title="No skill fits this case"
             description={
               asOf
                 ? 'No published skill matches what was known at this moment. Move the cursor later, or clear it.'
-                : 'No published or validated skill matches this case yet. Skills are extracted from an accepted counterfactual path and then governed through review.'
+                : 'No published or validated skill matches this case yet. Skills come from a safer path accepted on a case’s What if page, and are then checked step by step.'
             }
           />
         }

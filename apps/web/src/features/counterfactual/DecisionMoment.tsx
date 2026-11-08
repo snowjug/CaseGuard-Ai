@@ -3,6 +3,8 @@
 import type { DecisionFork, Evidence, ForkAlternative } from '@caseguard/schemas';
 import { ACTION_KIND_LABELS } from '@caseguard/schemas';
 import {
+  AccordionItem,
+  Card,
   KeyValueList,
   Notice,
   ProvenanceBadge,
@@ -48,14 +50,27 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     gap: cg.space[2],
-    padding: cg.space[3],
-    borderRadius: cg.radius.md,
-    border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surfaceSunken,
     minWidth: 0,
     listStyle: 'none',
   },
+  alternative: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[2],
+    minWidth: 0,
+    listStyle: 'none',
+    padding: `${cg.space[4]} 0`,
+    borderTop: `1px solid ${cg.borderSubtle}`,
+    ':first-child': { borderTop: 0, paddingTop: 0 },
+  },
   list: {
+    display: 'flex',
+    flexDirection: 'column',
+    margin: 0,
+    padding: 0,
+    listStyle: 'none',
+  },
+  evidenceList: {
     display: 'flex',
     flexDirection: 'column',
     gap: cg.space[2],
@@ -70,20 +85,6 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase300,
   },
   head: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
-  details: {
-    borderRadius: cg.radius.md,
-    border: `1px solid ${cg.borderSubtle}`,
-    padding: `${cg.space[1]} ${cg.space[3]}`,
-    backgroundColor: cg.surface,
-  },
-  summary: {
-    cursor: 'pointer',
-    minHeight: '32px',
-    display: 'flex',
-    alignItems: 'center',
-    fontWeight: tokens.fontWeightSemibold,
-    fontSize: tokens.fontSizeBase300,
-  },
   link: {
     color: cg.textLink,
     textDecorationLine: 'underline',
@@ -117,7 +118,7 @@ function AlternativeCard({
     return item ? [item] : [];
   });
   return (
-    <li className={styles.card}>
+    <li className={styles.alternative}>
       <div className={styles.head}>
         <strong>
           {rank}. {alternative.label}
@@ -166,16 +167,16 @@ function AlternativeCard({
       {alternative.requiresFirst.length > 0 ? (
         <p className={styles.muted}>Needs first: {alternative.requiresFirst.join('; ')}.</p>
       ) : null}
-      <details className={styles.details}>
-        <summary className={styles.summary}>
-          Evidence this alternative rests on ({alternative.supportingEvidenceIds.length})
-        </summary>
+      <AccordionItem
+        title={`Evidence this alternative rests on (${alternative.supportingEvidenceIds.length})`}
+        headingLevel={4}
+      >
         {alternative.supportingEvidenceIds.length === 0 ? (
           <p className={styles.text}>
             No evidence is cited: the alternative follows from the knowledge pack.
           </p>
         ) : evidence.length > 0 ? (
-          <ul className={styles.list}>
+          <ul className={styles.evidenceList}>
             {evidence.map((item) => (
               <EvidenceItem key={item.id} evidence={item} caseId={caseId} />
             ))}
@@ -194,7 +195,7 @@ function AlternativeCard({
             ))}
           </ul>
         )}
-      </details>
+      </AccordionItem>
     </li>
   );
 }
@@ -278,7 +279,7 @@ export function DecisionMoment({ fork, caseId, evidenceById }: DecisionMomentPro
           estimate.
         </p>
         {fork.alternatives.length === 0 ? (
-          <p className={styles.text}>No alternative action was identified for this fork.</p>
+          <p className={styles.text}>No alternative action was identified for this key decision.</p>
         ) : (
           <ol className={styles.list}>
             {fork.alternatives.map((alternative, index) => (
@@ -300,7 +301,7 @@ export function DecisionMoment({ fork, caseId, evidenceById }: DecisionMomentPro
           <ProvenanceBadge kind="estimated" />
         </div>
         <div className={styles.two}>
-          <div className={styles.card}>
+          <Card flat padding="sm" className={styles.card}>
             <h4 className={styles.h4}>The step taken</h4>
             <KeyValueList
               columns={1}
@@ -320,8 +321,8 @@ export function DecisionMoment({ fork, caseId, evidenceById }: DecisionMomentPro
                 { label: 'Risk', value: LEVEL_LABELS[consequences.actual.riskLevel] },
               ]}
             />
-          </div>
-          <div className={styles.card}>
+          </Card>
+          <Card flat padding="sm" className={styles.card}>
             <h4 className={styles.h4}>The best alternative</h4>
             {consequences.bestAlternative ? (
               <KeyValueList
@@ -345,7 +346,7 @@ export function DecisionMoment({ fork, caseId, evidenceById }: DecisionMomentPro
             ) : (
               <p className={styles.text}>No safe alternative was identified.</p>
             )}
-          </div>
+          </Card>
         </div>
         <p className={styles.text}>{consequences.deltaSummary}</p>
       </section>
@@ -363,7 +364,7 @@ export function DecisionMoment({ fork, caseId, evidenceById }: DecisionMomentPro
           </p>
           <p className={styles.text}>{fork.uncertainty.rationale}</p>
         </section>
-        <section className={styles.section} aria-label="Counterfactual eligibility">
+        <section className={styles.section} aria-label="Simulation eligibility">
           <h3 className={styles.h3}>May it be simulated?</h3>
           <p className={styles.text}>
             <StatusBadge

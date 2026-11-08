@@ -6,7 +6,7 @@ import {
   RetentionConfigSchema,
   type GovernanceSettings,
 } from '@caseguard/schemas';
-import { FieldGrid, FieldGroup, NumberField, SwitchField, TextField } from './fields';
+import { FieldRows, NumberField, SwitchField, TextField } from './fields';
 import { SectionEditor } from './SectionEditor';
 
 /** Retention (`retention` section): how long each kind of data is meant to be kept. Recorded only today. */
@@ -22,48 +22,46 @@ export function RetentionSection({ envelope }: { envelope: GovernanceSettings['r
       effect="recorded"
       effectNote="These periods are stored and audited, but no scheduled job enforces them yet: nothing is deleted when a period passes."
     >
-      <FieldGroup title="Retention periods">
-        <FieldGrid>
-          <TextField path="version" label="Version label" maxLength={40} hint="Free text." />
-          <NumberField
-            path="caseDataDays"
-            label="Case data"
-            unit="days"
-            min={1}
-            max={3650}
-            hint="Recorded only: nothing deletes case data when this period ends."
-          />
-          <NumberField
-            path="auditDays"
-            label="Audit trail"
-            unit="days"
-            min={30}
-            max={3650}
-            hint="Recorded only: nothing deletes audit events when this period ends."
-          />
-          <NumberField
-            path="modelExecutionDays"
-            label="Model executions"
-            unit="days"
-            min={1}
-            max={3650}
-            hint="Recorded only: nothing deletes model execution records when this period ends."
-          />
-          <NumberField
-            path="analyticsDays"
-            label="Analytics"
-            unit="days"
-            min={1}
-            max={3650}
-            hint="Recorded only: nothing deletes analytics when this period ends."
-          />
-        </FieldGrid>
+      <FieldRows>
+        <NumberField
+          path="caseDataDays"
+          label="Case data"
+          unit="days"
+          min={1}
+          max={3650}
+          hint="Recorded only: nothing deletes case data when this period ends."
+        />
+        <NumberField
+          path="auditDays"
+          label="Audit trail"
+          unit="days"
+          min={30}
+          max={3650}
+          hint="Recorded only: nothing deletes audit events when this period ends."
+        />
+        <NumberField
+          path="modelExecutionDays"
+          label="Model executions"
+          unit="days"
+          min={1}
+          max={3650}
+          hint="Recorded only: nothing deletes model execution records when this period ends."
+        />
+        <NumberField
+          path="analyticsDays"
+          label="Analytics"
+          unit="days"
+          min={1}
+          max={3650}
+          hint="Recorded only: nothing deletes analytics when this period ends."
+        />
         <SwitchField
           path="legalHold"
           label="Legal hold"
           hint="Recorded only: nothing is deleted today, so a legal hold suspends nothing."
         />
-      </FieldGroup>
+        <TextField path="version" label="Version label" maxLength={40} hint="Free text." />
+      </FieldRows>
     </SectionEditor>
   );
 }
@@ -76,12 +74,12 @@ const FLAGS = [
   ],
   [
     'counterfactualLab',
-    'Counterfactual Lab',
-    'Recorded only: this flag does not make the Counterfactual Lab available or hide it.',
+    'What if',
+    'Recorded only: this flag does not make the What if view available or hide it.',
   ],
   [
     'skillMutation',
-    'SkillDNA mutation proposals',
+    'Skill refinement proposals',
     'Recorded only: this flag does not allow or block refinement proposals for published skills.',
   ],
   [
@@ -114,13 +112,11 @@ export function FlagsSection({ envelope }: { envelope: GovernanceSettings['featu
       effect="recorded"
       effectNote="No part of the application reads these flags yet, and the features reported to your session come from the deployment's configuration, not from this section. Changing a flag is recorded but does not turn anything on or off."
     >
-      <FieldGroup title="Capabilities">
-        <FieldGrid>
-          {FLAGS.map(([key, label, hint]) => (
-            <SwitchField key={key} path={key} label={label} hint={hint} />
-          ))}
-        </FieldGrid>
-      </FieldGroup>
+      <FieldRows>
+        {FLAGS.map(([key, label, hint]) => (
+          <SwitchField key={key} path={key} label={label} hint={hint} />
+        ))}
+      </FieldRows>
     </SectionEditor>
   );
 }
@@ -142,27 +138,23 @@ export function ExportControlsSection({
       effect="enforced"
       effectNote="Enforced on every export: whether case and audit exports are allowed, and the record cap. The allowed formats and the reason requirement are recorded only: JSON is the only format, and a reason is always required."
     >
-      <FieldGroup title="What may be exported">
-        <FieldGrid>
-          <SwitchField path="allowCaseExport" label="Allow case export" />
-          <SwitchField path="allowAuditExport" label="Allow audit-log export" />
-          <SwitchField
-            path="requireReasonForExport"
-            label="Require a reason"
-            hint="Recorded only: the API always requires a reason."
-          />
-        </FieldGrid>
-        <FieldGrid columns={2}>
-          <NumberField
-            path="maxRecordsPerExport"
-            label="Most records per export"
-            min={1}
-            max={100000}
-            hint="A larger export is refused, not truncated."
-          />
-          <TextField path="version" label="Version label" maxLength={40} hint="Free text." />
-        </FieldGrid>
-      </FieldGroup>
+      <FieldRows>
+        <SwitchField path="allowCaseExport" label="Allow case export" />
+        <SwitchField path="allowAuditExport" label="Allow audit-log export" />
+        <SwitchField
+          path="requireReasonForExport"
+          label="Require a reason"
+          hint="Recorded only: the API always requires a reason."
+        />
+        <NumberField
+          path="maxRecordsPerExport"
+          label="Most records per export"
+          min={1}
+          max={100000}
+          hint="A larger export is refused, not truncated."
+        />
+        <TextField path="version" label="Version label" maxLength={40} hint="Free text." />
+      </FieldRows>
     </SectionEditor>
   );
 }

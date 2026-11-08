@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect } from 'react';
+import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoAxeViolations, fakeApi, renderApp } from '../../../test/harness';
 import { persona } from '../../../test/fixtures';
@@ -85,6 +86,22 @@ describe('[AUTH-DEV-01] DevPersonaAuth', () => {
     expect(window.localStorage.getItem('cg-persona')).toBeNull();
   });
 
+  it('renders a returning person as loading on the server (not as the first-visit page), and signed out without a cookie', () => {
+    const page = (initialPersonaId?: string | null) =>
+      renderToString(
+        <DevPersonaAuthProvider
+          {...(initialPersonaId === undefined ? {} : { initialPersonaId })}
+          store={createPersonaStore(() => undefined)}
+        >
+          <Capture onAuth={() => undefined} />
+        </DevPersonaAuthProvider>,
+      );
+    expect(page('persona_manager')).toContain('status:<!-- -->loading');
+    expect(page('persona_manager')).toContain('key:<!-- -->dev:none');
+    expect(page(null)).toContain('status:<!-- -->unauthenticated');
+    expect(page()).toContain('status:<!-- -->unauthenticated');
+  });
+
   it('gives each persona its own cache partition key (no data leaks between roles)', () => {
     const keys: string[] = [];
     let auth: AuthContextValue | null = null;
@@ -162,7 +179,7 @@ describe('[AUTH-DEV-02] persona picker dialog', () => {
     await waitFor(() => expect(opener).toHaveFocus());
   });
 
-  it('keeps the muted lines of the chosen persona readable: they take the button colour, not the grey that fails on the filled button', async () => {
+  it('marks the chosen persona, and only that one (its tinted state is covered by the contrast guard)', async () => {
     const user = userEvent.setup();
     const api = fakeApi({
       'dev.personas': () => ({ enabled: true, notice: '', items: personas }),
@@ -176,15 +193,13 @@ describe('[AUTH-DEV-02] persona picker dialog', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Open picker' }));
     const list = await screen.findByRole('list', { name: 'Personas' });
-    const chosen = within(list).getByRole('button', { name: /Rae Reviewer/ });
-    const other = within(list).getByRole('button', { name: /Eli Engineer/ });
-    expect(chosen).toHaveAttribute('aria-pressed', 'true');
-    const mutedLine = (option: HTMLElement): HTMLElement => within(option).getByText(/^Tenant:/);
-    // The style sheet is updated after the render that marks the choice, so wait for the cascade instead of reading it once.
-    await waitFor(() =>
-      expect(getComputedStyle(mutedLine(chosen)).color).not.toBe(
-        getComputedStyle(mutedLine(other)).color,
-      ),
+    expect(within(list).getByRole('button', { name: /Rae Reviewer/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(within(list).getByRole('button', { name: /Eli Engineer/ })).toHaveAttribute(
+      'aria-pressed',
+      'false',
     );
   });
 

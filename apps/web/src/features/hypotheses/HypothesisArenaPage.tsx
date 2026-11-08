@@ -2,22 +2,30 @@
 
 import type { HypothesesResponse } from '@caseguard/schemas';
 import {
+  Badge,
+  BlurFade,
+  Button,
+  ButtonLink,
+  Drawer,
   EmptyState,
+  IconButton,
   LoadingSkeleton,
   PageHeader,
   ProvenanceBadge,
+  Skeleton,
+  VisuallyHidden,
   cg,
   formatDateTimeUtc,
 } from '@caseguard/ui';
-import { Button, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
 import {
-  ArrowSyncRegular,
-  BeakerRegular,
-  LightbulbRegular,
-  TargetRegular,
-} from '@fluentui/react-icons';
-import { useMemo } from 'react';
-import { AsOfPanel } from '../../components/case/AsOfPanel';
+  FlaskConicalIcon,
+  GitForkIcon,
+  LightbulbIcon,
+  RefreshCwIcon,
+  TargetIcon,
+} from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
 import {
   AsOfLimited,
   isRateLimited,
@@ -26,12 +34,12 @@ import {
 } from '../../components/case/as-of';
 import { caseTimeRange, useKnownAt } from '../../components/case/case-hooks';
 import { CaseNotFoundState } from '../../components/case/CaseNotFoundState';
-import { LinkButton } from '../../components/common/LinkButton';
 import { QueryBoundary } from '../../components/common/QueryBoundary';
 import { QueryErrorState } from '../../components/common/QueryErrorState';
 import { useAuth } from '../../lib/auth/context';
 import { caseHref } from '../../lib/deep-links';
 import { codecs, useSelectionState, useUrlState } from '../../lib/url-state';
+import { WhatWasKnownBar } from '../evidence/WhatWasKnownBar';
 import { useCaseDetail, useInvalidate } from '../reasoning/hooks';
 import { LookingUp } from '../reasoning/LookingUp';
 import { instantBefore } from '../reasoning/time';
@@ -39,6 +47,7 @@ import { ActionValuePanel } from './ActionValuePanel';
 import { ConfidencePanel } from './ConfidencePanel';
 import { HypothesisDetail } from './HypothesisDetail';
 import { HypothesisList } from './HypothesisList';
+import { LeadingCause } from './LeadingCause';
 import { useActionRanking, useActions, useDecisionPoint, useForks, useHypotheses } from './hooks';
 import {
   chartMarkers,
@@ -55,34 +64,33 @@ const RANKING_ANCHOR = 'action-ranking';
 const useStyles = makeStyles({
   page: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
   busy: { opacity: 0.72 },
-  context: {
+  strip: {
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: `${cg.space[2]} ${cg.space[3]}`,
-    margin: 0,
-    fontSize: tokens.fontSizeBase300,
+    padding: `${cg.space[2]} ${cg.space[4]}`,
+    borderRadius: cg.radius.md,
+    border: `1px solid ${cg.borderSubtle}`,
     color: cg.textSecondary,
+    fontSize: tokens.fontSizeBase300,
   },
-  actions: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
-  shortcuts: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
-  band: {
-    display: 'grid',
-    gap: cg.space[4],
-    gridTemplateColumns: 'minmax(0, 1fr)',
-    alignItems: 'start',
-    '@media (min-width: 1100px)': { gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 3fr)' },
-  },
-  sticky: {
-    '@media (min-width: 1100px)': {
-      position: 'sticky',
-      top: 'calc(var(--cg-shell-top, 84px) + 12px)',
-    },
+  stripText: { flex: '1 1 240px', minWidth: 0, overflowWrap: 'anywhere' },
+  stripActions: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
+  // The long label of a strip action may wrap on a phone instead of running out of the card.
+  wrap: {
+    whiteSpace: 'normal',
+    textAlign: 'start',
+    lineHeight: tokens.lineHeightBase200,
+    paddingBlock: cg.space[2],
+    maxWidth: '100%',
+    minWidth: 0,
+    flexShrink: 1,
   },
 });
 
 const PAGE_HELP =
-  'The Arena keeps competing explanations alive instead of choosing a root cause early. Every confidence is a model estimate from an authored knowledge pack, shown with its range. Use the time cursor to see the case as it stood at any moment: it lands on an event, because nothing changes between two events, and nothing later than the cursor is requested or shown. While a moment loads, the page shows only that it is loading, never the numbers of another moment. Each earlier view is computed once by the server and then kept; computing many new ones in a short time is limited, and the page says so and counts down. The ranking at the bottom explains which diagnostic action would be worth taking next, and a reviewer can override it, with a recorded reason, on the ranking at the moment shown; the overrides are listed under it. When the last event of a resolved case has nothing left to rank, the ranking just before the earliest meaningful decision fork is shown instead.';
+  'Possible causes keeps competing explanations alive instead of choosing a root cause early. Every confidence is a model estimate from an authored knowledge pack, shown with its range. Use “What was known then” to see the case as it stood at any moment: it lands on an event, because nothing changes between two events, and nothing later than the cursor is requested or shown. While a moment loads, the page shows only that it is loading, never the numbers of another moment. Each earlier view is computed once by the server and then kept; computing many new ones in a short time is limited, and the page says so and counts down. “What to test next” explains which diagnostic action would be worth taking, and a reviewer can override its ranking, with a recorded reason, at the moment shown; the overrides are listed under it. When the last event of a resolved case has nothing left to rank, the ranking just before the first key decision is shown instead.';
 
 function RankingSection({
   caseId,
@@ -91,6 +99,8 @@ function RankingSection({
   lastInstant,
   caseResolved,
   onWholeRecord,
+  open,
+  onOpenChange,
 }: {
   caseId: string;
   asOf: string | null;
@@ -98,6 +108,8 @@ function RankingSection({
   lastInstant: string | null;
   caseResolved: boolean;
   onWholeRecord: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   // The ranking the time cursor asks for: the whole record (the last event) or an earlier moment.
   const cursorRanking = useActionRanking(caseId, asOf, ready);
@@ -140,11 +152,19 @@ function RankingSection({
 
   const view = cursorView(cursorRanking.data, { asOf, lastInstant, caseResolved });
   if (!nothingLeft) {
-    return <ActionValuePanel caseId={caseId} view={view} onShowLatest={onWholeRecord} />;
+    return (
+      <ActionValuePanel
+        caseId={caseId}
+        view={view}
+        onShowLatest={onWholeRecord}
+        open={open}
+        onOpenChange={onOpenChange}
+      />
+    );
   }
   if (decision.pending) return skeleton;
   if (decision.fork === null || decision.asOf === null) {
-    return <ActionValuePanel caseId={caseId} view={view} />;
+    return <ActionValuePanel caseId={caseId} view={view} open={open} onOpenChange={onOpenChange} />;
   }
   if (decisionRanking.isPending) return skeleton;
   if (decisionRanking.isError) {
@@ -152,7 +172,7 @@ function RankingSection({
       <AsOfLimited
         key={decisionRanking.errorUpdatedAt}
         error={decisionRanking.error}
-        subject="the ranking just before the earliest decision fork"
+        subject="the ranking just before the first key decision"
         onRetry={() => void decisionRanking.refetch()}
         retrying={decisionRanking.isFetching}
       />
@@ -175,6 +195,8 @@ function RankingSection({
         decision.fork,
         caseResolved,
       )}
+      open={open}
+      onOpenChange={onOpenChange}
     />
   );
 }
@@ -189,6 +211,7 @@ function Content({
   lastInstant,
   caseResolved,
   onWholeRecord,
+  keyDecision,
 }: {
   caseId: string;
   asOf: string | null;
@@ -199,63 +222,104 @@ function Content({
   lastInstant: string | null;
   caseResolved: boolean;
   onWholeRecord: () => void;
+  /** The shortcut to the moment before the first key decision, when there is one. */
+  keyDecision: ReactNode;
 }) {
   const styles = useStyles();
   const [selection, select] = useSelectionState();
   const [chart, setChart] = useUrlState('chart', CHART_CODEC);
-  const selected = findHypothesis(data.items, selection) ?? data.items[0];
+  const [rankingOpen, setRankingOpen] = useState(false);
+  const leading = data.items[0];
+  const selected = findHypothesis(data.items, selection);
+  // The drawer slides out with what it showed, not empty: the last cause that was open is kept until it is gone.
+  const [lastSelected, setLastSelected] = useState(selected);
+  if (selected !== undefined && selected !== lastSelected) setLastSelected(selected);
+  const shown = selected ?? lastSelected;
+
+  // The ranking is part of the page, below: the drawer closes and the row opens at it.
+  const showRanking = (): void => {
+    select(null);
+    setRankingOpen(true);
+    window.setTimeout(
+      () => document.getElementById(RANKING_ANCHOR)?.scrollIntoView({ block: 'start' }),
+      50,
+    );
+  };
 
   return (
     <div
       className={mergeClasses(styles.page, isRefreshing && styles.busy)}
       aria-busy={isRefreshing}
     >
-      <ConfidencePanel
-        hypotheses={data.items}
-        markers={chartEvents}
-        focusId={selected?.id ?? null}
-        showAll={chart === 'all'}
-        onShowAllChange={(value) => setChart(value ? 'all' : 'top')}
-        asOf={data.asOf}
-      />
-      <div className={styles.band}>
-        <div className={styles.sticky}>
-          <HypothesisList
-            hypotheses={data.items}
-            selectedId={selected?.id ?? null}
-            onSelect={select}
+      {leading ? (
+        <BlurFade index={1}>
+          <LeadingCause
+            hypothesis={leading}
+            onOpen={() => select(leading.id)}
+            onShowRanking={showRanking}
+          />
+        </BlurFade>
+      ) : null}
+      {keyDecision}
+      <BlurFade index={2}>
+        <HypothesisList
+          hypotheses={data.items.slice(1)}
+          selectedId={selected?.id ?? null}
+          onSelect={select}
+        />
+      </BlurFade>
+      <BlurFade index={3}>
+        <ConfidencePanel
+          hypotheses={data.items}
+          markers={chartEvents}
+          focusId={(selected ?? leading)?.id ?? null}
+          showAll={chart === 'all'}
+          onShowAllChange={(value) => setChart(value ? 'all' : 'top')}
+          asOf={data.asOf}
+        />
+      </BlurFade>
+      <BlurFade index={4}>
+        <div id={RANKING_ANCHOR}>
+          <RankingSection
+            caseId={caseId}
+            asOf={asOf}
+            ready={ready}
+            lastInstant={lastInstant}
+            caseResolved={caseResolved}
+            onWholeRecord={onWholeRecord}
+            open={rankingOpen}
+            onOpenChange={setRankingOpen}
           />
         </div>
-        {selected ? (
+      </BlurFade>
+      <Drawer
+        open={selected !== undefined}
+        onOpenChange={(open) => {
+          if (!open) select(null);
+        }}
+        title={shown?.name ?? 'Possible cause'}
+        size="lg"
+      >
+        {shown ? (
           <HypothesisDetail
-            hypothesis={selected}
+            hypothesis={shown}
             data={data}
             caseId={caseId}
-            rankingHref={`#${RANKING_ANCHOR}`}
+            onShowRanking={showRanking}
           />
         ) : null}
-      </div>
-      <div id={RANKING_ANCHOR}>
-        <RankingSection
-          caseId={caseId}
-          asOf={asOf}
-          ready={ready}
-          lastInstant={lastInstant}
-          caseResolved={caseResolved}
-          onWholeRecord={onWholeRecord}
-        />
-      </div>
+      </Drawer>
     </div>
   );
 }
 
 /**
- * Hypothesis Arena (`/cases/[caseId]/hypotheses`): the competing explanations with model-estimated confidence over
- * time, the evidence for and against each, the cheapest safe validating action and the action-value ranking with its
- * transparent calculation, sensitivity and audited reviewer override. Everything follows the time cursor (`?asOf=`, which
- * always lands on an event: an earlier view is computed once per window and metered, so it is requested once, after the
- * cursor rests, and a refusal is shown with its countdown); `?sel=` is the selected hypothesis and `?chart=all` draws
- * every line.
+ * Possible causes (`/cases/[caseId]/hypotheses`): the competing explanations, the leading one first with its estimated
+ * confidence, the others as ranked rows, the evidence for and against each in a drawer, how confidence moved, and the
+ * ranking of what to test next with its transparent calculation, sensitivity and audited reviewer override. Everything
+ * follows the time cursor (`?asOf=`, which always lands on an event: an earlier view is computed once per window and
+ * metered, so it is requested once, after the cursor rests, and a refusal is shown with its countdown); `?sel=` is the
+ * open cause and `?chart=all` draws every line.
  */
 export function HypothesisArenaPage({ caseId }: { caseId: string }) {
   const styles = useStyles();
@@ -310,129 +374,148 @@ export function HypothesisArenaPage({ caseId }: { caseId: string }) {
   // A case that does not exist has nothing to wait for and nothing to retry: say so, instead of failing on each read.
   if (caseQuery.isError && caseQuery.error.isNotFound) return <CaseNotFoundState />;
 
+  const keyDecision =
+    earliest && decisionMoment ? (
+      <div className={styles.strip}>
+        <Badge tone="fork" icon={<GitForkIcon />}>
+          Key decision
+        </Badge>
+        <span className={styles.stripText}>
+          {earliest.title} · {formatDateTimeUtc(earliest.timestamp)}
+        </span>
+        <div className={styles.stripActions}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<TargetIcon />}
+            className={styles.wrap}
+            disabled={asOf === decisionMoment}
+            onClick={() => setAsOf(decisionMoment)}
+          >
+            Just before the first key decision
+          </Button>
+          <ButtonLink
+            variant="ghost"
+            size="sm"
+            icon={<FlaskConicalIcon />}
+            className={styles.wrap}
+            href={`${caseHref(caseId, 'counterfactual')}?sel=${encodeURIComponent(earliest.id)}`}
+          >
+            Simulate a safer path from {formatDateTimeUtc(earliest.timestamp)}
+          </ButtonLink>
+        </div>
+      </div>
+    ) : null;
+
   return (
     <>
       <PageHeader
-        title="Hypothesis Arena"
-        description="Competing explanations for the case, each with model-estimated confidence, the evidence for and against it and the cheapest safe way to test it."
+        title="Possible causes"
+        description="Compare explanations and decide what to test next."
         help={PAGE_HELP}
         meta={
           <>
-            <ProvenanceBadge kind="estimated" label="Model estimates" />
+            <ProvenanceBadge kind="estimated" />
             {detail?.synthetic ? <ProvenanceBadge kind="synthetic" /> : null}
           </>
         }
         actions={
-          <div className={styles.actions}>
-            <LinkButton
+          <>
+            <ButtonLink
               href={caseHref(caseId, 'counterfactual')}
-              appearance="outline"
-              icon={<BeakerRegular />}
+              variant="secondary"
+              icon={<FlaskConicalIcon />}
             >
-              Counterfactual Lab
-            </LinkButton>
-            <Button
-              appearance="outline"
-              icon={<ArrowSyncRegular />}
-              disabled={auth.status !== 'ready' || hypotheses.isFetching}
+              What if
+            </ButtonLink>
+            <IconButton
+              icon={<RefreshCwIcon />}
+              label="Refresh"
+              disabled={auth.status !== 'ready'}
+              loading={hypotheses.isFetching && !hypotheses.isPending}
               onClick={refresh}
-            >
-              {hypotheses.isFetching && !hypotheses.isPending ? 'Refreshing…' : 'Refresh'}
-            </Button>
-          </div>
+            />
+          </>
         }
       />
-      {detail ? (
-        <p className={styles.context}>
-          <strong>{detail.reference}</strong>
-          <span>{detail.title}</span>
-        </p>
-      ) : null}
-      <AsOfPanel
-        caseId={caseId}
-        range={caseTimeRange(detail)}
-        asOf={asOf}
-        onChange={setAsOf}
-        instants={cursor.instants}
-        known={knownSummary}
-        loading={known.isPending && asOf !== null}
-        limited={knownLimited}
-        decisionsNote={false}
-        linkTo={['timeline', 'evidence']}
-      />
-      {earliest && decisionMoment ? (
-        <div className={styles.shortcuts}>
-          <Button
-            appearance="primary"
-            icon={<TargetRegular />}
-            disabled={asOf === decisionMoment}
-            onClick={() => setAsOf(decisionMoment)}
-          >
-            Just before the earliest meaningful decision fork
-          </Button>
-          <LinkButton
-            href={`${caseHref(caseId, 'counterfactual')}?sel=${encodeURIComponent(earliest.id)}`}
-            appearance="outline"
-            icon={<BeakerRegular />}
-          >
-            Simulate a safer path from {formatDateTimeUtc(earliest.timestamp)}
-          </LinkButton>
-        </div>
-      ) : null}
-      {hypothesesLimited && hypotheses.error ? (
-        <AsOfLimited
-          key={hypotheses.errorUpdatedAt}
-          error={hypotheses.error}
-          subject="the hypothesis view"
-          onRetry={retryEarlierViews}
-          retrying={hypotheses.isFetching}
-          onWholeRecord={wholeRecord}
-        />
-      ) : (
-        <QueryBoundary
-          query={hypotheses}
-          subject="The Hypothesis Arena"
-          skeleton={
-            // The "What was known" panel already says which moment it is looking up while its own counts load.
-            asOf && !known.isPending ? (
-              <>
-                <LookingUp asOf={asOf} />
-                <ArenaSkeleton />
-              </>
-            ) : (
-              <ArenaSkeleton />
-            )
-          }
-          isEmpty={(value) => value.items.length === 0}
-          empty={
-            <EmptyState
-              headingLevel={2}
-              icon={<LightbulbRegular />}
-              title="No hypotheses yet"
-              description="Hypotheses appear once the case has been analysed. Open the case to see its analysis status."
-              action={
-                <LinkButton href={caseHref(caseId)} appearance="primary">
-                  Open the case
-                </LinkButton>
-              }
-            />
-          }
-        >
-          {(value, meta) => (
-            <Content
+      <div className={styles.page}>
+        <BlurFade>
+          {detail ? (
+            <WhatWasKnownBar
               caseId={caseId}
+              range={caseTimeRange(detail)}
               asOf={asOf}
-              ready={ready}
-              data={value}
-              isRefreshing={meta.isRefreshing}
-              chartEvents={markers}
-              lastInstant={lastInstant}
-              caseResolved={caseResolved}
-              onWholeRecord={wholeRecord}
+              onChange={setAsOf}
+              instants={cursor.instants}
+              known={knownSummary}
+              loading={known.isPending && asOf !== null}
+              limited={knownLimited}
+              decisionsNote={false}
+              linkTo={['timeline', 'evidence']}
             />
+          ) : caseQuery.isError ? null : (
+            <div role="status" aria-busy="true" aria-live="polite">
+              <VisuallyHidden>Loading what was known…</VisuallyHidden>
+              <Skeleton height={58} radius="lg" />
+            </div>
           )}
-        </QueryBoundary>
-      )}
+        </BlurFade>
+        {hypothesesLimited && hypotheses.error ? (
+          <AsOfLimited
+            key={hypotheses.errorUpdatedAt}
+            error={hypotheses.error}
+            subject="the possible causes"
+            onRetry={retryEarlierViews}
+            retrying={hypotheses.isFetching}
+            onWholeRecord={wholeRecord}
+          />
+        ) : (
+          <QueryBoundary
+            query={hypotheses}
+            subject="The possible causes"
+            skeleton={
+              // The "What was known then" bar already says which moment it is looking up while its own counts load.
+              asOf && !known.isPending ? (
+                <>
+                  <LookingUp asOf={asOf} />
+                  <ArenaSkeleton />
+                </>
+              ) : (
+                <ArenaSkeleton />
+              )
+            }
+            isEmpty={(value) => value.items.length === 0}
+            empty={
+              <EmptyState
+                headingLevel={2}
+                icon={<LightbulbIcon />}
+                title="No possible causes yet"
+                description="Possible causes appear once the case has been analysed. Open the case to see its analysis status."
+                action={
+                  <ButtonLink href={caseHref(caseId)} variant="primary">
+                    Open the case
+                  </ButtonLink>
+                }
+              />
+            }
+          >
+            {(value, meta) => (
+              <Content
+                caseId={caseId}
+                asOf={asOf}
+                ready={ready}
+                data={value}
+                isRefreshing={meta.isRefreshing}
+                chartEvents={markers}
+                lastInstant={lastInstant}
+                caseResolved={caseResolved}
+                onWholeRecord={wholeRecord}
+                keyDecision={keyDecision}
+              />
+            )}
+          </QueryBoundary>
+        )}
+      </div>
     </>
   );
 }

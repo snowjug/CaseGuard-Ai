@@ -248,3 +248,26 @@ export function deriveNextActions(input: NextActionsInput): NextActionsModel {
 export function reasonLine(action: NextAction, max = 160): string {
   return clipWords(action.reason, max);
 }
+
+/** One fix as plain text for a chat message or a ticket: what to do, why, what is suggested, who and the gain. */
+export function fixText(action: NextAction): string {
+  const lines = [action.title, `Why: ${action.reason}`];
+  if (action.suggestion) lines.push(`Suggested: ${action.suggestion}`);
+  const meta = [
+    action.owner ? `Owner: ${action.owner}` : null,
+    action.gain ? `Expected gain: ${action.gain}` : null,
+  ].filter((part): part is string => part !== null);
+  if (meta.length > 0) lines.push(meta.join(' · '));
+  return lines.join('\n');
+}
+
+/** The first fixes of a case as a numbered plain-text list, under a heading that names the case. */
+export function fixListText(heading: string, items: readonly NextAction[]): string {
+  const lines = [heading];
+  items.forEach((item, index) => {
+    lines.push(`${index + 1}. ${item.title} (${item.priorityLabel.toLowerCase()})`);
+    lines.push(`   Why: ${reasonLine(item)}`);
+    if (item.suggestion) lines.push(`   Suggested: ${item.suggestion}`);
+  });
+  return lines.join('\n');
+}

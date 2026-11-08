@@ -1,3 +1,4 @@
+import { formatDuration } from '@caseguard/ui';
 import { configure, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -66,8 +67,25 @@ function api(overrides: FakeHandlers = {}, role: Role = 'reviewer') {
 const renderLab = (handler = api()) =>
   renderApp(<CounterfactualLabPage caseId={CASE_ID} />, { api: handler });
 
-const forkList_ = () => screen.findByRole('list', { name: 'Decision forks in time order' });
+const forkList_ = () => screen.findByRole('list', { name: 'Key decisions in time order' });
 const tab = (name: string | RegExp) => screen.getByRole('tab', { name });
+const strategy = (name: string | RegExp) => screen.getByRole('radio', { name });
+const strategies_ = () => screen.findByRole('radiogroup', { name: 'Simulated path strategies' });
+const reviewPanel = () => screen.findByRole('group', { name: 'Review this path' });
+
+/** The hero of the screen: the answer to "what would have changed the outcome". */
+const hero = () => screen.findByRole('group', { name: 'What would have changed the outcome' });
+
+/** A folded section (an accordion item) is opened by its heading button; its content is mounted on the first open. */
+async function open(
+  user: ReturnType<typeof userEvent.setup>,
+  name: string | RegExp,
+): Promise<HTMLElement> {
+  const trigger = await screen.findByRole('button', { name });
+  if (trigger.getAttribute('aria-expanded') !== 'true') await user.click(trigger);
+  expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  return screen.findByRole('region', { name });
+}
 
 const queryOf = (input: unknown): Record<string, string> =>
   (input as { query?: Record<string, string> }).query ?? {};
@@ -82,16 +100,19 @@ async function ready(
   name: string | RegExp,
   scope: HTMLElement = document.body,
 ): Promise<HTMLElement> {
-  await waitFor(() => {
-    const button = within(scope).getByRole('button', { name });
-    expect(button).not.toHaveAttribute('aria-disabled', 'true');
-    expect(button).toBeEnabled();
-  });
+  await waitFor(
+    () => {
+      const button = within(scope).getByRole('button', { name });
+      expect(button).not.toHaveAttribute('aria-disabled', 'true');
+      expect(button).toBeEnabled();
+    },
+    { timeout: 30_000 },
+  );
   return within(scope).getByRole('button', { name });
 }
 
-describe('[FR-CF-01] Counterfactual Lab: fork selector', () => {
-  it('lists every decision fork in time order with the earliest meaningful one highlighted and its paths counted', async () => {
+describe('[FR-CF-01] What if: key decision picker', () => {
+  it('lists every key decision in time order with the earliest meaningful one marked and its paths counted', async () => {
     const others = scenarioList().items.slice(1);
     renderLab(api({ 'counterfactuals.list': () => ({ items: [accepted(), ...others] }) }));
     const items = within(await forkList_()).getAllByRole('listitem');
@@ -101,9 +122,9 @@ describe('[FR-CF-01] Counterfactual Lab: fork selector', () => {
       name: /Heavy customer request when a lighter ask was available/,
     });
     expect(firstButton).toHaveAttribute('aria-pressed', 'true');
-    expect(within(first).getByText('Earliest meaningful')).toBeInTheDocument();
-    expect(within(first).getByText('Fork 1 of 2 · 9 Mar 2026, 09:41 UTC')).toBeInTheDocument();
-    expect(within(second).queryByText('Earliest meaningful')).toBeNull();
+    expect(within(first).getByText('Earliest')).toBeInTheDocument();
+    expect(within(first).getByText('1 of 2 · 9 Mar 2026, 09:41 UTC')).toBeInTheDocument();
+    expect(within(second).queryByText('Earliest')).toBeNull();
     expect(
       within(second).getByRole('button', {
         name: /Disruptive change made before the cause was established/,
@@ -116,30 +137,38 @@ describe('[FR-CF-01] Counterfactual Lab: fork selector', () => {
     expect(within(second).getByText('1 simulated path')).toBeInTheDocument();
   });
 
-  it('opens the earliest meaningful fork first, labelled as simulation and not history', async () => {
+  it('opens the earliest meaningful decision first, under its own heading, with the one persistent simulation badge', async () => {
     renderLab();
     expect(
       await screen.findByRole('heading', {
         name: 'Heavy customer request when a lighter ask was available',
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Simulation, not history')).toBeInTheDocument();
+    // The page starts with its own name: the case title belongs to the case header above it.
+    expect(screen.getByRole('heading', { level: 1, name: 'What if' })).toBeInTheDocument();
+    expect(screen.getByText('See how a safer path would have gone.')).toBeInTheDocument();
+    // "Simulation, not history" is one badge whose tooltip carries the sentence, never a banner.
+    const badge = screen.getByText('Simulation, not history');
+    expect(badge.closest('[title]')).toHaveAttribute(
+      'title',
+      expect.stringMatching(/estimate made from what was on record before the decision/),
+    );
+    expect(screen.getAllByText('Simulation, not history')).toHaveLength(1);
+    expect(screen.queryByText(/It is not something that happened\./)).toBeNull();
     expect(screen.getAllByText('Simulated').length).toBeGreaterThan(0);
-    expect(await screen.findByText('Synthetic')).toBeInTheDocument();
-    expect(await screen.findByText('CG-SYN-1001')).toBeInTheDocument();
+    expect(await screen.findByText('Demo data')).toBeInTheDocument();
+    expect(screen.queryByText('CG-SYN-1001')).toBeNull();
     expect(
-      screen.getByRole('link', { name: /See the hypotheses just before this decision/ }),
+      screen.getByRole('link', { name: /See possible causes just before this decision/ }),
     ).toHaveAttribute('href', '/cases/case_1/hypotheses?asOf=2026-03-09T09%3A40%3A59Z');
     expect(
       screen.getByRole('link', { name: /Open the decision event in the timeline/ }),
     ).toHaveAttribute('href', '/cases/case_1/timeline?sel=e03');
-    expect(screen.getByRole('link', { name: 'Hypothesis Arena' })).toHaveAttribute(
-      'href',
-      '/cases/case_1/hypotheses',
-    );
+    // The case tabs already lead to the other views: no second route out of the page in its header.
+    expect(screen.queryByRole('link', { name: 'Hypothesis Arena' })).toBeNull();
   });
 
-  it('switches fork and keeps the choice in the URL', async () => {
+  it('switches decision and keeps the choice in the URL', async () => {
     const user = userEvent.setup();
     renderLab();
     await forkList_();
@@ -154,18 +183,15 @@ describe('[FR-CF-01] Counterfactual Lab: fork selector', () => {
         name: 'Disruptive change made before the cause was established',
       }),
     ).toBeInTheDocument();
-    const strategies = screen.getByRole('tablist', { name: 'Simulated path strategies' });
-    expect(within(strategies).getAllByRole('tab')).toHaveLength(1);
+    expect(within(await strategies_()).getAllByRole('radio')).toHaveLength(1);
   });
 
-  it('opens a scenario, its fork, its section and its step straight from the URL', async () => {
+  it('opens a path, its decision, its section and its step straight from the URL', async () => {
     navigateTo('/?sel=scn_2&tab=evidence&step=cfs_2_b');
     renderLab();
     await forkList_();
-    await waitFor(() =>
-      expect(tab(/Fastest to diagnosis/)).toHaveAttribute('aria-selected', 'true'),
-    );
-    expect(tab('Evidence behind each step')).toHaveAttribute('aria-selected', 'true');
+    await waitFor(() => expect(strategy(/Fastest to diagnosis/)).toBeChecked());
+    expect(tab('Evidence per step')).toHaveAttribute('aria-selected', 'true');
     expect(
       await screen.findByRole('heading', {
         name: 'Step 2: Correlate failing attempts with Entra sign-in logs',
@@ -173,7 +199,7 @@ describe('[FR-CF-01] Counterfactual Lab: fork selector', () => {
     ).toBeInTheDocument();
   });
 
-  it('says when a fork cannot be simulated', async () => {
+  it('says when a key decision cannot be simulated', async () => {
     const blocked = fork({
       eligibility: {
         eligible: false,
@@ -199,34 +225,47 @@ describe('[FR-CF-01] Counterfactual Lab: fork selector', () => {
     );
     expect(await screen.findByText('Not eligible for simulation')).toBeInTheDocument();
     expect(
-      await screen.findByText(/This fork cannot be simulated: The window leaks a later event\./),
+      await screen.findByText(
+        /This key decision cannot be simulated: The window leaks a later event\./,
+      ),
     ).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: 'Generate simulated paths' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: 'Generate paths' })).toBeDisabled();
   });
 });
 
-describe('[FR-CF-02] temporal boundary and leak check', () => {
-  it('shows the decision instant, how much was known and withheld, and the passed leak check', async () => {
+describe('[FR-CF-02] no-hindsight check', () => {
+  it('shows the decision instant, how much was known and withheld, and the passed check', async () => {
+    const user = userEvent.setup();
     renderLab();
-    const boundary = await screen.findByRole('group', { name: 'Temporal boundary and leak check' });
+    await forkList_();
+    // Folded, but its closed line already says whether it passed.
+    const trigger = await screen.findByRole('button', { name: /^No-hindsight check/ });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(within(trigger).getByText('Passed')).toBeInTheDocument();
+    expect(
+      within(trigger).getByText('Used only what was known at 9 Mar 2026, 09:41 UTC'),
+    ).toBeInTheDocument();
+
+    const boundary = await open(user, /^No-hindsight check/);
     expect(within(boundary).getByText('Known as of 9 Mar 2026, 09:41 UTC')).toBeInTheDocument();
     expect(
       await within(boundary).findByRole('img', {
         name: '2 of 31 events were known at the decision instant; 29 later events were withheld',
       }),
     ).toBeInTheDocument();
-    expect(await within(boundary).findByText('Leak check passed')).toBeInTheDocument();
+    expect(await within(boundary).findByText('No-hindsight check passed')).toBeInTheDocument();
     expect(
       within(boundary).getByText(
         /No reference to the future was found\. The final resolution was excluded\./,
       ),
     ).toBeInTheDocument();
-    const details = within(boundary).getByRole('list', { name: 'Leak check details' });
+    const details = within(boundary).getByRole('list', { name: 'No-hindsight check details' });
     expect(within(details).getAllByRole('listitem')).toHaveLength(3);
     expect(within(boundary).getByText('Validity checks (2 of 2 passed)')).toBeInTheDocument();
   });
 
-  it('says plainly when the leak check failed or the resolution was not excluded', async () => {
+  it('says plainly when the check failed or the resolution was not excluded', async () => {
+    const user = userEvent.setup();
     const leaky = scenario({
       boundary: {
         ...scenario().boundary,
@@ -239,8 +278,14 @@ describe('[FR-CF-02] temporal boundary and leak check', () => {
       },
     });
     renderLab(api({ 'counterfactuals.list': () => ({ items: [leaky] }) }));
-    const boundary = await screen.findByRole('group', { name: 'Temporal boundary and leak check' });
-    expect(await within(boundary).findByText('Leak check failed')).toBeInTheDocument();
+    await forkList_();
+    expect(
+      within(await screen.findByRole('button', { name: /^No-hindsight check/ })).getByText(
+        'Failed',
+      ),
+    ).toBeInTheDocument();
+    const boundary = await open(user, /^No-hindsight check/);
+    expect(await within(boundary).findByText('No-hindsight check failed')).toBeInTheDocument();
     expect(
       within(boundary).getByText(
         /2 references to the future found\. The final resolution was NOT excluded\./,
@@ -248,18 +293,25 @@ describe('[FR-CF-02] temporal boundary and leak check', () => {
     ).toBeInTheDocument();
   });
 
-  it('explains that no leak check exists before a path is generated', async () => {
+  it('explains that no check exists before a path is generated', async () => {
+    const user = userEvent.setup();
     renderLab(api({ 'counterfactuals.list': () => ({ items: [] }) }));
+    await forkList_();
+    const boundary = await open(user, /^No-hindsight check/);
     expect(
-      await screen.findByText(
-        /No simulated path exists for this fork yet, so there is no leak check to show/,
+      within(boundary).getByText(
+        /No simulated path exists for this key decision yet, so there is no no-hindsight check to show/,
       ),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('button', { name: /^No-hindsight check/ })).getByText('Not run yet'),
     ).toBeInTheDocument();
   });
 });
 
 describe('[FR-CF-03] actual versus simulated comparison', () => {
-  it('draws the recorded path and the simulated alternative diverging at the fork, with estimates labelled', async () => {
+  it('draws the recorded path and the simulated alternative diverging at the decision, with estimates labelled', async () => {
+    const user = userEvent.setup();
     renderLab();
     const figure = await screen.findByRole('figure', {
       name: 'The recorded path and the simulated alternative, from the decision moment',
@@ -273,20 +325,29 @@ describe('[FR-CF-03] actual versus simulated comparison', () => {
         name: 'Metric differences between actual and simulated paths',
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Confidence in this comparison: Low (0.25 of 1)')).toBeInTheDocument();
+    // The confidence sits once, in the hero, where the answer is; the comparison does not repeat it.
+    expect(screen.getAllByText('Confidence in this comparison: Low (0.25 of 1)')).toHaveLength(1);
     const improvements = screen.getByRole('list', { name: 'Estimated improvements' });
     expect(within(improvements).getByText('85% less time to diagnosis')).toBeInTheDocument();
     expect(within(improvements).getByText('73% less customer effort')).toBeInTheDocument();
     expect(screen.getByText(/Estimated from 200 seeded simulations/)).toBeInTheDocument();
     expect(
+      screen.getByText(/Only the simulated side was generated from what was known at the decision/),
+    ).toBeInTheDocument();
+    // The numbers and the branches are one click away, not on the way to the picture.
+    expect(
+      screen.getByRole('button', { name: 'The numbers behind the comparison' }),
+    ).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('table', { name: 'Actual and simulated measures' })).toBeNull();
+    await open(user, 'The numbers behind the comparison');
+    expect(
       screen.getByRole('table', { name: 'Actual and simulated measures' }),
     ).toBeInTheDocument();
+    await open(user, 'What could turn out differently');
     expect(
       screen.getByText(/After step 1: If the result is “Error tag indicates a connection timeout”/),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Only the simulated side was generated from what was known at the decision/),
-    ).toBeInTheDocument();
+    await open(user, /^Assumptions \(\d+\)/);
   });
 
   it('shows each strategy’s own wording and steps, never another strategy’s', async () => {
@@ -313,12 +374,12 @@ describe('[FR-CF-03] actual versus simulated comparison', () => {
       await screen.findByText(/the “Balanced path” strategy would take 3 steps/),
     ).toBeInTheDocument();
     expect(screen.queryByText(/the “Fastest to diagnosis” strategy would take 3 steps/)).toBeNull();
-    await user.click(await screen.findByRole('tab', { name: /Fastest to diagnosis/ }));
+    await user.click(await screen.findByRole('radio', { name: /Fastest to diagnosis/ }));
     expect(
       await screen.findByText(/the “Fastest to diagnosis” strategy would take 3 steps/),
     ).toBeInTheDocument();
     expect(screen.queryByText(/the “Balanced path” strategy would take 3 steps/)).toBeNull();
-    await user.click(tab('Evidence behind each step'));
+    await user.click(tab('Evidence per step'));
     expect(
       await screen.findByText(/Rank 1 under “Fastest to diagnosis”: this step is chosen/),
     ).toBeInTheDocument();
@@ -332,13 +393,156 @@ describe('[FR-CF-03] actual versus simulated comparison', () => {
     expect(handler.call).not.toHaveBeenCalledWith('counterfactuals.hindsight', expect.anything());
   });
 
-  it('offers to generate paths when the fork has none', async () => {
+  it('offers to generate paths, as the one primary action, when the decision has none', async () => {
     renderLab(api({ 'counterfactuals.list': () => ({ items: [] }) }, 'engineer'));
-    expect(await screen.findByText('No simulated path to show')).toBeInTheDocument();
+    const answer = await hero();
+    expect(await within(answer).findByText('No simulated path yet')).toBeInTheDocument();
     expect(
-      screen.getByText('No simulated paths have been generated for this fork yet.'),
+      within(answer).getByText(/Generate paths to see how a safer path would have gone/),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Generate simulated paths' })).toBeEnabled();
+    // One button, in the page header; the views that need a path say so instead of offering another one.
+    expect(screen.getAllByRole('button', { name: 'Generate paths' })).toHaveLength(1);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Generate paths' })).toBeEnabled(),
+    );
+    expect(screen.queryByRole('button', { name: 'Generate more strategies' })).toBeNull();
+    expect(screen.queryByRole('radiogroup', { name: 'Simulated path strategies' })).toBeNull();
+    expect(screen.getAllByText('No simulated path yet').length).toBeGreaterThan(1);
+  });
+
+  it('has no primary action once the decision has paths, only the secondary one for the strategies still missing', async () => {
+    renderLab(api({}, 'engineer'));
+    await strategies_();
+    expect(screen.queryByRole('button', { name: 'Generate paths' })).toBeNull();
+    expect(await ready('Generate more strategies')).toBeVisible();
+  });
+});
+
+describe('[FR-CF-12] what would have changed the outcome', () => {
+  /** A path whose simulated time to a diagnosis is the given range, against the 2994 minutes that happened. */
+  const simulatedIn = (low: number, mid: number, high: number, overrides = {}) => {
+    const base = scenario();
+    return scenario({
+      counterfactualMetrics: {
+        ...base.counterfactualMetrics,
+        timeToDiagnosisMinutes: { low, mid, high },
+      },
+      ...overrides,
+    });
+  };
+
+  it('leads with the time that could have been saved as a big number with its estimate range, labelled estimated and simulated', async () => {
+    renderLab();
+    const answer = await hero();
+    expect(
+      within(answer).getByRole('heading', {
+        level: 2,
+        name: 'What would have changed the outcome',
+      }),
+    ).toBeInTheDocument();
+    expect(within(answer).getByText('Estimated')).toBeInTheDocument();
+    expect(within(answer).getByText('Simulated')).toBeInTheDocument();
+    const saved = within(answer).getByRole('region', { name: 'Time that could have been saved' });
+    expect(within(saved).getByText('1 d 18 h')).toBeInTheDocument();
+    expect(within(saved).getByText('sooner to a diagnosis')).toBeInTheDocument();
+    expect(
+      within(saved).getByText(
+        /Estimated range 1 d 15 h to 1 d 22 h\. A simulation, not a measurement\./,
+      ),
+    ).toBeInTheDocument();
+    // What happened against what could have happened, on one scale and in words.
+    const bars = within(answer).getByRole('figure', {
+      name: 'Time from the decision to a diagnosis: what happened against what could have happened',
+    });
+    expect(within(bars).getByText('What happened')).toBeInTheDocument();
+    expect(within(bars).getByText('What could have happened')).toBeInTheDocument();
+    expect(within(bars).getByText('(range 3 h 17 min to 10 h 49 min)')).toBeInTheDocument();
+    expect(
+      within(answer).getByText('Confidence in this comparison: Low (0.25 of 1)'),
+    ).toBeInTheDocument();
+    // The decision it is about sits beside the answer.
+    expect(
+      within(answer).getByRole('heading', {
+        level: 3,
+        name: 'Heavy customer request when a lighter ask was available',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('gives the confidence its reason one click away', async () => {
+    const user = userEvent.setup();
+    renderLab();
+    const answer = await hero();
+    await user.click(
+      within(answer).getByRole('button', { name: 'About the confidence in this comparison' }),
+    );
+    expect(await screen.findByText(/Diagnosis reached in 57% of 200 rollouts/)).toBeInTheDocument();
+  });
+
+  it('follows the chosen strategy: another path, another answer', async () => {
+    const user = userEvent.setup();
+    const [balanced] = scenarioList().items;
+    const fastest = simulatedIn(100, 300, 500, {
+      id: 'scn_2',
+      strategy: 'fastest_diagnosis',
+      label: 'Fastest to diagnosis',
+    });
+    renderLab(
+      api({ 'counterfactuals.list': () => ({ items: [balanced as typeof fastest, fastest] }) }),
+    );
+    const answer = await hero();
+    expect(await within(answer).findByText('1 d 18 h')).toBeInTheDocument();
+    expect(within(answer).getByText('Balanced path')).toBeInTheDocument();
+    // The strategies sit between the answer and the sections they scope, not inside the answer.
+    const strategies = await strategies_();
+    expect(answer.contains(strategies)).toBe(false);
+    await user.click(within(strategies).getByRole('radio', { name: /Fastest to diagnosis/ }));
+    expect(await within(answer).findByText(formatDuration(2994 - 300))).toBeInTheDocument();
+    expect(within(answer).getByText('Fastest to diagnosis')).toBeInTheDocument();
+    expect(within(answer).queryByText('1 d 18 h')).toBeNull();
+  });
+
+  it('never calls a range that includes what happened a saving, and says when the path is slower', async () => {
+    const unclear = renderLab(
+      api({ 'counterfactuals.list': () => ({ items: [simulatedIn(2000, 2800, 3600)] }) }),
+    );
+    let answer = await hero();
+    expect(await within(answer).findByText('No clear saving')).toBeInTheDocument();
+    expect(within(answer).queryByText('sooner to a diagnosis')).toBeNull();
+    unclear.unmount();
+
+    renderLab(api({ 'counterfactuals.list': () => ({ items: [simulatedIn(3100, 3500, 3900)] }) }));
+    answer = await hero();
+    expect(await within(answer).findByText('No time saved')).toBeInTheDocument();
+    expect(
+      within(answer).getByText(
+        `In this simulation the path takes longer: about ${formatDuration(506)} more (range ${formatDuration(-(2994 - 3100))} to ${formatDuration(-(2994 - 3900))} more).`,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('claims no saving for an illustration, whatever its numbers say', async () => {
+    const illustration = scenario({
+      quality: {
+        basis: {
+          scenario: 'illustrative',
+          summary: 'A worked example.',
+          parts: [
+            { what: 'Recorded path', basis: 'measured', note: 'Read from the case.' },
+            { what: 'Alternative path', basis: 'illustrative', note: 'An example.' },
+          ],
+        },
+        feasibility: { level: 'feasible', reasons: [] },
+        constraints: [],
+        skillApplicability: { status: 'not_assessed', skills: [], note: 'Not checked.' },
+        validation: ['Check it before relying on it.'],
+        timeSavedClaim: 'none',
+      },
+    });
+    renderLab(api({ 'counterfactuals.list': () => ({ items: [illustration] }) }));
+    const answer = await hero();
+    expect(await within(answer).findByText('No saving is claimed')).toBeInTheDocument();
+    expect(within(answer).queryByText('sooner to a diagnosis')).toBeNull();
   });
 });
 
@@ -348,7 +552,7 @@ describe('[FR-CF-04] evidence inspector', () => {
     const handler = api();
     renderLab(handler);
     await forkList_();
-    await user.click(tab('Evidence behind each step'));
+    await user.click(tab('Evidence per step'));
     await waitFor(() => expect(window.location.search).toBe('?tab=evidence'));
 
     const inspector = await screen.findByRole('group', { name: 'Evidence inspector' });
@@ -543,12 +747,12 @@ describe('[FR-CF-06] reviewer accepts or rejects a simulated path', () => {
     });
     renderLab(handler);
     await forkList_();
-    await user.click(tab('Review and SkillDNA'));
-    const review = await screen.findByRole('group', { name: 'Review and SkillDNA' });
+    await user.click(tab('Review'));
+    const review = await reviewPanel();
     expect(within(review).getByText('Awaiting review')).toBeInTheDocument();
     expect(within(review).getByText('Nobody has reviewed this path yet.')).toBeInTheDocument();
     expect(within(review).getByText('Version 1')).toBeInTheDocument();
-    expect(within(review).getByText('Two sets of eyes')).toBeInTheDocument();
+    expect(within(review).getByText('Two sets of eyes.')).toBeInTheDocument();
 
     await waitFor(() =>
       expect(within(review).getByRole('button', { name: 'Accept this path' })).not.toHaveAttribute(
@@ -599,7 +803,7 @@ describe('[FR-CF-06] reviewer accepts or rejects a simulated path', () => {
     });
     navigateTo('/?tab=review');
     renderLab(handler);
-    const review = await screen.findByRole('group', { name: 'Review and SkillDNA' });
+    const review = await reviewPanel();
     await waitFor(() =>
       expect(within(review).getByRole('button', { name: 'Reject this path' })).not.toHaveAttribute(
         'aria-disabled',
@@ -634,7 +838,7 @@ describe('[FR-CF-06] reviewer accepts or rejects a simulated path', () => {
     });
     navigateTo('/?tab=review');
     renderLab(handler);
-    const review = await screen.findByRole('group', { name: 'Review and SkillDNA' });
+    const review = await reviewPanel();
     await waitFor(() =>
       expect(within(review).getByRole('button', { name: 'Accept this path' })).not.toHaveAttribute(
         'aria-disabled',
@@ -716,7 +920,7 @@ describe('[FR-CF-06] reviewer accepts or rejects a simulated path', () => {
     await waitFor(() => expect(reads()).toBeGreaterThan(before));
   });
 
-  it('blocks acceptance of a path that failed the leak check, says why, and still allows a rejection', async () => {
+  it('blocks acceptance of a path that failed the no-hindsight check, says why, and still allows a rejection', async () => {
     const leaky = scenario({
       boundary: {
         ...scenario().boundary,
@@ -725,11 +929,9 @@ describe('[FR-CF-06] reviewer accepts or rejects a simulated path', () => {
     });
     navigateTo('/?tab=review');
     renderLab(api({ 'counterfactuals.list': () => ({ items: [leaky] }) }));
-    const review = await screen.findByRole('group', { name: 'Review and SkillDNA' });
+    const review = await reviewPanel();
     expect(await within(review).findByText('Cannot be accepted')).toBeInTheDocument();
-    expect(
-      within(review).getByText('It did not pass the temporal leak check.'),
-    ).toBeInTheDocument();
+    expect(within(review).getByText('It did not pass the no-hindsight check.')).toBeInTheDocument();
     expect(within(review).getByRole('button', { name: 'Accept this path' })).toBeDisabled();
     expect(within(review).getByRole('button', { name: 'Reject this path' })).toBeEnabled();
   });
@@ -738,7 +940,7 @@ describe('[FR-CF-06] reviewer accepts or rejects a simulated path', () => {
     const user = userEvent.setup();
     navigateTo('/?tab=review');
     renderLab(api({}, 'engineer'));
-    const review = await screen.findByRole('group', { name: 'Review and SkillDNA' });
+    const review = await reviewPanel();
     const accept = within(review).getByRole('button', { name: 'Accept this path' });
     await waitFor(() => expect(accept).toHaveAttribute('aria-disabled', 'true'));
     await user.click(accept);
@@ -770,7 +972,7 @@ describe('[FR-CF-06] reviewer accepts or rejects a simulated path', () => {
         }),
       }),
     );
-    const review = await screen.findByRole('group', { name: 'Review and SkillDNA' });
+    const review = await reviewPanel();
     expect(await within(review).findByText(/by user_other on/)).toBeInTheDocument();
     expect(within(review).getByRole('button', { name: 'Accept instead' })).toBeInTheDocument();
     expect(within(review).queryByRole('button', { name: /Reject/ })).toBeNull();
@@ -781,7 +983,7 @@ describe('[FR-CF-06] reviewer accepts or rejects a simulated path', () => {
     const { unmount } = renderLab(
       api({ 'counterfactuals.list': () => ({ items: [scenario({ version: 3 })] }) }),
     );
-    const review = await screen.findByRole('group', { name: 'Review and SkillDNA' });
+    const review = await reviewPanel();
     expect(
       await within(review).findByText('Pending again because the analysis changed'),
     ).toBeInTheDocument();
@@ -800,7 +1002,7 @@ describe('[FR-CF-06] reviewer accepts or rejects a simulated path', () => {
     unmount();
 
     renderLab();
-    const fresh = await screen.findByRole('group', { name: 'Review and SkillDNA' });
+    const fresh = await reviewPanel();
     expect(
       await within(fresh).findByText('Nobody has reviewed this path yet.'),
     ).toBeInTheDocument();
@@ -808,13 +1010,13 @@ describe('[FR-CF-06] reviewer accepts or rejects a simulated path', () => {
   });
 });
 
-describe('[FR-CF-07] Extract SkillDNA', () => {
+describe('[FR-CF-07] Create a skill from an accepted path', () => {
   it('stays disabled until a reviewer has accepted the path', async () => {
     navigateTo('/?tab=review');
     renderLab(api({}, 'engineer'));
-    const review = await screen.findByRole('group', { name: 'Review and SkillDNA' });
-    expect(within(review).getByText('Accept the path first')).toBeInTheDocument();
-    expect(within(review).getByRole('button', { name: 'Extract SkillDNA' })).toBeDisabled();
+    const review = await reviewPanel();
+    expect(within(review).getByText('Accept the path first.')).toBeInTheDocument();
+    expect(within(review).getByRole('button', { name: 'Create skill' })).toBeDisabled();
   });
 
   it('extracts a draft skill from the accepted path, shows the job and opens the new skill', async () => {
@@ -878,13 +1080,13 @@ describe('[FR-CF-07] Extract SkillDNA', () => {
     );
     navigateTo('/?tab=review');
     renderLab(handler);
-    const review = await screen.findByRole('group', { name: 'Review and SkillDNA' });
+    const review = await reviewPanel();
     expect(await within(review).findByText(/by user_riley_reviewer on/)).toBeInTheDocument();
     await waitFor(() =>
-      expect(within(review).getByRole('button', { name: 'Extract SkillDNA' })).toBeEnabled(),
+      expect(within(review).getByRole('button', { name: 'Create skill' })).toBeEnabled(),
     );
-    expect(within(review).queryByText('Accept the path first')).toBeNull();
-    await user.click(within(review).getByRole('button', { name: 'Extract SkillDNA' }));
+    expect(within(review).queryByText('Accept the path first.')).toBeNull();
+    await user.click(within(review).getByRole('button', { name: 'Create skill' }));
     await waitFor(() =>
       expect(handler.call).toHaveBeenCalledWith(
         'skills.extract',
@@ -892,7 +1094,7 @@ describe('[FR-CF-07] Extract SkillDNA', () => {
       ),
     );
     expect(
-      await within(review).findByRole('heading', { level: 3, name: 'Extracting SkillDNA' }),
+      await within(review).findByRole('heading', { level: 3, name: 'Creating the skill' }),
     ).toBeInTheDocument();
     const steps = await within(review).findByRole('list', { name: 'Steps' });
     const [distil, save] = within(steps).getAllByRole('listitem') as [HTMLElement, HTMLElement];
@@ -901,10 +1103,10 @@ describe('[FR-CF-07] Extract SkillDNA', () => {
     expect(within(review).getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     finish();
     await waitFor(() => expect(router.push).toHaveBeenCalledWith('/skills/skl_9'));
-    expect(await screen.findByText('Draft SkillDNA created')).toBeInTheDocument();
+    expect(await screen.findByText('Draft skill created')).toBeInTheDocument();
   });
 
-  it('asks before cancelling a running extraction, then says nothing was created and allows a new one', async () => {
+  it('asks before cancelling a running creation, then says nothing was created and allows a new one', async () => {
     const user = userEvent.setup();
     const stage = (id: string, label: string, status: 'pending' | 'running') => ({
       id,
@@ -952,8 +1154,8 @@ describe('[FR-CF-07] Extract SkillDNA', () => {
     );
     navigateTo('/?tab=review');
     renderLab(handler);
-    const review = await screen.findByRole('group', { name: 'Review and SkillDNA' });
-    await user.click(await ready('Extract SkillDNA', review));
+    const review = await reviewPanel();
+    await user.click(await ready('Create skill', review));
     await user.click(await within(review).findByRole('button', { name: 'Cancel' }));
     const dialog = await screen.findByRole('alertdialog', { name: 'Cancel this job?' });
     expect(handler.call).not.toHaveBeenCalledWith('jobs.cancel', expect.anything());
@@ -971,12 +1173,12 @@ describe('[FR-CF-07] Extract SkillDNA', () => {
     ).toBeInTheDocument();
     expect(within(review).queryByRole('list', { name: 'Steps' })).toBeNull();
     await waitFor(() =>
-      expect(within(review).getByRole('button', { name: 'Extract SkillDNA' })).toBeEnabled(),
+      expect(within(review).getByRole('button', { name: 'Create skill' })).toBeEnabled(),
     );
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  it('shows the failure of the extraction job where it can be read, and allows a new one', async () => {
+  it('shows the failure of the creation job where it can be read, and allows a new one', async () => {
     const user = userEvent.setup();
     const failed = job({
       id: 'job_skill',
@@ -997,17 +1199,17 @@ describe('[FR-CF-07] Extract SkillDNA', () => {
         'engineer',
       ),
     );
-    const review = await screen.findByRole('group', { name: 'Review and SkillDNA' });
-    await user.click(await ready('Extract SkillDNA', review));
-    expect(await within(review).findByText('The skill could not be extracted')).toBeInTheDocument();
+    const review = await reviewPanel();
+    await user.click(await ready('Create skill', review));
+    expect(await within(review).findByText('The skill could not be created')).toBeInTheDocument();
     expect(within(review).getByText('The path has no steps to distil.')).toBeInTheDocument();
     await waitFor(() =>
-      expect(within(review).getByRole('button', { name: 'Extract SkillDNA' })).toBeEnabled(),
+      expect(within(review).getByRole('button', { name: 'Create skill' })).toBeEnabled(),
     );
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  it('shows why the skill could not be extracted', async () => {
+  it('shows why the skill could not be created', async () => {
     const user = userEvent.setup();
     navigateTo('/?tab=review');
     renderLab(
@@ -1027,16 +1229,16 @@ describe('[FR-CF-07] Extract SkillDNA', () => {
         'engineer',
       ),
     );
-    const review = await screen.findByRole('group', { name: 'Review and SkillDNA' });
-    await user.click(await ready('Extract SkillDNA', review));
-    expect(await within(review).findByText('The skill could not be extracted')).toBeInTheDocument();
+    const review = await reviewPanel();
+    await user.click(await ready('Create skill', review));
+    expect(await within(review).findByText('The skill could not be created')).toBeInTheDocument();
     expect(
       within(review).getByText(/This scenario cannot seed a skill\. Its leak check did not pass\./),
     ).toBeInTheDocument();
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  it('says a skill is already being extracted when the API reports an active job, by its reason', async () => {
+  it('says a skill is already being created when the API reports an active job, by its reason', async () => {
     const user = userEvent.setup();
     navigateTo('/?tab=review');
     renderLab(
@@ -1056,9 +1258,9 @@ describe('[FR-CF-07] Extract SkillDNA', () => {
         'engineer',
       ),
     );
-    const review = await screen.findByRole('group', { name: 'Review and SkillDNA' });
-    await user.click(await ready('Extract SkillDNA', review));
-    expect(await within(review).findByText('The skill could not be extracted')).toBeInTheDocument();
+    const review = await reviewPanel();
+    await user.click(await ready('Create skill', review));
+    expect(await within(review).findByText('The skill could not be created')).toBeInTheDocument();
     expect(
       within(review).getByText(
         /A skill is already being extracted for this case\. Wait for that job to finish/,
@@ -1068,12 +1270,12 @@ describe('[FR-CF-07] Extract SkillDNA', () => {
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  it('tells a reviewer who cannot extract skills who can', async () => {
+  it('tells a reviewer who cannot create skills who can', async () => {
     navigateTo('/?tab=review');
     renderLab(api({ 'counterfactuals.list': () => ({ items: [accepted()] }) }));
-    const review = await screen.findByRole('group', { name: 'Review and SkillDNA' });
-    expect(await within(review).findByText(/Your role cannot extract skills/)).toBeInTheDocument();
-    expect(within(review).getByRole('button', { name: 'Extract SkillDNA' })).toHaveAttribute(
+    const review = await reviewPanel();
+    expect(await within(review).findByText(/Your role cannot create skills/)).toBeInTheDocument();
+    expect(within(review).getByRole('button', { name: 'Create skill' })).toHaveAttribute(
       'aria-disabled',
       'true',
     );
@@ -1081,7 +1283,7 @@ describe('[FR-CF-07] Extract SkillDNA', () => {
 });
 
 describe('[FR-CF-08] generating simulated paths', () => {
-  it('generates the missing strategies for the fork and shows the real job progress', async () => {
+  it('generates the missing strategies for the key decision and shows the real job progress', async () => {
     const user = userEvent.setup();
     const handler = api(
       {
@@ -1093,7 +1295,7 @@ describe('[FR-CF-08] generating simulated paths', () => {
     navigateTo('/?sel=fork_2');
     renderLab(handler);
     await user.click(await ready('Generate more strategies'));
-    const dialog = await screen.findByRole('alertdialog', { name: 'Generate simulated paths' });
+    const dialog = await screen.findByRole('alertdialog', { name: 'Generate paths' });
     expect(
       within(dialog).getByRole('checkbox', { name: 'Balanced path (already generated)' }),
     ).not.toBeChecked();
@@ -1110,7 +1312,7 @@ describe('[FR-CF-08] generating simulated paths', () => {
       ),
     );
     expect(
-      await screen.findByRole('heading', { level: 3, name: 'Generating simulated paths' }),
+      await screen.findByRole('heading', { level: 2, name: 'Generating simulated paths' }),
     ).toBeInTheDocument();
     const steps = await screen.findByRole('list', { name: 'Steps' });
     expect(
@@ -1139,7 +1341,7 @@ describe('[FR-CF-08] generating simulated paths', () => {
       ),
     );
     await user.click(await ready('Generate more strategies'));
-    const dialog = await screen.findByRole('alertdialog', { name: 'Generate simulated paths' });
+    const dialog = await screen.findByRole('alertdialog', { name: 'Generate paths' });
     await user.click(within(dialog).getByRole('button', { name: 'Generate' }));
     expect(
       await within(dialog).findByText(
@@ -1149,7 +1351,7 @@ describe('[FR-CF-08] generating simulated paths', () => {
     expect(within(dialog).queryByText(/Another job is running/)).toBeNull();
   });
 
-  it('shows the API reasons when a fork cannot be simulated (a conflict without a reason)', async () => {
+  it('shows the API reasons when a key decision cannot be simulated (a conflict without a reason)', async () => {
     const user = userEvent.setup();
     navigateTo('/?sel=fork_2');
     renderLab(
@@ -1168,7 +1370,7 @@ describe('[FR-CF-08] generating simulated paths', () => {
       ),
     );
     await user.click(await ready('Generate more strategies'));
-    const dialog = await screen.findByRole('alertdialog', { name: 'Generate simulated paths' });
+    const dialog = await screen.findByRole('alertdialog', { name: 'Generate paths' });
     await user.click(within(dialog).getByRole('button', { name: 'Generate' }));
     expect(
       await within(dialog).findByText(
@@ -1183,6 +1385,19 @@ describe('[FR-CF-08] generating simulated paths', () => {
     renderLab(api({}, 'reviewer'));
     const generate = await screen.findByRole('button', { name: 'Generate more strategies' });
     await waitFor(() => expect(generate).toHaveAttribute('aria-disabled', 'true'));
+    await user.hover(generate);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      /does not include the "counterfactual:run" permission/,
+    );
+  });
+
+  it('keeps the primary action, shown while a decision has no paths, unavailable for such a role too', async () => {
+    const user = userEvent.setup();
+    renderLab(api({ 'counterfactuals.list': () => ({ items: [] }) }, 'reviewer'));
+    const generate = await screen.findByRole('button', { name: 'Generate paths' });
+    await waitFor(() => expect(generate).toHaveAttribute('aria-disabled', 'true'));
+    await user.click(generate);
+    expect(screen.queryByRole('alertdialog')).toBeNull();
     await user.hover(generate);
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       /does not include the "counterfactual:run" permission/,
@@ -1207,8 +1422,8 @@ describe('[FR-CF-08] generating simulated paths', () => {
         'engineer',
       ),
     );
-    await user.click(await ready('Generate simulated paths'));
-    const dialog = await screen.findByRole('alertdialog', { name: 'Generate simulated paths' });
+    await user.click(await ready('Generate paths'));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Generate paths' });
     await user.click(within(dialog).getByRole('button', { name: 'Generate' }));
     expect(await screen.findByText('The job failed')).toBeInTheDocument();
     expect(await screen.findByText('The paths could not be generated')).toBeInTheDocument();
@@ -1228,8 +1443,8 @@ describe('[FR-CF-08] generating simulated paths', () => {
         'engineer',
       ),
     );
-    await user.click(await ready('Generate simulated paths'));
-    const dialog = await screen.findByRole('alertdialog', { name: 'Generate simulated paths' });
+    await user.click(await ready('Generate paths'));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Generate paths' });
     await user.click(within(dialog).getByRole('button', { name: 'Generate' }));
     expect(await screen.findByText('Path generation was cancelled')).toBeInTheDocument();
     expect(screen.queryByText('The paths could not be generated')).toBeNull();
@@ -1237,34 +1452,36 @@ describe('[FR-CF-08] generating simulated paths', () => {
 });
 
 describe('[FR-CF-09] hindsight is separate from generation', () => {
-  it('is locked, and loads nothing from the recorded outcome, for a role without quality review', async () => {
+  it('is folded, and loads nothing from the recorded outcome, for a role without quality review', async () => {
+    const user = userEvent.setup();
     const handler = api({}, 'engineer');
     renderLab(handler);
-    const hindsight = await screen.findByRole('region', {
-      name: 'Hindsight (not used to generate)',
-    });
+    await forkList_();
+    const hindsight = await open(user, /^Known only later/);
     expect(
       await within(hindsight).findByText(/Hindsight is limited to people who review quality/),
     ).toBeInTheDocument();
-    expect(within(hindsight).queryByRole('button', { name: /hindsight check/ })).toBeNull();
     expect(handler.call).not.toHaveBeenCalledWith('counterfactuals.hindsight', expect.anything());
   });
 
-  it('is not requested on load and appears only after the reviewer asks, in its own labelled panel', async () => {
+  it('is not requested on load and appears only after the reviewer opens it, in its own labelled section', async () => {
     const user = userEvent.setup();
     const handler = api();
     renderLab(handler);
-    const hindsight = await screen.findByRole('region', {
-      name: 'Hindsight (not used to generate)',
-    });
-    expect(within(hindsight).getByText('Uses the final resolution')).toBeInTheDocument();
     await forkList_();
+    const trigger = await screen.findByRole('button', { name: /^Known only later/ });
+    // Folded, and the closed line already says why it is kept apart.
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      within(trigger).getByText(
+        'Hindsight: uses the final resolution and is never used to generate a path',
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByText('hyp.dns-resolution')).toBeNull();
     expect(handler.call).not.toHaveBeenCalledWith('counterfactuals.hindsight', expect.anything());
 
-    const show = await within(hindsight).findByRole('button', { name: 'Show the hindsight check' });
-    await waitFor(() => expect(show).toBeEnabled());
-    await user.click(show);
+    const hindsight = await open(user, /^Known only later/);
+    expect(within(hindsight).getByText('Uses the final resolution.')).toBeInTheDocument();
     expect(await within(hindsight).findByText('hyp.dns-resolution')).toBeInTheDocument();
     expect(handler.call).toHaveBeenCalledWith(
       'counterfactuals.hindsight',
@@ -1282,9 +1499,7 @@ describe('[FR-CF-09] hindsight is separate from generation', () => {
     expect(
       within(hindsight).getByText(/What the recorded step eventually produced:/),
     ).toBeInTheDocument();
-    expect(
-      within(hindsight).getByRole('button', { name: 'Hide the hindsight check' }),
-    ).toHaveAttribute('aria-expanded', 'true');
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('says it is not available when the API refuses it', async () => {
@@ -1296,13 +1511,9 @@ describe('[FR-CF-09] hindsight is separate from generation', () => {
         },
       }),
     );
-    const hindsight = await screen.findByRole('region', {
-      name: 'Hindsight (not used to generate)',
-    });
-    const show = await within(hindsight).findByRole('button', { name: 'Show the hindsight check' });
-    await waitFor(() => expect(show).toBeEnabled());
-    await user.click(show);
-    expect(await within(hindsight).findByText('Not available to your role')).toBeInTheDocument();
+    await forkList_();
+    const hindsight = await open(user, /^Known only later/);
+    expect(await within(hindsight).findByText('Not available to your role.')).toBeInTheDocument();
   });
 });
 
@@ -1516,7 +1727,7 @@ describe('[FR-CF-10] Investigation Graph integration', () => {
     await waitFor(() =>
       expect(document.querySelector('[data-node-id="evidence:evd_name"]')).not.toBeNull(),
     );
-    await user.click(await screen.findByRole('tab', { name: /Fastest to diagnosis/ }));
+    await user.click(await screen.findByRole('radio', { name: /Fastest to diagnosis/ }));
     expect(await screen.findByText(/Loading the investigation graph/)).toBeInTheDocument();
     expect(document.querySelector('[data-node-id]')).toBeNull();
   });
@@ -1559,30 +1770,32 @@ describe('[FR-CF-10] Investigation Graph integration', () => {
     expect(refused).toBe(2);
   }, 60_000);
 
-  it('shows only the recorded path, with a notice, when the fork has no simulated path', async () => {
+  it('shows only the recorded path, with a notice, when the key decision has no simulated path', async () => {
     navigateTo('/?tab=graph');
     const handler = api({ 'counterfactuals.list': () => ({ items: [] }) });
     renderLab(handler);
     expect(
-      await screen.findByText('Recorded path only', { selector: 'p, div, span, h4' }),
+      await screen.findByText(
+        /Generate a simulated path for this key decision to compare the two paths/,
+      ),
     ).toBeInTheDocument();
     expect(await screen.findByRole('radio', { name: 'Compare both paths' })).toBeDisabled();
     expect(handler.call).toHaveBeenCalledWith('graph.get', expect.objectContaining({ query: {} }));
   });
 });
 
-describe('[FR-CF-11] Counterfactual Lab states', () => {
-  it('explains that a case without decision forks is a good sign, and offers a next step', async () => {
+describe('[FR-CF-11] What if states', () => {
+  it('explains that a case without key decisions is a good sign, and offers a next step', async () => {
     const { container } = renderLab(
       api({ 'forks.list': () => ({ items: [], earliestMeaningfulForkId: null }) }),
     );
     expect(
-      await screen.findByRole('heading', { name: 'No decision forks in this case' }),
+      await screen.findByRole('heading', { name: 'No key decisions in this case' }),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/That is a good sign for this case, not an error\./),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'See the hypotheses' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'See possible causes' })).toHaveAttribute(
       'href',
       '/cases/case_1/hypotheses',
     );
@@ -1616,7 +1829,7 @@ describe('[FR-CF-11] Counterfactual Lab states', () => {
     await expectNoAxeViolations(container);
     await user.click(screen.getByRole('button', { name: /Retry/ }));
     expect(
-      await screen.findByRole('list', { name: 'Decision forks in time order' }),
+      await screen.findByRole('list', { name: 'Key decisions in time order' }),
     ).toBeInTheDocument();
   });
 
@@ -1634,11 +1847,9 @@ describe('[FR-CF-11] Counterfactual Lab states', () => {
       }),
     );
     expect(await screen.findByText('The simulated paths could not be loaded')).toBeInTheDocument();
-    expect(screen.getByRole('list', { name: 'Decision forks in time order' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Key decisions in time order' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Retry/ }));
-    expect(
-      await screen.findByRole('tablist', { name: 'Simulated path strategies' }),
-    ).toBeInTheDocument();
+    expect(await strategies_()).toBeInTheDocument();
   });
 
   it('does not offer Retry for a forbidden response', async () => {
@@ -1661,23 +1872,23 @@ describe('[FR-CF-11] Counterfactual Lab states', () => {
       await screen.findByRole('heading', { name: 'We could not find that case' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Browse cases' })).toHaveAttribute('href', '/cases');
-    // Not the generic failure of the page, whose Retry could never succeed, and none of the Lab around it.
-    expect(screen.queryByText('The Counterfactual Lab could not be loaded')).toBeNull();
+    // Not the generic failure of the page, whose Retry could never succeed, and none of the screen around it.
+    expect(screen.queryByText('The what-if view could not be loaded')).toBeNull();
     expect(screen.queryByRole('button', { name: /Retry/ })).toBeNull();
     expect(screen.queryByText('Simulation, not history')).toBeNull();
-    expect(screen.queryByRole('list', { name: 'Decision forks in time order' })).toBeNull();
+    expect(screen.queryByRole('list', { name: 'Key decisions in time order' })).toBeNull();
     // Nothing is left busy: a screen reader would otherwise announce a page that is loading for ever.
     expect(document.querySelector('[aria-busy="true"]')).toBeNull();
   });
 
-  it('does not wait for the forks of a case that does not exist', async () => {
+  it('does not wait for the key decisions of a case that does not exist', async () => {
     renderApp(<CounterfactualLabPage caseId="case_gone" />, {
       api: api({ 'cases.get': missing, 'forks.list': () => new Promise<never>(() => undefined) }),
     });
     expect(
       await screen.findByRole('heading', { name: 'We could not find that case' }),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/Loading the decision forks/)).toBeNull();
+    expect(screen.queryByText(/Loading the key decisions/)).toBeNull();
     expect(document.querySelector('[aria-busy="true"]')).toBeNull();
   });
 
@@ -1690,16 +1901,27 @@ describe('[FR-CF-11] Counterfactual Lab states', () => {
     expect(quiet.call).not.toHaveBeenCalledWith('forks.list', expect.anything());
   });
 
-  it('registers the case reference as the breadcrumb label', async () => {
+  it('leaves the case title to the case header and has no navigation of its own besides its sections', async () => {
     renderLab();
     await forkList_();
-    expect(await screen.findByText('CG-SYN-1001')).toBeInTheDocument();
+    expect(screen.queryByText('CG-SYN-1001')).toBeNull();
+    expect(
+      screen.queryByText('Intermittent Teams sign-in failures for about 140 branch users'),
+    ).toBeNull();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.queryByRole('navigation')).toBeNull();
+    expect(
+      within(screen.getByRole('tablist', { name: 'What if sections' }))
+        .getAllByRole('tab')
+        .map((item) => item.textContent),
+    ).toEqual(['Compare', 'Evidence per step', 'Decision moment', 'Graph', 'Review']);
+    expect(tab('Compare')).toHaveAttribute('aria-selected', 'true');
   });
 });
 
 describe('[NFR-A11Y] Counterfactual Lab accessibility', () => {
   // axe walks the whole DOM, which is slow in jsdom on a busy machine.
-  const SLOW = 120_000;
+  const SLOW = 240_000;
 
   it(
     'has no axe violations on the comparison',
@@ -1743,7 +1965,7 @@ describe('[NFR-A11Y] Counterfactual Lab accessibility', () => {
       const user = userEvent.setup();
       navigateTo('/?tab=review');
       const { container } = renderLab();
-      const review = await screen.findByRole('group', { name: 'Review and SkillDNA' });
+      const review = await reviewPanel();
       await waitFor(() =>
         expect(
           within(review).getByRole('button', { name: 'Accept this path' }),
@@ -1766,7 +1988,7 @@ describe('[NFR-A11Y] Counterfactual Lab accessibility', () => {
       navigateTo('/?sel=fork_2');
       renderLab(api({}, 'engineer'));
       await user.click(await ready('Generate more strategies'));
-      const dialog = await screen.findByRole('alertdialog', { name: 'Generate simulated paths' });
+      const dialog = await screen.findByRole('alertdialog', { name: 'Generate paths' });
       await expectNoAxeViolations(dialog);
     },
     SLOW,

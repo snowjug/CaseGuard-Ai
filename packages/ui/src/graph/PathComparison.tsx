@@ -1,7 +1,7 @@
 'use client';
 
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
-import { BranchForkRegular } from '@fluentui/react-icons';
+import { GitForkIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { ChartTable, useElementWidth } from '../charts/ChartParts';
 import { DeltaBar } from '../charts/DeltaBar';
@@ -212,7 +212,7 @@ export function PathComparison({
         : t.fg;
     const StatusIcon = STATUS_META[status].icon;
     const Icon = isFork
-      ? BranchForkRegular
+      ? GitForkIcon
       : kind === 'outcome'
         ? KIND_META.outcome.icon
         : kind === 'evidence'

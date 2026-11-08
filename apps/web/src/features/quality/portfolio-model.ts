@@ -58,3 +58,62 @@ export function optionalRate(rate: number | null, whenNull: string): string {
 export function casesText(count: number): string {
   return `${count} ${count === 1 ? 'case' : 'cases'}`;
 }
+
+/** A whole number for a count chart; the axis tick that falls between two whole numbers stays blank, never "1, 1, 2, 2". */
+export function formatCount(value: number): string {
+  return Number.isInteger(value) ? formatNumber(value, { maximumFractionDigits: 0 }) : '';
+}
+
+type TrendRow = AnalyticsOverview['qualityTrend'][number];
+
+/**
+ * The average score over every analysed case, from the monthly averages weighted by their cases (so it is the figure the
+ * bars add up to, not an average of averages). Null when no month has a score.
+ */
+export function averageQuality(
+  trend: readonly TrendRow[],
+): { value: number; caseCount: number } | null {
+  let sum = 0;
+  let count = 0;
+  for (const row of trend) {
+    if (row.avgQuality === null || row.caseCount === 0) continue;
+    sum += row.avgQuality * row.caseCount;
+    count += row.caseCount;
+  }
+  return count === 0 ? null : { value: sum / count, caseCount: count };
+}
+
+/** True when every month holds a single case: each bar is then that case's own estimate, not a trend. */
+export function isEveryMonthOneCase(trend: readonly TrendRow[]): boolean {
+  return trend.length > 0 && trend.every((row) => row.caseCount === 1);
+}
+
+/**
+ * How the latest month moved from the one before it, in points. Null while there is nothing to compare or when every
+ * month holds one case (that would present two single cases as a movement).
+ */
+export function trendChange(
+  trend: readonly TrendRow[],
+): { points: number; from: string; to: string } | null {
+  const scored = trend.filter((row) => row.avgQuality !== null);
+  const latest = scored.at(-1);
+  const before = scored.at(-2);
+  if (!latest || !before || isEveryMonthOneCase(trend)) return null;
+  return {
+    points: (latest.avgQuality ?? 0) - (before.avgQuality ?? 0),
+    from: before.period,
+    to: latest.period,
+  };
+}
+
+/**
+ * The one figure about time in the portfolio: the average share of waiting time (to diagnosis) that a better-sequenced
+ * path would have avoided, over the cases that have an estimate. The overview carries no overall figure for the
+ * estimate, so this does not pretend to be one. Null when no case has it.
+ */
+export function waitingTimeSaved(
+  patterns: AnalyticsOverview['avoidableEffortPatterns'],
+): { pct: number; caseCount: number } | null {
+  const row = patterns.find((pattern) => pattern.component === 'waiting_time');
+  return row ? { pct: row.avgAvoidablePct, caseCount: row.caseCount } : null;
+}

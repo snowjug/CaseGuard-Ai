@@ -564,7 +564,7 @@ export function LineChart({
             listStyle: 'none',
             display: 'flex',
             flexWrap: 'wrap',
-            gap: '4px 16px',
+            gap: `${cg.space[1]} ${cg.space[4]}`,
             fontSize: CHART_FONT_SIZE,
             color: cg.textSecondary,
           }}

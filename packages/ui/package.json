@@ -16,7 +16,10 @@
   "dependencies": {
     "@caseguard/schemas": "workspace:*",
     "@fluentui/react-components": "^9.75.0",
-    "@fluentui/react-icons": "^2.0.344"
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
+    "lucide-react": "catalog:",
+    "motion": "catalog:"
   },
   "peerDependencies": {
     "react": "catalog:",

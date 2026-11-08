@@ -44,7 +44,7 @@ describe('[FR-GOV-30] roles', () => {
     const table = await screen.findByRole('table', { name: 'Users and their roles' });
     expect(within(table).getAllByRole('row')).toHaveLength(4);
     expect(within(table).getByText('Riley Reviewer (synthetic)')).toBeInTheDocument();
-    expect(within(table).getAllByText('Synthetic').length).toBeGreaterThan(0);
+    expect(within(table).getAllByText('Demo data').length).toBeGreaterThan(0);
 
     await user.click(
       screen.getByRole('button', { name: 'Change roles for Riley Reviewer (synthetic)' }),
@@ -250,7 +250,7 @@ describe('[FR-GOV-31] audit log', () => {
     expect(screen.getByText('Showing 2 events.')).toBeInTheDocument();
   });
 
-  it('reports the chain verification: intact, then broken with the first bad sequence', async () => {
+  it('reports the audit log check: intact, then broken with the first bad sequence', async () => {
     const user = userEvent.setup();
     open('audit');
     let broken = false;
@@ -266,7 +266,8 @@ describe('[FR-GOV-31] audit log', () => {
             : auditVerification(),
       }),
     });
-    const panel = await screen.findByRole('group', { name: 'Hash-chain verification' });
+    // The check sits in the summary at the top, so it shows on every section, not only on the audit log.
+    const panel = await screen.findByRole('group', { name: 'Audit log check' });
     expect(await within(panel).findByText('Chain intact')).toBeInTheDocument();
     expect(
       within(panel).getByText(/Verified 19 audit events; the hash chain is intact/),
@@ -487,16 +488,17 @@ describe('[FR-GOV-32] reviewer decisions and prompts', () => {
     const list = await screen.findByRole('list', { name: /Reviewer decisions, 1 shown/ });
     const article = within(list).getByRole('article');
     expect(within(article).getByText('Confirmed')).toBeInTheDocument();
-    expect(
-      within(article).getByRole('link', { name: 'Counterfactual path scn_1' }),
-    ).toHaveAttribute('href', '/cases/case_1/counterfactual?sel=scn_1');
+    expect(within(article).getByRole('link', { name: 'What-if path scn_1' })).toHaveAttribute(
+      'href',
+      '/cases/case_1/counterfactual?sel=scn_1',
+    );
     expect(
       within(article).getByText(/every step uses only what was known before the decision/),
     ).toBeInTheDocument();
     expect(within(article).getByText(/"reviewState": "pending"/)).toBeInTheDocument();
     expect(within(article).getByText(/"reviewState": "confirmed"/)).toBeInTheDocument();
     expect(
-      screen.getByText(/Skill approvals .* are recorded in the SkillDNA Library/),
+      screen.getByText(/Skill approvals .* are recorded in the Skills library/),
     ).toBeInTheDocument();
   });
 
@@ -520,7 +522,7 @@ describe('[FR-GOV-32] reviewer decisions and prompts', () => {
       api: api({ 'governance.reviews': () => ({ items: [], nextCursor: null }) }),
     });
     expect(await screen.findByText('No reviewer decisions yet')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open Cases' })).toHaveAttribute('href', '/cases');
+    expect(screen.getByRole('link', { name: 'Open cases' })).toHaveAttribute('href', '/cases');
   });
 
   it('shows prompt versions read-only with the hash, and expands a long template on request', async () => {
@@ -532,9 +534,12 @@ describe('[FR-GOV-32] reviewer decisions and prompts', () => {
     });
     expect(await screen.findByText('Read-only')).toBeInTheDocument();
     expect(screen.getByText(/cannot be edited here/)).toBeInTheDocument();
-    const card = screen.getByRole('group', { name: 'Quality Judge prompt' });
-    expect(within(card).getByText('Version 1.0.0')).toBeInTheDocument();
-    expect(within(card).getByText('Active')).toBeInTheDocument();
+    // The first prompt is open; the version and status are part of its header.
+    const header = screen.getByRole('button', { name: /^Quality Judge prompt/ });
+    expect(header).toHaveAccessibleName(/Version 1\.0\.0/);
+    expect(header).toHaveAccessibleName(/Active/);
+    expect(header).toHaveAttribute('aria-expanded', 'true');
+    const card = screen.getByRole('region', { name: /^Quality Judge prompt/ });
     expect(within(card).getByText(/cccccccccccccccc…/)).toBeInTheDocument();
     const expand = within(card).getByRole('button', { name: /Show all .* characters/ });
     expect(expand).toHaveAttribute('aria-expanded', 'false');

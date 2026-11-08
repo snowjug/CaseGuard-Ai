@@ -8,88 +8,104 @@ import {
   type ThrowawayCase,
 } from '../support/flows';
 
-test.describe('[FR-FK-01] Counterfactual Lab: decision forks and what a better path would have changed', () => {
-  test('lists the nine forks of Case One in time order; the earliest meaningful one is first and selected', async ({
+test.describe('[FR-FK-01] What if: key decisions and what a better path would have changed', () => {
+  test('lists the nine key decisions of Case One in time order; the earliest meaningful one is first and selected', async ({
     page,
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/counterfactual`);
-    await expect(page.getByRole('heading', { level: 1, name: 'Counterfactual Lab' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'What if' })).toBeVisible();
+    // "Simulation, not history" is one persistent badge whose tooltip carries the sentence, never a banner.
+    await expect(page.getByText('Simulation, not history')).toBeVisible();
     await expect(
-      page.getByText(
+      page.getByTitle(
         'Everything marked Simulated is an estimate made from what was on record before the decision. It is not something that happened.',
       ),
     ).toBeVisible();
-    const forks = page.getByRole('list', { name: 'Decision forks in time order' });
+    const forks = page.getByRole('list', { name: 'Key decisions in time order' });
     await expect(forks.getByRole('button')).toHaveCount(9);
     const first = forks.getByRole('button').first();
-    await expect(first).toContainText('Fork 1 of 9');
-    await expect(first).toContainText('Earliest meaningful');
+    await expect(first).toContainText('1 of 9');
+    await expect(first).toContainText('Earliest');
     await expect(first).toContainText('9 Mar 2026, 09:41 UTC');
     await expect(first).toContainText('Heavy customer request when a lighter ask was available');
+    await expect(first).toHaveAttribute('aria-pressed', 'true');
     await expect(
-      page.getByRole('group', { name: 'Heavy customer request when a lighter ask was available' }),
+      page.getByRole('region', { name: 'Heavy customer request when a lighter ask was available' }),
     ).toBeVisible();
     await expect(
       page.getByRole('link', { name: 'Open the decision event in the timeline' }),
     ).toHaveAttribute('href', /sel=e03/);
   });
 
-  test('the temporal boundary: the decision is judged on what was known strictly before it, and the leak check passed', async ({
+  test('the no-hindsight check: the decision is judged on what was known strictly before it, and the check passed', async ({
     page,
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/counterfactual`);
-    const boundary = page.getByRole('group', { name: 'Temporal boundary and leak check' });
+    // Folded away, but the closed line already says that it passed.
+    const toggle = page.getByRole('button', { name: /^No-hindsight check/ });
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle).toContainText('Passed');
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const boundary = page.getByRole('region', { name: /^No-hindsight check/ });
     await expect(
       boundary.getByRole('img', {
         name: '2 of 31 events were known at the decision instant; 29 later events were withheld',
       }),
     ).toBeVisible();
-    await expect(boundary.getByText('Validity checks (8 of 8 passed)')).toBeVisible();
-    await boundary.getByText('Validity checks (8 of 8 passed)').click();
-    await expect(boundary.getByRole('listitem').first()).toBeVisible();
-  });
-
-  test('three strategies are generated for the fork, each with its review state; the comparison is labelled simulated and estimated', async ({
-    page,
-    demo,
-  }) => {
-    await openPage(page, `/cases/${demo.caseOneId}/counterfactual`);
-    const strategies = page.getByRole('tablist', { name: 'Simulated path strategies' });
-    await expect(strategies.getByRole('tab')).toHaveCount(3);
-    await expect(strategies.getByRole('tab', { name: /^Balanced path/ })).toBeVisible();
-    await expect(strategies.getByRole('tab', { name: /^Lowest customer effort/ })).toBeVisible();
-    await expect(strategies.getByRole('tab', { name: /^Fastest to diagnosis/ })).toBeVisible();
-
-    const compare = page.getByRole('tabpanel', { name: 'Compare paths' });
-    await expect(compare.getByRole('heading', { name: 'What would have changed' })).toBeVisible();
-    await expect(compare.getByText(/Confidence in this comparison/)).toBeVisible();
+    await expect(boundary.getByText('No-hindsight check passed')).toBeVisible();
+    const checks = boundary.getByRole('button', { name: 'Validity checks (8 of 8 passed)' });
+    await expect(checks).toBeVisible();
+    await checks.click();
+    await expect(checks).toHaveAttribute('aria-expanded', 'true');
     await expect(
-      compare.getByRole('region', { name: 'What could turn out differently' }),
+      boundary.getByRole('list', { name: 'Validity checks' }).getByRole('listitem').first(),
     ).toBeVisible();
-    await expect(compare.getByRole('region', { name: /^Assumptions/ })).toBeVisible();
-    await strategies.getByRole('tab', { name: /^Lowest customer effort/ }).click();
-    await settle(page);
-    await expect(strategies.getByRole('tab', { name: /^Lowest customer effort/ })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
   });
 
-  test('the five sections of the lab open: paths, evidence behind each step, decision moment, graph and review', async ({
+  test('three strategies are generated for the key decision, each with its review state; the comparison is labelled simulated and estimated', async ({
     page,
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/counterfactual`);
-    const sections = page.getByRole('tablist', { name: 'Lab sections' });
-    for (const name of [
-      'Compare paths',
-      'Evidence behind each step',
-      'Decision moment',
-      'Investigation graph',
-      'Review and SkillDNA',
-    ]) {
+    const strategies = page.getByRole('radiogroup', { name: 'Simulated path strategies' });
+    await expect(strategies.getByRole('radio')).toHaveCount(3);
+    await expect(strategies.getByRole('radio', { name: /^Balanced path/ })).toBeVisible();
+    await expect(strategies.getByRole('radio', { name: /^Lowest customer effort/ })).toBeVisible();
+    await expect(strategies.getByRole('radio', { name: /^Fastest to diagnosis/ })).toBeVisible();
+
+    // The answer is the hero, labelled as an estimate and a simulation, with its confidence; the detail is in Compare.
+    const hero = page.getByRole('group', { name: 'What would have changed the outcome' });
+    await expect(
+      hero.getByRole('heading', { name: 'What would have changed the outcome' }),
+    ).toBeVisible();
+    await expect(hero.getByText('Estimated', { exact: true })).toBeVisible();
+    await expect(hero.getByText('Simulated', { exact: true })).toBeVisible();
+    await expect(hero.getByText(/Confidence in this comparison/)).toBeVisible();
+    const compare = page.getByRole('tabpanel', { name: 'Compare' });
+    for (const name of ['What could turn out differently', /^Assumptions/]) {
+      const toggle = compare.getByRole('button', { name });
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      await expect(compare.getByRole('region', { name })).toBeVisible();
+    }
+    await strategies.getByRole('radio', { name: /^Lowest customer effort/ }).click();
+    await settle(page);
+    await expect(
+      strategies.getByRole('radio', { name: /^Lowest customer effort/ }),
+    ).toHaveAttribute('aria-checked', 'true');
+  });
+
+  test('the five sections open: compare, evidence per step, decision moment, graph and review', async ({
+    page,
+    demo,
+  }) => {
+    await openPage(page, `/cases/${demo.caseOneId}/counterfactual`);
+    const sections = page.getByRole('tablist', { name: 'What if sections' });
+    for (const name of ['Compare', 'Evidence per step', 'Decision moment', 'Graph', 'Review']) {
       await sections.getByRole('tab', { name }).click();
       await settle(page);
       await expect(page.getByRole('tabpanel', { name }), name).toBeVisible();
@@ -102,7 +118,7 @@ test.describe('[FR-FK-01] Counterfactual Lab: decision forks and what a better p
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/counterfactual?tab=graph`);
     await settle(page);
-    const panel = page.getByRole('tabpanel', { name: 'Investigation graph' });
+    const panel = page.getByRole('tabpanel', { name: 'Graph' });
     await expect(panel).toBeVisible();
     const canvas = panel.getByRole('group', {
       name: /^Investigation graph with \d+ nodes and \d+ connections\. Tab to enter the graph/,
@@ -135,22 +151,30 @@ test.describe('[FR-FK-01] Counterfactual Lab: decision forks and what a better p
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/counterfactual`);
-    const hindsight = page.getByRole('region', { name: 'Hindsight (not used to generate)' });
+    // Folded away, and the closed line already says why it is kept apart.
+    const toggle = page.getByRole('button', { name: /^Known only later/ });
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle).toContainText(
+      'Hindsight: uses the final resolution and is never used to generate a path',
+    );
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const hindsight = page.getByRole('region', { name: /^Known only later/ });
     await expect(hindsight).toBeVisible();
     await expect(hindsight.getByText(/Uses the final resolution/)).toBeVisible();
   });
 
-  test('selecting another fork changes the decision shown, and the fork is in the URL', async ({
+  test('selecting another key decision changes the decision shown, and it is in the URL', async ({
     page,
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/counterfactual`);
-    const forks = page.getByRole('list', { name: 'Decision forks in time order' });
+    const forks = page.getByRole('list', { name: 'Key decisions in time order' });
     await forks.getByRole('button').nth(1).click();
     await settle(page);
     await expect(page).toHaveURL(/sel=fork_/);
     await expect(
-      page.getByRole('group', { name: 'Cause stated as fact without supporting evidence' }),
+      page.getByRole('region', { name: 'Cause stated as fact without supporting evidence' }),
     ).toBeVisible();
     await expect(forks.getByRole('button').nth(1)).toHaveAttribute('aria-pressed', 'true');
   });
@@ -164,7 +188,7 @@ test.describe('[FR-CF-01] "Generate more strategies" runs a counterfactual job w
     if (copy) await deleteCase(copy.id);
   });
 
-  test('on a throw-away copy of Case One, an engineer generates the missing strategies for a fork and the tabs appear', async ({
+  test('on a throw-away copy of Case One, an engineer generates the missing strategies for a key decision and the three strategies appear', async ({
     page,
     api,
   }) => {
@@ -172,19 +196,19 @@ test.describe('[FR-CF-01] "Generate more strategies" runs a counterfactual job w
     const caseId = copy.id;
 
     await openPage(page, `/cases/${caseId}/counterfactual`);
-    const forks = page.getByRole('list', { name: 'Decision forks in time order' });
-    // A fork with one simulated path: the other strategies can still be generated.
+    const forks = page.getByRole('list', { name: 'Key decisions in time order' });
+    // A key decision with one simulated path: the other strategies can still be generated.
     const fork = forks.getByRole('button').filter({ hasText: '1 simulated path' }).first();
     await fork.click();
     await settle(page);
     await page.getByRole('button', { name: 'Generate more strategies' }).click();
     await expect(
-      confirmDialog(page).getByRole('heading', { name: 'Generate simulated paths' }),
+      confirmDialog(page).getByRole('heading', { name: 'Generate paths' }),
     ).toBeVisible();
     await confirmDialog(page).getByRole('button', { name: 'Generate', exact: true }).click();
     await expect(toast(page, 'Simulated paths are ready')).toBeVisible({ timeout: 240_000 });
     await expect(
-      page.getByRole('tablist', { name: 'Simulated path strategies' }).getByRole('tab'),
+      page.getByRole('radiogroup', { name: 'Simulated path strategies' }).getByRole('radio'),
     ).toHaveCount(3);
   });
 });

@@ -2,10 +2,10 @@
 
 import type { CounterfactualScenario, DecisionFork, DiagnosticAction } from '@caseguard/schemas';
 import {
+  Accordion,
+  AccordionItem,
   DataTable,
-  Notice,
   PathComparison,
-  ProvenanceBadge,
   StatusBadge,
   cg,
   formatNumber,
@@ -15,7 +15,6 @@ import {
 } from '@caseguard/ui';
 import { makeStyles, tokens } from '@fluentui/react-components';
 import { useMemo } from 'react';
-import { LEVEL_LABELS } from '../reasoning/labels';
 import {
   METRIC_SPECS,
   comparisonTracks,
@@ -27,14 +26,8 @@ import { TrustPanel } from './TrustPanel';
 import { describeTrust } from './trust';
 
 const useStyles = makeStyles({
-  stack: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
+  stack: { display: 'flex', flexDirection: 'column', gap: cg.space[6], minWidth: 0 },
   section: { display: 'flex', flexDirection: 'column', gap: cg.space[2], minWidth: 0 },
-  h3: {
-    margin: 0,
-    fontSize: tokens.fontSizeBase400,
-    lineHeight: tokens.lineHeightBase400,
-    fontWeight: tokens.fontWeightSemibold,
-  },
   text: {
     margin: 0,
     fontSize: tokens.fontSizeBase300,
@@ -70,21 +63,6 @@ const useStyles = makeStyles({
     color: cg.textSecondary,
     fontSize: tokens.fontSizeBase300,
   },
-  details: {
-    borderRadius: cg.radius.md,
-    border: `1px solid ${cg.borderSubtle}`,
-    padding: `${cg.space[1]} ${cg.space[3]}`,
-    backgroundColor: cg.surface,
-  },
-  summary: {
-    cursor: 'pointer',
-    minHeight: '32px',
-    display: 'flex',
-    alignItems: 'center',
-    fontWeight: tokens.fontWeightSemibold,
-    fontSize: tokens.fontSizeBase300,
-  },
-  row: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
 });
 
 function formatRange(row: PathMetricDelta): string {
@@ -125,8 +103,8 @@ export interface ComparisonPanelProps {
 
 /**
  * What happened next to what the simulation says would have happened, both measured from the decision instant: the two
- * paths diverging at the fork, ten estimated measures with their ranges, and how much confidence the comparison itself
- * deserves. Simulated and estimated labels are on every number.
+ * paths diverging at the key decision and ten estimated measures with their ranges. How far the comparison itself can be
+ * trusted is said in the hero above and in the trust card here. Simulated and estimated labels are on every number.
  */
 export function ComparisonPanel({ fork, scenario, actions }: ComparisonPanelProps) {
   const styles = useStyles();
@@ -136,18 +114,12 @@ export function ComparisonPanel({ fork, scenario, actions }: ComparisonPanelProp
   );
   const deltas = useMemo(() => metricDeltas(scenario), [scenario]);
   const headlines = headlineImprovements(scenario);
-  const confidence = scenario.comparisonConfidence;
   const trust = useMemo(() => describeTrust(scenario.quality), [scenario.quality]);
   const countMismatch = tracks.recordedActionCount !== scenario.actualMetrics.actionCount.mid;
 
   return (
     <div className={styles.stack}>
       <section className={styles.section} aria-label="Summary of the comparison">
-        <div className={styles.row}>
-          <h3 className={styles.h3}>What would have changed</h3>
-          <ProvenanceBadge kind="simulated" />
-          <ProvenanceBadge kind="estimated" />
-        </div>
         <p className={styles.text}>{scenario.summary}</p>
         {headlines.length > 0 ? (
           <ul className={styles.chips} aria-label="Estimated improvements">
@@ -170,13 +142,6 @@ export function ComparisonPanel({ fork, scenario, actions }: ComparisonPanelProp
         </p>
       </section>
 
-      <Notice
-        variant="model-estimate"
-        title={`Confidence in this comparison: ${LEVEL_LABELS[confidence.level]} (${formatNumber(confidence.score, { maximumFractionDigits: 2 })} of 1)`}
-      >
-        {confidence.rationale}
-      </Notice>
-
       {trust ? <TrustPanel trust={trust} /> : null}
 
       <PathComparison
@@ -195,51 +160,48 @@ export function ComparisonPanel({ fork, scenario, actions }: ComparisonPanelProp
         </p>
       ) : null}
 
-      <details className={styles.details}>
-        <summary className={styles.summary}>The numbers behind the comparison</summary>
-        <DataTable
-          caption="Actual and simulated measures"
-          columns={COLUMNS}
-          rows={deltas}
-          getRowId={(row) => row.key}
-          dense
-        />
-      </details>
-
-      {scenario.branchNotes.length > 0 ? (
-        <section className={styles.section} aria-label="What could turn out differently">
-          <h3 className={styles.h3}>What could turn out differently</h3>
-          <p className={styles.muted}>
-            Each step has more than one possible result. These are the alternative branches the
-            simulation considered, with their estimated probabilities.
-          </p>
+      <Accordion>
+        <AccordionItem title="The numbers behind the comparison">
+          <DataTable
+            caption="Actual and simulated measures"
+            columns={COLUMNS}
+            rows={deltas}
+            getRowId={(row) => row.key}
+            dense
+          />
+        </AccordionItem>
+        {scenario.branchNotes.length > 0 ? (
+          <AccordionItem title="What could turn out differently">
+            <p className={styles.muted}>
+              Each step has more than one possible result. These are the alternative branches the
+              simulation considered, with their estimated probabilities.
+            </p>
+            <ul className={styles.list}>
+              {scenario.branchNotes.map((note) => (
+                <li key={`${note.afterStepIndex}-${note.condition}`}>
+                  After step {note.afterStepIndex + 1}: {note.condition} (
+                  {formatProbability(note.probability)}, estimate). {note.thenAction}
+                </li>
+              ))}
+            </ul>
+          </AccordionItem>
+        ) : null}
+        <AccordionItem title={`Assumptions (${scenario.assumptions.length})`}>
           <ul className={styles.list}>
-            {scenario.branchNotes.map((note) => (
-              <li key={`${note.afterStepIndex}-${note.condition}`}>
-                After step {note.afterStepIndex + 1}: {note.condition} (
-                {formatProbability(note.probability)}, estimate). {note.thenAction}
-              </li>
+            {scenario.assumptions.map((assumption) => (
+              <li key={assumption}>{assumption}</li>
             ))}
           </ul>
-        </section>
-      ) : null}
-
-      <section className={styles.section} aria-label="Assumptions">
-        <h3 className={styles.h3}>Assumptions ({scenario.assumptions.length})</h3>
-        <ul className={styles.list}>
-          {scenario.assumptions.map((assumption) => (
-            <li key={assumption}>{assumption}</li>
-          ))}
-        </ul>
-        <p className={styles.muted}>
-          <StatusBadge
-            status={scenario.validity.valid ? 'productive' : 'unsupported'}
-            label={scenario.validity.valid ? 'Valid path' : 'Failed validity checks'}
-            size="small"
-          />{' '}
-          {METRIC_SPECS.length} measures compared · every value is a simulated estimate
-        </p>
-      </section>
+          <p className={styles.muted}>
+            <StatusBadge
+              status={scenario.validity.valid ? 'productive' : 'unsupported'}
+              label={scenario.validity.valid ? 'Valid path' : 'Failed validity checks'}
+              size="small"
+            />{' '}
+            {METRIC_SPECS.length} measures compared · every value is a simulated estimate
+          </p>
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { JobSchema } from '@caseguard/schemas';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ALL_PERMISSIONS, persona, session } from '../../../test/fixtures';
 import {
   expectNoAxeViolations,
@@ -14,6 +14,9 @@ import { COMPARE_ROUTE, T0, demoState } from '../../../test/u4-fixtures';
 import { expectToast } from '../../../test/u4-support';
 import { ApiError } from '../../lib/api/errors';
 import { DemoGuidePage } from './DemoGuidePage';
+
+// The page renders a lot, dialogs and axe walk all of it, and the suite often runs on a busy machine: allow for it.
+vi.setConfig({ testTimeout: 120_000 });
 
 const admin = () => session('administrator', ALL_PERMISSIONS);
 const engineer = () => session('engineer', ['case:read', 'case:ingest']);
@@ -86,6 +89,11 @@ const stepItem = async (title: string): Promise<HTMLElement> => {
   return item;
 };
 
+/** The seed and reset controls live in a collapsed section; a person opens it with its button. */
+const openTools = async (user: ReturnType<typeof userEvent.setup>): Promise<void> => {
+  await user.click(await screen.findByRole('button', { name: /^Demo data tools/ }));
+};
+
 /** The seed controls enable once the session says the role may manage the demo (the page loads before it). */
 const enabledButton = async (group: HTMLElement, name: string): Promise<HTMLElement> => {
   await waitFor(() =>
@@ -97,10 +105,10 @@ const enabledButton = async (group: HTMLElement, name: string): Promise<HTMLElem
   return within(group).getByRole('button', { name });
 };
 
-describe('[FR-DEMO-01] Demo Guide', () => {
+describe('[FR-DEMO-01] Guided demo', () => {
   it('shows progress derived from demo.state and the 13 steps in order with their state', async () => {
     renderApp(<DemoGuidePage />, { api: api() });
-    expect(await screen.findByRole('heading', { level: 1, name: 'Demo Guide' })).toBeVisible();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Guided demo' })).toBeVisible();
     expect(await screen.findByText('3 of 13 steps complete')).toBeInTheDocument();
     expect(
       screen.getByRole('progressbar', { name: 'Demo progress: 3 of 13 steps complete' }),
@@ -117,6 +125,8 @@ describe('[FR-DEMO-01] Demo Guide', () => {
     expect(within(items[3] as HTMLElement).getByRole('heading', { level: 3 })).toHaveTextContent(
       'Step 4 of 13: Competing hypotheses shown',
     );
+    // Only the step that can be shown next is highlighted: no other step claims to be the current one.
+    expect(items.filter((item) => item.getAttribute('aria-current') === 'step')).toHaveLength(1);
   });
 
   it('opens an unlocked step in the product through a real link, and explains a locked step', async () => {
@@ -146,6 +156,7 @@ describe('[FR-DEMO-01] Demo Guide', () => {
   });
 
   it('shows the dataset, provider and case links as the API reports them, with honest labels', async () => {
+    const user = userEvent.setup();
     renderApp(<DemoGuidePage />, { api: api() });
     const progress = await screen.findByRole('group', { name: 'Progress' });
     expect(within(progress).getByText('Synthetic demonstration data')).toBeInTheDocument();
@@ -156,8 +167,16 @@ describe('[FR-DEMO-01] Demo Guide', () => {
       '/cases/case_1',
     );
     expect(within(progress).getByText('Not imported yet')).toBeInTheDocument();
+
+    // The longer statements about what is synthetic, simulated or estimated are one click away.
+    await user.click(
+      screen.getByRole('button', { name: /^What is synthetic, simulated or estimated/ }),
+    );
+    const notices = await screen.findByRole('list', {
+      name: 'What is synthetic, simulated or estimated',
+    });
     expect(
-      screen.getByText(/validated against mocks or locally generated test keys only/),
+      within(notices).getByText(/validated against mocks or locally generated test keys only/),
     ).toBeInTheDocument();
   });
 
@@ -186,7 +205,7 @@ describe('[FR-DEMO-01] Demo Guide', () => {
     );
   });
 
-  it('leads the last step to the Efficiency Monitor while the API has no two cases to compare', async () => {
+  it('leads the last step to Usage and cost while the API has no two cases to compare', async () => {
     const complete = demoState(13);
     const steps = complete.steps.map((step) =>
       step.id === 'compare-outcomes' ? { ...step, route: '/efficiency' } : step,
@@ -223,14 +242,14 @@ describe('[FR-DEMO-02] persona per step and presentation mode', () => {
   it('starts and exits presentation mode, hiding seed and persona controls while presenting', async () => {
     const user = userEvent.setup();
     renderApp(<DemoGuidePage />, { api: api() });
-    await screen.findByRole('group', { name: 'Demo data' });
+    await screen.findByRole('button', { name: /^Demo data tools/ });
     await user.click(screen.getByRole('button', { name: 'Start presentation mode' }));
     await waitFor(() => expect(document.documentElement.dataset.cgPresent).toBe('true'));
     expect(screen.getByRole('button', { name: 'Exit presentation mode' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
-    expect(screen.queryByRole('group', { name: 'Demo data' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Demo data tools/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Switch to/ })).toBeNull();
     expect(
       screen.getByText(/Seeding and persona controls are hidden while presenting/),
@@ -253,6 +272,18 @@ describe('[FR-DEMO-02] persona per step and presentation mode', () => {
 });
 
 describe('[FR-DEMO-03] seed and reset controls', () => {
+  it('keeps the controls out of the way until the section is opened', async () => {
+    const user = userEvent.setup();
+    renderApp(<DemoGuidePage />, { api: api() });
+    const trigger = await screen.findByRole('button', { name: /^Demo data tools/ });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('group', { name: 'Reset demo data' })).toBeNull();
+    await user.click(trigger);
+    expect(await screen.findByRole('group', { name: 'Reset demo data' })).toBeVisible();
+    expect(screen.getByRole('group', { name: 'Play the whole story' })).toBeVisible();
+    expect(screen.getByRole('group', { name: 'Start from step 1' })).toBeVisible();
+  });
+
   it('resets the demo after a confirmation, refreshes the data and confirms with a toast', async () => {
     const user = userEvent.setup();
     let resets = 0;
@@ -263,6 +294,7 @@ describe('[FR-DEMO-03] seed and reset controls', () => {
       },
     });
     renderApp(<DemoGuidePage />, { api: fake });
+    await openTools(user);
     const controls = await screen.findByRole('group', { name: 'Reset demo data' });
     await user.click(await enabledButton(controls, 'Reset demo data'));
     const dialog = await screen.findByRole('alertdialog', { name: 'Reset the demo data?' });
@@ -292,6 +324,7 @@ describe('[FR-DEMO-03] seed and reset controls', () => {
         },
       }),
     });
+    await openTools(user);
     const controls = await screen.findByRole('group', { name: 'Reset demo data' });
     await user.click(await enabledButton(controls, 'Reset demo data'));
     const dialog = await screen.findByRole('alertdialog');
@@ -323,6 +356,7 @@ describe('[FR-DEMO-03] seed and reset controls', () => {
         'jobs.list': () => ({ items: [], nextCursor: null }),
       }),
     });
+    await openTools(user);
     const controls = await screen.findByRole('group', { name: 'Play the whole story' });
     await user.click(await enabledButton(controls, 'Play the whole story'));
     const dialog = await screen.findByRole('alertdialog');
@@ -350,6 +384,7 @@ describe('[FR-DEMO-03] seed and reset controls', () => {
         },
       }),
     });
+    await openTools(user);
     const controls = await screen.findByRole('group', { name: 'Start from step 1' });
     await user.click(await enabledButton(controls, 'Start from step 1'));
     const dialog = await screen.findByRole('alertdialog');
@@ -372,6 +407,7 @@ describe('[FR-DEMO-03] seed and reset controls', () => {
         },
       }),
     });
+    await openTools(user);
     const controls = await screen.findByRole('group', { name: 'Reset demo data' });
     await user.click(await enabledButton(controls, 'Reset demo data'));
     const dialog = await screen.findByRole('alertdialog');
@@ -383,6 +419,7 @@ describe('[FR-DEMO-03] seed and reset controls', () => {
     const user = userEvent.setup();
     const fake = api({ 'demo.seed': () => demoState(0) });
     renderApp(<DemoGuidePage />, { api: fake });
+    await openTools(user);
     const controls = await screen.findByRole('group', { name: 'Start from step 1' });
     await user.click(await enabledButton(controls, 'Start from step 1'));
     const dialog = await screen.findByRole('alertdialog');
@@ -411,6 +448,7 @@ describe('[FR-DEMO-03] seed and reset controls', () => {
       'jobs.list': () => ({ items: [runningJob], nextCursor: null }),
     });
     renderApp(<DemoGuidePage />, { api: fake });
+    await openTools(user);
     const controls = await screen.findByRole('group', { name: 'Play the whole story' });
     await user.click(await enabledButton(controls, 'Play the whole story'));
     const dialog = await screen.findByRole('alertdialog');
@@ -431,7 +469,9 @@ describe('[FR-DEMO-03] seed and reset controls', () => {
   });
 
   it('disables the controls for a role without demo:manage and says why', async () => {
+    const user = userEvent.setup();
     renderApp(<DemoGuidePage />, { api: api({ 'session.me': engineer }) });
+    await openTools(user);
     const controls = await screen.findByRole('group', { name: 'Reset demo data' });
     expect(within(controls).getByRole('button', { name: 'Reset demo data' })).toHaveAttribute(
       'aria-disabled',
@@ -477,7 +517,7 @@ describe('[FR-DEMO-04] URL state and page states', () => {
 
   it('explains an empty guide and offers a reload', async () => {
     renderApp(<DemoGuidePage />, { api: api({ 'demo.state': () => demoState(0, { steps: [] }) }) });
-    expect(await screen.findByText('The demo guide has no steps')).toBeInTheDocument();
+    expect(await screen.findByText('The guided demo has no steps')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument();
   });
 
@@ -494,7 +534,7 @@ describe('[FR-DEMO-04] URL state and page states', () => {
         },
       }),
     });
-    expect(await screen.findByText('The demo guide could not be loaded')).toBeInTheDocument();
+    expect(await screen.findByText('The guided demo could not be loaded')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByText('3 of 13 steps complete')).toBeInTheDocument();
   });
@@ -504,9 +544,15 @@ describe('[FR-DEMO-04] URL state and page states', () => {
     expect(await screen.findByText('Choose who you are acting as')).toBeInTheDocument();
   });
 
-  it('has no accessibility violations (admin, loaded)', async () => {
+  it('has no accessibility violations (admin, loaded, tools and labels open)', async () => {
+    const user = userEvent.setup();
     const { container } = renderApp(<DemoGuidePage />, { api: api() });
     await screen.findByText('3 of 13 steps complete');
+    await openTools(user);
+    await user.click(
+      screen.getByRole('button', { name: /^What is synthetic, simulated or estimated/ }),
+    );
+    await screen.findByRole('group', { name: 'Reset demo data' });
     await expectNoAxeViolations(container);
   });
 
@@ -516,6 +562,15 @@ describe('[FR-DEMO-04] URL state and page states', () => {
       api: api({ 'session.me': engineer, 'demo.state': () => demoState(13) }),
     });
     await screen.findByText('13 of 13 steps complete');
+    await expectNoAxeViolations(container);
+  });
+
+  it('has no accessibility violations (nothing loaded yet, dark)', async () => {
+    const { container } = renderApp(<DemoGuidePage />, {
+      mode: 'dark',
+      api: api({ 'demo.state': () => demoState(0) }),
+    });
+    await screen.findByText('Nothing has been loaded yet');
     await expectNoAxeViolations(container);
   });
 });
@@ -546,7 +601,7 @@ describe('[FR-DEMO-05] keyboard', () => {
         },
       }),
     });
-    await screen.findByText('The demo guide could not be loaded');
+    await screen.findByText('The guided demo could not be loaded');
     await user.keyboard('n');
     expect(router.push).not.toHaveBeenCalled();
   });

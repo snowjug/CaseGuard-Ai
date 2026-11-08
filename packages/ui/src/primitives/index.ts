@@ -1,4 +1,3 @@
-export * from './BadgeShell';
 export * from './ConfirmDialog';
 export * from './CopyButton';
 export * from './DataTable';

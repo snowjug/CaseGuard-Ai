@@ -1,20 +1,23 @@
 'use client';
 
-import { LoadingSkeleton, Notice, PageHeader, ProvenanceBadge, cg, copyText } from '@caseguard/ui';
-import { Button, makeStyles, tokens } from '@fluentui/react-components';
 import {
-  ArrowDownloadRegular,
-  ArrowSyncRegular,
-  CopyRegular,
-  DocumentTextRegular,
-  PrintRegular,
-} from '@fluentui/react-icons';
-import { useState, useSyncExternalStore } from 'react';
+  Button,
+  Card,
+  Notice,
+  PageHeader,
+  ProvenanceBadge,
+  Skeleton,
+  VisuallyHidden,
+  cg,
+  copyText,
+} from '@caseguard/ui';
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { CopyIcon, DownloadIcon, PrinterIcon, RotateCwIcon } from 'lucide-react';
+import { useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useCaseDetail } from '../../../components/case/case-hooks';
 import { CaseNotFoundState } from '../../../components/case/CaseNotFoundState';
 import { NotAnalysedState } from '../../../components/case/NotAnalysedState';
 import { IdentityRequired } from '../../../components/common/IdentityRequired';
-import { LinkButton } from '../../../components/common/LinkButton';
 import { useAuth } from '../../../lib/auth/context';
 import { caseHref } from '../../../lib/deep-links';
 import { useToast } from '../../../lib/toast';
@@ -43,31 +46,86 @@ import { buildReport, reportSummary, REPORT_MATCHES_SHOWN, type ReportInput } fr
 import { ReportDocument } from './ReportDocument';
 
 const useStyles = makeStyles({
-  toolbar: {
+  actions: {
     display: 'flex',
-    flexWrap: 'wrap',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'stretch',
     gap: cg.space[2],
-    margin: `0 0 ${cg.space[4]}`,
+    '@media (min-width: 640px)': { alignItems: 'flex-end' },
   },
-  note: { margin: 0, fontSize: tokens.fontSizeBase200, color: cg.textSecondary },
-  stack: { display: 'flex', flexDirection: 'column', gap: cg.space[3], minWidth: 0 },
+  toolbar: { display: 'flex', flexWrap: 'wrap', gap: cg.space[2] },
+  hint: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+    color: cg.textSecondary,
+    '@media (min-width: 640px)': { textAlign: 'end' },
+  },
+  stack: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[3],
+    minWidth: 0,
+    marginBottom: cg.space[4],
+  },
+  placeholder: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[4],
+    maxWidth: '880px',
+    marginInline: 'auto',
+  },
+  placeholderHead: { gap: cg.space[3] },
+  placeholderRow: { display: 'flex', flexWrap: 'wrap', gap: cg.space[2] },
+  placeholderLines: { display: 'flex', flexDirection: 'column', gap: cg.space[2] },
 });
 
 const PAGE_HELP = (
   <>
     <p>
-      The decision-ready version of the guided review, on one page: the verdict, the chronology, the
-      earliest missed moment, the recorded and the better-supported path, the recommendations with
-      their evidence, what was learned, how it was calculated and who reviewed what.
+      The review on one page: the verdict, the chronology, the earliest missed moment, the recorded
+      and the better-supported path, the recommendations with their evidence, what was learned, how
+      it was calculated and who reviewed what.
     </p>
     <p>
-      It is built from the same figures as the guided review. A section your role may not read is
-      left out, and the report says so. Print it, copy a short summary, or download it as one HTML
-      file that opens anywhere without a script.
+      It is built from the same figures as the review. A section your role may not read is left out,
+      and the report says so. Print it, copy a short summary, or download it as one HTML file that
+      opens anywhere without a script.
     </p>
   </>
 );
+
+/** Same footprint as the document (title block, then section cards), so nothing jumps when it appears. */
+function ReportSkeleton() {
+  const styles = useStyles();
+  return (
+    <div role="status" aria-busy="true" aria-live="polite" className={styles.placeholder}>
+      <VisuallyHidden>Preparing the report…</VisuallyHidden>
+      <Card aria-hidden="true" className={styles.placeholderHead}>
+        <Skeleton width={190} height={12} />
+        <Skeleton width="72%" height={28} />
+        <div className={styles.placeholderRow}>
+          <Skeleton width={92} height={22} radius="pill" />
+          <Skeleton width={168} height={22} radius="pill" />
+          <Skeleton width={104} height={22} radius="pill" />
+        </div>
+        <div className={styles.placeholderLines}>
+          <Skeleton width="48%" height={14} />
+          <Skeleton width="40%" height={14} />
+          <Skeleton width="44%" height={14} />
+        </div>
+      </Card>
+      {[0, 1].map((index) => (
+        <Card key={index} aria-hidden="true" className={styles.placeholderHead}>
+          <Skeleton width="34%" height={20} />
+          <Skeleton height={14} />
+          <Skeleton width="92%" height={14} />
+          <Skeleton width="64%" height={14} />
+        </Card>
+      ))}
+    </div>
+  );
+}
 
 const subscribeNever = (): (() => void) => () => undefined;
 const readOrigin = (): string => window.location.origin;
@@ -156,14 +214,10 @@ export function ReportPage({ caseId }: { caseId: string }) {
   const failedHandles = all.filter((handle) => handle.source.kind === 'failed');
   const data = record.data;
 
-  const header = (
+  const header = (actions?: ReactNode) => (
     <PageHeader
       title="Report"
-      description={
-        data
-          ? `${data.reference} · ${data.title}`
-          : 'The decision-ready report of the guided review.'
-      }
+      description="Share the review as one document."
       help={PAGE_HELP}
       meta={
         <>
@@ -171,15 +225,7 @@ export function ReportPage({ caseId }: { caseId: string }) {
           {data?.synthetic ? <ProvenanceBadge kind="synthetic" /> : null}
         </>
       }
-      actions={
-        <LinkButton
-          href={caseHref(caseId, 'review')}
-          appearance="outline"
-          icon={<DocumentTextRegular />}
-        >
-          Back to the guided review
-        </LinkButton>
-      }
+      {...(actions ? { actions } : {})}
     />
   );
 
@@ -187,7 +233,7 @@ export function ReportPage({ caseId }: { caseId: string }) {
   if (auth.status === 'unauthenticated') {
     return (
       <>
-        {header}
+        {header()}
         <IdentityRequired />
       </>
     );
@@ -195,7 +241,7 @@ export function ReportPage({ caseId }: { caseId: string }) {
   if (data !== undefined && data.analysisState !== 'analyzed') {
     return (
       <>
-        {header}
+        {header()}
         <NotAnalysedState caseId={caseId} subject="the report" analysisState={data.analysisState} />
       </>
     );
@@ -229,61 +275,72 @@ export function ReportPage({ caseId }: { caseId: string }) {
     }
   };
 
+  // The toolbar is for the screen only: the print rules hide it with the rest of the page around the document.
+  const toolbar = (
+    <div className={mergeClasses(styles.actions, 'cg-no-print')}>
+      <div className={styles.toolbar} role="group" aria-label="Report actions">
+        <Button
+          variant="primary"
+          icon={<PrinterIcon />}
+          disabled={pending}
+          onClick={() => window.print()}
+        >
+          Print
+        </Button>
+        <Button
+          variant="secondary"
+          icon={<CopyIcon />}
+          disabled={pending}
+          onClick={() => void copy()}
+        >
+          Copy summary
+        </Button>
+        <Button
+          variant="secondary"
+          icon={<DownloadIcon />}
+          disabled={pending}
+          loading={downloading}
+          onClick={() => void download()}
+        >
+          Download HTML
+        </Button>
+      </div>
+      <p className={styles.hint}>
+        To keep a PDF, choose Print and then “Save as PDF” in your browser.
+      </p>
+    </div>
+  );
+
   return (
     <>
-      {header}
+      {header(toolbar)}
       {/* The report's own stylesheet: a constant, so it is written as it is. */}
       <style dangerouslySetInnerHTML={{ __html: REPORT_CSS }} />
-      <div className={`${styles.stack} cg-no-print`}>
-        <div className={styles.toolbar} role="group" aria-label="Report actions">
-          <Button
-            appearance="primary"
-            icon={<PrintRegular />}
-            disabled={pending}
-            onClick={() => window.print()}
-          >
-            Print
-          </Button>
-          <Button
-            appearance="outline"
-            icon={<CopyRegular />}
-            disabled={pending}
-            onClick={() => void copy()}
-          >
-            Copy summary
-          </Button>
-          <Button
-            appearance="outline"
-            icon={<ArrowDownloadRegular />}
-            disabled={pending || downloading}
-            onClick={() => void download()}
-          >
-            Download HTML
-          </Button>
-          <p className={styles.note}>
-            To keep a PDF, choose Print and then “Save as PDF” in your browser.
-          </p>
-        </div>
-        {failedHandles.length > 0 ? (
-          <Notice variant="warning" compact title="Some parts could not be read">
-            <p>
-              {failedHandles.length === 1
-                ? 'One part of the report could not be read and is left out.'
-                : `${failedHandles.length} parts of the report could not be read and are left out.`}{' '}
+      {failedHandles.length > 0 ? (
+        <div className={`${styles.stack} cg-no-print`}>
+          <Notice
+            variant="warning"
+            compact
+            title="Some parts could not be read"
+            action={
               <Button
-                appearance="outline"
-                size="small"
-                icon={<ArrowSyncRegular />}
+                variant="secondary"
+                size="sm"
+                icon={<RotateCwIcon />}
                 onClick={() => failedHandles.forEach((handle) => handle.retry())}
               >
                 Try again
               </Button>
-            </p>
+            }
+          >
+            {failedHandles.length === 1
+              ? 'One part of the report could not be read and is left out.'
+              : `${failedHandles.length} parts of the report could not be read and are left out.`}
           </Notice>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
       {pending ? (
-        <LoadingSkeleton variant="card" count={3} label="Preparing the report" />
+        <ReportSkeleton />
       ) : (
         <ReportDocument report={report} caseId={caseId} origin={origin} embedded />
       )}

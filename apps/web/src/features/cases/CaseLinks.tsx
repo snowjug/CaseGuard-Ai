@@ -1,12 +1,10 @@
 'use client';
 
 import type { AnalysisRun } from '@caseguard/schemas';
-import { Panel, UiLink, cg } from '@caseguard/ui';
+import { NumberTicker, UiLink, borderColors, cg, formatNumber } from '@caseguard/ui';
 import { makeStyles, tokens } from '@fluentui/react-components';
-import { ChevronRightRegular } from '@fluentui/react-icons';
-import { countOf } from '../../components/case/labels';
 import { caseHref } from '../../lib/deep-links';
-import { NAV_ITEMS } from '../../lib/nav';
+import { CASE_TABS, NAV_ITEMS } from '../../lib/nav';
 
 const useStyles = makeStyles({
   grid: {
@@ -15,57 +13,97 @@ const useStyles = makeStyles({
     margin: 0,
     padding: 0,
     listStyle: 'none',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    '@media (min-width: 640px)': { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' },
+    '@media (min-width: 1024px)': { gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' },
   },
-  card: {
+  tile: {
     display: 'flex',
-    alignItems: 'flex-start',
-    gap: cg.space[3],
-    minHeight: '72px',
-    padding: cg.space[3],
+    flexDirection: 'column',
+    gap: cg.space[1],
+    height: '100%',
+    boxSizing: 'border-box',
+    minHeight: '88px',
+    padding: `${cg.space[3]} ${cg.space[4]}`,
     borderRadius: cg.radius.md,
     border: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surface,
+    backgroundColor: cg.surfaceSunken,
     color: cg.text,
     textDecorationLine: 'none',
-    ':hover': { backgroundColor: cg.surfaceSunken },
+    transitionProperty: 'transform, border-color, box-shadow',
+    transitionDuration: cg.motion.fast,
+    transitionTimingFunction: cg.motion.easing,
+    ':hover': {
+      transform: 'translateY(-2px)',
+      ...borderColors(cg.tone.brand.border),
+      boxShadow: `0 14px 36px -18px ${cg.glow}`,
+    },
+    ':focus-visible': { outline: `2px solid ${cg.focus}`, outlineOffset: '2px' },
   },
-  icon: { fontSize: '24px', color: cg.tone.brand.fg, display: 'inline-flex', flexShrink: 0 },
-  body: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 },
-  title: {
+  where: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: cg.space[2],
+    color: cg.textSecondary,
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightMedium,
+  },
+  icon: { display: 'inline-flex', color: cg.tone.brand.fg, fontSize: '1.25em' },
+  stat: { display: 'flex', alignItems: 'baseline', gap: cg.space[2], flexWrap: 'wrap' },
+  value: {
+    fontSize: tokens.fontSizeBase500,
+    lineHeight: tokens.lineHeightBase500,
     fontWeight: tokens.fontWeightSemibold,
-    fontSize: tokens.fontSizeBase300,
-    color: cg.textLink,
+    fontVariantNumeric: 'tabular-nums',
+    letterSpacing: '-0.01em',
   },
-  text: { fontSize: tokens.fontSizeBase200, color: cg.textSecondary },
-  stat: { fontSize: tokens.fontSizeBase200, color: cg.text, fontVariantNumeric: 'tabular-nums' },
-  chevron: { color: cg.textMuted, display: 'inline-flex', alignSelf: 'center' },
+  unit: { color: cg.textSecondary, fontSize: tokens.fontSizeBase300 },
+  second: {
+    color: cg.textMuted,
+    fontSize: tokens.fontSizeBase200,
+    fontVariantNumeric: 'tabular-nums',
+  },
+  moment: { color: cg.textSecondary, fontSize: tokens.fontSizeBase300 },
+  // Five tiles in two columns would leave one alone on the last row of a phone: it takes the whole row instead.
+  alone: { '@media (max-width: 639px)': { gridColumn: '1 / -1' } },
+});
+
+interface Stat {
+  value: number;
+  unit: string;
+}
+
+const stat = (value: number, singular: string, plural = `${singular}s`): Stat => ({
+  value,
+  unit: value === 1 ? singular : plural,
 });
 
 interface Destination {
+  /** The id of the case tab and of the navigation item (they share it). */
   navId: string;
   section: string;
-  stat: (counts: AnalysisRun['counts']) => string;
+  /** The headline figure, then optionally one more. */
+  stats: (counts: AnalysisRun['counts']) => readonly [Stat, ...Stat[]];
 }
 
 const DESTINATIONS: readonly Destination[] = [
-  { navId: 'timeline', section: 'timeline', stat: (c) => countOf(c.events, 'event') },
+  { navId: 'timeline', section: 'timeline', stats: (c) => [stat(c.events, 'event')] },
   {
     navId: 'evidence',
     section: 'evidence',
-    stat: (c) => `${countOf(c.claims, 'claim')} · ${countOf(c.evidence, 'evidence item')}`,
+    stats: (c) => [stat(c.claims, 'claim'), stat(c.evidence, 'evidence item')],
   },
   {
     navId: 'hypotheses',
     section: 'hypotheses',
-    stat: (c) => countOf(c.hypotheses, 'hypothesis', 'hypotheses'),
+    stats: (c) => [stat(c.hypotheses, 'possible cause')],
   },
   {
     navId: 'counterfactual',
     section: 'counterfactual',
-    stat: (c) => countOf(c.forks, 'decision fork'),
+    stats: (c) => [stat(c.forks, 'key decision')],
   },
-  { navId: 'quality', section: 'quality', stat: (c) => countOf(c.warnings, 'live warning') },
+  { navId: 'quality', section: 'quality', stats: (c) => [stat(c.warnings, 'open warning')] },
 ];
 
 export interface CaseLinksProps {
@@ -75,47 +113,59 @@ export interface CaseLinksProps {
   counts: AnalysisRun['counts'] | null;
 }
 
-/** Entry points to every case page. With a time cursor set, the links carry it so each page opens at the same moment. */
+/**
+ * The case in numbers, each a link to the page that shows it. With a time cursor set the figures of the whole record are
+ * not shown, and the links carry the moment so each page opens at the same one.
+ */
 export function CaseLinks({ caseId, asOf, counts }: CaseLinksProps) {
   const styles = useStyles();
   const query = asOf ? `?asOf=${encodeURIComponent(asOf)}` : '';
   return (
-    <Panel
-      title="Investigate this case"
-      level={2}
-      description={
-        asOf
-          ? 'Each page opens at the moment you have selected.'
-          : 'Each page looks at the same case from a different angle.'
-      }
-    >
-      <ul className={styles.grid} aria-label="Case pages">
-        {DESTINATIONS.map((destination) => {
-          const item = NAV_ITEMS.find((candidate) => candidate.id === destination.navId);
-          if (!item) return null;
-          const Icon = item.icon;
-          return (
-            <li key={destination.navId}>
-              <UiLink
-                href={`${caseHref(caseId, destination.section)}${query}`}
-                className={styles.card}
-              >
+    <ul className={styles.grid} aria-label="Case pages">
+      {DESTINATIONS.map((destination, index) => {
+        const label = CASE_TABS.find((tab) => tab.id === destination.navId)?.label;
+        const Icon = NAV_ITEMS.find((item) => item.id === destination.navId)?.icon;
+        if (!label || !Icon) return null;
+        const stats = counts ? destination.stats(counts) : null;
+        const [first, ...rest] = stats ?? [];
+        const alone = index === DESTINATIONS.length - 1 && DESTINATIONS.length % 2 === 1;
+        return (
+          <li key={destination.navId} className={alone ? styles.alone : undefined}>
+            <UiLink
+              href={`${caseHref(caseId, destination.section)}${query}`}
+              className={styles.tile}
+            >
+              <span className={styles.where}>
                 <span aria-hidden="true" className={styles.icon}>
                   <Icon />
                 </span>
-                <span className={styles.body}>
-                  <span className={styles.title}>{item.label}</span>
-                  <span className={styles.text}>{item.description}</span>
-                  {counts ? <span className={styles.stat}>{destination.stat(counts)}</span> : null}
-                </span>
-                <span aria-hidden="true" className={styles.chevron}>
-                  <ChevronRightRegular />
-                </span>
-              </UiLink>
-            </li>
-          );
-        })}
-      </ul>
-    </Panel>
+                {label}
+              </span>{' '}
+              {first ? (
+                <>
+                  <span className={styles.stat}>
+                    <span className={styles.value}>
+                      <NumberTicker
+                        value={first.value}
+                        format={(n) => formatNumber(n, { maximumFractionDigits: 0 })}
+                      />
+                    </span>{' '}
+                    <span className={styles.unit}>{first.unit}</span>
+                  </span>
+                  {rest.map((more) => (
+                    <span key={more.unit} className={styles.second}>
+                      {' '}
+                      {formatNumber(more.value, { maximumFractionDigits: 0 })} {more.unit}
+                    </span>
+                  ))}
+                </>
+              ) : (
+                <span className={styles.moment}>{asOf ? 'At this moment' : 'Open'}</span>
+              )}
+            </UiLink>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

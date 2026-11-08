@@ -1,20 +1,35 @@
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from '../support/fixtures';
-import { mainRegion, openPage, settle } from '../support/ui';
+import { escapeRegExp, mainRegion, openPage, settle } from '../support/ui';
 
-test.describe('[FR-TK-01] Efficiency Monitor: tokens and compute, as estimates', () => {
+/**
+ * Opens a collapsed section of the page from its heading button and returns its content region. A closed section keeps
+ * its content mounted but clipped, so Playwright would call it visible: what proves it is open is `aria-expanded`.
+ */
+async function openSection(page: Page, name: RegExp): Promise<Locator> {
+  // The button inside the section's heading: a table in the section may have a sort button of the same name.
+  const trigger = page.getByRole('heading', { name }).getByRole('button');
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  return page.getByRole('region', { name });
+}
+
+test.describe('[FR-TK-01] Usage and cost: tokens and compute, as estimates', () => {
   test('every group says what it is made of and labels simulated and estimated values; unset budgets read "No limit set", never 0', async ({
     page,
   }) => {
     await openPage(page, '/efficiency');
-    await expect(page.getByRole('heading', { level: 1, name: 'Efficiency Monitor' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Usage and cost' })).toBeVisible();
     await expect(page.getByRole('combobox', { name: 'Scope' })).toBeVisible();
-    await expect(page.getByText(/Updated \d\d:\d\d UTC/)).toBeVisible();
+    // The page says when it read the figures: relative text, with the exact UTC moment next to it.
+    await expect(page.getByText(/^Updated .+\d\d:\d\d UTC\)$/)).toBeVisible();
 
-    const usage = page.getByRole('group', { name: 'Token usage' });
+    const usage = page.getByRole('group', { name: 'Estimated spend' });
     await expect(usage.getByText('Estimated').first()).toBeVisible();
     await expect(usage.getByText('Simulated').first()).toBeVisible();
 
-    const savings = page.getByRole('group', { name: 'Estimated savings' });
+    // The savings are the section that is open when the page loads.
+    const savings = await openSection(page, /^Estimated savings/);
     for (const name of [
       'Context compression',
       'Duplicate-note removal',
@@ -25,7 +40,7 @@ test.describe('[FR-TK-01] Efficiency Monitor: tokens and compute, as estimates',
     }
     await expect(savings.getByText('Estimated').first()).toBeVisible();
 
-    const budgets = page.getByRole('group', { name: 'Budgets and limits' });
+    const budgets = await openSection(page, /^Budgets and limits/);
     await expect(budgets.getByText('No limit set').first()).toBeVisible();
     await expect(budgets).not.toContainText(/Per case\s*0 tokens/);
     await expect(budgets.getByText('Per request (input)')).toBeVisible();
@@ -38,9 +53,7 @@ test.describe('[FR-TK-01] Efficiency Monitor: tokens and compute, as estimates',
     const overview = await api('engineer').getOk<Record<string, unknown>>('/efficiency/overview');
     expect(JSON.stringify(overview)).toMatch(/simulated|counterfactual/i);
     await openPage(page, '/efficiency');
-    const comparison = page.getByRole('group', {
-      name: 'Real process versus a simulated better path',
-    });
+    const comparison = await openSection(page, /^Real process versus a simulated better path/);
     await expect(comparison).toBeVisible();
     await expect(comparison.getByText('Estimated').first()).toBeVisible();
     await expect(comparison.getByText('Simulated').first()).toBeVisible();
@@ -50,27 +63,30 @@ test.describe('[FR-TK-01] Efficiency Monitor: tokens and compute, as estimates',
     await expect(comparison.getByRole('columnheader', { name: 'High' })).toBeVisible();
   });
 
-  test('usage by agent and by model, and the model executions, are tables with named columns', async ({
+  test('usage by analysis step and by model, and the model calls, are tables with named columns', async ({
     page,
   }) => {
     await openPage(page, '/efficiency');
-    const agents = page.getByRole('table', { name: 'Usage by agent' });
+    await openSection(page, /^Usage by analysis step and model/);
+    const agents = page.getByRole('table', { name: 'Usage by analysis step' });
     for (const column of [
-      'Agent',
+      'Analysis step',
       'Calls',
-      'Prompt tokens',
-      'Completion tokens',
+      'Tokens (in / out)',
       'Cached tokens',
       'Average latency',
       'Failures',
     ]) {
       await expect(
-        agents.getByRole('columnheader', { name: new RegExp(`^${column}`) }),
+        agents.getByRole('columnheader', { name: new RegExp(`^${escapeRegExp(column)}`) }),
         column,
       ).toBeVisible();
     }
+    // The prompt and the completion tokens share one column, as "prompt / completion".
+    await expect(agents.getByRole('row').nth(1)).toContainText(/[\d,]+ \/ [\d,]+/);
     await expect(page.getByRole('table', { name: 'Usage by model' })).toBeVisible();
-    const executions = page.getByRole('table', { name: 'Model executions' });
+    await openSection(page, /^Model calls/);
+    const executions = page.getByRole('table', { name: 'Model calls' });
     await expect(executions.getByRole('columnheader', { name: 'Status' })).toBeVisible();
     await expect(executions.getByRole('columnheader', { name: /^Answer came from/ })).toBeVisible();
     await expect(executions.getByRole('row').nth(1)).toContainText(
@@ -78,18 +94,19 @@ test.describe('[FR-TK-01] Efficiency Monitor: tokens and compute, as estimates',
     );
   });
 
-  test('filtering executions by agent narrows the table and keeps the choice in the URL', async ({
+  test('filtering model calls by analysis step narrows the table and keeps the choice in the URL', async ({
     page,
   }) => {
     await openPage(page, '/efficiency');
-    const filter = page.getByRole('combobox', { name: 'Agent' });
+    await openSection(page, /^Model calls/);
+    const filter = page.getByRole('combobox', { name: 'Analysis step' });
     const options = await filter.getByRole('option').allInnerTexts();
     expect(options.length).toBeGreaterThan(2);
     const agent = options.find((text) => !/^(all|any)/i.test(text.trim()))!;
     await filter.selectOption({ label: agent });
     await settle(page);
     await expect(page).toHaveURL(/agent=/);
-    const rows = page.getByRole('table', { name: 'Model executions' }).getByRole('row');
+    const rows = page.getByRole('table', { name: 'Model calls' }).getByRole('row');
     await expect(rows.nth(1)).toBeVisible();
   });
 
@@ -106,12 +123,14 @@ test.describe('[FR-TK-01] Efficiency Monitor: tokens and compute, as estimates',
       'no unit prices are configured, so no cost can be known',
     ).toBeNull();
     await openPage(page, '/efficiency');
+    // Where the figures come from is said in "How to read these figures"; the summary says the cost is unknown.
+    await openSection(page, /^How to read these figures/);
     const main = mainRegion(page);
     await expect(main).toContainText('deterministic offline provider (simulated)');
     await expect(main).toContainText('not Azure OpenAI usage');
     await expect(main).toContainText('Cost is unknown');
-    await expect(page.getByRole('group', { name: 'Token usage' })).toContainText(
-      /Estimated cost\s*Unknown/,
+    await expect(page.getByRole('group', { name: 'Estimated spend' })).toContainText(
+      'Cost unknown',
     );
     await expect(main).not.toContainText(/\$\s?0(\.0+)?\b/);
   });

@@ -28,22 +28,23 @@ describe('[UX-404-01] page not found', () => {
     mount();
     const main = within(screen.getByRole('main'));
     expect(
-      main.getByRole('heading', { level: 1, name: 'We could not find that page' }),
+      main.getByRole('heading', { level: 1, name: "We couldn't find that page" }),
     ).toBeInTheDocument();
     expect(
-      main.getByText(/Resetting the demo data removes the synthetic cases and skills/),
+      main.getByText(/Resetting the demo data removes the demo cases and skills/),
     ).toBeInTheDocument();
-    expect(main.getByRole('link', { name: 'Command Center' })).toHaveAttribute('href', '/');
+    expect(main.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/');
     expect(main.getByRole('link', { name: 'Browse cases' })).toHaveAttribute('href', '/cases');
-    expect(main.getByRole('link', { name: 'Demo Guide' })).toHaveAttribute('href', '/demo');
+    expect(main.getByRole('link', { name: 'Guided demo' })).toHaveAttribute('href', '/demo');
     expect(main.getByRole('button', { name: 'Search' })).toBeInTheDocument();
   });
 
-  it('moves focus to the header search from the Search button', async () => {
+  it('opens the search from the Search button', async () => {
     const user = userEvent.setup();
     mount();
     await user.click(within(screen.getByRole('main')).getByRole('button', { name: 'Search' }));
-    expect(screen.getByRole('combobox', { name: /Search cases/ })).toHaveFocus();
+    expect(await screen.findByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Search commands' })).toBeInTheDocument();
   });
 
   it('has no accessibility violations', async () => {

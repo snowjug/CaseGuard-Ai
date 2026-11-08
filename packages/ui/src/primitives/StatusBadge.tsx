@@ -1,6 +1,6 @@
 'use client';
 
-import { BadgeShell } from './BadgeShell';
+import { Badge } from '../kit/Badge';
 import { STATUS_META, type BadgeStatus } from './status-meta';
 
 export interface StatusBadgeProps {
@@ -11,16 +11,13 @@ export interface StatusBadgeProps {
   size?: 'small' | 'medium';
   /**
    * Hides the text and exposes it as the accessible name. Prefer the text form: the label is part of the
-   * "never colour alone" rule (colour + icon + label + pattern).
+   * "never colour alone" rule (colour + icon + label).
    */
   iconOnly?: boolean;
   className?: string;
 }
 
-/**
- * Status pill: a tone-coloured border, a pattern chip (dots = uncertain, cross-hatch = unsupported,
- * outline-only = missing), a status icon and a text label.
- */
+/** Status pill: tone colours, a status icon and a text label. Missing evidence has a dashed outline. */
 export function StatusBadge({
   status,
   label,
@@ -31,17 +28,17 @@ export function StatusBadge({
   const meta = STATUS_META[status];
   const Icon = meta.icon;
   return (
-    <BadgeShell
+    <Badge
       tone={meta.tone}
-      pattern={meta.pattern}
       icon={<Icon />}
-      label={label ?? meta.label}
-      size={size}
+      size={size === 'small' ? 'sm' : 'md'}
       iconOnly={iconOnly}
-      borderStyle={status === 'missing' ? 'dashed' : 'solid'}
+      dashed={status === 'missing'}
       outlined={status === 'missing'}
       title={meta.description}
       {...(className ? { className } : {})}
-    />
+    >
+      {label ?? meta.label}
+    </Badge>
   );
 }

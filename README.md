@@ -19,11 +19,14 @@ The logo is the name in text plus the web app's own mark ([`apps/web/src/app/ico
 nodes for evidence, a decision fork and a hypothesis); besides the screenshots below, no other image asset is shipped. The badges
 are the workflows in [`.github/workflows`](.github/workflows) (`ci`, `codeql`, `dependency-review` and the manual `deploy`;
 `deploy-environment` is the reusable part of `deploy` and has no badge of its own). **A badge reports the latest run of its workflow
-on the default branch.** Before the foundation work all 27 CI runs failed; the first fully green run
-(41495498658) is on the unmerged branch `build/p0-foundation`, and `build/wave-1` is green too (for example run 41546529865), so
-the CI badge cannot show a pass until that work reaches the default branch. Dependency review (13 runs, all failed) fails because the repository's
-Dependency graph setting is off. No CodeQL or Deploy run
-is recorded here (CodeQL runs on pushes and pull requests to `main`, which does not exist yet, on a weekly schedule and on demand), so those two badges say nothing yet.
+on the default branch, which is `main`.** `main` was created on 8 November 2026, at the owner's request, from the tip of the
+interface redesign branch, so it holds all the work of the build branches and of the redesign; the earlier default branch,
+`feat/caseguard-ai-platform`, is unchanged. Before the foundation work all 27 CI runs failed; the first fully green run
+(41495498658) is on the branch `build/p0-foundation`, `build/wave-1` is green too (for example run 41546529865), and so is pull
+request #14, which brought the work to `main` (run 42299024612, 8 of 8 jobs). `ci.yml` does not run on pushes to `main`, only on pull
+requests, on other branches and by hand, so the CI badge shows a pass only after a run on `main`. Dependency review (14 runs, all
+failed) fails because the repository's Dependency graph setting is off. CodeQL runs on pushes and pull requests to `main`, on a weekly
+schedule and on demand; no CodeQL or Deploy run was recorded before `main` was created, so those two badges may say nothing yet.
 
 **Hackathon track: C+AI Hack for Quality.**
 
@@ -34,10 +37,11 @@ is recorded here (CodeQL runs on pushes and pull requests to `main`, which does 
 > smoke-tests them (run 41546529865: both were built and the compose smoke test passed 12 checks). The data tier is exercised on
 > **PGlite** locally and on PostgreSQL 16 in the CI integration job.
 > **CI was never fully green until the foundation branch**: all 27 earlier runs failed (the one on `2ecb454`, run 41182982903,
-> had only the production build fully green). The first fully green run is 41495498658 on the unmerged branch
+> had only the production build fully green). The first fully green run is 41495498658 on the branch
 > `build/p0-foundation`; run 41546529865 on `build/wave-1` is fully green too (8 of 8 jobs: 6,152 unit tests, 1,033 integration tests on
-> PostgreSQL 16 and 374 end-to-end tests passed, none failed; see [Running tests](#running-tests)). None of this has reached the
-> default branch.
+> PostgreSQL 16 and 374 end-to-end tests passed, none failed; see [Running tests](#running-tests)), and so is run 42299024612 on pull
+> request #14 (the interface redesign and everything before it). All of this has been on `main`, the default branch, since 8 November
+> 2026; `ci.yml` does not run on pushes to `main` (it runs on pull requests, on other branches and by hand).
 > Every score is an **estimate**, shown with its basis and range. CaseGuard AI is not a Microsoft product.
 > The repository is **UNLICENSED** (the owner has to choose a license). One known HIGH advisory (`@azure/msal-node`, reached through
 > `@azure/identity`) is carried as a time-boxed exception until 2027-01-15 and needs a human to accept the risk or upgrade.
@@ -47,7 +51,7 @@ is recorded here (CodeQL runs on pushes and pull requests to `main`, which does 
 
 | Group       | Sections                                                                                                                                                                                                                                                                                                                                                           |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| The product | [Overview](#thirty-second-overview) · [Problem](#problem) · [Why existing approaches fall short](#why-existing-approaches-are-insufficient) · [Solution](#solution) · [Key innovation](#key-innovation) · [Screenshots](#product-screenshots) · [Capabilities](#main-capabilities) · [End-to-end use case](#end-to-end-use-case)                                   |
+| The product | [Overview](#thirty-second-overview) · [Problem](#problem) · [Why existing approaches fall short](#why-existing-approaches-are-insufficient) · [Solution](#solution) · [Key innovation](#key-innovation) · [UI](#ui) · [Screenshots](#product-screenshots) · [Capabilities](#main-capabilities) · [End-to-end use case](#end-to-end-use-case)                       |
 | The ideas   | [Counterfactual analysis](#counterfactual-analysis) · [Evidence integrity](#evidence-integrity-model) · [Case Quality Index](#case-quality-index) · [Avoidable Support Effort](#avoidable-support-effort) · [SkillDNA](#skilldna) · [Token and compute efficiency](#token-and-compute-efficiency) · [Trust and responsible AI](#trust-security-and-responsible-ai) |
 | The system  | [Architecture](#architecture) · [Diagrams](#architecture-diagram) ([data flow](#data-flow-diagram), [sequence](#sequence-diagram), [domain model](#domain-model)) · [Azure resources](#azure-resources)                                                                                                                                                            |
 | Run it      | [Local development](#local-development) · [Environment variables](#environment-variables) · [Mock AI](#running-with-mock-ai) · [Azure OpenAI](#running-with-azure-openai) · [Tests](#running-tests) · [Deploying to Azure](#deploying-to-azure) · [CI/CD](#cicd)                                                                                                   |
@@ -124,6 +128,36 @@ every skill approval. Nothing closes a case automatically and nothing ranks a pe
 4. **Honest by construction.** Every score carries a range, a basis and a label (estimated, simulated, measured, synthetic), and the
    interface says so on every page.
 
+## UI
+
+The interface answers one question in five seconds: how did this case go, and what should I fix first.
+
+![Home in the dark theme: the latest review as a score ring with one line of why, the first fixes beside it, and the three steps](docs/screenshots/home-dark.png)
+
+- **Three steps:** add a case, see the review, fix what matters. Home always shows them, with the score ring and the first
+  fix, and the empty states say what to do next, including "Try a sample case".
+- **Five navigation items:** Home, Cases, Quality, Skills and Advanced. A case opens as tabs (Review, Score, Evidence, What if,
+  Timeline, and More for Possible causes, Case details and Report); settings, usage and cost, system status and the guided
+  demo live under Advanced. `Ctrl` or `⌘` + `K` opens a command palette that jumps to any page, starts a new case, switches the
+  theme and opens Advanced.
+- **Result first:** a verdict or a big figure, one line of why, then the first three fixes with one-click copy. Detail opens on
+  demand (accordions, drawers, tabs), and every score keeps its range, its basis and its label (Estimated, Simulated or Demo data).
+- **Dark and light themes** that follow the system on the first visit, are remembered, and never flash the wrong colours. Colour,
+  spacing and corner radii are defined once in `packages/ui/src/tokens`; a test fails on a literal that bypasses them. Motion is
+  short, never blocks a task, never loops on content and is off under reduced motion.
+- **Accessible and responsive:** axe finds no violation on the 19 views and 42 states of the end-to-end suite in either theme at
+  1440 px, nor on the nine key pages at 390 px. Controls are at least 44 px tall on a touch screen (the small event marks that
+  the Timeline chart draws are the exception; every event also has a full-size row), and no page scrolls sideways from 320 to
+  1920 px (a bottom bar replaces the sidebar on a phone).
+
+![The review in the light theme: the verdict ring beside the first fix, with the section links above](docs/screenshots/review-light.png)
+
+More screenshots (twelve, dark and light, desktop and phone) are in [docs/screenshots](docs/screenshots/). The spec, the log
+of the redesign, the baseline and the screenshots from before it are in [docs/ui-redesign](docs/ui-redesign/):
+[DESIGN.md](docs/ui-redesign/DESIGN.md), [PROGRESS.md](docs/ui-redesign/PROGRESS.md), [baseline.md](docs/ui-redesign/baseline.md)
+and the [before screenshots](docs/ui-redesign/before/). The decision to build the kit on Fluent is
+[ADR 0013](docs/adr/0013-ui-kit-on-fluent.md).
+
 ## Product screenshots
 
 <!-- SCREENSHOTS:BEGIN -->
@@ -139,28 +173,30 @@ show instead.
 
 ## Main capabilities
 
-The web app has 13 destinations (`apps/web/src/lib/nav.ts`), all backed by the typed route registry (78 routes, see
-[API documentation](#api-documentation)). Roles decide what a person can open and change: five roles and 30 permissions
-([RBAC matrix](docs/SECURITY.md#4-rbac-matrix)).
+The web app has five items in its navigation (Home, Cases, Quality, Skills, Advanced) and 14 destinations in all
+(`apps/web/src/lib/nav.ts`): the pages of a case sit under its tabs and four more views under Advanced. All are backed by the
+typed route registry (78 routes, see [API documentation](#api-documentation)). Roles decide what a person can open and change:
+five roles and 30 permissions ([RBAC matrix](docs/SECURITY.md#4-rbac-matrix)). Page names changed in the UI redesign; the
+Page column gives the earlier name in brackets, and the older documents may still use it.
 
-| Page               | Route                                              | What it does today                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Command Center     | `/`                                                | Key metrics of the active case (seven estimates), leading hypothesis, SkillDNA match, critical missing evidence, open warnings, recent cases, skill candidates and system health                                                                                                                                                                                                                                                                                                                                                                        |
-| Cases              | `/cases`, `/cases/new`, `/cases/[caseId]`          | Ingest a case (paste, upload, or a built-in sample) with a preview that runs the same pipeline as the create; browse cases; the case overview shows the digital twin and the analysis job                                                                                                                                                                                                                                                                                                                                                               |
-| Guided Review      | `/cases/[caseId]/review`, `/cases/[caseId]/report` | One scrolling read of an analysed case in the order a person decides: the verdict, the chronology, what went wrong, what a better-supported path would have looked like, what to do next, what to learn, and how to share it. Evidence opens in one drawer with the stored message and a checked excerpt; each section explains how it was calculated and a section the role may not read says so while the rest still works. The report holds the same figures as a page to read, print, copy as a summary or download as one self-contained HTML file |
-| Case Timeline      | `/cases/[caseId]/timeline`                         | Events with delays, repeats and decision-fork flags, a confidence chart over time, and a time cursor ("What was known") that withholds later events                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Evidence Ledger    | `/cases/[caseId]/evidence`                         | Every claim in one of eight evidence categories with its source events; a reviewer can re-categorise (the original classification is kept); missing evidence is listed                                                                                                                                                                                                                                                                                                                                                                                  |
-| Hypothesis Arena   | `/cases/[caseId]/hypotheses`                       | Competing hypotheses ranked by confidence with ranges over time, and the action ranking at a decision moment with reviewer overrides                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Counterfactual Lab | `/cases/[caseId]/counterfactual`                   | Decision forks (the earliest meaningful one first), the temporal boundary and validity checks, simulated paths against the recorded one, the evidence behind each step, the investigation graph, hindsight kept apart, review                                                                                                                                                                                                                                                                                                                           |
-| Quality Review     | `/quality`, `/cases/[caseId]/quality`              | Portfolio analytics; per case: quality index, effort and metrics, live warnings, SkillDNA matches, coaching, and comparison with another case                                                                                                                                                                                                                                                                                                                                                                                                           |
-| SkillDNA Library   | `/skills`, `/skills/[skillId]`                     | Skills with their lifecycle, governance (who decided what), versions, validation runs, and the cases a skill was applied to with its estimated effectiveness                                                                                                                                                                                                                                                                                                                                                                                            |
-| Efficiency Monitor | `/efficiency`                                      | Token usage, estimated savings, the real process against a simulated better path, usage by agent and model, budgets, circuit breakers and model executions                                                                                                                                                                                                                                                                                                                                                                                              |
-| Governance         | `/governance`                                      | Versioned settings (model, prompts, scoring, retention, redaction, feature flags, export), roles, the audit log with hash-chain verification, reviewer decisions, provider status and demo reset                                                                                                                                                                                                                                                                                                                                                        |
-| System Health      | `/system`                                          | Dependencies with simulated stand-ins labelled, migrations, the AI provider, request metrics, and a "What is real here" panel                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Demo Guide         | `/demo`                                            | The 13-step story with progress derived from stored data, presenter notes and (administrators only) seed and reset                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Page                                | Route                                              | What it does today                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ----------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Home (Command Center)               | `/`                                                | The latest review at a glance (score, one-line reason, Open review), the first three fixes, key numbers (seven estimates), recent cases, skills you could reuse and system health                                                                                                                                                                                                                                                                                                                                                                                |
+| Cases                               | `/cases`, `/cases/new`, `/cases/[caseId]`          | Add a case in three phases (paste, upload, a built-in sample or JSON) with a check that runs the same pipeline as the create; browse cases with one search row; Case details shows the key facts, the case structure and the review run                                                                                                                                                                                                                                                                                                                          |
+| Review (Guided Review)              | `/cases/[caseId]/review`, `/cases/[caseId]/report` | One scrolling read of an analysed case in the order a person decides: the verdict beside the first three fixes, the evidence, what would have changed the outcome, what happened, what went wrong, what to learn, and how to share it. Evidence opens in one drawer with the stored message and a checked excerpt; each section explains how it was calculated and a section the role may not read says so while the rest still works. The report holds the same figures as a page to read, print, copy as a summary or download as one self-contained HTML file |
+| Timeline (Case Timeline)            | `/cases/[caseId]/timeline`                         | Events with delays, repeats and key-decision flags, a confidence chart over time, and a time cursor ("What was known then") that withholds later events                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Evidence (Evidence Ledger)          | `/cases/[caseId]/evidence`                         | Every claim in one of eight evidence categories, shown as a coverage bar, with its source events; a reviewer can re-categorise (the original classification is kept); missing evidence is listed                                                                                                                                                                                                                                                                                                                                                                 |
+| Possible causes (Hypothesis Arena)  | `/cases/[caseId]/hypotheses`                       | The most likely cause with its estimated confidence and range, the other possible causes ranked, the confidence over time, and what to test next at a decision moment with reviewer overrides                                                                                                                                                                                                                                                                                                                                                                    |
+| What if (Counterfactual Lab)        | `/cases/[caseId]/counterfactual`                   | Key decisions (the earliest first), the time that could have been saved, the no-hindsight check, simulated paths against the recorded one, the evidence behind each step, the investigation graph, what was known only later kept apart, review                                                                                                                                                                                                                                                                                                                  |
+| Score and Quality (Quality Review)  | `/quality`, `/cases/[caseId]/quality`              | Quality (`/quality`): portfolio analytics. Score (per case): the score and what would raise it, effort and metrics, warnings, skills, coaching, and comparison with another case                                                                                                                                                                                                                                                                                                                                                                                 |
+| Skills (SkillDNA Library)           | `/skills`, `/skills/[skillId]`                     | Skills with their lifecycle, governance (who decided what), versions, validation runs, and the cases a skill was applied to with its estimated effectiveness                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Usage and cost (Efficiency Monitor) | `/efficiency`                                      | Token usage, estimated savings, the real process against a simulated better path, usage by agent and model, budgets, circuit breakers and model executions                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Settings and audit (Governance)     | `/governance`                                      | Versioned settings (model, prompts, scoring, retention, redaction, feature flags, export), roles, the audit log with hash-chain verification, reviewer decisions, provider status and demo reset                                                                                                                                                                                                                                                                                                                                                                 |
+| System status (System Health)       | `/system`                                          | Dependencies with simulated stand-ins labelled, migrations, the AI provider, request metrics, and a "What is real here" panel                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Guided demo (Demo Guide)            | `/demo`                                            | The 13-step story with progress derived from stored data, presenter notes and (administrators only) seed and reset                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
-**Start with the Guided Review.** For an analysed case it is the one page to read: the verdict, the chronology, what went wrong,
-what a better-supported path would have looked like, what to do next and what to learn, each with its evidence one click away,
+**Start with the Review.** For an analysed case it is the one page to read: the verdict with the first three fixes, the evidence,
+what would have changed the outcome, what happened, what went wrong and what to learn, each with its evidence one click away,
 and a report to print, copy or download. The other case pages are the drill-downs it links to. What each section reads for each
 role, how it degrades, and what it does not claim: [GUIDED_REVIEW.md](docs/GUIDED_REVIEW.md).
 
@@ -170,7 +206,7 @@ and a persona switcher for the synthetic users of a local run.
 
 ## End-to-end use case
 
-The built-in demo plays the 13-step story of the product specification on two fictional cases. The Demo Guide lists the steps and
+The built-in demo plays the 13-step story of the product specification on two fictional cases. The Guided demo lists the steps and
 derives their progress from stored data, so a step is Done only when the data it produces exists. Each step names the persona who
 performs it; the seeder plays the same story through the real services as the synthetic users, so permissions, four-eyes approval
 and the audit trail apply exactly as they do over HTTP.
@@ -211,7 +247,7 @@ measurement pipeline; it is **not evidence of real-world effectiveness**.
 
 ## Counterfactual analysis
 
-The Counterfactual Lab answers one question: **what would a safer path have looked like from this fork, using only what was known
+The What if page answers one question: **what would a safer path have looked like from this fork, using only what was known
 then?**
 
 1. **Start from the decision moment.** The belief, the open requirements and the observed signals are those of the exclusive view
@@ -239,7 +275,7 @@ Details: [DOMAIN_ENGINE.md](docs/DOMAIN_ENGINE.md#8-counterfactual-simulation).
 
 ## Evidence integrity model
 
-The product separates what was observed from what was assumed or inferred. Every claim in the Evidence Ledger is in one of eight
+The product separates what was observed from what was assumed or inferred. Every claim in the Evidence page is in one of eight
 categories and cites the events it comes from. The category is assigned by transparent rules over the case text; a reviewer can
 re-categorise a claim with a reason, and the original classification is never overwritten.
 
@@ -352,7 +388,7 @@ hashes of the prompt and the minimised input; the prompts and raw model output a
 provider the token counts are **estimates** (characters divided by 4, rounded up) and the cost is **unknown** unless the operator
 supplies unit prices; prices are never hard-coded. A measured figure appears only when a real provider reports its own counts.
 
-The Efficiency Monitor shows token usage, the estimated savings by mechanism (context compression, duplicate removal, cache hits,
+The Usage and cost page shows token usage, the estimated savings by mechanism (context compression, duplicate removal, cache hits,
 early stops), the real process against a simulated better path ("Tokens used by the investigation"), usage by agent and model,
 budgets and limits, circuit breakers, and the individual executions. The case-level **token efficiency** metric is bits of
 information gained per 1,000 tokens. On the synthetic cases the telemetry recorded in the case is itself simulated, and the
@@ -363,23 +399,23 @@ simulated better path, an estimated saving of 80.7 percent.
 
 ## Trust, security, and responsible AI
 
-| Control                  | What it does                                                                                                                                                                               | Status                                                                                                                             |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Tenant isolation         | The tenant comes from the credential only; tenant-scoped repositories, composite keys and forced row-level security                                                                        | Tested on PGlite; CI on PostgreSQL 16: 1,011 passed, 0 failed; **not verified on a managed server**                                |
-| Identity                 | Development persona login only for `APP_ENV` local or test (refused elsewhere); Microsoft Entra JWT validation for deployed environments                                                   | Persona login tested. Entra validation tested with locally generated keys only, never against a live tenant                        |
-| Authorization            | Five roles, 30 permissions, one declared permission per route, checked before the body is parsed                                                                                           | Implemented and tested                                                                                                             |
-| Input handling           | Size and type checks from the bytes, redaction of secrets and personal data (a tenant pattern that cannot be applied fails closed), prompt-injection screening that flags and never blocks | Redaction is pattern-based. The malware scanner is a stub (`not_scanned`): nothing scans uploads for malware                       |
-| AI boundary              | Minimised, redacted, delimited context; no tools; strict JSON; seven validators; repair once, then the deterministic result; a circuit breaker and token budgets                           | Tested with the deterministic provider and a mock Azure server; **no real model was ever called**                                  |
-| Audit                    | Per-tenant append-only hash chain, verified from the Governance page                                                                                                                       | Tamper-evident, not tamper-proof (no external anchor)                                                                              |
-| Web and API hardening    | Nonce-based CSP in the web tier, security headers, CORS allow-list, rate limits applied before authentication, idempotency keys                                                            | Tested locally; the client address behind the web tier is tested with simulated headers only                                       |
-| Secrets and supply chain | No secrets in the repository (scanner in the pre-commit hook and CI, gitleaks in CI), managed identity by design, CodeQL, dependency review and an audit gate in CI                        | CI is green only on unmerged branches; one time-boxed advisory exception for `@azure/msal-node` that needs a human risk acceptance |
+| Control                  | What it does                                                                                                                                                                               | Status                                                                                                                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tenant isolation         | The tenant comes from the credential only; tenant-scoped repositories, composite keys and forced row-level security                                                                        | Tested on PGlite; CI on PostgreSQL 16: 1,011 passed, 0 failed; **not verified on a managed server**                                                                                                      |
+| Identity                 | Development persona login only for `APP_ENV` local or test (refused elsewhere); Microsoft Entra JWT validation for deployed environments                                                   | Persona login tested. Entra validation tested with locally generated keys only, never against a live tenant                                                                                              |
+| Authorization            | Five roles, 30 permissions, one declared permission per route, checked before the body is parsed                                                                                           | Implemented and tested                                                                                                                                                                                   |
+| Input handling           | Size and type checks from the bytes, redaction of secrets and personal data (a tenant pattern that cannot be applied fails closed), prompt-injection screening that flags and never blocks | Redaction is pattern-based. The malware scanner is a stub (`not_scanned`): nothing scans uploads for malware                                                                                             |
+| AI boundary              | Minimised, redacted, delimited context; no tools; strict JSON; seven validators; repair once, then the deterministic result; a circuit breaker and token budgets                           | Tested with the deterministic provider and a mock Azure server; **no real model was ever called**                                                                                                        |
+| Audit                    | Per-tenant append-only hash chain, verified from the Settings and audit page                                                                                                               | Tamper-evident, not tamper-proof (no external anchor)                                                                                                                                                    |
+| Web and API hardening    | Nonce-based CSP in the web tier, security headers, CORS allow-list, rate limits applied before authentication, idempotency keys                                                            | Tested locally; the client address behind the web tier is tested with simulated headers only                                                                                                             |
+| Secrets and supply chain | No secrets in the repository (scanner in the pre-commit hook and CI, gitleaks in CI), managed identity by design, CodeQL, dependency review and an audit gate in CI                        | CI ran green on the build branches and on pull request #14, not on pushes to `main`, which `ci.yml` ignores; one time-boxed advisory exception for `@azure/msal-node` that needs a human risk acceptance |
 
 **Responsible AI.** Synthetic data only: the product says so everywhere, a tenant flagged synthetic refuses a payload declaring
 `"synthetic": false`, and redaction runs as a safety net, but nothing can prove that a payload is fictional (it is self-attested).
 Nothing ranks, scores or disciplines a person: coaching is supportive and describes the route, analytics are aggregated, and the
 footer of the app says scores "must not be used to rank, rate or discipline individual employees". The consequential steps are
 human decisions: re-categorising a claim, accepting a path, and the four-eyes approval of a skill. Uncertainty is shown as ranges
-and "estimated" or "simulated" labels, and the System Health page states which integrations were validated against mocks only.
+and "estimated" or "simulated" labels, and the System status page states which integrations were validated against mocks only.
 Known failure modes and bias risks: [RESPONSIBLE_AI.md](docs/RESPONSIBLE_AI.md), [SECURITY.md](docs/SECURITY.md),
 [PRIVACY.md](docs/PRIVACY.md) and the [threat model](docs/THREAT_MODEL.md).
 
@@ -456,7 +492,7 @@ demo seed).
 
 **Tenants are isolated twice**: in the application (tenant-scoped repositories; the tenant is never read from a request) and in the
 database (every table has `tenant_id` in a composite primary key, and row-level security is forced for the `caseguard_app` role). The
-**audit trail** is a per-tenant hash chain whose verification you can run from the Governance page. **Configuration fails fast**:
+**audit trail** is a per-tenant hash chain whose verification you can run from the Settings and audit page. **Configuration fails fast**:
 `packages/config` refuses unsafe combinations at start-up (persona login outside `local` and `test`, wildcard CORS, PGlite in
 staging or production, an API-key credential for Azure OpenAI in a deployed environment, and others listed in
 [SECURITY.md](docs/SECURITY.md#23-fail-closed-configuration-guards-packagesconfig)).
@@ -835,8 +871,8 @@ To confirm which provider is active, sign in as a persona with `telemetry:read` 
 Invoke-RestMethod -Uri http://localhost:4000/api/v1/system/provider -Headers @{ 'x-cg-persona' = 'user_morgan_manager' }
 ```
 
-The response reports the provider kind, whether it is simulated and a validation note; the same facts appear on the System Health
-page (the "Dependencies" panel with the "Simulated stand-in" badge) and in the Efficiency Monitor. Details:
+The response reports the provider kind, whether it is simulated and a validation note; the same facts appear on the System status
+page (the "Dependencies" section with the "Simulated stand-in" badge) and on Usage and cost. Details:
 [AI_ORCHESTRATION.md](docs/AI_ORCHESTRATION.md#93-running-with-mock-ai-the-default).
 
 ## Running with Azure OpenAI
@@ -863,7 +899,7 @@ deterministic results, retrying every 60 seconds. Full rules: [AI_ORCHESTRATION.
 
 Everything below runs offline. Counts, timings and coverage are not repeated here from memory: each result cell is the outcome of
 [GitHub Actions run 41546529865](https://github.com/snowjug/CaseGuard-Ai/actions/runs/41546529865) (the CI workflow on commit
-`69c4c85` of the unmerged branch `build/wave-1`, 2026-11-02, fully green; the commits after it change documents and the tolerance
+`69c4c85` of the branch `build/wave-1`, 2026-11-02, fully green; the commits after it change documents and the tolerance
 of one property test, see [CI_CD.md](docs/CI_CD.md#9-what-was-and-was-not-validated)), a local measurement that says so, or "NOT RUN in CI". The 27 runs before the foundation work
 all failed; run 41182982903 on `2ecb454` is the last one whose counts were recorded, and run 41495498658 on `build/p0-foundation`
 (5,843 unit, 1,011 integration and 342 end-to-end tests) was the first fully green
@@ -909,12 +945,13 @@ cases are in [docs/runbooks](docs/runbooks/README.md).
 
 ## CI/CD
 
-Five workflows exist in [`.github/workflows`](.github/workflows). **Two have run on GitHub; CI is green only on the unmerged
-branches**: `ci.yml` ran 27 times before the foundation work and every run failed. Since then it has been fully green on
-`build/p0-foundation` (run 41495498658) and on `build/wave-1` (for example run 41546529865: 8 jobs, all green); the wave's own failed
+Five workflows exist in [`.github/workflows`](.github/workflows). **Two have run on GitHub; CI is green on the build branches and on
+pull request #14, and has no run of its own on `main`**: `ci.yml` ran 27 times before the foundation work and every run failed. Since
+then it has been fully green on `build/p0-foundation` (run 41495498658), on `build/wave-1` (for example run 41546529865: 8 jobs, all
+green) and on pull request #14 (run 42299024612: 8 jobs, all green; it does not run on pushes to `main`); the wave's own failed
 and cancelled runs, among them two whose unit job found a counterexample to a property test on a documents-only commit (test-side
-flaws, fixed), are accounted for in [CI_CD.md](docs/CI_CD.md#9-what-was-and-was-not-validated). `dependency-review.yml` has run 13 times and failed every
-time because the repository's Dependency graph setting is off. No CodeQL or deploy run is recorded here, so every statement about
+flaws, fixed), are accounted for in [CI_CD.md](docs/CI_CD.md#9-what-was-and-was-not-validated). `dependency-review.yml` has run 14 times and failed every
+time because the repository's Dependency graph setting is off. No CodeQL or deploy run was recorded when this was written, so every statement about
 those two is a reading of the configuration, not an observed result ([CI_CD.md](docs/CI_CD.md#9-what-was-and-was-not-validated)).
 
 | Workflow                                             | Trigger                                                                        | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -935,20 +972,20 @@ enabled). The repository settings a person must apply (branch protection, requir
 
 ## Demo walkthrough
 
-The Demo Guide page lists the 13 steps (above) with their progress, the persona for each, presenter notes and a button to the next
+The Guided demo page lists the 13 steps (above) with their progress, the persona for each, presenter notes and a button to the next
 screen. **Presentation Mode** (`/?present=1`, or the Present button) adds a presenter strip, hides the development controls and
 keeps the honesty labels. The full script, with timings, a 30-second introduction, three-, five- and eight-minute versions and
 answers to the questions judges are likely to ask, is [DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md). The six moments the demo is built
 around:
 
-| #   | Moment                                                                   | Where to see it                                                                                                                  |
-| --- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | The system highlights the earliest meaningful decision fork              | Counterfactual Lab, fork selector badge "Earliest meaningful"; "Decision fork" on event e03 in the Case Timeline                 |
-| 2   | The actual and counterfactual paths visually diverge                     | Counterfactual Lab, tabs "Compare paths" and "Investigation graph"                                                               |
-| 3   | The user can inspect exactly which evidence supported the alternative    | Counterfactual Lab, tab "Evidence behind each step" and the eight "Validity checks"                                              |
-| 4   | SkillDNA is generated from validated reasoning                           | Counterfactual Lab, tab "Review and SkillDNA"; then the SkillDNA Library detail and its Governance, Validation and Versions tabs |
-| 5   | A second case resolves more efficiently because of the learned skill     | Case Two: the "SkillDNA match" panel in the Command Center, the "SkillDNA" tab of Quality Review, and its "Compare cases" tab    |
-| 6   | Token and customer-effort improvement shown with honest estimated labels | Efficiency Monitor, "Real process versus a simulated better path"; Quality Review, tab "Effort and metrics"                      |
+| #   | Moment                                                                   | Where to see it                                                                                                     |
+| --- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| 1   | The system highlights the earliest meaningful decision fork              | What if, the key decision cards, badge "Earliest"; "Key decision" on event e03 in the Timeline                      |
+| 2   | The actual and counterfactual paths visually diverge                     | What if, tabs "Compare" and "Graph"                                                                                 |
+| 3   | The user can inspect exactly which evidence supported the alternative    | What if, tab "Evidence per step" and the eight checks under "No-hindsight check"                                    |
+| 4   | SkillDNA is generated from validated reasoning                           | What if, tab "Review" (button "Create skill"); then the skill page and its Validation, Versions and Governance tabs |
+| 5   | A second case resolves more efficiently because of the learned skill     | Case Two: "Skills you could reuse" on Home, the "Skills" tab of the Score page, and its "Compare" tab               |
+| 6   | Token and customer-effort improvement shown with honest estimated labels | Usage and cost, "Real process versus a simulated better path"; Score, tab "Effort and metrics"                      |
 
 ## Repository structure
 
@@ -1028,7 +1065,7 @@ The complete, graded list is [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md). 
 
 - **No real language model has ever been called**; the Azure OpenAI provider was exercised only against a local mock server.
 - **Microsoft Entra ID, Azure Blob Storage and Azure AI Search were validated against fakes only**; **nothing has been deployed to
-  Azure**, no Docker image was built locally (CI builds them), and CI is green only on unmerged branches, not on the default branch.
+  Azure**, no Docker image was built locally (CI builds them), and no CI run is recorded on `main` itself (CI ran green on the build branches and on pull request #14).
 - **PostgreSQL ran only in the CI integration job**: local database tests run on PGlite (one connection), and CI run 41546529865 ran
   the integration tests on PostgreSQL 16 (1,033 passed, 0 failed), including the two-connection ingestion race (added in run
   41502284661), and a subset of the API suites also passed on a local PostgreSQL 16.15 server. No Azure Database for PostgreSQL was
@@ -1051,7 +1088,7 @@ The complete, graded list is [KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md). 
 
 [ROADMAP.md](docs/ROADMAP.md) orders the work by what removes the largest unknown first. In short:
 
-1. **Prove what exists**: merge the green foundation work so the default branch is green (it is green only on unmerged branches); deploy a dev environment from the Bicep; validate Entra, Blob and AI Search for real;
+1. **Prove what exists**: start CI on `main` and keep it green (the foundation work is on `main`, and CI ran green on the build branches and on pull request #14); deploy a dev environment from the Bicep; validate Entra, Blob and AI Search for real;
    evaluate a real model; build a human-labelled evaluation set; observe the telemetry (and bridge the AI package's own metrics into
    the product registry).
 2. **Remove single points of failure**: a durable job queue with separate workers, shared limiters and caches, finished tenant

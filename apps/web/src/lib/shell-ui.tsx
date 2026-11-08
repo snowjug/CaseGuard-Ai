@@ -1,43 +1,33 @@
 'use client';
 
-import { createContext, useContext, useMemo, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useOverlayState as useOverlay } from './use-overlay-state';
 
 export interface ShellUiState {
+  /** The command palette, which is also where search lives. */
   paletteOpen: boolean;
   setPaletteOpen: (open: boolean) => void;
   shortcutsOpen: boolean;
   setShortcutsOpen: (open: boolean) => void;
-  /** Mobile navigation drawer. */
-  navOpen: boolean;
-  setNavOpen: (open: boolean) => void;
-  /** The header search input registers itself so the `/` shortcut can focus it. */
-  registerSearchInput: (element: HTMLInputElement | null) => void;
-  focusSearch: () => void;
+  /** Opens the palette with the cursor in its field (the `/` shortcut and the search button). */
+  openSearch: () => void;
 }
 
 const ShellUiContext = createContext<ShellUiState | null>(null);
 
-/** Open/close state for the shell's overlays (command palette, shortcut help, navigation drawer) and search focus. */
+/** Open/close state for the shell's overlays (command palette and search, shortcut help). */
 export function ShellUiProvider({ children }: { children: ReactNode }) {
   const [paletteOpen, setPaletteOpen] = useOverlay();
   const [shortcutsOpen, setShortcutsOpen] = useOverlay();
-  const [navOpen, setNavOpen] = useOverlay();
-  const searchInput = useRef<HTMLInputElement | null>(null);
   const value = useMemo<ShellUiState>(
     () => ({
       paletteOpen,
       setPaletteOpen,
       shortcutsOpen,
       setShortcutsOpen,
-      navOpen,
-      setNavOpen,
-      registerSearchInput: (element) => {
-        searchInput.current = element;
-      },
-      focusSearch: () => searchInput.current?.focus(),
+      openSearch: () => setPaletteOpen(true),
     }),
-    [paletteOpen, setPaletteOpen, shortcutsOpen, setShortcutsOpen, navOpen, setNavOpen],
+    [paletteOpen, setPaletteOpen, shortcutsOpen, setShortcutsOpen],
   );
   return <ShellUiContext.Provider value={value}>{children}</ShellUiContext.Provider>;
 }

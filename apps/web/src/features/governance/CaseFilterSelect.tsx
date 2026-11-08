@@ -1,16 +1,13 @@
 'use client';
 
-import { Select, makeStyles } from '@fluentui/react-components';
+import { Select, type SelectProps } from '@caseguard/ui';
 import { shortId } from '../../lib/format';
 import { useCaseOptions } from './use-case-options';
 
-const useStyles = makeStyles({
-  // A native select is as wide as its longest option, which would push a narrow screen sideways.
-  root: { width: '100%', minWidth: 0, maxWidth: '100%' },
-  native: { width: '100%', minWidth: 0 },
-});
-
-export interface CaseFilterSelectProps {
+export interface CaseFilterSelectProps extends Omit<
+  SelectProps,
+  'value' | 'onChange' | 'children' | 'wrapperClassName'
+> {
   /** The chosen case id, or an empty string for "any". */
   value: string;
   /** Label of the empty choice, for example "All cases". */
@@ -20,22 +17,20 @@ export interface CaseFilterSelectProps {
   onChange: (caseId: string) => void;
 }
 
-/** A case picker for the Governance filters: the cases the header switcher already loaded, as a native select. */
+/**
+ * A case picker for the filters of Settings and audit: the cases the case list already loaded, as a native select. It
+ * takes the `id` and `aria-*` props of a `Field`, so the label of the field names it.
+ */
 export function CaseFilterSelect({
   value,
   emptyLabel,
   showTitle = true,
   onChange,
+  ...select
 }: CaseFilterSelectProps) {
-  const styles = useStyles();
   const cases = useCaseOptions();
   return (
-    <Select
-      className={styles.root}
-      select={{ className: styles.native }}
-      value={value}
-      onChange={(_event, data) => onChange(data.value)}
-    >
+    <Select {...select} value={value} onChange={(event) => onChange(event.target.value)}>
       <option value="">{emptyLabel}</option>
       {cases.map((item) => (
         <option key={item.id} value={item.id}>

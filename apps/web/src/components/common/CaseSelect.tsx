@@ -1,16 +1,20 @@
 'use client';
 
 import type { CaseSummary } from '@caseguard/schemas';
-import { Select, makeStyles } from '@fluentui/react-components';
+import { Select, cg } from '@caseguard/ui';
+import { makeStyles, tokens } from '@fluentui/react-components';
 import { useId } from 'react';
 import { describeError } from '../../lib/api/errors';
 import { useApiQuery } from '../../lib/api/hooks';
 import { useAuth } from '../../lib/auth/context';
-import { cg } from '@caseguard/ui';
 
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', gap: cg.space[1], minWidth: 0 },
-  label: { fontSize: '12px', color: cg.textMuted, fontWeight: 600 },
+  label: {
+    fontSize: tokens.fontSizeBase200,
+    color: cg.textSecondary,
+    fontWeight: tokens.fontWeightMedium,
+  },
   select: { minWidth: '200px', maxWidth: '320px' },
 });
 
@@ -18,13 +22,13 @@ export interface CaseSelectProps {
   /** Selected case id, or null/undefined for none. */
   value: string | null | undefined;
   onChange: (caseId: string) => void;
-  /** Visible label above the control. Omit and pass `ariaLabel` for compact use (the header). */
+  /** Visible label above the control. Omit and pass `ariaLabel` for compact use. */
   label?: string;
   ariaLabel?: string;
   className?: string;
 }
 
-/** Case chooser bound to `cases.list`. Used by the header switcher and the Command Center. */
+/** Case chooser bound to `cases.list` (a native select, the best control on a phone). Used on Home. */
 export function CaseSelect({
   value,
   onChange,
@@ -50,7 +54,7 @@ export function CaseSelect({
           ? 'No cases yet'
           : null;
   const known = items.some((c) => c.id === value);
-  // The full reason is available on hover; the control itself stays short enough to fit the header.
+  // The full reason is available on hover; the control itself stays short enough to fit its row.
   const detail = cases.isError
     ? `Cases unavailable: ${describeError(cases.error)}`
     : (status ?? undefined);
@@ -68,8 +72,8 @@ export function CaseSelect({
         aria-label={label ? undefined : ariaLabel}
         disabled={items.length === 0}
         value={known && value ? value : ''}
-        onChange={(_event, data) => {
-          if (data.value) onChange(data.value);
+        onChange={(event) => {
+          if (event.target.value) onChange(event.target.value);
         }}
         title={detail}
       >

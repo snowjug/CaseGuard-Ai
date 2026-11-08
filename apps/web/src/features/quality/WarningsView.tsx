@@ -7,26 +7,30 @@ import {
   type WarningCategory,
 } from '@caseguard/schemas';
 import {
+  Button,
   EmptyState,
+  Field,
   Panel,
+  SegmentedControl,
+  Select,
   StatusBadge,
   cg,
   formatDateTimeUtc,
   type BadgeStatus,
 } from '@caseguard/ui';
-import { Button, Field, Select, ToggleButton } from '@fluentui/react-components';
-import { CheckmarkCircleRegular } from '@fluentui/react-icons';
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { CircleCheckIcon } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { useApiMutation } from '../../lib/api/hooks';
 import { PRIORITY_BADGES } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
-import { codecs, useSelectionState, useUrlState } from '../../lib/url-state';
+import { codecs, useSelectionState, useUrlChoiceState } from '../../lib/url-state';
 import { useActorLabel } from './actors';
 import { ClampedText } from './ClampedText';
 import { EvidenceLinkList } from './EvidenceLinkList';
 import { explainFailure, failureText, needsReload } from './failure';
 import { GatedConfirm } from './GatedConfirm';
-import { useInsightStyles } from './styles';
+import { useLook } from './look';
 
 const STATES = ['open', 'resolved', 'dismissed', 'all'] as const;
 type StateFilter = (typeof STATES)[number];
@@ -48,10 +52,48 @@ const STATE_BADGE: Record<CaseWarning['state'], { label: string; status: BadgeSt
 };
 
 const HELP =
-  'Live warnings are specific, evidence-linked prompts raised by rules while an investigation is under way: a missing timestamp, an unsupported cause, a repeated request, a customer waiting. Each is raised once per situation and says what to do next. With the time cursor set you see the warnings that were open at that moment, exactly as the engineer would have seen them. Dismissing one records who did it and why in the audit log.';
+  'Warnings are specific, evidence-linked prompts raised by rules while an investigation is under way: a missing timestamp, an unsupported cause, a repeated request, a customer waiting. Each is raised once per situation and says what to do next. With the time cursor set you see the warnings that were open at that moment, exactly as the engineer would have seen them. Dismissing one records who did it and why in the audit log.';
 
 const DISMISS_HELP =
   'Dismissing a warning records your name and your reason in the audit log, and it cannot be undone from here.';
+
+const useStyles = makeStyles({
+  toolbar: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: `${cg.space[3]} ${cg.space[4]}`,
+  },
+  field: { flex: '0 1 240px', minWidth: 0 },
+  list: { display: 'flex', flexDirection: 'column', margin: 0, padding: 0, listStyleType: 'none' },
+  item: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[2],
+    paddingBlock: cg.space[4],
+    paddingInline: cg.space[3],
+    borderTop: `1px solid ${cg.borderSubtle}`,
+    ':first-child': { borderTop: 0 },
+  },
+  // The warning the address points at: a soft accent edge and tint, not a heavier outline.
+  selected: {
+    backgroundColor: `color-mix(in srgb, ${cg.tone.brand.solid} 10%, transparent)`,
+    boxShadow: `inset 3px 0 0 ${cg.tone.brand.solid}`,
+    borderRadius: cg.radius.md,
+  },
+  head: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
+  title: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase400,
+    lineHeight: tokens.lineHeightBase400,
+    fontWeight: tokens.fontWeightSemibold,
+    letterSpacing: '-0.01em',
+    color: cg.text,
+    overflowWrap: 'anywhere',
+  },
+  actions: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
+});
 
 interface DismissProps {
   caseId: string;
@@ -62,7 +104,7 @@ interface DismissProps {
 }
 
 function DismissWarning({ caseId, warning, asOf, onStale }: DismissProps) {
-  const styles = useInsightStyles();
+  const look = useLook();
   const toast = useToast();
   const dismiss = useApiMutation('warnings.dismiss', {
     invalidate: ['warnings.list', 'timeline.get', 'cases.list', 'dashboard.commandCenter'],
@@ -76,11 +118,7 @@ function DismissWarning({ caseId, warning, asOf, onStale }: DismissProps) {
         permission="warning:dismiss"
         blockedReason={blockedReason}
         trigger={
-          <Button
-            appearance="outline"
-            size="small"
-            aria-label={`Dismiss warning: ${warning.title}`}
-          >
+          <Button variant="secondary" size="sm" aria-label={`Dismiss warning: ${warning.title}`}>
             Dismiss
           </Button>
         }
@@ -112,7 +150,7 @@ function DismissWarning({ caseId, warning, asOf, onStale }: DismissProps) {
         <p>{warning.title}</p>
         <p>{DISMISS_HELP}</p>
       </GatedConfirm>
-      {blockedReason ? <span className={styles.meta}>{blockedReason}</span> : null}
+      {blockedReason ? <span className={look.meta}>{blockedReason}</span> : null}
     </>
   );
 }
@@ -130,43 +168,43 @@ function WarningItem({
   selected: boolean;
   onStale: () => void;
 }) {
-  const styles = useInsightStyles();
+  const styles = useStyles();
+  const look = useLook();
   const actor = useActorLabel();
   const priority = PRIORITY_BADGES[warning.priority];
   const state = STATE_BADGE[warning.state];
   return (
     <li
       id={`warning-${warning.id}`}
-      className={styles.item}
+      className={mergeClasses(styles.item, selected && styles.selected)}
       aria-current={selected ? 'true' : undefined}
-      style={selected ? { borderColor: cg.focus, borderWidth: 2 } : undefined}
     >
-      <div className={styles.itemHead}>
+      <div className={styles.head}>
         <StatusBadge status={priority.status} label={priority.label} size="small" />
         <StatusBadge status={state.status} label={state.label} size="small" />
-        <span className={styles.meta}>{WARNING_CATEGORY_LABELS[warning.category]}</span>
+        <span className={look.meta}>{WARNING_CATEGORY_LABELS[warning.category]}</span>
       </div>
-      <h3 className={styles.itemTitle}>{warning.title}</h3>
+      <h3 className={styles.title}>{warning.title}</h3>
       <ClampedText text={warning.message} lines={3} label="warning message" />
-      <p className={styles.text}>
-        <span className={styles.strong}>Next step:</span> {warning.suggestedAction}
+      <p className={look.text}>
+        <span className={look.strong}>Next step:</span> {warning.suggestedAction}
       </p>
       <EvidenceLinkList
         caseId={caseId}
         links={warning.evidence}
         label={`Evidence for ${warning.title}`}
       />
-      <p className={styles.meta}>
+      <p className={look.meta}>
         Raised {formatDateTimeUtc(warning.raisedAt)} · rule {warning.ruleId}
       </p>
       {warning.state === 'resolved' && warning.resolvedAt ? (
-        <p className={styles.meta}>
+        <p className={look.meta}>
           Resolved {formatDateTimeUtc(warning.resolvedAt)}
           {warning.resolvedReason ? `: ${warning.resolvedReason}` : ''}
         </p>
       ) : null}
       {warning.state === 'dismissed' && warning.dismissal ? (
-        <p className={styles.meta}>
+        <p className={look.meta}>
           Dismissed by {actor(warning.dismissal.by)} on {formatDateTimeUtc(warning.dismissal.at)}:{' '}
           {warning.dismissal.reason}
         </p>
@@ -189,14 +227,15 @@ export interface WarningsViewProps {
 }
 
 /**
- * The "Live warnings" tab: the warnings of the case as they stood at the time cursor (or on the whole record), filtered
+ * The "Warnings" tab: the warnings of the case as they stood at the time cursor (or on the whole record), filtered
  * by state and category through the URL, with a dismissal that needs a reason and is audited. Counts are taken from the
  * list the API returned for the same boundary, never from anything later.
  */
 export function WarningsView({ caseId, asOf, warnings, onReload }: WarningsViewProps) {
-  const styles = useInsightStyles();
-  const [state, setState] = useUrlState('wstate', STATE_CODEC);
-  const [category, setCategory] = useUrlState('wcat', CATEGORY_CODEC);
+  const styles = useStyles();
+  const look = useLook();
+  const [state, setState] = useUrlChoiceState('wstate', STATE_CODEC);
+  const [category, setCategory] = useUrlChoiceState('wcat', CATEGORY_CODEC);
   const [selection] = useSelectionState();
 
   const inCategory = useMemo(
@@ -231,25 +270,20 @@ export function WarningsView({ caseId, asOf, warnings, onReload }: WarningsViewP
       help={HELP}
     >
       <div className={styles.toolbar}>
-        <div role="group" aria-label="Show warnings">
-          <div className={styles.actions}>
-            {STATES.map((value) => (
-              <ToggleButton
-                key={value}
-                size="small"
-                checked={state === value}
-                onClick={() => setState(value)}
-              >
-                {STATE_LABELS[value]} ({counts[value]})
-              </ToggleButton>
-            ))}
-          </div>
-        </div>
+        <SegmentedControl
+          aria-label="Show warnings"
+          size="sm"
+          value={state}
+          onValueChange={setState}
+          options={STATES.map((value) => ({
+            value,
+            label: `${STATE_LABELS[value]} (${counts[value]})`,
+          }))}
+        />
         <Field label="Category" className={styles.field}>
           <Select
-            className={styles.select}
             value={category}
-            onChange={(_event, next) => setCategory(next.value as (typeof CATEGORIES)[number])}
+            onChange={(event) => setCategory(event.target.value as (typeof CATEGORIES)[number])}
           >
             <option value="all">All categories</option>
             {WARNING_CATEGORIES.map((value: WarningCategory) => (
@@ -260,14 +294,14 @@ export function WarningsView({ caseId, asOf, warnings, onReload }: WarningsViewP
           </Select>
         </Field>
       </div>
-      <span role="status" aria-live="polite" className={styles.meta}>
+      <span role="status" aria-live="polite" className={look.meta}>
         {visible.length === 1 ? '1 warning shown' : `${visible.length} warnings shown`}
       </span>
       {visible.length === 0 ? (
         <EmptyState
           compact
           headingLevel={3}
-          icon={<CheckmarkCircleRegular />}
+          icon={<CircleCheckIcon />}
           title={
             warnings.length === 0
               ? 'No warning was raised'
@@ -284,7 +318,7 @@ export function WarningsView({ caseId, asOf, warnings, onReload }: WarningsViewP
           }
           action={
             counts.all > 0 && state !== 'all' ? (
-              <Button appearance="outline" onClick={() => setState('all')}>
+              <Button variant="secondary" onClick={() => setState('all')}>
                 Show all {counts.all}
               </Button>
             ) : undefined

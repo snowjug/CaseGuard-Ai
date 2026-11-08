@@ -1,15 +1,24 @@
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from '../support/fixtures';
 import { mainRegion, openPage, settle } from '../support/ui';
 
 const EVENT_COUNT = 31;
 
-test.describe('[FR-TL-01] Case Timeline: every event in order, with what was known when', () => {
+/** "What was known then" is one bar, closed until it is opened: the time cursor and the counts are inside it. */
+async function openKnownBar(page: Page): Promise<Locator> {
+  const toggle = page.getByRole('button', { name: /^What was known then/ });
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  return page.getByRole('region', { name: /^What was known then/ });
+}
+
+test.describe('[FR-TL-01] Timeline: every event in order, with what was known when', () => {
   test('reconstructs the 31 events of Case One in time order, with the gap since the previous event and the flags that matter', async ({
     page,
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/timeline`);
-    await expect(page.getByRole('heading', { level: 1, name: 'Case Timeline' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Timeline' })).toBeVisible();
     await expect(page.getByText(`Showing ${EVENT_COUNT} of ${EVENT_COUNT} events.`)).toBeVisible();
     const events = page.getByRole('list', { name: new RegExp(`^Events, ${EVENT_COUNT} shown`) });
     await expect(events).toBeVisible();
@@ -20,11 +29,11 @@ test.describe('[FR-TL-01] Case Timeline: every event in order, with what was kno
     await expect(items.first()).toContainText('Customer email');
     await expect(items.first()).toContainText('Event e01');
     await expect(items.nth(1)).toContainText('18 min after the previous event');
-    // e03 is the first decision fork; e09 revokes sign-in sessions, a destructive action.
+    // e03 is the first key decision; e09 revokes sign-in sessions, a destructive action.
     const e03 = items.filter({
       has: page.getByRole('button', { name: /^Details of Teams sign-in - information needed/ }),
     });
-    await expect(e03).toContainText('Decision fork');
+    await expect(e03).toContainText('Key decision');
     await expect(e03).toContainText('Very high customer effort');
     const e09 = items.filter({
       has: page.getByRole('button', { name: /^Details of Revoke sign-in sessions/ }),
@@ -36,14 +45,14 @@ test.describe('[FR-TL-01] Case Timeline: every event in order, with what was kno
     ).toBeVisible();
   });
 
-  test('"Show only" toggles narrow the list to delays, repeated diagnostics or decision forks, and Clear filters restores it', async ({
+  test('"Show only" toggles narrow the list to delays, repeated diagnostics or key decisions, and Clear filters restores it', async ({
     page,
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/timeline`);
     const filters = page.getByRole('search', { name: 'Filter events' });
     const status = filters.getByRole('status');
-    await filters.getByRole('button', { name: 'Decision forks' }).click();
+    await filters.getByRole('button', { name: 'Key decisions' }).click();
     await expect(status).toContainText(/Showing \d+ of 31 events, 1 filter on\./);
     const forksOnly = Number(/Showing (\d+) of/.exec((await status.textContent()) ?? '')![1]);
     expect(forksOnly).toBeGreaterThan(0);
@@ -61,7 +70,7 @@ test.describe('[FR-TL-01] Case Timeline: every event in order, with what was kno
     await filters.getByRole('button', { name: 'Clear filters' }).click();
   });
 
-  test('an event opens in a side panel with its claims and evidence; the selection is in the URL and survives a reload', async ({
+  test('an event opens in a drawer with its claims and evidence; the selection is in the URL and survives a reload', async ({
     page,
     demo,
   }) => {
@@ -71,12 +80,15 @@ test.describe('[FR-TL-01] Case Timeline: every event in order, with what was kno
       .click();
     await settle(page);
     await expect(page).toHaveURL(/sel=e06/);
-    await expect(mainRegion(page).getByText(/claim/i).first()).toBeVisible();
+    // The drawer is a modal dialog: the page behind it is hidden from assistive technology while it is open.
+    const drawer = page.getByRole('dialog', { name: 'Event details' });
+    await expect(drawer.getByText(/claim/i).first()).toBeVisible();
     await page.reload();
     await expect(page).toHaveURL(/sel=e06/);
     await settle(page);
     await expect(
-      mainRegion(page)
+      page
+        .getByRole('dialog', { name: 'Event details' })
         .getByText(/Sign-in log query result/)
         .first(),
     ).toBeVisible();
@@ -87,7 +99,7 @@ test.describe('[FR-TL-01] Case Timeline: every event in order, with what was kno
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/timeline`);
-    const known = page.getByRole('group', { name: 'What was known' });
+    const known = await openKnownBar(page);
     await expect(known.getByRole('status')).toContainText(
       'Showing everything up to 12 Mar 2026, 10:20 UTC',
     );
@@ -126,26 +138,30 @@ test.describe('[FR-TL-01] Case Timeline: every event in order, with what was kno
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/timeline?asOf=2026-03-09T09%3A41%3A00Z`);
-    const known = page.getByRole('group', { name: 'What was known' });
+    const known = await openKnownBar(page);
     await expect(known.getByRole('status')).toContainText('9 Mar 2026, 09:41 UTC');
     await expect(
       page.getByRole('search', { name: 'Filter events' }).getByRole('status'),
     ).toContainText('Showing 3 of');
   });
 
-  test('hypothesis confidence over time is shown as an estimate with a text alternative', async ({
+  test('confidence over time is shown as an estimate with a text alternative', async ({
     page,
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/timeline`);
-    const chart = page.getByRole('group', { name: 'Hypothesis confidence over time' });
+    const chart = page.getByRole('group', { name: 'Confidence over time' });
     await expect(chart).toBeVisible();
     await expect(chart.getByText('Estimated').first()).toBeVisible();
+    // The caveat is behind the help button of the chart, not in a banner above it.
+    await chart.getByRole('button', { name: 'About Confidence over time' }).click();
     await expect(
-      chart.getByText('Confidence values are model estimates, not statistical truth.'),
+      page.getByText(
+        /These are model estimates from an authored knowledge pack, not statistical truth/,
+      ),
     ).toBeVisible();
     await expect(
-      chart.getByRole('img', { name: /Hypothesis confidence over time/ }).first(),
+      chart.getByRole('img', { name: /Confidence in each possible cause over time/ }).first(),
     ).toBeVisible();
   });
 });

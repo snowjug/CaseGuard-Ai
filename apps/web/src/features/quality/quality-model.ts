@@ -1,14 +1,49 @@
-import type { QualityAssessment, QualityBand } from '@caseguard/schemas';
-import type { BadgeStatus, ScoreStatus } from '@caseguard/ui';
+import type { QualityAssessment, QualityBand, QualityDimensionKey } from '@caseguard/schemas';
+import { BAND_WORDS } from '../review/model/verdict';
 
-export const BAND_META: Record<
-  QualityBand,
-  { label: string; badge: BadgeStatus; ring: ScoreStatus }
-> = {
-  strong: { label: 'Strong', badge: 'productive', ring: 'good' },
-  adequate: { label: 'Adequate', badge: 'neutral', ring: 'watch' },
-  needs_attention: { label: 'Needs attention', badge: 'uncertain', ring: 'watch' },
-  poor: { label: 'Poor', badge: 'unsupported', ring: 'poor' },
+/**
+ * The words and status of a quality band. They come from the review's verdict table, so the Review and the Score say
+ * the same thing about the same case.
+ */
+export const bandOf = (band: QualityBand): (typeof BAND_WORDS)[QualityBand] => BAND_WORDS[band];
+
+/** A dimension of the index in plain words, and what it checks (the technical name goes in a tooltip). */
+export interface DimensionCopy {
+  name: string;
+  definition: string;
+}
+
+/** The six dimensions, named for a person who has never read the scoring configuration. */
+export const DIMENSION_COPY: Record<QualityDimensionKey, DimensionCopy> = {
+  evidence_integrity: {
+    name: 'Claims backed by evidence',
+    definition:
+      'Whether conclusions rest on diagnostic evidence, contradicting evidence is acknowledged and assumptions are labelled as assumptions.',
+  },
+  diagnostic_reasoning: {
+    name: 'Sound decisions',
+    definition:
+      'Whether each decision was sound at the time it was made, the working hypothesis followed the evidence and risky changes followed a justified diagnosis.',
+  },
+  scoping_completeness: {
+    name: 'Problem scoped well',
+    definition:
+      'Whether scope, impact and key identifiers were captured, the first request to the customer was targeted and the minimum evidence was in hand before escalating.',
+  },
+  customer_communication: {
+    name: 'Customer kept informed',
+    definition:
+      'Whether replies were prompt, expectations and next steps were set, and the customer never had to chase for news.',
+  },
+  resolution_validation: {
+    name: 'Diagnosis confirmed',
+    definition: 'Whether a diagnosis was confirmed before the case was closed.',
+  },
+  efficiency_proportionality: {
+    name: 'Effort kept proportionate',
+    definition:
+      'Whether steps added information rather than repeating work, the effort asked of the customer was proportionate and the evidence became a confirmed diagnosis promptly.',
+  },
 };
 
 /**

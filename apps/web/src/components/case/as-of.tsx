@@ -1,8 +1,8 @@
 'use client';
 
-import { Notice, VisuallyHidden, cg } from '@caseguard/ui';
-import { Button, makeStyles } from '@fluentui/react-components';
-import { ArrowSyncRegular, HistoryRegular } from '@fluentui/react-icons';
+import { Button, Notice, VisuallyHidden, cg } from '@caseguard/ui';
+import { makeStyles } from '@fluentui/react-components';
+import { HistoryIcon, RefreshCwIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiError } from '../../lib/api/errors';
 import { useApiPages } from '../../lib/api/pages';
@@ -213,9 +213,9 @@ export function AsOfLimited({
         computed for this moment just now. Views you already opened stay available.
         <div className={styles.actions}>
           <Button
-            appearance="primary"
-            size={compact ? 'small' : 'medium'}
-            icon={<ArrowSyncRegular />}
+            variant="secondary"
+            size={compact ? 'sm' : 'md'}
+            icon={<RefreshCwIcon />}
             disabled={left > 0 || retrying}
             onClick={onRetry}
           >
@@ -223,9 +223,9 @@ export function AsOfLimited({
           </Button>
           {onWholeRecord ? (
             <Button
-              appearance="outline"
-              size={compact ? 'small' : 'medium'}
-              icon={<HistoryRegular />}
+              variant="ghost"
+              size={compact ? 'sm' : 'md'}
+              icon={<HistoryIcon />}
               onClick={onWholeRecord}
             >
               Show the whole record

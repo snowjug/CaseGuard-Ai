@@ -47,11 +47,19 @@ describe('[REV-REPORT-20] the report page', () => {
     for (const name of ['Print', 'Copy summary', 'Download HTML']) {
       expect(screen.getByRole('button', { name })).toBeEnabled();
     }
+    // The toolbar is for the screen: the print rules hide everything marked this way around the document.
+    const toolbar = screen.getByRole('group', { name: 'Report actions' });
+    expect(toolbar.closest('.cg-no-print')).not.toBeNull();
+    expect(
+      within(toolbar)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['Print', 'Copy summary', 'Download HTML']);
     expect(screen.getByText(/choose Print and then “Save as PDF”/)).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Back to the guided review' })).toHaveAttribute(
-      'href',
-      `/cases/${CASE_ONE.detail.id}/review`,
-    );
+    // The page is reached from the case tabs; the document itself still links back to the review.
+    expect(
+      screen.getByRole('link', { name: 'Open the guided review in CaseGuard' }),
+    ).toHaveAttribute('href', `${window.location.origin}/cases/${CASE_ONE.detail.id}/review`);
     await expectNoAxeViolations(container);
   });
 

@@ -3,7 +3,7 @@ import { expect, test } from '../support/fixtures';
 import { openPage } from '../support/ui';
 
 /**
- * @perf: how long the Case Timeline page takes to show its first timeline row in a real browser, for Case One (31
+ * @perf: how long the Timeline page takes to show its first timeline row in a real browser, for Case One (31
  * events), from the start of the navigation. It also records the largest contentful paint when the browser reports one.
  * It measures; it asserts nothing about speed (no SLO is claimed). Run it on demand:
  *
@@ -17,7 +17,7 @@ const WARMUP = 2;
 const percentile = (sorted: number[], percent: number): number =>
   sorted[Math.max(0, Math.ceil((percent / 100) * sorted.length) - 1)] ?? Number.NaN;
 
-test.describe('@perf Case Timeline render', () => {
+test.describe('@perf Timeline render', () => {
   test.setTimeout(900_000);
 
   test('time from navigation start to the first timeline row, and the largest contentful paint', async ({
@@ -68,7 +68,7 @@ test.describe('@perf Case Timeline render', () => {
       };
     };
     const report = {
-      page: 'Case Timeline, Case One (31 events)',
+      page: 'Timeline, Case One (31 events)',
       mode: 'production build, standalone server, local API, deterministic AI provider',
       browser: testInfo.project.use.channel ?? 'bundled chromium',
       iterations: ITERATIONS,

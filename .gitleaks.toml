@@ -85,3 +85,11 @@ paths = ['''^packages/security/test/redaction-property\.test\.ts$''']
 regexTarget = "line"
 # secretscan:allow-next-line a regex that matches a PEM-shaped template with a body placeholder, not a key
 regexes = ['''-----BEGIN PRIVATE KEY-----\\n\$\{body\}\\n-----END PRIVATE KEY-----''']
+
+[[allowlists]]
+description = "packages/ai/test/reasoning/locate.test.ts and the rules instruction-like-text.test.ts and secret-like-text.test.ts use the made-up value 'abcdef1234567890' in an API key assignment to check that the reasoning rules recognise or ignore secret-like text. It is a test constant, not a credential. Only that value, in those three files, for that one rule is allowed."
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^packages/ai/test/reasoning/(locate|rules/instruction-like-text|rules/secret-like-text)\.test\.ts$''']
+regexTarget = "line"
+regexes = ['''abcdef1234567890''']

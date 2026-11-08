@@ -1,15 +1,15 @@
 import type { GraphEdge, GraphNode } from '@caseguard/schemas';
 import {
-  AlertUrgentRegular,
-  BeakerRegular,
-  BranchForkRegular,
-  DocumentSearchRegular,
-  FlagRegular,
-  FlashRegular,
-  LightbulbRegular,
-  PlayRegular,
-  type FluentIcon,
-} from '@fluentui/react-icons';
+  BellRingIcon,
+  FileSearchIcon,
+  FlagIcon,
+  FlaskConicalIcon,
+  GitForkIcon,
+  LightbulbIcon,
+  PlayIcon,
+  ZapIcon,
+  type LucideIcon,
+} from 'lucide-react';
 import { formatProbability } from '../format';
 import { STATUS_META } from '../primitives/status-meta';
 import type { ToneName } from '../tokens/palette';
@@ -22,7 +22,7 @@ export interface KindMeta {
   label: string;
   shape: NodeShape;
   tone: ToneName;
-  icon: FluentIcon;
+  icon: LucideIcon;
   /** `solid`: filled with the tone; `tint`: light fill with a tone outline; `hatch`: simulated texture. */
   fill: 'solid' | 'tint' | 'hatch';
   description: string;
@@ -34,7 +34,7 @@ export const KIND_META: Record<GraphNodeKind, KindMeta> = {
     label: 'Problem',
     shape: 'stadium',
     tone: 'actual',
-    icon: AlertUrgentRegular,
+    icon: BellRingIcon,
     fill: 'solid',
     description: 'The initial problem statement',
   },
@@ -42,7 +42,7 @@ export const KIND_META: Record<GraphNodeKind, KindMeta> = {
     label: 'Evidence',
     shape: 'circle',
     tone: 'evidence',
-    icon: DocumentSearchRegular,
+    icon: FileSearchIcon,
     fill: 'solid',
     description: 'Information available in the case',
   },
@@ -50,7 +50,7 @@ export const KIND_META: Record<GraphNodeKind, KindMeta> = {
     label: 'Hypothesis',
     shape: 'hexagon',
     tone: 'hypothesis',
-    icon: LightbulbRegular,
+    icon: LightbulbIcon,
     fill: 'tint',
     description: 'A candidate explanation with model-estimated confidence',
   },
@@ -58,7 +58,7 @@ export const KIND_META: Record<GraphNodeKind, KindMeta> = {
     label: 'Action',
     shape: 'square',
     tone: 'actual',
-    icon: PlayRegular,
+    icon: PlayIcon,
     fill: 'solid',
     description: 'An action that was actually taken',
   },
@@ -66,7 +66,7 @@ export const KIND_META: Record<GraphNodeKind, KindMeta> = {
     label: 'Decision fork',
     shape: 'diamond',
     tone: 'fork',
-    icon: BranchForkRegular,
+    icon: GitForkIcon,
     fill: 'solid',
     description: 'A point where a better path was available',
   },
@@ -74,7 +74,7 @@ export const KIND_META: Record<GraphNodeKind, KindMeta> = {
     label: 'Outcome',
     shape: 'stadium',
     tone: 'actual',
-    icon: FlagRegular,
+    icon: FlagIcon,
     fill: 'tint',
     description: 'A result of the investigation',
   },
@@ -82,7 +82,7 @@ export const KIND_META: Record<GraphNodeKind, KindMeta> = {
     label: 'Simulated step',
     shape: 'square',
     tone: 'simulated',
-    icon: BeakerRegular,
+    icon: FlaskConicalIcon,
     fill: 'hatch',
     description: 'A step of the simulated alternative path',
   },
@@ -90,7 +90,7 @@ export const KIND_META: Record<GraphNodeKind, KindMeta> = {
     label: 'SkillDNA',
     shape: 'dna',
     tone: 'skill',
-    icon: FlashRegular,
+    icon: ZapIcon,
     fill: 'tint',
     description: 'Reusable skill extracted from the validated path',
   },

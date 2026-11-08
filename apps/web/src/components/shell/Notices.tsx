@@ -5,72 +5,57 @@ import {
   RESPONSIBLE_USE_NOTICE,
   SYNTHETIC_DATA_NOTICE,
 } from '@caseguard/schemas';
-import { ProvenanceBadge, cg } from '@caseguard/ui';
-import { Button, makeStyles, tokens } from '@fluentui/react-components';
-import { KeyboardRegular } from '@fluentui/react-icons';
+import { Button, ProvenanceBadge, cg, useMediaQuery } from '@caseguard/ui';
+import {
+  Popover,
+  PopoverSurface,
+  PopoverTrigger,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
+import { KeyboardIcon } from 'lucide-react';
 import { publicEnv } from '../../lib/env';
-import { useAuth } from '../../lib/auth/context';
-import { DevIdentityBadge } from '../../lib/auth/dev-persona';
-import { usePresentation } from '../../lib/presentation';
 import { useShellUi } from '../../lib/shell-ui';
 
-const useBar = makeStyles({
-  bar: {
-    display: 'flex',
+const useStyles = makeStyles({
+  pill: {
+    display: 'inline-flex',
+    minHeight: '32px',
     alignItems: 'center',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-    gap: `0 ${cg.space[3]}`,
-    minHeight: '28px',
-    padding: `2px ${cg.space[4]}`,
-    backgroundColor: cg.tone.neutral.tint,
-    borderBottom: `1px dashed ${cg.tone.neutral.border}`,
-    color: cg.tone.neutral.fg,
-    fontSize: tokens.fontSizeBase200,
-    lineHeight: tokens.lineHeightBase200,
-    textAlign: 'center',
-  },
-  // On narrow screens the badge carries the message; the sentence stays available to assistive technology.
-  sentence: {
-    '@media (max-width: 719px)': {
-      position: 'absolute',
-      width: '1px',
-      height: '1px',
-      overflow: 'hidden',
-      clipPath: 'inset(50%)',
-      whiteSpace: 'nowrap',
+    padding: 0,
+    border: 0,
+    borderRadius: cg.radius.pill,
+    backgroundColor: 'transparent',
+    cursor: 'pointer',
+    '@media (pointer: coarse)': {
+      minHeight: '44px',
+      minWidth: '44px',
+      justifyContent: 'center',
     },
+    ':focus-visible': { outline: `2px solid ${cg.focus}`, outlineOffset: '2px' },
   },
-});
-
-/** Persistent, unobtrusive honesty notice above the header. */
-export function HonestyBar() {
-  const styles = useBar();
-  const auth = useAuth();
-  const presentation = usePresentation();
-  return (
-    <div className={styles.bar}>
-      <ProvenanceBadge kind="synthetic" label="Synthetic demo data" />
-      <span className={styles.sentence}>
-        {SYNTHETIC_DATA_NOTICE}
-        {publicEnv.appEnv === 'production' ? '' : ` Environment: ${publicEnv.appEnv}.`}
-      </span>
-      {auth.mode === 'dev' && !presentation.enabled ? <DevIdentityBadge /> : null}
-    </div>
-  );
-}
-
-const useFooter = makeStyles({
+  surface: {
+    maxWidth: '320px',
+    padding: cg.space[4],
+    color: cg.text,
+    backgroundColor: cg.surfaceRaised,
+    border: `1px solid ${cg.glassBorder}`,
+    borderRadius: cg.radius.md,
+    boxShadow: cg.shadowHigh,
+    fontSize: tokens.fontSizeBase300,
+  },
+  popTitle: { margin: `0 0 ${cg.space[1]}`, fontWeight: tokens.fontWeightSemibold },
+  popBody: { margin: 0, color: cg.textSecondary },
   footer: {
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: `${cg.space[2]} ${cg.space[6]}`,
-    padding: `${cg.space[4]} ${cg.space[6]}`,
+    marginTop: cg.space[10],
+    paddingTop: cg.space[4],
     borderTop: `1px solid ${cg.borderSubtle}`,
-    backgroundColor: cg.surface,
-    color: cg.textSecondary,
+    color: cg.textMuted,
     fontSize: tokens.fontSizeBase200,
     lineHeight: tokens.lineHeightBase200,
   },
@@ -83,9 +68,33 @@ const useFooter = makeStyles({
   },
 });
 
-/** Footer with the synthetic-data and responsible-use notices. */
+/**
+ * The one honesty marker of the shell: a small "Demo data" pill that opens the full sentence. It replaces the banner
+ * that used to sit above the header.
+ */
+export function DemoDataPill() {
+  const styles = useStyles();
+  // On the narrowest phones the label shortens so that the top bar still fits its row.
+  const narrow = useMediaQuery('(max-width: 359px)');
+  const sentence = `${SYNTHETIC_DATA_NOTICE}${publicEnv.appEnv === 'production' ? '' : ` Environment: ${publicEnv.appEnv}.`}`;
+  return (
+    <Popover positioning="below-end" withArrow>
+      <PopoverTrigger disableButtonEnhancement>
+        <button type="button" className={styles.pill} aria-label="Demo data: what this means">
+          <ProvenanceBadge kind="synthetic" {...(narrow ? { label: 'Demo' } : {})} />
+        </button>
+      </PopoverTrigger>
+      <PopoverSurface className={styles.surface} aria-label="About demo data">
+        <p className={styles.popTitle}>Demo data</p>
+        <p className={styles.popBody}>{sentence}</p>
+      </PopoverSurface>
+    </Popover>
+  );
+}
+
+/** The responsible-use and estimate sentences, quiet, at the end of every page, with the keyboard shortcuts button. */
 export function Footer() {
-  const styles = useFooter();
+  const styles = useStyles();
   const { setShortcutsOpen } = useShellUi();
   return (
     <footer className={styles.footer}>
@@ -94,9 +103,9 @@ export function Footer() {
         <span>{MODEL_ESTIMATE_NOTICE}</span>
       </p>
       <Button
-        appearance="subtle"
-        size="small"
-        icon={<KeyboardRegular />}
+        variant="ghost"
+        size="sm"
+        icon={<KeyboardIcon />}
         onClick={() => setShortcutsOpen(true)}
       >
         Keyboard shortcuts

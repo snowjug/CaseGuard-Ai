@@ -14,7 +14,7 @@ test.describe('[FR-UX-06] Presentation Mode: the story, with the development con
     await openPage(page, '/?present=1');
     const presenter = strip(page);
     await expect(presenter).toBeVisible();
-    await expect(presenter.getByText('Demo guide · 13 of 13 done')).toBeVisible();
+    await expect(presenter.getByText('Guided demo · 13 of 13 done')).toBeVisible();
     await expect(
       presenter.getByRole('progressbar', { name: 'Demo progress: 13 of 13 steps complete' }),
     ).toBeVisible();
@@ -22,10 +22,7 @@ test.describe('[FR-UX-06] Presentation Mode: the story, with the development con
     await expect(presenter).toContainText('present as Support Manager');
 
     const banner = page.getByRole('banner');
-    await expect(
-      banner.getByText('Synthetic demo data').first(),
-      'the honesty label stays',
-    ).toBeVisible();
+    await expect(banner.getByText('Demo data').first(), 'the honesty label stays').toBeVisible();
     await expect(
       banner.getByText('Development identity'),
       'the development badge is hidden',
@@ -36,17 +33,17 @@ test.describe('[FR-UX-06] Presentation Mode: the story, with the development con
     await page.keyboard.press('Escape');
   });
 
-  test('the Present button toggles it, and Exit presentation brings the development controls back', async ({
+  test('the account menu toggles it, and Exit presentation brings the development controls back', async ({
     page,
   }) => {
     await openPage(page, '/');
     await expect(strip(page)).toHaveCount(0);
-    await page.getByRole('button', { name: 'Present', exact: true }).click();
+    await accountButton(page, PERSONAS.engineer).click();
+    await page.getByRole('menuitemcheckbox', { name: 'Presentation mode' }).click();
     await expect(strip(page)).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Present', exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    await accountButton(page, PERSONAS.engineer).click();
+    await expect(page.getByRole('menuitemcheckbox', { name: 'Presentation mode' })).toBeChecked();
+    await page.keyboard.press('Escape');
     await strip(page).getByRole('button', { name: 'Exit presentation' }).click();
     await expect(strip(page)).toHaveCount(0);
     await expect(page.getByRole('banner').getByText('Development identity').first()).toBeVisible();
@@ -130,7 +127,7 @@ test.describe('[FR-UX-06] Presentation Mode: the administrator can reset, behind
     const dialog = confirmDialog(page);
     await expect(dialog.getByRole('heading', { name: 'Reset the demo data?' })).toBeVisible();
     await expect(dialog).toContainText(
-      'erases the cases, analysis results and skills of the synthetic demo tenant',
+      'erases the cases, analysis results and skills of the demo tenant',
     );
     await expect(dialog).toContainText('Users, settings and the audit trail are kept');
     await dialog.getByRole('button', { name: 'Cancel' }).click();

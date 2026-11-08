@@ -1,8 +1,8 @@
 'use client';
 
-import { EmptyState, ProvenanceBadge, StatusBadge, UiLink, cg } from '@caseguard/ui';
-import { Button, makeStyles, tokens } from '@fluentui/react-components';
-import { CheckmarkCircleRegular } from '@fluentui/react-icons';
+import { Button, EmptyState, ProvenanceBadge, StatusBadge, UiLink, cg } from '@caseguard/ui';
+import { makeStyles, tokens } from '@fluentui/react-components';
+import { ChevronDownIcon, CircleCheckIcon } from 'lucide-react';
 import { useId, useMemo, useState } from 'react';
 import { evidenceLinkHref } from '../../../lib/deep-links';
 import { ClampedText } from '../../quality/ClampedText';
@@ -34,11 +34,11 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     gap: cg.space[3],
     minWidth: 0,
-    padding: cg.space[4],
-    borderRadius: cg.radius.md,
-    border: `1px solid ${cg.borderSubtle}`,
-    borderLeft: `4px solid ${cg.tone.fork.solid}`,
+    padding: cg.space[6],
+    borderRadius: cg.radius.lg,
+    boxShadow: `inset 3px 0 0 ${cg.tone.fork.solid}`,
     backgroundColor: cg.surfaceSunken,
+    '@media (max-width: 639px)': { padding: cg.space[4] },
   },
   head: { display: 'flex', flexDirection: 'column', gap: cg.space[1] },
   badges: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cg.space[2] },
@@ -72,7 +72,6 @@ const useStyles = makeStyles({
     padding: cg.space[3],
     borderRadius: cg.radius.md,
     backgroundColor: cg.surface,
-    border: `1px solid ${cg.borderSubtle}`,
   },
   blockTitle: {
     margin: 0,
@@ -209,9 +208,9 @@ function DecisionCard({
         <UiLink
           className={styles.link}
           href={evidenceLinkHref(caseId, { type: 'fork', id: point.forkId })}
-          aria-label={`Open in the Counterfactual Lab: decision point ${point.number}`}
+          aria-label={`Open in What if: decision point ${point.number}`}
         >
-          Open in the Counterfactual Lab
+          Open in What if
         </UiLink>
       </article>
     </li>
@@ -251,13 +250,14 @@ export function DecisionsSection({ caseId }: { caseId: string }) {
       description="The moments where a better-supported step was available, judged only from what was known then."
       badges={<ProvenanceBadge kind="estimated" />}
       method={notes}
+      collapsible
     >
       {forks.source.kind !== 'ready' ? (
         <PartState handle={forks} what="the decision points" />
       ) : points.length === 0 ? (
         <EmptyState
           compact
-          icon={<CheckmarkCircleRegular />}
+          icon={<CircleCheckIcon />}
           title="No decision point stood out"
           description="The analysis found no moment where a clearly better-supported step was available. That is a good sign for this case, not an error."
         />
@@ -277,9 +277,12 @@ export function DecisionsSection({ caseId }: { caseId: string }) {
           {points.length > DECISION_POINTS_SHOWN ? (
             <div className={styles.more}>
               <Button
-                appearance="outline"
+                variant="ghost"
+                size="sm"
                 aria-expanded={expanded}
                 aria-controls={listId}
+                icon={<ChevronDownIcon />}
+                iconPosition="end"
                 onClick={() => setExpanded((value) => !value)}
               >
                 {expanded

@@ -1,31 +1,54 @@
 'use client';
 
-import { Notice, PageHeader, ProvenanceBadge, formatTimeUtc } from '@caseguard/ui';
-import { Button, Field, Select, mergeClasses } from '@fluentui/react-components';
-import { ArrowSyncRegular } from '@fluentui/react-icons';
+import type { EfficiencyOverview } from '@caseguard/schemas';
+import {
+  AccordionItem,
+  BlurFade,
+  Button,
+  Field,
+  PageHeader,
+  Select,
+  formatNumber,
+  formatPercent,
+} from '@caseguard/ui';
 import { keepPreviousData } from '@tanstack/react-query';
+import {
+  ChartNoAxesColumnIcon,
+  GaugeIcon,
+  InfoIcon,
+  ListIcon,
+  PiggyBankIcon,
+  RefreshCwIcon,
+  ScaleIcon,
+  ShieldCheckIcon,
+} from 'lucide-react';
 import { PermissionGate } from '../../components/common/PermissionGate';
 import { QueryBoundary } from '../../components/common/QueryBoundary';
 import { useApiQuery } from '../../lib/api/hooks';
 import { useAuth } from '../../lib/auth/context';
+import { useSession } from '../../lib/auth/session';
+import { shortId } from '../../lib/format';
+import { DetailSections, StateBadge, ViewSkeleton } from '../../lib/advanced-view-parts';
 import { codecs, useUrlState } from '../../lib/url-state';
-import { useInsightStyles } from '../quality/styles';
-import { AgentsPanel } from './AgentsPanel';
-import { BreakersPanel } from './BreakersPanel';
-import { BudgetsPanel } from './BudgetsPanel';
-import { CaseProcessPanel } from './CaseProcessPanel';
-import { ExecutionsPanel } from './ExecutionsPanel';
-import { SavingsPanel } from './SavingsPanel';
-import { EfficiencySkeleton } from './Skeleton';
-import { TotalsPanel } from './TotalsPanel';
+import { AgentsSection } from './AgentsSection';
+import { BudgetsSection } from './BudgetsSection';
+import { AGENT_CODEC, ExecutionsSection } from './ExecutionsSection';
+import { budgetState, tokensText } from './model';
+import { PathComparisonSection } from './PathComparisonSection';
+import { SafetyLimitsSection } from './SafetyLimitsSection';
+import { SavingsSection } from './SavingsSection';
+import { useUsageStyles } from './styles';
+import { UsageSummary } from './UsageSummary';
 
 const CASE_CODEC = codecs.optionalString();
+
+const SKELETON = <ViewSkeleton label="Loading usage and cost" sections={6} />;
 
 const PAGE_HELP = (
   <>
     <p>
-      The Efficiency Monitor shows how much model work the analysis used (tokens, time and calls),
-      what was saved by sending less or reusing answers, and which limits apply.
+      Usage and cost shows how much model work the analysis used (tokens, time and calls), what was
+      saved by sending less or reusing answers, and which limits apply.
     </p>
     <p>
       Every figure is an estimate. With the deterministic offline provider the token counts and
@@ -40,119 +63,229 @@ const PAGE_HELP = (
   </>
 );
 
-function EfficiencyContent() {
-  const styles = useInsightStyles();
+/** Which case the figures are about. It sits above the summary so it is there while the figures load or fail. */
+function ScopeBar({
+  caseId,
+  onChange,
+}: {
+  caseId: string | null;
+  onChange: (caseId: string | null) => void;
+}) {
+  const styles = useUsageStyles();
   const auth = useAuth();
-  const [caseId, setCaseId] = useUrlState('case', CASE_CODEC);
   const cases = useApiQuery(
     'cases.list',
     { query: { limit: 100 } },
     { enabled: auth.status === 'ready', staleTime: 30_000 },
   );
-  const query = useApiQuery(
-    'efficiency.overview',
-    { query: caseId ? { caseId } : {} },
-    { enabled: auth.status === 'ready', placeholderData: keepPreviousData },
-  );
   const items = cases.data?.items ?? [];
-  const reference = items.find((item) => item.id === caseId)?.reference ?? null;
+  return (
+    <div className={styles.toolbar}>
+      <Field label="Scope" className={styles.scope}>
+        <Select
+          wrapperClassName={styles.scopeSelect}
+          value={caseId ?? ''}
+          onChange={(event) => onChange(event.target.value === '' ? null : event.target.value)}
+        >
+          <option value="">All cases</option>
+          {caseId && !items.some((item) => item.id === caseId) ? (
+            <option value={caseId}>{caseId}</option>
+          ) : null}
+          {items.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.reference} · {item.title}
+            </option>
+          ))}
+        </Select>
+      </Field>
+    </div>
+  );
+}
+
+function EfficiencyContent({
+  overview,
+  caseId,
+  isRefreshing,
+}: {
+  overview: EfficiencyOverview;
+  caseId: string | null;
+  isRefreshing: boolean;
+}) {
+  const styles = useUsageStyles();
+  const auth = useAuth();
+  const [agent] = useUrlState('agent', AGENT_CODEC);
+  const cases = useApiQuery(
+    'cases.list',
+    { query: { limit: 100 } },
+    { enabled: auth.status === 'ready', staleTime: 30_000 },
+  );
+  const reference = cases.data?.items.find((item) => item.id === caseId)?.reference ?? null;
+  const hasUsage = overview.totals.executions > 0;
+  const budget = budgetState(overview.budgets);
+  const tripped = overview.circuitBreakers.filter((breaker) => breaker.state !== 'closed').length;
+  const { savings, caseProcess, byAgent, byModel, totals } = overview;
 
   return (
-    <div className={styles.page}>
-      <div className={styles.toolbar}>
-        <Field label="Scope" className={styles.field}>
-          <Select
-            className={styles.select}
-            value={caseId ?? ''}
-            onChange={(_event, next) => setCaseId(next.value === '' ? null : next.value)}
-          >
-            <option value="">All cases</option>
-            {caseId && !items.some((item) => item.id === caseId) ? (
-              <option value={caseId}>{caseId}</option>
-            ) : null}
-            {items.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.reference} · {item.title}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Button
-          appearance="outline"
-          icon={<ArrowSyncRegular />}
-          disabled={auth.status !== 'ready' || query.isFetching}
-          onClick={() => void query.refetch()}
-        >
-          {query.isFetching && !query.isPending ? 'Refreshing…' : 'Refresh'}
-        </Button>
-        {query.data ? (
-          <span className={styles.meta}>Updated {formatTimeUtc(query.data.generatedAt)}</span>
-        ) : null}
-      </div>
-      <QueryBoundary
-        query={query}
-        subject="The Efficiency Monitor"
-        skeleton={<EfficiencySkeleton />}
-      >
-        {(data, meta) => {
-          const hasUsage = data.totals.executions > 0;
-          return (
-            <div
-              className={mergeClasses(styles.page, meta.isRefreshing && styles.busy)}
-              aria-busy={meta.isRefreshing}
+    <div className={styles.page} aria-busy={isRefreshing}>
+      <BlurFade index={0}>
+        <UsageSummary
+          overview={overview}
+          scope={caseId ? (reference ?? shortId(caseId, 14)) : null}
+          busy={isRefreshing}
+        />
+      </BlurFade>
+      <BlurFade index={1}>
+        <DetailSections>
+          {hasUsage ? (
+            <AccordionItem
+              headingLevel={2}
+              icon={<PiggyBankIcon />}
+              title="Estimated savings"
+              subtitle={`${tokensText(savings.totalTokens)} tokens saved, by estimate`}
+              defaultOpen
             >
-              {data.notes.length > 0 ? (
-                <Notice variant="model-estimate" title="How to read these figures">
-                  <ul className={styles.bullets}>
-                    {data.notes.map((note) => (
-                      <li key={note}>{note}</li>
-                    ))}
-                  </ul>
-                </Notice>
-              ) : null}
-              <TotalsPanel totals={data.totals} simulated={data.labels.simulated} />
-              {hasUsage ? (
-                <div className={styles.band}>
-                  <SavingsPanel savings={data.savings} />
-                  <CaseProcessPanel caseProcess={data.caseProcess} caseReference={reference} />
-                </div>
-              ) : null}
-              <div className={styles.band}>
-                <BudgetsPanel budgets={data.budgets} />
-                <BreakersPanel breakers={data.circuitBreakers} simulated={data.labels.simulated} />
-              </div>
-              {hasUsage ? <AgentsPanel byAgent={data.byAgent} byModel={data.byModel} /> : null}
-              {hasUsage ? <ExecutionsPanel caseId={caseId} /> : null}
-            </div>
-          );
-        }}
-      </QueryBoundary>
+              <SavingsSection savings={savings} />
+            </AccordionItem>
+          ) : null}
+          {hasUsage ? (
+            <AccordionItem
+              headingLevel={2}
+              icon={<ScaleIcon />}
+              title="Real process versus a simulated better path"
+              subtitle={
+                caseProcess.counterfactualTokens === null
+                  ? 'No comparison is available yet'
+                  : caseProcess.estimatedSavingsPct === null
+                    ? 'Estimated saving not available'
+                    : `Estimated saving ${formatPercent(caseProcess.estimatedSavingsPct, 1)}`
+              }
+            >
+              <PathComparisonSection caseProcess={caseProcess} caseReference={reference} />
+            </AccordionItem>
+          ) : null}
+          <AccordionItem
+            headingLevel={2}
+            icon={<GaugeIcon />}
+            title="Budgets and limits"
+            subtitle={budget.label}
+            defaultOpen={!hasUsage}
+          >
+            <BudgetsSection budgets={overview.budgets} />
+          </AccordionItem>
+          <AccordionItem
+            headingLevel={2}
+            icon={<ShieldCheckIcon />}
+            title="Safety limits"
+            subtitle={
+              overview.circuitBreakers.length === 0
+                ? 'None in use'
+                : `${formatNumber(overview.circuitBreakers.length)} in use`
+            }
+            badge={
+              tripped > 0 ? (
+                <StateBadge
+                  status="uncertain"
+                  label={`${formatNumber(tripped)} not normal`}
+                  title="A safety limit that has tripped or is checking again."
+                />
+              ) : undefined
+            }
+          >
+            <SafetyLimitsSection
+              breakers={overview.circuitBreakers}
+              simulated={overview.labels.simulated}
+            />
+          </AccordionItem>
+          {hasUsage ? (
+            <AccordionItem
+              headingLevel={2}
+              icon={<ChartNoAxesColumnIcon />}
+              title="Usage by analysis step and model"
+              subtitle={`${formatNumber(byAgent.length)} ${byAgent.length === 1 ? 'step' : 'steps'} · ${formatNumber(byModel.length)} ${byModel.length === 1 ? 'model' : 'models'}`}
+            >
+              <AgentsSection byAgent={byAgent} byModel={byModel} />
+            </AccordionItem>
+          ) : null}
+          {hasUsage ? (
+            <AccordionItem
+              headingLevel={2}
+              icon={<ListIcon />}
+              title="Model calls"
+              subtitle={`${formatNumber(totals.executions)} recorded`}
+              defaultOpen={agent !== 'all'}
+            >
+              <ExecutionsSection caseId={caseId} />
+            </AccordionItem>
+          ) : null}
+          {overview.notes.length > 0 ? (
+            <AccordionItem
+              headingLevel={2}
+              icon={<InfoIcon />}
+              title="How to read these figures"
+              subtitle="What is estimated, what is simulated"
+            >
+              <ul className={styles.bullets}>
+                {overview.notes.map((note) => (
+                  <li key={note}>{note}</li>
+                ))}
+              </ul>
+            </AccordionItem>
+          ) : null}
+        </DetailSections>
+      </BlurFade>
     </div>
   );
 }
 
 /**
- * Efficiency Monitor (`/efficiency`): token and compute telemetry, estimated savings, budgets (unset limits say so),
- * circuit breakers, the real-versus-simulated token comparison and the model executions table. Everything is labelled
- * Estimated, and Simulated when the deterministic provider produced it. `?case=` scopes the page to one case and
- * `?agent=` filters the executions.
+ * Usage and cost (`/efficiency`): the estimated spend and where today's use stands against the budget first, then the
+ * savings, the real-versus-simulated comparison, budgets (unset limits say so), safety limits, usage by analysis step and
+ * the model calls, in collapsed sections. Everything is labelled Estimated, and Simulated when the deterministic provider
+ * produced it. `?case=` scopes the page to one case and `?agent=` filters the model calls.
  */
 export function EfficiencyPage() {
+  const auth = useAuth();
+  const { can } = useSession();
+  const allowed = auth.status === 'ready' && can('telemetry:read');
+  const [caseId, setCaseId] = useUrlState('case', CASE_CODEC);
+  const query = useApiQuery(
+    'efficiency.overview',
+    { query: caseId ? { caseId } : {} },
+    { enabled: allowed, placeholderData: keepPreviousData },
+  );
+  const refreshing = query.isFetching && !query.isPending;
   return (
     <>
       <PageHeader
-        title="Efficiency Monitor"
-        description="Token and compute use of the analysis, what was saved, and the limits that apply."
+        title="Usage and cost"
+        description="What the analysis spends, and where it could spend less."
         help={PAGE_HELP}
-        meta={<ProvenanceBadge kind="estimated" />}
+        actions={
+          allowed ? (
+            <Button
+              variant="secondary"
+              icon={<RefreshCwIcon />}
+              loading={refreshing}
+              disabledFocusable={query.isPending}
+              onClick={() => void query.refetch()}
+            >
+              {refreshing ? 'Refreshing…' : 'Refresh'}
+            </Button>
+          ) : undefined
+        }
       />
       <PermissionGate
         permission="telemetry:read"
-        subject="the Efficiency Monitor"
+        subject="Usage and cost"
         grantedTo="Engineers, reviewers, managers and administrators"
-        skeleton={<EfficiencySkeleton />}
+        skeleton={SKELETON}
       >
-        <EfficiencyContent />
+        <ScopeBar caseId={caseId} onChange={setCaseId} />
+        <QueryBoundary query={query} subject="Usage and cost" skeleton={SKELETON}>
+          {(data, meta) => (
+            <EfficiencyContent overview={data} caseId={caseId} isRefreshing={meta.isRefreshing} />
+          )}
+        </QueryBoundary>
       </PermissionGate>
     </>
   );

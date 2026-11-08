@@ -17,7 +17,7 @@ export interface NavBadge {
 const plural = (count: number, one: string, many = `${one}s`): string =>
   `${count} ${count === 1 ? one : many}`;
 
-/** Cases (how many) and Quality Review (open warnings), from the case list the header switcher already loads. */
+/** Cases (how many) and Quality (open warnings), from the case list. */
 export function caseBadges(
   cases: readonly CaseSummary[],
   hasMore: boolean,
@@ -42,7 +42,7 @@ export function caseBadges(
   return badges;
 }
 
-/** Demo Guide: progress through the story, as the API derived it. */
+/** Guided demo: progress through the story, as the API derived it. */
 export function demoBadge(state: Pick<DemoState, 'steps'>): NavBadge | null {
   const total = state.steps.length;
   if (total === 0) return null;
@@ -60,7 +60,7 @@ const HEALTH_TEXT: Partial<Record<HealthStatus, { text: string; tone: NavBadgeTo
   unknown: { text: 'Unknown', tone: 'warning' },
 };
 
-/** System Health: quiet when everything is healthy, a labelled marker when anything is not. */
+/** System status: quiet when everything is healthy, a labelled marker when anything is not. */
 export function systemBadge(status: HealthStatus): NavBadge | null {
   const known = HEALTH_TEXT[status];
   if (!known) return null;
@@ -69,21 +69,24 @@ export function systemBadge(status: HealthStatus): NavBadge | null {
 
 export interface NavBadgeState {
   badges: Readonly<Record<string, NavBadge>>;
-  /** True once the case list loaded and is empty: case-scoped items then say there are no cases at all. */
-  noCases: boolean;
+}
+
+export interface NavBadgeOptions {
+  /** Also read the guided demo's progress (only the Advanced page shows it, so the shell does not ask for it). */
+  demo?: boolean;
 }
 
 /** How often the figures that can change by themselves are re-read, while the tab is visible. */
 const POLL_MS = 60_000;
 
 /**
- * Figures for the navigation, all from the API and all optional: while something loads, fails, or the role may not read
- * it, that item simply has no badge. A route is only requested when the role holds its permission (`case:read` for the
- * case list and the demo state, `telemetry:read` for system health), and none of them is a heavy or metered route. The
- * demo state and system health are re-read once a minute while the tab is visible and not at all while it is hidden.
- * The case list is the header switcher's own request (shared cache).
+ * Figures for the navigation and the Advanced page, all from the API and all optional: while something loads, fails, or
+ * the role may not read it, that item simply has no badge. A route is only requested when the role holds its permission
+ * (`case:read` for the case list and the demo state, `telemetry:read` for system health), and none of them is a heavy or
+ * metered route. System health (and the demo state, when asked for) are re-read once a minute while the tab is visible
+ * and not at all while it is hidden.
  */
-export function useNavBadges(): NavBadgeState {
+export function useNavBadges({ demo: includeDemo = false }: NavBadgeOptions = {}): NavBadgeState {
   const auth = useAuth();
   const { can } = useSession();
   const ready = auth.status === 'ready';
@@ -94,7 +97,7 @@ export function useNavBadges(): NavBadgeState {
     { enabled: canReadCases, staleTime: 30_000 },
   );
   const demo = useApiQuery('demo.state', undefined, {
-    enabled: canReadCases,
+    enabled: includeDemo && canReadCases,
     staleTime: POLL_MS,
     refetchInterval: POLL_MS,
     refetchIntervalInBackground: false,
@@ -112,5 +115,5 @@ export function useNavBadges(): NavBadgeState {
   if (demoItem) badges.demo = demoItem;
   const systemItem = health.data ? systemBadge(health.data.status) : null;
   if (systemItem) badges.system = systemItem;
-  return { badges, noCases: cases.data !== undefined && cases.data.items.length === 0 };
+  return { badges };
 }

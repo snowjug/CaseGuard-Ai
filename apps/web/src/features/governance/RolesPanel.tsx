@@ -2,18 +2,21 @@
 
 import { ROLES, ROLE_LABELS, type Role, type User } from '@caseguard/schemas';
 import {
+  Button,
   EmptyState,
+  Field,
   LoadingSkeleton,
   Notice,
   Panel,
   ProvenanceBadge,
-  StatusBadge,
+  RelativeTime,
+  Textarea,
+  Tooltip,
   cg,
-  formatDateTimeUtc,
-  type DataTableColumn,
+  useDialogClasses,
+  useRestoreFocusTarget,
 } from '@caseguard/ui';
 import {
-  Button,
   Checkbox,
   Dialog,
   DialogActions,
@@ -21,19 +24,15 @@ import {
   DialogContent,
   DialogSurface,
   DialogTitle,
-  Field,
-  Spinner,
-  Textarea,
-  Tooltip,
   makeStyles,
+  mergeClasses,
   tokens,
-  useRestoreFocusTarget,
 } from '@fluentui/react-components';
-import { PeopleRegular, PersonEditRegular } from '@fluentui/react-icons';
 import { useQueryClient } from '@tanstack/react-query';
+import { UserCogIcon, UsersIcon } from 'lucide-react';
 import { useState } from 'react';
 import { QueryErrorState } from '../../components/common/QueryErrorState';
-import { ScrollTable } from '../../components/common/ScrollTable';
+import { ResponsiveTable, StateBadge, type ResponsiveColumn } from '../../lib/advanced-view-parts';
 import { useApiMutation, useApiQuery } from '../../lib/api/hooks';
 import { invalidateRoutes } from '../../lib/api/query-keys';
 import { useAuth } from '../../lib/auth/context';
@@ -43,8 +42,14 @@ import { explainRoleRefusal } from './refusals';
 
 const useStyles = makeStyles({
   stack: { display: 'flex', flexDirection: 'column', gap: cg.space[4], minWidth: 0 },
-  cell: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 },
+  cell: { display: 'flex', flexDirection: 'column', gap: cg.space[1], minWidth: 0 },
   muted: { fontSize: tokens.fontSizeBase200, color: cg.textMuted, overflowWrap: 'anywhere' },
+  text: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase300,
+    color: cg.textSecondary,
+  },
   roles: {
     display: 'flex',
     flexDirection: 'column',
@@ -53,7 +58,20 @@ const useStyles = makeStyles({
     padding: 0,
     border: 'none',
   },
-  alert: { margin: 0 },
+  legend: {
+    padding: 0,
+    marginBottom: cg.space[2],
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightSemibold,
+    color: cg.textSecondary,
+  },
+  alert: { margin: 0, color: cg.tone.unsupported.fg, fontSize: tokens.fontSizeBase300 },
+  caption: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+    color: cg.textMuted,
+  },
 });
 
 const MIN_REASON = 5;
@@ -66,6 +84,7 @@ interface EditorProps {
 /** Edit one user's roles. The change needs the user's current version (optimistic lock) and a reason, and is audited. */
 function RoleEditor({ user, onClose }: EditorProps) {
   const styles = useStyles();
+  const dialog = useDialogClasses('md');
   const auth = useAuth();
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -108,11 +127,11 @@ function RoleEditor({ user, onClose }: EditorProps) {
   };
 
   return (
-    <DialogBody>
-      <DialogTitle>Change roles for {user.displayName}</DialogTitle>
-      <DialogContent className={styles.stack}>
+    <DialogBody className={dialog.body}>
+      <DialogTitle className={dialog.title}>Change roles for {user.displayName}</DialogTitle>
+      <DialogContent className={mergeClasses(dialog.content, styles.stack)}>
         <fieldset className={styles.roles}>
-          <legend>Roles (at least one)</legend>
+          <legend className={styles.legend}>Roles (at least one)</legend>
           {ROLES.map((role) => (
             <Checkbox
               key={role}
@@ -136,23 +155,20 @@ function RoleEditor({ user, onClose }: EditorProps) {
           label="Reason"
           required
           hint="Required. The audit event records who changed which roles and when; this text is not copied into it."
-          validationState={touched && reasonShort ? 'error' : 'none'}
-          validationMessage={
-            touched && reasonShort ? `Enter at least ${MIN_REASON} characters.` : undefined
-          }
+          error={touched && reasonShort ? `Enter at least ${MIN_REASON} characters.` : undefined}
         >
           <Textarea
             value={reason}
             rows={3}
             maxLength={500}
             disabled={assign.isPending}
-            onChange={(_event, data) => setReason(data.value)}
+            onChange={(event) => setReason(event.target.value)}
           />
         </Field>
-        <Notice variant="info" compact title={null}>
+        <p className={styles.caption}>
           A tenant must keep at least one active administrator; a change that would remove the last
           one is refused.
-        </Notice>
+        </p>
         {failure ? (
           <div role="alert">
             <Notice variant="warning" title="Not changed">
@@ -161,13 +177,13 @@ function RoleEditor({ user, onClose }: EditorProps) {
           </div>
         ) : null}
       </DialogContent>
-      <DialogActions>
-        <Button appearance="secondary" onClick={onClose} disabled={assign.isPending}>
+      <DialogActions className={dialog.actions}>
+        <Button variant="secondary" onClick={onClose} disabled={assign.isPending}>
           Cancel
         </Button>
         <Button
-          appearance="primary"
-          icon={assign.isPending ? <Spinner size="tiny" /> : undefined}
+          variant="primary"
+          loading={assign.isPending}
           disabledFocusable={unchanged || none || assign.isPending}
           onClick={() => void save()}
         >
@@ -181,6 +197,7 @@ function RoleEditor({ user, onClose }: EditorProps) {
 /** Users and role assignments (`governance.users`, `governance.assignRoles`). In Entra mode roles come from Entra and cannot be changed here. */
 export function RolesPanel() {
   const styles = useStyles();
+  const dialog = useDialogClasses('md');
   const auth = useAuth();
   const { session, can } = useSession();
   const [editing, setEditing] = useState<User | null>(null);
@@ -201,7 +218,7 @@ export function RolesPanel() {
     );
   }
 
-  const columns: DataTableColumn<User>[] = [
+  const columns: ResponsiveColumn<User>[] = [
     {
       id: 'name',
       header: 'User',
@@ -222,25 +239,28 @@ export function RolesPanel() {
     {
       id: 'status',
       header: 'Status',
+      width: '112px',
       cell: (row) =>
         row.status === 'active' ? (
-          <StatusBadge status="productive" label="Active" />
+          <StateBadge status="productive" label="Active" title="Can sign in." />
         ) : (
-          <StatusBadge status="missing" label="Disabled" />
+          <StateBadge status="missing" label="Disabled" title="Cannot sign in." />
         ),
     },
     {
       id: 'synthetic',
       header: 'Data',
+      width: '128px',
       cell: (row) =>
         row.synthetic ? <ProvenanceBadge kind="synthetic" /> : <span>Real account</span>,
     },
     {
       id: 'changed',
       header: 'Last changed',
+      width: '144px',
       cell: (row) => (
         <span className={styles.cell}>
-          {formatDateTimeUtc(row.updatedAt)}
+          <RelativeTime value={row.updatedAt} />
           <span className={styles.muted}>Version {row.version}</span>
         </span>
       ),
@@ -248,18 +268,16 @@ export function RolesPanel() {
     {
       id: 'actions',
       header: <span className="cg-sr-only">Actions</span>,
+      card: 'footer',
+      width: '152px',
       cell: (row) => {
         if (entra) {
           return (
-            <Tooltip
-              content="Roles are managed in Microsoft Entra ID"
-              relationship="description"
-              withArrow
-            >
+            <Tooltip content="Roles are managed in Microsoft Entra ID">
               <Button
-                appearance="outline"
-                size="small"
-                icon={<PersonEditRegular />}
+                variant="secondary"
+                size="sm"
+                icon={<UserCogIcon />}
                 disabledFocusable
                 aria-label={`Change roles for ${row.displayName}`}
               >
@@ -270,9 +288,9 @@ export function RolesPanel() {
         }
         const button = (
           <Button
-            appearance="outline"
-            size="small"
-            icon={<PersonEditRegular />}
+            variant="secondary"
+            size="sm"
+            icon={<UserCogIcon />}
             aria-label={`Change roles for ${row.displayName}`}
             onClick={manage ? () => setEditing(row) : undefined}
             {...(manage ? restoreFocus : {})}
@@ -293,29 +311,29 @@ export function RolesPanel() {
           them (the API answers 409). Ask an Entra administrator to change app-role or group
           membership. The list below is read-only.
         </Notice>
-      ) : (
-        <Notice variant="info" compact title={null}>
-          Development identity: roles are stored in CaseGuard and every change is audited with its
-          reason. Users here are synthetic.
-        </Notice>
-      )}
+      ) : null}
       <Panel
         title="Users and roles"
         description="Who can do what in this tenant. Roles grant permissions; there is no ranking or scoring of people."
         help="A role is a bundle of permissions: engineers investigate, reviewers review and override with a reason, managers read analytics, curators run the skill lifecycle and administrators govern. A tenant must keep at least one active administrator. Every change is written to the audit trail."
       >
+        {entra ? null : (
+          <p className={styles.caption}>
+            Development identity: roles are stored in CaseGuard and every change is audited with its
+            reason. Users here are demo data.
+          </p>
+        )}
         {users.data.items.length === 0 ? (
           <EmptyState
             headingLevel={3}
-            icon={<PeopleRegular />}
+            icon={<UsersIcon />}
             title="No users"
             description="The API returned no users for this tenant."
           />
         ) : (
-          <ScrollTable
-            label="Users and roles, scrollable"
-            minWidth={880}
+          <ResponsiveTable
             caption="Users and their roles"
+            minWidth={880}
             columns={columns}
             rows={users.data.items}
             getRowId={(row) => row.id}
@@ -325,11 +343,12 @@ export function RolesPanel() {
       </Panel>
       <Dialog
         open={editing !== null}
+        modalType="modal"
         onOpenChange={(_event, data) => {
           if (!data.open) setEditing(null);
         }}
       >
-        <DialogSurface>
+        <DialogSurface className={dialog.surface} backdrop={{ className: dialog.backdrop }}>
           {editing ? (
             <RoleEditor key={editing.id} user={editing} onClose={() => setEditing(null)} />
           ) : null}

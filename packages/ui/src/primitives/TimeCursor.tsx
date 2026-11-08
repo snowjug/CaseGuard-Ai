@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Slider, makeStyles, tokens } from '@fluentui/react-components';
-import { ArrowNextRegular, ArrowPreviousRegular, HistoryRegular } from '@fluentui/react-icons';
+import { ArrowLeftIcon, ArrowRightIcon, HistoryIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { VisuallyHidden } from '../a11y/VisuallyHidden';
 import { formatDateTimeUtc } from '../format';
@@ -40,7 +40,7 @@ const useStyles = makeStyles({
   },
   withheld: { fontSize: tokens.fontSizeBase200, color: cg.textSecondary },
   controls: { display: 'flex', alignItems: 'center', gap: cg.space[2] },
-  sliderWrap: { position: 'relative', flex: 1, minWidth: 0, paddingBottom: '6px' },
+  sliderWrap: { position: 'relative', flex: 1, minWidth: 0, paddingBottom: cg.space[2] },
   slider: { width: '100%', minWidth: 0 },
   // Fluent draws a step notch (in the page colour) every `step`; with minute resolution that would paint over the rail.
   rail: { '::before': { display: 'none' } },
@@ -58,7 +58,7 @@ const useStyles = makeStyles({
     width: '2px',
     height: '8px',
     marginLeft: '-1px',
-    borderRadius: '1px',
+    borderRadius: cg.radius.pill,
     backgroundColor: cg.tone.fork.solid,
   },
   ends: {
@@ -203,7 +203,7 @@ export function TimeCursor({
           <Button
             size="small"
             appearance="subtle"
-            icon={<ArrowPreviousRegular />}
+            icon={<ArrowLeftIcon />}
             aria-label="Previous event"
             title="Previous event"
             disabled={disabled || previous === undefined}
@@ -246,7 +246,7 @@ export function TimeCursor({
           <Button
             size="small"
             appearance="subtle"
-            icon={<ArrowNextRegular />}
+            icon={<ArrowRightIcon />}
             aria-label="Next event"
             title="Next event"
             disabled={disabled || next === undefined}
@@ -256,7 +256,7 @@ export function TimeCursor({
         <Button
           size="small"
           appearance="outline"
-          icon={<HistoryRegular />}
+          icon={<HistoryIcon />}
           disabled={disabled || value === null}
           onClick={() => {
             if (timer.current) clearTimeout(timer.current);

@@ -1,25 +1,41 @@
 'use client';
 
+import { palettes, radius, space, type Palette } from '@caseguard/ui/server';
 import { useEffect, useRef } from 'react';
 
+const variables = (palette: Palette): string =>
+  [
+    `--bg:${palette.surfaces.canvas}`,
+    `--card:${palette.surfaces.surface}`,
+    `--text:${palette.text.primary}`,
+    `--muted:${palette.text.secondary}`,
+    `--border:${palette.borders.subtle}`,
+    `--control:${palette.borders.control}`,
+    `--focus:${palette.borders.focus}`,
+    `--brand:${palette.tones.brand.solid}`,
+    `--on-brand:${palette.tones.brand.onSolid}`,
+  ].join(';');
+
+// The page replaces the root layout, so the theme provider and the global stylesheet do not exist: the same palette is
+// written out as plain CSS, in both themes, following the system setting.
 const CSS = `
-:root{color-scheme:light dark;--bg:#f5f6fb;--card:#ffffff;--text:#12172b;--muted:#4a5270;--border:#c9cee3;--brand:#4b55c9;--on-brand:#ffffff}
-@media (prefers-color-scheme:dark){:root{--bg:#0b1020;--card:#111830;--text:#eef1fb;--muted:#b7bfdc;--border:#3a4366;--brand:#aeb6ff;--on-brand:#0b1020}}
-body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:24px;background:var(--bg);color:var(--text);font:14px/1.5 'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif}
-main{max-width:560px;width:100%;padding:32px;border:1px solid var(--border);border-radius:12px;background:var(--card)}
-h1{margin:0 0 8px;font-size:22px}
-p{margin:0 0 16px;color:var(--muted)}
-code{font-family:Consolas,monospace;font-size:12px}
-.actions{display:flex;gap:12px;flex-wrap:wrap}
-button,a{min-height:36px;padding:0 16px;border-radius:8px;font:inherit;font-weight:600;display:inline-flex;align-items:center;cursor:pointer;text-decoration:none}
+:root{color-scheme:light dark;${variables(palettes.light)}}
+@media (prefers-color-scheme:dark){:root{${variables(palettes.dark)}}}
+body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:${space[6]}px;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+main{max-width:560px;width:100%;box-sizing:border-box;padding:${space[8]}px;border:1px solid var(--border);border-radius:${radius.xl}px;background:var(--card)}
+h1{margin:0 0 ${space[2]}px;font-size:24px;line-height:1.25;letter-spacing:-0.02em}
+p{margin:0 0 ${space[4]}px;color:var(--muted)}
+code{font-family:ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;font-size:13px;color:var(--text)}
+.actions{display:flex;gap:${space[3]}px;flex-wrap:wrap}
+button,a{min-height:44px;box-sizing:border-box;padding:0 ${space[4]}px;border-radius:${radius.md}px;font:inherit;font-weight:600;display:inline-flex;align-items:center;cursor:pointer;text-decoration:none}
 button{border:1px solid var(--brand);background:var(--brand);color:var(--on-brand)}
-a{border:1px solid var(--border);color:var(--text)}
-:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+a{border:1px solid var(--control);color:var(--text)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 `;
 
 /**
  * Last-resort error page. It replaces the root layout, so none of the providers exist here: plain HTML and CSS only,
- * with no dependency on the theme, the API client or the design system.
+ * with no dependency on the theme, the API client or the design system components.
  */
 export default function GlobalError({
   error,
@@ -44,8 +60,8 @@ export default function GlobalError({
             CaseGuard AI hit an unexpected problem
           </h1>
           <p>
-            The application could not be displayed. Nothing was changed. Try again; if it keeps
-            happening, share this reference with your administrator
+            The app could not be displayed. Nothing was changed. Try again; if it keeps happening,
+            share this reference with your administrator
             {error.digest ? (
               <>
                 : <code>{error.digest}</code>
@@ -58,7 +74,7 @@ export default function GlobalError({
             <button type="button" onClick={reset}>
               Try again
             </button>
-            <a href="/">Reload the Command Center</a>
+            <a href="/">Go home</a>
           </div>
         </main>
       </body>

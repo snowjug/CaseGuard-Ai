@@ -5,56 +5,59 @@ import { PERSONAS, type PersonaKey } from './support/personas';
 import { mainRegion, openPage, settle } from './support/ui';
 
 /**
- * Key mobile layout behaviour (the `mobile` project: 390x844, touch): no horizontal page scroll on any page, a navigation
- * drawer that works, tables that scroll inside a labelled region instead of squeezing, and primary actions that can be
- * reached and are big enough to touch.
+ * Key mobile layout behaviour (the `mobile` project: 390x844, touch): no horizontal page scroll on any page (also at the
+ * 320 px of WCAG 1.4.10), a bottom bar with the five places, tables that scroll inside a labelled region instead of
+ * squeezing, and primary actions that can be reached and are big enough to touch.
  */
 interface PageSpec {
   readonly name: string;
   readonly path: (ids: DemoIds) => string;
-  readonly persona: PersonaKey;
+  readonly persona: PersonaKey | null;
 }
 
 const PAGES: readonly PageSpec[] = [
-  { name: 'Command Center', path: () => '/', persona: 'manager' },
+  { name: 'First visit', path: () => '/', persona: null },
+  { name: 'Home', path: () => '/', persona: 'manager' },
   { name: 'Cases', path: () => '/cases', persona: 'engineer' },
-  { name: 'Ingest a case', path: () => '/cases/new', persona: 'engineer' },
-  { name: 'Case overview', path: (ids) => `/cases/${ids.caseOneId}`, persona: 'engineer' },
-  { name: 'Guided review', path: (ids) => `/cases/${ids.caseOneId}/review`, persona: 'engineer' },
+  { name: 'Add a case', path: () => '/cases/new', persona: 'engineer' },
+  { name: 'Add a case, sample', path: () => '/cases/new?source=sample', persona: 'engineer' },
+  { name: 'Case details', path: (ids) => `/cases/${ids.caseOneId}`, persona: 'engineer' },
+  { name: 'Review', path: (ids) => `/cases/${ids.caseOneId}/review`, persona: 'engineer' },
   {
-    name: 'Guided review of the second case',
+    name: 'Review of the second case',
     path: (ids) => `/cases/${ids.caseTwoId}/review`,
     persona: 'engineer',
   },
-  { name: 'Case report', path: (ids) => `/cases/${ids.caseOneId}/report`, persona: 'engineer' },
-  { name: 'Case Timeline', path: (ids) => `/cases/${ids.caseOneId}/timeline`, persona: 'engineer' },
+  { name: 'Report', path: (ids) => `/cases/${ids.caseOneId}/report`, persona: 'engineer' },
+  { name: 'Timeline', path: (ids) => `/cases/${ids.caseOneId}/timeline`, persona: 'engineer' },
   {
-    name: 'Evidence Ledger',
+    name: 'Evidence',
     path: (ids) => `/cases/${ids.caseOneId}/evidence`,
     persona: 'engineer',
   },
   {
-    name: 'Hypothesis Arena',
+    name: 'Possible causes',
     path: (ids) => `/cases/${ids.caseOneId}/hypotheses`,
     persona: 'engineer',
   },
   {
-    name: 'Counterfactual Lab',
+    name: 'What if',
     path: (ids) => `/cases/${ids.caseOneId}/counterfactual`,
     persona: 'reviewer',
   },
   {
-    name: 'Case Quality Review',
+    name: 'Score',
     path: (ids) => `/cases/${ids.caseOneId}/quality`,
     persona: 'manager',
   },
-  { name: 'Quality Review (portfolio)', path: () => '/quality', persona: 'manager' },
-  { name: 'SkillDNA Library', path: () => '/skills', persona: 'engineer' },
+  { name: 'Quality', path: () => '/quality', persona: 'manager' },
+  { name: 'Skills', path: () => '/skills', persona: 'engineer' },
   { name: 'Skill detail', path: (ids) => `/skills/${ids.skillId}`, persona: 'curator' },
-  { name: 'Efficiency Monitor', path: () => '/efficiency', persona: 'manager' },
-  { name: 'Governance', path: () => '/governance', persona: 'admin' },
-  { name: 'System Health', path: () => '/system', persona: 'admin' },
-  { name: 'Demo Guide', path: () => '/demo', persona: 'admin' },
+  { name: 'Advanced', path: () => '/advanced', persona: 'admin' },
+  { name: 'Usage and cost', path: () => '/efficiency', persona: 'manager' },
+  { name: 'Settings and audit', path: () => '/governance', persona: 'admin' },
+  { name: 'System status', path: () => '/system', persona: 'admin' },
+  { name: 'Guided demo', path: () => '/demo', persona: 'admin' },
 ];
 
 /** How far the page is wider than the viewport, in CSS pixels (0 means no horizontal scroll). */
@@ -111,53 +114,55 @@ test.describe('[FR-UX-02] no page scrolls sideways at 390x844', () => {
   }
 });
 
-test.describe('[FR-UX-02] the navigation drawer', () => {
-  test('the menu button opens a drawer with every destination; choosing one navigates and closes it', async ({
+test.describe('[NFR-A11Y-01] reflow at 320 CSS px: no page scrolls sideways (WCAG 1.4.10)', () => {
+  for (const spec of PAGES) {
+    test.describe(spec.name, () => {
+      test.use({ persona: spec.persona });
+      test('fits the width of the narrowest phone, with touch-sized controls', async ({
+        page,
+        demo,
+      }) => {
+        await page.setViewportSize({ width: 320, height: 640 });
+        await openPage(page, spec.path(demo));
+        const result = await overflow(page);
+        expect(
+          result.page,
+          `the page is ${result.page}px wider than the screen; wide elements: ${result.offenders.join(', ')}`,
+        ).toBe(0);
+      });
+    });
+  }
+});
+
+test.describe('[FR-UX-02] the bottom bar', () => {
+  test('replaces the side navigation on a phone and holds the five places; choosing one navigates and lights it', async ({
     page,
   }) => {
     await openPage(page, '/cases');
     await expect(
-      page.getByRole('navigation', { name: 'Primary' }),
-      'the rail is replaced by a drawer on a phone',
+      page.getByRole('navigation', { name: 'Primary', exact: true }),
+      'the side navigation is replaced by a bottom bar on a phone',
     ).toBeHidden();
-    const open = page.getByRole('button', { name: 'Open navigation' });
-    await expect(open).toBeVisible();
-    await open.click();
-    const drawer = page.getByRole('dialog').filter({ has: page.getByRole('navigation') });
-    await expect(drawer).toBeVisible();
-    for (const label of [
-      'Command Center',
-      'Cases',
-      'Quality Review',
-      'SkillDNA Library',
-      'Efficiency Monitor',
-      'Governance',
-      'System Health',
-      'Demo Guide',
-    ]) {
-      await expect(
-        drawer.getByRole('link', { name: new RegExp(`^${label}`) }),
-        label,
-      ).toBeVisible();
+    const bar = page.getByRole('navigation', { name: 'Primary, mobile' });
+    await expect(bar).toBeVisible();
+    for (const label of ['Home', 'Cases', 'Quality', 'Skills', 'Advanced']) {
+      await expect(bar.getByRole('link', { name: new RegExp(`^${label}`) }), label).toBeVisible();
     }
-    await drawer.getByRole('link', { name: /^SkillDNA Library/ }).click();
+    await expect(bar.getByRole('link', { name: /^Cases/ })).toHaveAttribute('aria-current', 'page');
+    await bar.getByRole('link', { name: /^Skills/ }).tap();
     await expect(page).toHaveURL(/\/skills$/);
-    await expect(drawer).toBeHidden();
-    await expect(page.getByRole('heading', { level: 1, name: 'SkillDNA Library' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Skills' })).toBeVisible();
+    await expect(bar.getByRole('link', { name: /^Skills/ })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
   });
 
-  test('Escape closes the drawer and focus goes back to the menu button', async ({ page }) => {
+  test('stays on screen while the page scrolls', async ({ page }) => {
     await openPage(page, '/cases');
-    const open = page.getByRole('button', { name: 'Open navigation' });
-    await open.click();
-    await expect(
-      page.getByRole('dialog').filter({ has: page.getByRole('navigation') }),
-    ).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(
-      page.getByRole('dialog').filter({ has: page.getByRole('navigation') }),
-    ).toBeHidden();
-    await expect(open).toBeFocused();
+    const bar = page.getByRole('navigation', { name: 'Primary, mobile' });
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await expect(bar).toBeInViewport();
   });
 });
 
@@ -179,30 +184,54 @@ test.describe('[FR-UX-02] tables degrade: cards where there is room for nothing 
     expect((await overflow(page)).page).toBe(0);
   });
 
-  test('a table that stays a table scrolls inside a focusable, named region, and the page stays put', async ({
-    page,
-  }) => {
-    await openPage(page, '/system');
-    const region = page.getByRole('region', { name: 'Dependencies, scrollable' });
-    await expect(region).toHaveAttribute('tabindex', '0');
-    const table = region.getByRole('table', { name: 'Dependencies and their health' });
-    await expect(table).toBeVisible();
-    const box = await table.boundingBox();
-    expect(box!.width, 'the table keeps a readable minimum width').toBeGreaterThan(390);
-    expect(
-      await region.evaluate((element) => element.scrollWidth > element.clientWidth),
-      'and scrolls inside its region',
-    ).toBe(true);
-    expect((await overflow(page)).page).toBe(0);
+  test.describe('the comparison of two cases', () => {
+    test.use({ persona: 'manager' });
+    test('a table that stays a table scrolls inside a focusable, named region, and the page stays put', async ({
+      page,
+      demo,
+    }) => {
+      await openPage(page, `/cases/${demo.caseTwoId}/quality?tab=compare`);
+      const region = page.getByRole('region', {
+        name: 'Comparison of the two cases, scrollable',
+      });
+      await expect(region).toHaveAttribute('tabindex', '0');
+      const table = region.getByRole('table');
+      await expect(table).toBeVisible();
+      const box = await table.boundingBox();
+      expect(box!.width, 'the table keeps a readable minimum width').toBeGreaterThan(390);
+      expect(
+        await region.evaluate((element) => element.scrollWidth > element.clientWidth),
+        'and scrolls inside its region',
+      ).toBe(true);
+      expect((await overflow(page)).page).toBe(0);
+    });
+  });
+
+  test.describe('System status', () => {
+    test.use({ persona: 'admin' });
+    test('the dependencies become a list of cards on a phone, one per dependency, and nothing scrolls sideways', async ({
+      page,
+      api,
+    }) => {
+      const health = await api('admin').getOk<{ dependencies: unknown[] }>('/system/health');
+      await openPage(page, '/system');
+      const dependencies = page.getByRole('list', { name: 'Dependencies and their health' });
+      await expect(dependencies).toBeVisible();
+      await expect(dependencies.getByRole('listitem')).toHaveCount(health.dependencies.length);
+      await expect(page.getByRole('table', { name: 'Dependencies and their health' })).toHaveCount(
+        0,
+      );
+      expect((await overflow(page)).page).toBe(0);
+    });
   });
 });
 
 test.describe('[FR-UX-02] primary actions are reachable and touchable', () => {
-  test('"Ingest a case" is on screen on the cases page, and the controls of the header are at least 24px', async ({
+  test('"Add a case" is on screen on the cases page, and the controls of the header are at least 24px', async ({
     page,
   }) => {
     await openPage(page, '/cases');
-    const ingest = mainRegion(page).getByRole('link', { name: 'Ingest a case' }).first();
+    const ingest = mainRegion(page).getByRole('link', { name: 'Add a case' }).first();
     await expect(ingest).toBeVisible();
     await ingest.scrollIntoViewIfNeeded();
     const box = await ingest.boundingBox();
@@ -242,7 +271,7 @@ test.describe('[FR-UX-02] primary actions are reachable and touchable', () => {
     await page.getByRole('button', { name: /^Theme:/ }).click();
     await expect(page.getByRole('menuitemradio', { name: 'Dark' })).toBeVisible();
     await page.keyboard.press('Escape');
-    await page.getByRole('button', { name: 'Commands' }).click();
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Command palette' })).toBeVisible();
     await page.keyboard.press('Escape');
     await settle(page);
@@ -253,7 +282,11 @@ test.describe('[FR-UX-02] primary actions are reachable and touchable', () => {
     demo,
   }) => {
     await openPage(page, `/cases/${demo.caseOneId}/timeline`);
-    const known = page.getByRole('group', { name: 'What was known' });
+    // The time cursor lives in the "What was known then" bar, which is closed until it is opened.
+    const bar = page.getByRole('button', { name: /^What was known then/ });
+    await bar.tap();
+    await expect(bar).toHaveAttribute('aria-expanded', 'true');
+    const known = page.getByRole('region', { name: /^What was known then/ });
     await known.getByRole('button', { name: 'Previous event' }).tap();
     await settle(page);
     await expect(page).toHaveURL(/asOf=/);

@@ -1,7 +1,7 @@
 import type { ActionExecutor, ActionRanking, CaseWarning, SkillMatch } from '@caseguard/schemas';
 import { describe, expect, it } from 'vitest';
 import { CASE_ONE, CASE_TWO, OVERLAY_ONE, OVERLAY_TWO } from '../../../../test/review-fixtures';
-import { GENERAL_GUIDANCE, deriveNextActions } from './actions';
+import { GENERAL_GUIDANCE, deriveNextActions, fixListText, fixText } from './actions';
 import { deriveLearning, describeOverlay, overlayFigure } from './learning';
 import { methodNotes, type MethodContext, type MethodSection } from './method';
 import { derivePaths } from './paths';
@@ -134,6 +134,26 @@ describe('[REV-ACTIONS-01] the one ranked list of next actions', () => {
       warnings: { open: 0, resolved: 0, dismissed: 0 },
       noDiagnosticNote: null,
     });
+  });
+
+  it('writes one fix, and the whole list, as plain text that keeps the honesty labels', () => {
+    const model = deriveNextActions(input(CASE_ONE));
+    const first = model.items[0];
+    if (!first) throw new Error('fixture has a fix');
+    expect(fixText(first)).toBe(
+      [
+        'Write causes as hypotheses until evidence supports them',
+        `Why: ${first.reason}`,
+        'Expected gain: About +8 points of case quality (estimate)',
+      ].join('\n'),
+    );
+
+    const list = fixListText('CaseGuard fix list: CG-1', model.items.slice(0, 2)).split('\n');
+    expect(list[0]).toBe('CaseGuard fix list: CG-1');
+    expect(list[1]).toBe('1. Write causes as hypotheses until evidence supports them (critical)');
+    expect(list[2]).toMatch(/^ {3}Why: /);
+    expect(list.filter((line) => /^\d+\. /.test(line))).toHaveLength(2);
+    expect(fixListText('Heading', [])).toBe('Heading');
   });
 });
 

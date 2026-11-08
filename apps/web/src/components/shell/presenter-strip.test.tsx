@@ -46,7 +46,7 @@ describe('[FR-PRES-01] presenter strip', () => {
     navigateTo('/?present=1');
     renderApp(<PresenterStrip />, { api: api() });
     const region = await strip();
-    expect(await within(region).findByText('Demo guide · 3 of 13 done')).toBeInTheDocument();
+    expect(await within(region).findByText('Guided demo · 3 of 13 done')).toBeInTheDocument();
     expect(
       within(region).getByRole('progressbar', { name: 'Demo progress: 3 of 13 steps complete' }),
     ).toBeInTheDocument();
@@ -118,13 +118,13 @@ describe('[FR-PRES-01] presenter strip', () => {
     });
     const region = await strip();
     expect(
-      await within(region).findByText(/The demo guide could not be loaded/),
+      await within(region).findByText(/The guided demo could not be loaded/),
     ).toBeInTheDocument();
   });
 });
 
 describe('[FR-PRES-02] reset from the strip', () => {
-  it('resets after a confirmation, refreshes everything, confirms with a toast and lands on the Demo Guide', async () => {
+  it('resets after a confirmation, refreshes everything, confirms with a toast and lands on the guided demo', async () => {
     const user = userEvent.setup();
     navigateTo('/?present=1');
     const fake = api({ 'demo.reset': () => demoState(0) });
@@ -193,15 +193,15 @@ describe('[FR-PRES-02] reset from the strip', () => {
     navigateTo('/?present=1');
     const { container } = renderApp(<PresenterStrip />, { api: api() });
     const region = await strip();
-    await within(region).findByText('Demo guide · 3 of 13 done');
+    await within(region).findByText('Guided demo · 3 of 13 done');
     await expectNoAxeViolations(container);
   });
 });
 
 describe('[FR-PRES-03] the navigation outlines where the next step leads', () => {
-  it('outlines the item of the page the step opens, also when its route has a query string', async () => {
-    // Step 13 leads to the comparison tab of case two: `/cases/case_2/quality?tab=compare&with=case_1`. While a case
-    // page is open the Quality Review item opens that case's review, which is where the step leads.
+  it('outlines the main item of the page the step opens, also when its route has a query string', async () => {
+    // Step 13 leads to the comparison tab of case two: `/cases/case_2/quality?tab=compare&with=case_1`. Every page of a
+    // case belongs to the Cases item of the main navigation, so that is the item that is outlined.
     navigateTo('/cases/case_2?present=1');
     renderApp(
       <AppShell>
@@ -221,13 +221,13 @@ describe('[FR-PRES-03] the navigation outlines where the next step leads', () =>
       },
     );
     const nav = await screen.findByRole('navigation', { name: 'Primary' });
-    const quality = await within(nav).findByRole('link', { name: /^Quality Review/ });
-    expect(quality).toHaveAttribute('href', '/cases/case_2/quality');
-    await waitFor(() => expect(quality).toHaveClass('cg-presenter-target'));
-    expect(within(nav).getByRole('link', { name: /^Case Timeline/ })).not.toHaveClass(
+    const cases = await within(nav).findByRole('link', { name: /^Cases/ });
+    expect(cases).toHaveAttribute('href', '/cases');
+    await waitFor(() => expect(cases).toHaveClass('cg-presenter-target'));
+    expect(within(nav).getByRole('link', { name: /^Quality/ })).not.toHaveClass(
       'cg-presenter-target',
     );
-    expect(within(nav).getByRole('link', { name: /^Efficiency Monitor/ })).not.toHaveClass(
+    expect(within(nav).getByRole('link', { name: /^Skills/ })).not.toHaveClass(
       'cg-presenter-target',
     );
   });

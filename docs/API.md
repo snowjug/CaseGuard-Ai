@@ -5,6 +5,8 @@ The HTTP API of CaseGuard AI is the Fastify 5 service in `apps/api`. This page h
 - **Conventions** (the sections up to the worked examples): what every route shares. Written by hand and checked against `apps/api/src/http/*` and the tests named in each section.
 - **[Route reference](#route-reference)**: one table per route group, **generated** from the `ROUTES` registry in `packages/schemas/src/api.ts` by `scripts/export-api-docs.ts`. The registry is the only authority on paths, permissions and shapes; see [Regenerating this page](#regenerating-this-page).
 
+**Page names.** The web app was redesigned and its pages were renamed; the API did not change. The generated route descriptions keep the earlier names, so read "Command center" as Home, "Evidence ledger" as Evidence, "Decision forks" as key decisions, "Digital twin" as Case details, "Counterfactual lab" as What if, "SkillDNA library" as Skills, "Ingest a case" as Add a case and "Avoidable Support Effort" as Time that could have been saved. Route ids such as `dashboard.commandCenter` are unchanged.
+
 **Validation status.** Every route has a handler, and the request pipeline, the contract and tenant isolation are exercised by the API test-suite on PGlite (`apps/api/test`). Identity in a local run is a development persona. `AUTH_MODE=entra` (token validation, just-in-time user provisioning) is implemented and tested against locally generated keys and the repository only: it has never met a real Entra tenant. Nothing has been deployed to Azure. The worked examples below were run against a local API with an in-memory database and the deterministic AI provider; where something was only read in code, the text says so.
 
 ## Conventions

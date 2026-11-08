@@ -10,20 +10,23 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     alignItems: 'center',
     textAlign: 'center',
-    gap: cg.space[2],
-    padding: `${cg.space[8]} ${cg.space[4]}`,
+    gap: cg.space[3],
+    padding: `${cg.space[12]} ${cg.space[4]}`,
     color: cg.text,
   },
-  compact: { padding: `${cg.space[4]} ${cg.space[3]}` },
+  compact: { padding: `${cg.space[6]} ${cg.space[4]}`, gap: cg.space[2] },
   icon: {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '48px',
-    height: '48px',
+    width: '56px',
+    height: '56px',
     borderRadius: cg.radius.pill,
-    backgroundColor: cg.surfaceSunken,
-    color: cg.textSecondary,
+    border: `1px solid ${cg.glassBorder}`,
+    backgroundColor: cg.surfaceRaised,
+    backgroundImage: `radial-gradient(circle at 50% 0%, ${cg.glow}, transparent 70%)`,
+    boxShadow: `0 12px 32px -12px ${cg.glow}`,
+    color: cg.tone.brand.fg,
     fontSize: '24px',
   },
   title: {
@@ -31,10 +34,11 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase400,
     lineHeight: tokens.lineHeightBase400,
     fontWeight: tokens.fontWeightSemibold,
+    letterSpacing: '-0.01em',
   },
   description: {
     margin: 0,
-    maxWidth: '52ch',
+    maxWidth: '46ch',
     fontSize: tokens.fontSizeBase300,
     lineHeight: tokens.lineHeightBase300,
     color: cg.textSecondary,
@@ -55,7 +59,7 @@ export interface EmptyStateProps {
   description?: ReactNode;
   /** Decorative icon (aria-hidden). */
   icon?: ReactNode;
-  /** The clear next action: a `Button`, `UiLink`... */
+  /** The clear next action: a `Button`, `ButtonLink`... */
   action?: ReactNode;
   secondaryAction?: ReactNode;
   /** Heading level used for the title (default 3). Use 1 when the empty state is the whole page (for example a 404). */

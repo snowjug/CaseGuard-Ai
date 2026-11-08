@@ -12,3 +12,6 @@ export {
   themeColorFor,
   type ThemeMode,
 } from './theme/theme-mode';
+// The raw design tokens, for the one page that renders without the theme provider (the last-resort error page).
+export { palettes, type Palette } from './tokens/palette';
+export { radius, space } from './tokens/static';

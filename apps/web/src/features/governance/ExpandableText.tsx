@@ -1,7 +1,7 @@
 'use client';
 
-import { cg } from '@caseguard/ui';
-import { Button, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { Button, cg } from '@caseguard/ui';
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
 import { useId, useState } from 'react';
 import { clipText } from '../../lib/text';
 
@@ -46,8 +46,8 @@ export function ExpandableText({
       </p>
       {long ? (
         <Button
-          appearance="transparent"
-          size="small"
+          variant="ghost"
+          size="sm"
           aria-expanded={open}
           aria-controls={id}
           onClick={() => setOpen((value) => !value)}

@@ -298,6 +298,11 @@ describe('[REV-REPORT-11] the downloaded file is one self-contained document', (
     expect(print).toContain('div:has(main#main-content){display:block!important');
   });
 
+  it('writes colours only as theme variables on screen: the fixed colours of paper live in the print rules', () => {
+    const screenRules = REPORT_CSS.slice(0, REPORT_CSS.indexOf('@media print'));
+    expect(screenRules).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i);
+  });
+
   it('is balanced CSS: every block that is opened is closed, in the stylesheet and in the theme variables', () => {
     const count = (text: string, char: string): number => text.split(char).length - 1;
     for (const css of [REPORT_CSS, STANDALONE_CSS]) {

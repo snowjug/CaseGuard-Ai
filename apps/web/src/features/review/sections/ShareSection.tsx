@@ -1,10 +1,9 @@
 'use client';
 
-import { Notice, ProvenanceBadge, cg, copyText } from '@caseguard/ui';
-import { Button, makeStyles, tokens } from '@fluentui/react-components';
-import { CopyRegular, DocumentTextRegular } from '@fluentui/react-icons';
+import { Button, ButtonLink, ProvenanceBadge, cg, copyText } from '@caseguard/ui';
+import { makeStyles, tokens } from '@fluentui/react-components';
+import { CopyIcon, FileTextIcon } from 'lucide-react';
 import { useMemo } from 'react';
-import { LinkButton } from '../../../components/common/LinkButton';
 import { caseHref } from '../../../lib/deep-links';
 import { useToast } from '../../../lib/toast';
 import {
@@ -132,32 +131,26 @@ export function ShareSection({ caseId }: { caseId: string }) {
     >
       <div className={styles.stack}>
         <p className={styles.text}>
-          The report puts the verdict, the chronology, the missed moment, the recorded and
-          better-supported paths, the recommendations with their evidence, what was learned, how it
-          was calculated and who reviewed what on one page that reads well on screen, prints and
-          downloads as a single file.
+          The whole review on one page, for someone who was not in the case. It prints and downloads
+          as a single file.
         </p>
         <div className={styles.actions}>
-          <LinkButton
-            href={caseHref(caseId, 'report')}
-            appearance="primary"
-            icon={<DocumentTextRegular />}
-          >
+          <ButtonLink href={caseHref(caseId, 'report')} variant="secondary" icon={<FileTextIcon />}>
             Open the report
-          </LinkButton>
+          </ButtonLink>
           <Button
-            appearance="outline"
-            icon={<CopyRegular />}
+            variant="secondary"
+            icon={<CopyIcon />}
             disabled={!detailData}
             onClick={() => void copy()}
           >
             Copy summary
           </Button>
         </div>
-        <Notice variant="info" compact title="About the figures">
+        <p className={styles.text}>
           Everything shared from here is an estimate or a simulation, and says so. Nothing in it
           rates a person.
-        </Notice>
+        </p>
       </div>
     </SectionFrame>
   );

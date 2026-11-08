@@ -1,6 +1,7 @@
 'use client';
 
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { NumberTicker } from '../motion/NumberTicker';
 import { STATUS_META, type BadgeStatus } from '../primitives/status-meta';
 import { cg } from '../tokens/cg';
 import { formatNumber } from '../format';
@@ -21,10 +22,28 @@ const useStyles = makeStyles({
     display: 'inline-flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: cg.space[1],
+    gap: cg.space[2],
     color: cg.text,
   },
+  dial: { position: 'relative', display: 'block' },
   svg: { display: 'block', overflow: 'visible' },
+  center: {
+    position: 'absolute',
+    inset: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    pointerEvents: 'none',
+  },
+  value: {
+    fontWeight: tokens.fontWeightSemibold,
+    letterSpacing: '-0.03em',
+    lineHeight: 1,
+    fontVariantNumeric: 'tabular-nums',
+    color: cg.text,
+  },
+  of: { marginTop: cg.space[1], fontSize: tokens.fontSizeBase200, color: cg.textSecondary },
   caption: { fontSize: tokens.fontSizeBase200, color: cg.textSecondary, textAlign: 'center' },
 });
 
@@ -84,84 +103,85 @@ export function ScoreRing({
 
   return (
     <figure className={mergeClasses(styles.root, className)} style={{ margin: 0 }}>
-      <svg
-        role="img"
-        aria-label={alt}
-        width={size}
-        height={size}
-        viewBox={`0 0 ${size} ${size}`}
-        className={styles.svg}
-      >
-        <circle
-          cx={centre}
-          cy={centre}
-          r={ringRadius}
-          fill="none"
-          stroke={cg.surfaceSunken}
-          strokeWidth={stroke}
-        />
-        <circle
-          cx={centre}
-          cy={centre}
-          r={ringRadius}
-          fill="none"
-          stroke={cg.borderSubtle}
-          strokeWidth={1}
-          strokeOpacity={0.9}
-        />
-        {hasValue && value > 0 ? (
-          <path
-            d={arcPath(centre, centre, ringRadius, 0, angle(value))}
+      <div className={styles.dial} style={{ width: size, height: size }}>
+        <svg
+          role="img"
+          aria-label={alt}
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          className={styles.svg}
+          style={{
+            filter: hasValue
+              ? `drop-shadow(0 0 ${Math.round(size / 9)}px color-mix(in srgb, ${tone.solid} 34%, transparent))`
+              : undefined,
+          }}
+        >
+          <circle
+            cx={centre}
+            cy={centre}
+            r={ringRadius}
             fill="none"
-            stroke={tone.solid}
+            stroke={cg.surfaceSunken}
             strokeWidth={stroke}
-            strokeLinecap="round"
           />
-        ) : null}
-        {hasRange ? (
-          <path
-            d={arcPath(
-              centre,
-              centre,
-              rangeRadius,
-              angle(low),
-              Math.max(angle(high), angle(low) + 2),
-            )}
+          <circle
+            cx={centre}
+            cy={centre}
+            r={ringRadius}
             fill="none"
-            stroke={tone.solid}
-            strokeWidth={3}
-            strokeDasharray="2 3"
-            strokeLinecap="butt"
+            stroke={cg.borderSubtle}
+            strokeWidth={1}
+            strokeOpacity={0.9}
           />
-        ) : null}
-        <text
-          x={centre}
-          y={centre - 2}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill={cg.text}
-          fontSize={size * 0.27}
-          fontWeight={600}
-          style={{ fontVariantNumeric: 'tabular-nums' }}
-        >
-          {shown}
-        </text>
-        <text
-          x={centre}
-          y={centre + size * 0.2}
-          textAnchor="middle"
-          fill={cg.textSecondary}
-          fontSize={12}
-        >
-          {hasValue ? `of ${max}` : 'no data'}
-        </text>
-      </svg>
+          {hasValue && value > 0 ? (
+            <path
+              d={arcPath(centre, centre, ringRadius, 0, angle(value))}
+              pathLength={100}
+              className="cg-ring-arc"
+              fill="none"
+              stroke={tone.solid}
+              strokeWidth={stroke}
+              strokeLinecap="round"
+            />
+          ) : null}
+          {hasRange ? (
+            <path
+              d={arcPath(
+                centre,
+                centre,
+                rangeRadius,
+                angle(low),
+                Math.max(angle(high), angle(low) + 2),
+              )}
+              fill="none"
+              stroke={tone.solid}
+              strokeWidth={3}
+              strokeDasharray="2 3"
+              strokeLinecap="butt"
+            />
+          ) : null}
+        </svg>
+        <div className={styles.center} aria-hidden="true">
+          <span className={styles.value} style={{ fontSize: size * 0.3 }}>
+            {valueText !== undefined || !hasValue ? (
+              shown
+            ) : (
+              <NumberTicker
+                value={value}
+                format={(n) => formatNumber(n, { maximumFractionDigits: 0 })}
+              />
+            )}
+          </span>
+          <span className={styles.of}>{hasValue ? `of ${max}` : 'no data'}</span>
+        </div>
+      </div>
       <figcaption className={styles.caption}>
         <span
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 4,
+            gap: cg.space[1],
             color: tone.fg,
             fontWeight: 600,
           }}

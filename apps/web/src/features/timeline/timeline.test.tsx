@@ -24,7 +24,6 @@ import {
 } from '../../../test/harness';
 import { installNearEndObserver } from '../../../test/intersection';
 import { liveRegionOf } from '../../../test/live-region';
-import { installMatchMedia } from '../../../test/media';
 import { navigateTo } from '../../../test/next-navigation';
 import { ApiError } from '../../lib/api/errors';
 import {
@@ -42,7 +41,8 @@ const ENGINEER = ['case:read', 'case:ingest', 'case:analyze'] as const;
 const AS_OF = '2026-03-09T09:41:00Z';
 
 // A busy machine can take longer than the 1 s default to render a page for the first time.
-configure({ asyncUtilTimeout: 5000 });
+configure({ asyncUtilTimeout: 30_000 });
+vi.setConfig({ testTimeout: 120_000 });
 
 function api(overrides: FakeHandlers = {}) {
   return fakeApi({
@@ -61,7 +61,6 @@ function lastQuery(handler: FakeApi, route = 'timeline.get'): Record<string, unk
   return (calls[calls.length - 1]?.[1] as { query?: Record<string, unknown> } | undefined)?.query;
 }
 
-const wide = (): void => installMatchMedia((query) => query.includes('1100px'));
 const param = (name: string): string | null =>
   new URLSearchParams(window.location.search).get(name);
 const titles = (): (string | null)[] =>
@@ -77,8 +76,44 @@ async function enabledButton(name: string): Promise<HTMLElement> {
   return screen.getByRole('button', { name });
 }
 
-describe('[FR-TIME-01] Case Timeline', () => {
-  it('shows a skeleton, then every event in time order with its delays, repeats and forks', async () => {
+/** "What was known then" is a collapsed bar: open it to reach the time cursor and the counts of the moment. */
+async function openKnownBar(): Promise<HTMLElement> {
+  const bar = await screen.findByRole('button', { name: /^What was known then/ });
+  if (bar.getAttribute('aria-expanded') !== 'true') await userEvent.setup().click(bar);
+  return screen.findByRole('group', { name: 'Time cursor' });
+}
+
+/** The opened bar, for the counts and links of the chosen moment. */
+const knownBar = (): Promise<HTMLElement> =>
+  screen.findByRole('region', { name: /^What was known then/ });
+
+/** Moves the whole page to the moment of the event at `index` (0-based) from its "More actions" menu. */
+async function knownAsOfHere(index: number): Promise<void> {
+  const user = userEvent.setup();
+  const menus = screen.getAllByRole('button', { name: /^More actions for / });
+  await user.click(menus[index] as HTMLElement);
+  await user.click(await screen.findByRole('menuitem', { name: /^What was known here/ }));
+}
+
+/** The "Filters" popover of the page, opened: queries bound to its surface. */
+async function openFilters() {
+  const user = userEvent.setup();
+  const trigger = screen.getByRole('button', { name: /^Filters/ });
+  if (trigger.getAttribute('aria-expanded') !== 'true') await user.click(trigger);
+  // The page behind a modal popover is hidden from assistive technology while it is open: its fields are found by label.
+  const surface = (await screen.findByLabelText('Zoom from')).closest('[role="dialog"]');
+  if (!(surface instanceof HTMLElement)) throw new Error('the filters are not in a dialog');
+  return within(surface);
+}
+
+/** Closes the "Filters" popover with Escape and waits until it is gone. */
+async function closeFilters(): Promise<void> {
+  await userEvent.setup().keyboard('{Escape}');
+  await waitFor(() => expect(screen.queryByLabelText('Zoom from')).toBeNull());
+}
+
+describe('[FR-TIME-01] Timeline', () => {
+  it('shows a skeleton, then every event in time order with its delays, repeats and key decisions', async () => {
     renderApp(<TimelinePage caseId={CASE_ID} />, { api: api() });
     expect(screen.getAllByText(/Loading the events/).length).toBeGreaterThan(0);
 
@@ -88,7 +123,7 @@ describe('[FR-TIME-01] Case Timeline', () => {
       'Teams sign-in - information needed',
       'Repeat sign-in log query',
     ]);
-    expect(screen.getByRole('heading', { level: 1, name: 'Case Timeline' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Timeline' })).toBeInTheDocument();
 
     const [first, second, third] = screen.getAllByRole('article') as [
       HTMLElement,
@@ -100,13 +135,13 @@ describe('[FR-TIME-01] Case Timeline', () => {
     expect(within(first).getByText('Customer-reported observation')).toBeInTheDocument();
 
     expect(within(second).getByText('29 min after the previous event')).toBeInTheDocument();
-    expect(within(second).getByText('Decision fork')).toBeInTheDocument();
+    expect(within(second).getByText('Key decision')).toBeInTheDocument();
     expect(within(second).getByText('Very high customer effort')).toBeInTheDocument();
     expect(within(second).getByText('Action: Request HAR and Fiddler traces')).toBeInTheDocument();
     expect(
-      within(second).getByRole('link', { name: 'Inspect fork 1 in the Counterfactual Lab' }),
+      within(second).getByRole('link', { name: 'See key decision 1 in What if' }),
     ).toHaveAttribute('href', '/cases/case_1/counterfactual?sel=fork_1');
-    // The effect on the leading hypothesis, named from the hypothesis list and labelled in points.
+    // The effect on the leading possible cause, named from the list of causes and labelled in points.
     expect(
       within(second).getByText('DNS resolution failure for sign-in endpoints down 10.7 points'),
     ).toBeInTheDocument();
@@ -119,12 +154,18 @@ describe('[FR-TIME-01] Case Timeline', () => {
     expect(within(third).getByRole('button', { name: 'e03' })).toBeInTheDocument();
   });
 
-  it('draws the hypothesis confidence chart as estimates', async () => {
+  it('draws the confidence chart as estimates', async () => {
+    const user = userEvent.setup();
     renderApp(<TimelinePage caseId={CASE_ID} />, { api: api() });
-    const chart = await screen.findByRole('group', { name: 'Hypothesis confidence over time' });
+    const chart = await screen.findByRole('group', { name: 'Confidence over time' });
     expect(within(chart).getByText('Estimated')).toBeInTheDocument();
+    expect(
+      within(chart).getByText('How likely each possible cause looked after each event.'),
+    ).toBeInTheDocument();
     expect(within(chart).getAllByRole('img').length).toBeGreaterThan(0);
-    expect(within(chart).getByText(/Confidence values are model estimates/)).toBeInTheDocument();
+    // The caveat sits behind the help button of the chart rather than in a banner above it.
+    await user.click(within(chart).getByRole('button', { name: 'About Confidence over time' }));
+    expect(await screen.findByText(/These are model estimates/)).toBeInTheDocument();
   });
 
   it('says so when there is nothing to plot', async () => {
@@ -197,14 +238,26 @@ describe('[FR-TIME-01] Case Timeline', () => {
     expect(screen.queryByRole('button', { name: 'Load more events' })).toBeNull();
   });
 
-  it('has no accessibility violations when loaded', async () => {
-    wide();
+  it('has no accessibility violations when loaded, with an event open', async () => {
     navigateTo('/cases/case_1/timeline?sel=e03');
     const { container } = renderApp(<TimelinePage caseId={CASE_ID} />, { api: api() });
-    await screen.findByRole('list', { name: 'Events, 3 shown' });
-    await screen.findByText('Text as stored (after redaction)');
+    const drawer = await screen.findByRole('dialog', { name: 'Event details' });
+    await within(drawer).findByText('Text as stored (after redaction)');
+    // The drawer is outside the page's own container: it is checked as well.
+    await expectNoAxeViolations(drawer);
     await expectNoAxeViolations(container);
-  });
+  }, 120_000);
+
+  it('has no accessibility violations with the "What was known then" bar and the filters open', async () => {
+    const user = userEvent.setup();
+    const { container } = renderApp(<TimelinePage caseId={CASE_ID} />, { api: api() });
+    await screen.findByRole('list', { name: 'Events, 3 shown' });
+    await openKnownBar();
+    await expectNoAxeViolations(container);
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    await screen.findByLabelText('Zoom from');
+    await expectNoAxeViolations(document.body);
+  }, 120_000);
 });
 
 describe('[FR-TIME-02] filters, zoom and the address', () => {
@@ -215,16 +268,17 @@ describe('[FR-TIME-02] filters, zoom and the address', () => {
     await screen.findByRole('list', { name: 'Events, 3 shown' });
     expect(lastQuery(handler)).toEqual({ limit: 200 });
 
-    await user.click(screen.getByRole('button', { name: 'Event kind' }));
-    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Customer email' }));
+    const filters = await openFilters();
+    await user.click(filters.getByLabelText('Customer email'));
     await waitFor(() => expect(param('types')).toBe('customer_email'));
     await waitFor(() =>
       expect(lastQuery(handler)).toEqual({ limit: 200, types: 'customer_email' }),
     );
+    expect(filters.getByText('Event kind (1)')).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText('Evidence category'), 'customer_reported');
+    await user.selectOptions(filters.getByLabelText('Evidence category'), 'customer_reported');
     await waitFor(() => expect(param('category')).toBe('customer_reported'));
-    await user.selectOptions(screen.getByLabelText('Hypothesis'), 'hyp_1');
+    await user.selectOptions(filters.getByLabelText('Possible cause'), 'hyp_1');
     await waitFor(() => expect(param('hyp')).toBe('hyp_1'));
     await waitFor(() =>
       expect(lastQuery(handler)).toEqual({
@@ -235,11 +289,15 @@ describe('[FR-TIME-02] filters, zoom and the address', () => {
       }),
     );
     expect(screen.getByText(/3 filters on/)).toBeInTheDocument();
+    // Escape closes the popover; the page behind it is hidden from assistive technology while it is open.
+    await closeFilters();
+    // The button says how many of the filters inside it are on.
+    expect(await screen.findByRole('button', { name: 'Filters, 3 on' })).toBeInTheDocument();
 
     await user.click(screen.getAllByRole('button', { name: 'Clear filters' })[0] as HTMLElement);
     await waitFor(() => expect(window.location.search).toBe(''));
     // The unfiltered list is already cached, so clearing shows it again without asking the API twice.
-    expect(screen.getByRole('button', { name: 'Event kind' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Filters/ })).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText(/filters on/)).toBeNull());
   });
 
@@ -255,11 +313,14 @@ describe('[FR-TIME-02] filters, zoom and the address', () => {
       types: 'customer_email',
       hypothesisId: 'hyp_2',
     });
-    expect(screen.getByRole('button', { name: 'Event kind (1)' })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByLabelText('Hypothesis')).toHaveValue('hyp_2'));
+    expect(screen.getByRole('button', { name: 'Filters, 2 on' })).toBeInTheDocument();
+    const filters = await openFilters();
+    expect(filters.getByText('Event kind (1)')).toBeInTheDocument();
+    expect(filters.getByLabelText('Customer email')).toBeChecked();
+    await waitFor(() => expect(filters.getByLabelText('Possible cause')).toHaveValue('hyp_2'));
   });
 
-  it('filters delays, repeated diagnostics and forks on the loaded events, loading the rest of them first', async () => {
+  it('filters delays, repeated diagnostics and key decisions on the loaded events, loading the rest of them first', async () => {
     const user = userEvent.setup();
     const events = threeEvents();
     const handler = api({
@@ -275,6 +336,7 @@ describe('[FR-TIME-02] filters, zoom and the address', () => {
 
     await user.click(screen.getByRole('button', { name: 'Delays' }));
     expect(param('flags')).toBe('delay');
+    expect(screen.getByRole('button', { name: 'Delays' })).toHaveAttribute('aria-pressed', 'true');
     // The delay is on the second page: the page fetches it so the filter is exact.
     await screen.findByRole('list', { name: 'Events, 1 shown' });
     expect(titles()).toEqual(['Repeat sign-in log query']);
@@ -287,7 +349,7 @@ describe('[FR-TIME-02] filters, zoom and the address', () => {
     }
 
     await user.click(screen.getByRole('button', { name: 'Delays' }));
-    await user.click(screen.getByRole('button', { name: 'Decision forks' }));
+    await user.click(screen.getByRole('button', { name: 'Key decisions' }));
     await screen.findByRole('list', { name: 'Events, 1 shown' });
     expect(titles()).toEqual(['Teams sign-in - information needed']);
   });
@@ -298,7 +360,10 @@ describe('[FR-TIME-02] filters, zoom and the address', () => {
     renderApp(<TimelinePage caseId={CASE_ID} />, { api: handler });
     await screen.findByRole('list', { name: 'Events, 3 shown' });
     await user.click(
-      screen.getByRole('button', {
+      screen.getByRole('button', { name: 'More actions for Teams sign-in - information needed' }),
+    );
+    await user.click(
+      await screen.findByRole('menuitem', {
         name: 'Zoom here: only the events around Teams sign-in - information needed',
       }),
     );
@@ -311,7 +376,12 @@ describe('[FR-TIME-02] filters, zoom and the address', () => {
         to: '2026-03-10T08:55:00Z',
       }),
     );
-    expect(screen.getByLabelText('Zoom from')).toHaveValue('2026-03-09T09:12:00Z');
+    // The window is a filter like the others: it counts once, and its bounds are in the popover.
+    expect(screen.getByRole('button', { name: 'Filters, 1 on' })).toBeInTheDocument();
+    const filters = await openFilters();
+    expect(filters.getByLabelText('Zoom from')).toHaveValue('2026-03-09T09:12:00Z');
+    expect(filters.getByLabelText('Zoom to')).toHaveValue('2026-03-10T08:55:00Z');
+    await closeFilters();
     await user.click(screen.getAllByRole('button', { name: 'Clear filters' })[0] as HTMLElement);
     await waitFor(() => expect(window.location.search).toBe(''));
   });
@@ -325,8 +395,9 @@ describe('[FR-TIME-02] filters, zoom and the address', () => {
       }),
     });
     await screen.findByRole('list', { name: 'Events, 3 shown' });
-    const options = within(screen.getByLabelText('Zoom from'))
-      .getAllByRole('option')
+    const filters = await openFilters();
+    const options = within(filters.getByLabelText('Zoom from'))
+      .getAllByRole('option', { hidden: true })
       .map((option) => option.textContent ?? '');
     // The 48-character limit falls inside the emoji: it is left out whole, never cut in half.
     expect(options.some((text) => text.endsWith(` · ${'a'.repeat(46)}…`))).toBe(true);
@@ -415,24 +486,51 @@ describe('[FR-TIME-03] the time cursor', () => {
       : timelineResponse();
   };
 
-  it('"Known as of here" limits the whole view to what was known at that event', async () => {
+  it('keeps the time cursor in one collapsed bar, and explains in a tooltip what it does', async () => {
     const user = userEvent.setup();
+    renderApp(<TimelinePage caseId={CASE_ID} />, { api: api() });
+    await screen.findByRole('list', { name: 'Events, 3 shown' });
+    const bar = screen.getByRole('button', { name: /^What was known then/ });
+    expect(bar).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByText('Showing the whole record, up to the last event.')).toBeInTheDocument();
+    // The bar is usually closed when the moment changes, so a screen reader is told through a polite status.
+    expect(screen.getByText('Now showing the whole record.')).toHaveAttribute('role', 'status');
+    expect(screen.queryByRole('slider', { name: 'Time cursor' })).toBeNull();
+
+    await user.hover(screen.getByRole('button', { name: 'About what was known then' }));
+    expect(
+      await screen.findByText(/Replays the case as it stood at an earlier moment/),
+    ).toBeInTheDocument();
+
+    await user.click(bar);
+    expect(bar).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByRole('slider', { name: 'Time cursor' })).toBeInTheDocument();
+  });
+
+  it('"What was known here" limits the whole view to what was known at that event', async () => {
     const handler = api({ 'timeline.get': asOfResponse });
     renderApp(<TimelinePage caseId={CASE_ID} />, { api: handler });
     await screen.findByRole('list', { name: 'Events, 3 shown' });
-    await user.click(
-      screen.getAllByRole('button', { name: /^Known as of here/ })[1] as HTMLElement,
-    );
+    await knownAsOfHere(1);
     expect(param('asOf')).toBe(AS_OF);
     await screen.findByRole('list', { name: 'Events, 2 shown' });
+    expect(await screen.findByText(/^Now showing the case as of /)).toHaveAttribute(
+      'role',
+      'status',
+    );
     expect(lastQuery(handler)).toEqual({ limit: 200, asOf: AS_OF });
     expect(lastQuery(handler, 'hypotheses.list')).toEqual({ asOf: AS_OF });
-    const cursor = within(await screen.findByRole('group', { name: 'What was known' }));
+    await openKnownBar();
+    const cursor = within(await knownBar());
     expect(await cursor.findByText('Later events withheld')).toBeInTheDocument();
     expect(cursor.getByText('Critical evidence still missing')).toBeInTheDocument();
-    expect(cursor.getByRole('link', { name: 'Evidence Ledger at this moment' })).toHaveAttribute(
+    expect(cursor.getByRole('link', { name: 'Evidence at this moment' })).toHaveAttribute(
       'href',
       `/cases/case_1/evidence?asOf=${encodeURIComponent(AS_OF)}`,
+    );
+    expect(cursor.getByRole('link', { name: 'Possible causes at this moment' })).toHaveAttribute(
+      'href',
+      `/cases/case_1/hypotheses?asOf=${encodeURIComponent(AS_OF)}`,
     );
     expect(screen.queryByRole('heading', { name: 'Repeat sign-in log query' })).toBeNull();
   });
@@ -444,10 +542,22 @@ describe('[FR-TIME-03] the time cursor', () => {
     renderApp(<TimelinePage caseId={CASE_ID} />, { api: handler });
     await screen.findByRole('list', { name: 'Events, 2 shown' });
     expect(lastQuery(handler)).toEqual({ limit: 200, asOf: AS_OF });
-    const cursor = within(await screen.findByRole('group', { name: 'What was known' }));
+    expect(screen.getByText('Earlier view')).toBeInTheDocument();
+    const cursor = within(await openKnownBar());
     await user.click(await cursor.findByRole('button', { name: 'Latest' }));
     await screen.findByRole('list', { name: 'Events, 3 shown' });
     expect(param('asOf')).toBeNull();
+  });
+
+  it('goes back to the latest from the bar, without opening it', async () => {
+    const user = userEvent.setup();
+    navigateTo(`/cases/case_1/timeline?asOf=${encodeURIComponent(AS_OF)}`);
+    renderApp(<TimelinePage caseId={CASE_ID} />, { api: api({ 'timeline.get': asOfResponse }) });
+    await screen.findByRole('list', { name: 'Events, 2 shown' });
+    await user.click(screen.getByRole('button', { name: 'Back to latest' }));
+    await screen.findByRole('list', { name: 'Events, 3 shown' });
+    expect(param('asOf')).toBeNull();
+    expect(screen.queryByText('Earlier view')).toBeNull();
   });
 
   it('explains when nothing had been recorded by the chosen moment', async () => {
@@ -471,7 +581,8 @@ describe('[FR-TIME-03] the time cursor', () => {
     const { unmount } = renderApp(<TimelinePage caseId={CASE_ID} />, {
       api: api({ 'timeline.get': asOfResponse }),
     });
-    const cursor = within(await screen.findByRole('group', { name: 'What was known' }));
+    await openKnownBar();
+    const cursor = within(await knownBar());
     expect(
       await cursor.findByText(
         'Reviewer decisions recorded later are not shown in this earlier view.',
@@ -482,6 +593,7 @@ describe('[FR-TIME-03] the time cursor', () => {
     navigateTo('/cases/case_1/timeline');
     renderApp(<TimelinePage caseId={CASE_ID} />, { api: api({ 'timeline.get': asOfResponse }) });
     await screen.findByRole('list', { name: 'Events, 3 shown' });
+    await openKnownBar();
     expect(screen.queryByText(/Reviewer decisions recorded later are not shown/)).toBeNull();
   });
 });
@@ -519,6 +631,7 @@ describe('[FR-TIME-06] earlier views are metered: snapped, debounced, cancelled 
     const handler = api({ 'timeline.get': asOfResponse });
     renderApp(<TimelinePage caseId={CASE_ID} />, { api: handler });
     await screen.findByRole('list', { name: 'Events, 3 shown' });
+    await openKnownBar();
     const slider = await screen.findByRole('slider', { name: 'Time cursor' });
     // Three quick moves, as in a drag: nothing is sent until it stops, and then only the last place, moved to the last
     // event at or before it (the answer between two events is the same).
@@ -536,7 +649,7 @@ describe('[FR-TIME-06] earlier views are metered: snapped, debounced, cancelled 
     const handler = api({ 'timeline.get': asOfResponse });
     renderApp(<TimelinePage caseId={CASE_ID} />, { api: handler });
     await screen.findByRole('list', { name: 'Events, 2 shown' });
-    const cursor = within(await screen.findByRole('group', { name: 'Time cursor' }));
+    const cursor = within(await openKnownBar());
     await user.click(await cursor.findByRole('button', { name: 'Next event' }));
     await waitFor(() => expect(param('asOf')).toBe('2026-03-10T08:55:00Z'));
     await user.click(cursor.getByRole('button', { name: 'Previous event' }));
@@ -559,14 +672,12 @@ describe('[FR-TIME-06] earlier views are metered: snapped, debounced, cancelled 
     });
     renderApp(<TimelinePage caseId={CASE_ID} />, { api: handler });
     await screen.findByRole('list', { name: 'Events, 3 shown' });
-    await user.click(
-      screen.getAllByRole('button', { name: /^Known as of here/ })[1] as HTMLElement,
-    );
+    await knownAsOfHere(1);
     await waitFor(() => expect(signals).toHaveLength(1));
     expect(signals[0]?.aborted).toBe(false);
     // The events give way to a loading state meanwhile; the cursor stays, and moving it replaces the request.
     await user.click(
-      within(screen.getByRole('group', { name: 'Time cursor' })).getByRole('button', {
+      within(await openKnownBar()).getByRole('button', {
         name: 'Next event',
       }),
     );
@@ -575,13 +686,10 @@ describe('[FR-TIME-06] earlier views are metered: snapped, debounced, cancelled 
   });
 
   it('asks for an earlier view without hidden retries, so a refusal is shown as it arrives', async () => {
-    const user = userEvent.setup();
     const handler = api({ 'timeline.get': asOfResponse });
     renderApp(<TimelinePage caseId={CASE_ID} />, { api: handler });
     await screen.findByRole('list', { name: 'Events, 3 shown' });
-    await user.click(
-      screen.getAllByRole('button', { name: /^Known as of here/ })[1] as HTMLElement,
-    );
+    await knownAsOfHere(1);
     await screen.findByRole('list', { name: 'Events, 2 shown' });
     const earlier = handler.call.mock.calls.find(
       ([id, input]) => id === 'timeline.get' && asOfOf(input) === AS_OF,
@@ -594,19 +702,14 @@ describe('[FR-TIME-06] earlier views are metered: snapped, debounced, cancelled 
   });
 
   it('shows its loading state, and nothing of the whole record, while the chosen moment loads', async () => {
-    const user = userEvent.setup();
     const handler = api({
       'timeline.get': (input) =>
         asOfOf(input) ? new Promise(() => undefined) : timelineResponse(),
     });
     renderApp(<TimelinePage caseId={CASE_ID} />, { api: handler });
     await screen.findByRole('list', { name: 'Events, 3 shown' });
-    expect(
-      screen.getByRole('group', { name: 'Hypothesis confidence over time' }),
-    ).toBeInTheDocument();
-    await user.click(
-      screen.getAllByRole('button', { name: /^Known as of here/ })[1] as HTMLElement,
-    );
+    expect(screen.getByRole('group', { name: 'Confidence over time' })).toBeInTheDocument();
+    await knownAsOfHere(1);
     await waitFor(() => expect(param('asOf')).toBe(AS_OF));
 
     // It says which moment is being looked up, and shows placeholders.
@@ -616,19 +719,20 @@ describe('[FR-TIME-06] earlier views are metered: snapped, debounced, cancelled 
     expect(screen.getAllByText(/Loading the events/).length).toBeGreaterThan(0);
     // Nothing of the whole record is left: no events, chart or counts, and no claim that nothing had been recorded.
     expect(screen.queryByRole('list', { name: /^Events, \d+ shown$/ })).toBeNull();
-    expect(screen.queryAllByRole('button', { name: /^Known as of here/ })).toHaveLength(0);
+    expect(screen.queryAllByRole('button', { name: /^More actions for / })).toHaveLength(0);
     expect(screen.queryByText('Repeat sign-in log query')).toBeNull();
-    expect(screen.queryByRole('group', { name: 'Hypothesis confidence over time' })).toBeNull();
-    expect(screen.queryByText('Later events withheld')).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Confidence over time' })).toBeNull();
     expect(screen.queryByText(/No event had been recorded/)).toBeNull();
     expect(screen.queryByRole('heading', { name: 'No events at this moment' })).toBeNull();
-    // The cursor stays where it is (a keyboard user is in the middle of it), and the busy region says so.
+    // The cursor stays where it is (a keyboard user is in the middle of it), without the counts of another moment, and
+    // the busy region says so.
+    await openKnownBar();
     expect(screen.getByRole('group', { name: 'Time cursor' })).toBeInTheDocument();
+    expect(screen.queryByText('Later events withheld')).toBeNull();
     expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
   });
 
   it('shows its loading state too while the cursor is still reading the events it lands on', async () => {
-    const user = userEvent.setup();
     const handler = api({
       'timeline.get': (input) => {
         if ((input as { query?: { cursor?: string } }).query?.cursor === 'c2')
@@ -638,9 +742,7 @@ describe('[FR-TIME-06] earlier views are metered: snapped, debounced, cancelled 
     });
     renderApp(<TimelinePage caseId={CASE_ID} />, { api: handler });
     await screen.findByRole('list', { name: 'Events, 3 shown' });
-    await user.click(
-      screen.getAllByRole('button', { name: /^Known as of here/ })[1] as HTMLElement,
-    );
+    await knownAsOfHere(1);
     // The rest of the case's events never arrives, so no earlier view can be asked for yet: the whole record that was
     // on screen is not left there under the cursor, dimmed or not.
     expect(
@@ -663,9 +765,7 @@ describe('[FR-TIME-06] earlier views are metered: snapped, debounced, cancelled 
     });
     renderApp(<TimelinePage caseId={CASE_ID} />, { api: handler });
     await screen.findByRole('list', { name: 'Events, 3 shown' });
-    await user.click(
-      screen.getAllByRole('button', { name: /^Known as of here/ })[1] as HTMLElement,
-    );
+    await knownAsOfHere(1);
     const notice = (await screen.findByText('Earlier views are limited')).closest(
       '[role="note"]',
     ) as HTMLElement;
@@ -682,8 +782,10 @@ describe('[FR-TIME-06] earlier views are metered: snapped, debounced, cancelled 
     ).toHaveAttribute('role', 'status');
     expect(screen.queryByRole('alert')).toBeNull();
     // The page is intact: the cursor is there, and so is the way back to the whole record.
+    await openKnownBar();
     expect(screen.getByRole('group', { name: 'Time cursor' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Case Timeline' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Back to latest' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Timeline' })).toBeInTheDocument();
 
     limited = false;
     await waitFor(
@@ -724,24 +826,20 @@ describe('[FR-TIME-06] earlier views are metered: snapped, debounced, cancelled 
     });
     renderApp(<TimelinePage caseId={CASE_ID} />, { api: handler });
     await screen.findByRole('list', { name: 'Events, 3 shown' });
-    await user.click(
-      screen.getAllByRole('button', { name: /^Known as of here/ })[1] as HTMLElement,
-    );
+    await knownAsOfHere(1);
     await screen.findByRole('list', { name: 'Events, 2 shown' });
     // The budget is now empty. Back to the whole record, and to the window that was already open: no request, no notice.
     limited = true;
-    const cursor = within(await screen.findByRole('group', { name: 'Time cursor' }));
+    const cursor = within(await openKnownBar());
     await user.click(cursor.getByRole('button', { name: 'Latest' }));
     await screen.findByRole('list', { name: 'Events, 3 shown' });
-    await user.click(
-      screen.getAllByRole('button', { name: /^Known as of here/ })[1] as HTMLElement,
-    );
+    await knownAsOfHere(1);
     await screen.findByRole('list', { name: 'Events, 2 shown' });
     expect(screen.queryByText('Earlier views are limited')).toBeNull();
     expect(askedFor(handler)).toEqual([AS_OF]);
   });
 
-  it('shows the instant the API cut the evidence at, on the chart and in the panel, not the one asked for', async () => {
+  it('shows the instant the API cut the evidence at, on the chart and in the bar, not the one asked for', async () => {
     const cut = '2026-03-09T09:12:00Z';
     navigateTo(`/cases/case_1/timeline?asOf=${encodeURIComponent(AS_OF)}`);
     renderApp(<TimelinePage caseId={CASE_ID} />, {
@@ -757,17 +855,21 @@ describe('[FR-TIME-06] earlier views are metered: snapped, debounced, cancelled 
             : timelineResponse(),
       }),
     });
-    const chart = await screen.findByRole('group', { name: 'Hypothesis confidence over time' });
+    const chart = await screen.findByRole('group', { name: 'Confidence over time' });
     expect(
       within(chart).getByText(
-        `How likely each hypothesis looked, up to ${formatDateTimeUtc(cut)}, the last event recorded by the moment you chose.`,
+        `How likely each possible cause looked, up to ${formatDateTimeUtc(cut)}, the last event recorded by the moment you chose.`,
       ),
     ).toBeInTheDocument();
-    const cursor = within(await screen.findByRole('group', { name: 'What was known' }));
     expect(
-      await cursor.findByText(
+      await screen.findByText(
         `Showing the case as of ${formatDateTimeUtc(cut)}, the last event recorded by the moment you chose.`,
       ),
+    ).toBeInTheDocument();
+    await openKnownBar();
+    const cursor = within(await knownBar());
+    expect(
+      await cursor.findByLabelText(`Known as of ${formatDateTimeUtc(cut)}`),
     ).toBeInTheDocument();
     expect(cursor.getByText('2')).toBeInTheDocument();
   });
@@ -778,10 +880,8 @@ describe('[FR-TIME-06] earlier views are metered: snapped, debounced, cancelled 
     const { unmount } = renderApp(<TimelinePage caseId={CASE_ID} />, {
       api: api({ 'timeline.get': asOfResponse }),
     });
-    const chart = within(
-      await screen.findByRole('group', { name: 'Hypothesis confidence over time' }),
-    );
-    await user.click(chart.getByRole('button', { name: 'About Hypothesis confidence over time' }));
+    const chart = within(await screen.findByRole('group', { name: 'Confidence over time' }));
+    await user.click(chart.getByRole('button', { name: 'About Confidence over time' }));
     expect(
       await screen.findByText(
         /cannot be compared number for number with the range of the whole record/,
@@ -791,17 +891,13 @@ describe('[FR-TIME-06] earlier views are metered: snapped, debounced, cancelled 
 
     navigateTo('/cases/case_1/timeline');
     renderApp(<TimelinePage caseId={CASE_ID} />, { api: api({ 'timeline.get': asOfResponse }) });
-    const whole = within(
-      await screen.findByRole('group', { name: 'Hypothesis confidence over time' }),
-    );
-    await user.click(whole.getByRole('button', { name: 'About Hypothesis confidence over time' }));
-    expect(
-      await screen.findByText(/The shaded band is the leading hypothesis/),
-    ).toBeInTheDocument();
+    const whole = within(await screen.findByRole('group', { name: 'Confidence over time' }));
+    await user.click(whole.getByRole('button', { name: 'About Confidence over time' }));
+    expect(await screen.findByText(/The shaded band is the leading cause/)).toBeInTheDocument();
     expect(screen.queryByText(/cannot be compared number for number/)).toBeNull();
   });
 
-  it('reports a refused hypothesis lookup next to the chart without taking the page down', async () => {
+  it('reports a refused lookup of the possible causes next to the chart without taking the page down', async () => {
     navigateTo(`/cases/case_1/timeline?asOf=${encodeURIComponent(AS_OF)}`);
     renderApp(<TimelinePage caseId={CASE_ID} />, {
       api: api({
@@ -811,20 +907,17 @@ describe('[FR-TIME-06] earlier views are metered: snapped, debounced, cancelled 
         },
       }),
     });
-    const chart = within(
-      await screen.findByRole('group', { name: 'Hypothesis confidence over time' }),
-    );
+    const chart = within(await screen.findByRole('group', { name: 'Confidence over time' }));
     expect(await chart.findByText('Earlier views are limited')).toBeInTheDocument();
     expect(
       chart.getByText(
-        /the likely ranges and hypothesis names could not be computed for this moment just now/,
+        /the likely ranges and the names of the possible causes could not be computed for this moment just now/,
       ),
     ).toBeInTheDocument();
     expect(await screen.findByRole('list', { name: 'Events, 2 shown' })).toBeInTheDocument();
   });
 
-  it('reports a refused event lookup inside the event panel', async () => {
-    wide();
+  it('reports a refused event lookup inside the event drawer', async () => {
     navigateTo(`/cases/case_1/timeline?sel=e03&asOf=${encodeURIComponent(AS_OF)}`);
     renderApp(<TimelinePage caseId={CASE_ID} />, {
       api: api({
@@ -834,7 +927,7 @@ describe('[FR-TIME-06] earlier views are metered: snapped, debounced, cancelled 
         },
       }),
     });
-    const panel = within(await screen.findByRole('group', { name: 'Event details' }));
+    const panel = within(await screen.findByRole('dialog', { name: 'Event details' }));
     expect(await panel.findByText('Earlier views are limited')).toBeInTheDocument();
     expect(
       panel.getByText(/this event could not be computed for this moment just now/),
@@ -924,19 +1017,19 @@ describe('[FR-TIME-07] a page that failed is not requested again in a loop', () 
 });
 
 describe('[FR-TIME-04] the selected event', () => {
-  it('shows its full text, claims and conversation beside the list and follows links between events', async () => {
+  it('shows its full text, claims and conversation in a drawer and follows links between events', async () => {
     const user = userEvent.setup();
-    wide();
     const handler = api();
     renderApp(<TimelinePage caseId={CASE_ID} />, { api: handler });
     await screen.findByRole('list', { name: 'Events, 3 shown' });
-    expect(screen.getByText(/Select an event to see its full text/)).toBeInTheDocument();
+    // Nothing is open until an event is chosen: there is no standing side panel.
+    expect(screen.queryByRole('dialog', { name: 'Event details' })).toBeNull();
 
     await user.click(
       screen.getByRole('button', { name: /^Details of Teams sign-in - information needed/ }),
     );
     expect(param('sel')).toBe('e03');
-    const panel = within(await screen.findByRole('group', { name: 'Event details' }));
+    const panel = within(await screen.findByRole('dialog', { name: 'Event details' }));
     expect(
       await panel.findByText(
         /Please send a HAR capture and a Fiddler trace from three affected users/,
@@ -948,9 +1041,10 @@ describe('[FR-TIME-04] the selected event', () => {
     );
     const claims = panel.getByRole('list', { name: 'Derived claims' });
     expect(within(claims).getByText('Customer must send a HAR capture.')).toBeInTheDocument();
-    expect(
-      within(claims).getByRole('link', { name: 'Open in the Evidence Ledger' }),
-    ).toHaveAttribute('href', '/cases/case_1/evidence?sel=clm_e03');
+    expect(within(claims).getByRole('link', { name: 'Open in Evidence' })).toHaveAttribute(
+      'href',
+      '/cases/case_1/evidence?sel=clm_e03',
+    );
     expect(panel.getByText('No evidence signals were observed in this event.')).toBeInTheDocument();
     expect(panel.getByText('Nothing redacted')).toBeInTheDocument();
     expect(panel.getByText('#2 in time order')).toBeInTheDocument();
@@ -964,23 +1058,21 @@ describe('[FR-TIME-04] the selected event', () => {
       ),
     );
 
-    await user.click(screen.getByRole('button', { name: 'Close event details' }));
+    await user.click(panel.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(param('sel')).toBeNull());
   });
 
-  it('can move the whole page to the moment of the selected event', async () => {
+  it('opens the event named in the address, and can move the whole page to its moment', async () => {
     const user = userEvent.setup();
-    wide();
     navigateTo('/cases/case_1/timeline?sel=e03');
     renderApp(<TimelinePage caseId={CASE_ID} />, { api: api() });
-    await user.click(
-      await screen.findByRole('button', { name: 'Show what was known as of this event' }),
-    );
+    const panel = within(await screen.findByRole('dialog', { name: 'Event details' }));
+    expect(await panel.findByText('Text as stored (after redaction)')).toBeInTheDocument();
+    await user.click(await panel.findByRole('button', { name: 'Show what was known here' }));
     expect(param('asOf')).toBe(AS_OF);
   });
 
   it('passes the time cursor on when reading the event, and says when it is not in view', async () => {
-    wide();
     navigateTo(`/cases/case_1/timeline?sel=e99&asOf=${encodeURIComponent(AS_OF)}`);
     const handler = api({
       'events.get': () => {
@@ -988,11 +1080,12 @@ describe('[FR-TIME-04] the selected event', () => {
       },
     });
     renderApp(<TimelinePage caseId={CASE_ID} />, { api: handler });
+    const panel = within(await screen.findByRole('dialog', { name: 'Event details' }));
     expect(
-      await screen.findByRole('heading', { name: 'This event is not in the current view' }),
+      await panel.findByRole('heading', { name: 'This event is not in the current view' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/It may be after the selected moment, so it is withheld/),
+      panel.getByText(/It may be after the selected moment, so it is withheld/),
     ).toBeInTheDocument();
     expect(handler.call).toHaveBeenCalledWith(
       'events.get',
@@ -1001,13 +1094,6 @@ describe('[FR-TIME-04] the selected event', () => {
         query: { asOf: AS_OF },
       }),
     );
-  });
-
-  it('opens the details in a drawer on a narrow screen', async () => {
-    navigateTo('/cases/case_1/timeline?sel=e03');
-    renderApp(<TimelinePage caseId={CASE_ID} />, { api: api() });
-    const drawer = await screen.findByRole('dialog', { name: 'Event details' });
-    expect(await within(drawer).findByText('Text as stored (after redaction)')).toBeInTheDocument();
   });
 });
 

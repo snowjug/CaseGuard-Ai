@@ -27,7 +27,13 @@ export type PlainTokenKey =
   | 'cgFocus'
   | 'cgScrim'
   | 'cgShadowLow'
-  | 'cgShadowHigh';
+  | 'cgShadowHigh'
+  | 'cgGlow'
+  | 'cgGlass'
+  | 'cgGlassBorder'
+  | 'cgHighlight'
+  | 'cgAurora'
+  | 'cgGradientAccent';
 /** Every custom CSS variable (`--<key>`) that the CaseGuard themes add on top of the Fluent tokens. */
 export type CustomTokenKey = ToneTokenKey | SeriesTokenKey | PlainTokenKey;
 export type CustomTokens = Record<CustomTokenKey, string>;
@@ -57,6 +63,12 @@ export function buildCustomTokens(palette: Palette): CustomTokens {
     cgScrim: palette.scrim,
     cgShadowLow: palette.shadow.low,
     cgShadowHigh: palette.shadow.high,
+    cgGlow: palette.effects.glow,
+    cgGlass: palette.effects.glass,
+    cgGlassBorder: palette.effects.glassBorder,
+    cgHighlight: palette.effects.highlight,
+    cgAurora: palette.effects.aurora,
+    cgGradientAccent: palette.effects.gradient,
     cgSeries1: palette.series[0],
     cgSeries2: palette.series[1],
     cgSeries3: palette.series[2],
@@ -111,6 +123,12 @@ export const cg = {
   scrim: ref('cgScrim'),
   shadowLow: ref('cgShadowLow'),
   shadowHigh: ref('cgShadowHigh'),
+  glow: ref('cgGlow'),
+  glass: ref('cgGlass'),
+  glassBorder: ref('cgGlassBorder'),
+  highlight: ref('cgHighlight'),
+  aurora: ref('cgAurora'),
+  gradientAccent: ref('cgGradientAccent'),
   tone: buildToneRefs(),
   series: [
     ref('cgSeries1'),
@@ -128,12 +146,16 @@ export const cg = {
     4: px(space[4]),
     6: px(space[6]),
     8: px(space[8]),
+    10: px(space[10]),
+    12: px(space[12]),
+    16: px(space[16]),
   },
   radius: {
     none: '0',
     sm: px(radius.sm),
     md: px(radius.md),
     lg: px(radius.lg),
+    xl: px(radius.xl),
     pill: px(radius.pill),
   },
   borderWidth: {
@@ -145,9 +167,11 @@ export const cg = {
     fast: `${motion.fast}ms`,
     base: `${motion.base}ms`,
     slow: `${motion.slow}ms`,
+    max: `${motion.max}ms`,
     easing: motion.easing,
   },
   font: {
+    base: typography.family.base,
     mono: typography.family.mono,
   },
 } as const;

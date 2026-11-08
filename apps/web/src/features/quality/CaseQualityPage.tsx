@@ -1,25 +1,31 @@
 'use client';
 
 import type { AnalysisState, CaseDetail } from '@caseguard/schemas';
-import { EmptyState, LoadingSkeleton, PageHeader, ProvenanceBadge, cg } from '@caseguard/ui';
-import { Button, Tab, TabList, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
 import {
-  ArrowSyncRegular,
-  BeakerRegular,
-  FolderRegular,
-  SearchRegular,
-} from '@fluentui/react-icons';
-import { useId, type ReactNode } from 'react';
+  BlurFade,
+  Button,
+  ButtonLink,
+  EmptyState,
+  LoadingSkeleton,
+  PageHeader,
+  ProvenanceBadge,
+  TabPanel,
+  Tabs,
+  cg,
+  type TabItem,
+} from '@caseguard/ui';
+import { makeStyles, mergeClasses } from '@fluentui/react-components';
+import { ArrowLeftIcon, FolderSearchIcon, RotateCwIcon, SearchIcon } from 'lucide-react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { type AsOfCursor, useAsOfCursor } from '../../components/case/as-of';
 import { useKnownAt } from '../../components/case/case-hooks';
-import { LinkButton } from '../../components/common/LinkButton';
 import { PermissionGate } from '../../components/common/PermissionGate';
 import { QueryErrorState } from '../../components/common/QueryErrorState';
 import { useApiQuery } from '../../lib/api/hooks';
 import { useAuth } from '../../lib/auth/context';
 import { caseHref } from '../../lib/deep-links';
 import { ANALYSIS_STATE_BADGES } from '../../lib/labels';
-import { useTabState } from '../../lib/url-state';
+import { codecs, useUrlChoiceState } from '../../lib/url-state';
 import { CaseSkillMatches } from '../skills/CaseSkillMatches';
 import { AsOfBar } from './AsOfBar';
 import {
@@ -31,51 +37,53 @@ import {
 } from './case-hooks';
 import { CoachingView } from './CoachingView';
 import { CompareView } from './CompareView';
+import { useLook } from './look';
 import { MetricsView } from './MetricsView';
 import { PanelBoundary } from './PanelBoundary';
-import { QualityIndexView } from './QualityIndexPanel';
-import { useInsightStyles } from './styles';
+import { ScoreSkeleton } from './ScoreSkeleton';
+import { ScoreView } from './ScoreView';
 import { WarningsView } from './WarningsView';
 
-const TABS = ['index', 'effort', 'warnings', 'skills', 'coaching', 'compare'] as const;
+const TABS = ['effort', 'warnings', 'skills', 'coaching', 'compare'] as const;
 type Tab = (typeof TABS)[number];
-const TAB_LABELS: Record<Tab, string> = {
-  index: 'Quality index',
-  effort: 'Effort and metrics',
-  warnings: 'Live warnings',
-  skills: 'SkillDNA',
-  coaching: 'Coaching',
-  compare: 'Compare cases',
-};
+const TAB_CODEC = codecs.enumOf(TABS, 'effort');
+const TAB_ITEMS: readonly TabItem[] = [
+  { value: 'effort', label: 'Effort and metrics' },
+  { value: 'warnings', label: 'Warnings' },
+  { value: 'skills', label: 'Skills' },
+  { value: 'coaching', label: 'Coaching' },
+  { value: 'compare', label: 'Compare' },
+];
 
 const useStyles = makeStyles({
-  tabs: {
-    overflowX: 'auto',
-    maxWidth: '100%',
-    borderBottom: `1px solid ${cg.borderSubtle}`,
+  more: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[4],
+    minWidth: 0,
+    // Opening the page on a tab (a link from another page) scrolls here, clear of the sticky top bar.
+    scrollMarginTop: '72px',
   },
-  context: {
-    margin: 0,
-    fontSize: tokens.fontSizeBase300,
-    color: cg.textSecondary,
-    overflowWrap: 'anywhere',
+  panel: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cg.space[4],
+    minWidth: 0,
+    paddingTop: cg.space[2],
   },
 });
 
 const PAGE_HELP = (
   <>
     <p>
-      The case review shows how well the investigation went, as estimates you can open and question:
-      the Case Quality Index with its penalties and improvements, Avoidable Support Effort, the live
-      warnings an engineer would have seen, the SkillDNA that fits, a coaching report and a
-      comparison with another case.
+      The Case Quality Index is a model estimate from 0 to 100 of how well the investigation went.
+      It is built from six areas and reduced by penalties that each rest on evidence. It helps focus
+      a human review; it is not a rating of a person.
     </p>
     <p>
-      Use the time cursor to see the case as it stood at an earlier moment: the index, metrics,
-      warnings and skill matches then use only what was on record by then. Coaching and the
-      comparison review the finished case and say so.
+      &ldquo;What was known then&rdquo; shows the score, metrics, warnings and skill matches as they
+      stood at an earlier moment. Coaching and the comparison look back at the finished case.
     </p>
-    <p>Nothing here rates a person: it is about the case and the process.</p>
   </>
 );
 
@@ -83,13 +91,13 @@ function CaseMissing() {
   return (
     <EmptyState
       headingLevel={2}
-      icon={<FolderRegular />}
+      icon={<FolderSearchIcon />}
       title="We could not find that case"
       description="It may have been deleted, or the address may be mistyped."
       action={
-        <LinkButton href="/cases" appearance="primary" icon={<FolderRegular />}>
+        <ButtonLink href="/cases" variant="primary">
           Browse cases
-        </LinkButton>
+        </ButtonLink>
       }
     />
   );
@@ -108,7 +116,7 @@ function NotAnalysed({
   return (
     <EmptyState
       headingLevel={2}
-      icon={<SearchRegular />}
+      icon={<SearchIcon />}
       title={
         state === 'failed'
           ? 'The analysis of this case failed'
@@ -118,17 +126,17 @@ function NotAnalysed({
       }
       description={
         running
-          ? `The review appears when the analysis finishes (${ANALYSIS_STATE_BADGES[state].label.toLowerCase()}). Refresh in a moment.`
-          : 'The quality review is built from the analysis of the case. Open the case to start (or restart) the analysis; this page fills in once it has run.'
+          ? `The score appears when the analysis finishes (${ANALYSIS_STATE_BADGES[state].label.toLowerCase()}). Refresh in a moment.`
+          : 'The score is built from the analysis of the case. Open the case to start (or restart) the analysis; this page fills in once it has run.'
       }
       action={
-        <LinkButton href={caseHref(caseId)} appearance="primary">
-          Open the case
-        </LinkButton>
+        <ButtonLink href={caseHref(caseId)} variant="primary">
+          Open case details
+        </ButtonLink>
       }
       secondaryAction={
         running ? (
-          <Button appearance="outline" icon={<ArrowSyncRegular />} onClick={onRefresh}>
+          <Button variant="secondary" icon={<RotateCwIcon />} onClick={onRefresh}>
             Refresh
           </Button>
         ) : undefined
@@ -137,32 +145,8 @@ function NotAnalysed({
   );
 }
 
-function IndexTab({ caseId, cursor }: { caseId: string; cursor: AsOfCursor }) {
-  const styles = useInsightStyles();
-  const { asOf, ready, setAsOf } = cursor;
-  const query = useQualityAt(caseId, asOf, ready);
-  return (
-    <PanelBoundary
-      query={query}
-      subject="The quality index"
-      asOf={asOf}
-      onWholeRecord={() => setAsOf(null)}
-      skeleton={<LoadingSkeleton variant="card" count={3} label="Loading the quality index" />}
-    >
-      {(assessment, meta) => (
-        <div
-          className={mergeClasses(styles.page, meta.isRefreshing && styles.busy)}
-          aria-busy={meta.isRefreshing}
-        >
-          <QualityIndexView assessment={assessment} caseId={caseId} />
-        </div>
-      )}
-    </PanelBoundary>
-  );
-}
-
 function EffortTab({ caseId, cursor }: { caseId: string; cursor: AsOfCursor }) {
-  const styles = useInsightStyles();
+  const look = useLook();
   const { asOf, ready, setAsOf } = cursor;
   const query = useMetricsAt(caseId, asOf, ready);
   return (
@@ -175,7 +159,7 @@ function EffortTab({ caseId, cursor }: { caseId: string; cursor: AsOfCursor }) {
     >
       {(data, meta) => (
         <div
-          className={mergeClasses(styles.page, meta.isRefreshing && styles.busy)}
+          className={mergeClasses(look.stack, meta.isRefreshing && look.busy)}
           aria-busy={meta.isRefreshing}
         >
           <MetricsView metrics={data.items} caseId={caseId} asOf={asOf} />
@@ -186,7 +170,7 @@ function EffortTab({ caseId, cursor }: { caseId: string; cursor: AsOfCursor }) {
 }
 
 function WarningsTab({ caseId, cursor }: { caseId: string; cursor: AsOfCursor }) {
-  const styles = useInsightStyles();
+  const look = useLook();
   const { asOf, ready, setAsOf } = cursor;
   const query = useWarningsAt(caseId, asOf, ready);
   return (
@@ -199,7 +183,7 @@ function WarningsTab({ caseId, cursor }: { caseId: string; cursor: AsOfCursor })
     >
       {(data, meta) => (
         <div
-          className={mergeClasses(styles.page, meta.isRefreshing && styles.busy)}
+          className={mergeClasses(look.stack, meta.isRefreshing && look.busy)}
           aria-busy={meta.isRefreshing}
         >
           <WarningsView
@@ -242,8 +226,6 @@ function TabContent({
   cursor: AsOfCursor;
 }): ReactNode {
   switch (tab) {
-    case 'index':
-      return <IndexTab caseId={caseId} cursor={cursor} />;
     case 'effort':
       return <EffortTab caseId={caseId} cursor={cursor} />;
     case 'warnings':
@@ -264,62 +246,83 @@ function TabContent({
   }
 }
 
-function Review({ caseId, detail }: { caseId: string; detail: CaseDetail }) {
+function ScorePage({ caseId, detail }: { caseId: string; detail: CaseDetail }) {
   const styles = useStyles();
-  const insight = useInsightStyles();
-  const baseId = useId();
+  const look = useLook();
   // The boundary is always an event instant, asked for once the case's event instants are known (the shared protocol of
   // the case pages: an earlier view is metered by the server and one computation serves every instant between events).
   const cursor = useAsOfCursor(caseId);
   const { asOf, setAsOf } = cursor;
-  const [tab, setTab] = useTabState(TABS, 'index');
+  const [tab, setTab] = useUrlChoiceState('tab', TAB_CODEC, { history: 'push' });
   const known = useKnownAt(caseId, asOf, cursor.ready);
+  const quality = useQualityAt(caseId, asOf, cursor.ready);
+
+  // A link that names a tab lands on it: once the score is in (so the page stops growing), scroll to the tabs, once.
+  const more = useRef<HTMLElement>(null);
+  const scrolled = useRef(false);
+  const settled = !quality.isPending;
+  useEffect(() => {
+    if (!settled || scrolled.current) return;
+    scrolled.current = true;
+    if (new URLSearchParams(window.location.search).has('tab'))
+      more.current?.scrollIntoView({ block: 'start' });
+  }, [settled]);
 
   return (
-    <div className={insight.page}>
-      <AsOfBar
-        range={caseTimeRange(detail)}
+    <div className={look.page}>
+      <BlurFade index={0}>
+        <AsOfBar
+          range={caseTimeRange(detail)}
+          asOf={asOf}
+          onChange={setAsOf}
+          instants={cursor.instants}
+          known={known.data}
+          knownError={known.isError ? known.error : null}
+          loading={asOf !== null && known.isPending}
+        />
+      </BlurFade>
+      <PanelBoundary
+        query={quality}
+        subject="The score"
         asOf={asOf}
-        onChange={setAsOf}
-        instants={cursor.instants}
-        known={known.data}
-        knownError={known.isError ? known.error : null}
-        loading={asOf !== null && known.isPending}
-      />
-      <div className={styles.tabs}>
-        <TabList
-          selectedValue={tab}
-          onTabSelect={(_event, data) => setTab(data.value as Tab)}
-          aria-label="Quality review sections"
-        >
-          {TABS.map((value) => (
-            <Tab
-              key={value}
-              value={value}
-              id={`${baseId}-tab-${value}`}
-              aria-controls={`${baseId}-panel-${value}`}
-            >
-              {TAB_LABELS[value]}
-            </Tab>
-          ))}
-        </TabList>
-      </div>
-      <div
-        role="tabpanel"
-        id={`${baseId}-panel-${tab}`}
-        aria-labelledby={`${baseId}-tab-${tab}`}
-        className={insight.page}
+        onWholeRecord={() => setAsOf(null)}
+        skeleton={<ScoreSkeleton label="Loading the score" />}
       >
-        <TabContent tab={tab} caseId={caseId} cursor={cursor} />
-      </div>
+        {(assessment, meta) => (
+          <div
+            className={mergeClasses(meta.isRefreshing && look.busy)}
+            aria-busy={meta.isRefreshing}
+          >
+            <ScoreView
+              assessment={assessment}
+              caseId={caseId}
+              onWholeRecord={() => setAsOf(null)}
+            />
+          </div>
+        )}
+      </PanelBoundary>
+      <BlurFade index={5}>
+        <section ref={more} className={styles.more} aria-label="More about this score">
+          <Tabs
+            value={tab}
+            onValueChange={(value) => setTab(value as Tab)}
+            items={TAB_ITEMS}
+            aria-label="Score details"
+          >
+            <TabPanel value={tab} className={styles.panel}>
+              <TabContent tab={tab} caseId={caseId} cursor={cursor} />
+            </TabPanel>
+          </Tabs>
+        </section>
+      </BlurFade>
     </div>
   );
 }
 
-function ReviewBody({ caseId }: { caseId: string }) {
+function ScoreBody({ caseId }: { caseId: string }) {
   const record = useCaseRecord(caseId);
   if (record.isPending) {
-    return <LoadingSkeleton variant="card" count={2} label="Loading the case" />;
+    return <ScoreSkeleton label="Loading the case" />;
   }
   if (record.isError) {
     if (record.error.isNotFound) return <CaseMissing />;
@@ -342,24 +345,25 @@ function ReviewBody({ caseId }: { caseId: string }) {
       />
     );
   }
-  return <Review caseId={caseId} detail={detail} />;
+  return <ScorePage caseId={caseId} detail={detail} />;
 }
 
 /**
- * Case Quality Review (`/cases/[caseId]/quality`): the Case Quality Index, Avoidable Support Effort and metrics, live
- * warnings, SkillDNA matches, coaching and a comparison with another case. The time cursor (`?asOf=`) recomputes the index,
- * metrics, warnings and matches from only what was known then; coaching and the comparison are retrospective and say so.
- * `?tab=` picks the section, `?wstate=` / `?wcat=` filter the warnings and `?with=` picks the comparison case.
+ * Score (`/cases/[caseId]/quality`): how the Case Quality Index was built and what would raise it. The result comes first
+ * (the score, its six areas, what lowered it and what would raise it); effort and metrics, warnings, skill matches,
+ * coaching and a comparison with another case sit under tabs. The time cursor (`?asOf=`) recomputes the score, metrics,
+ * warnings and matches from only what was known then; coaching and the comparison are retrospective and say so. `?tab=`
+ * picks the section, `?wstate=` / `?wcat=` filter the warnings and `?with=` picks the comparison case. The case's own
+ * name, status and tabs are in the header above, so this page does not repeat them.
  */
 export function CaseQualityPage({ caseId }: { caseId: string }) {
-  const styles = useStyles();
   const record = useCaseRecord(caseId);
   const detail = record.data;
   return (
     <>
       <PageHeader
-        title="Case Quality Review"
-        description="How well the investigation went, as estimates you can open and question."
+        title="Score"
+        description="See how the score was built and what would raise it."
         help={PAGE_HELP}
         meta={
           <>
@@ -368,32 +372,18 @@ export function CaseQualityPage({ caseId }: { caseId: string }) {
           </>
         }
         actions={
-          <>
-            <LinkButton href={caseHref(caseId)} appearance="outline" icon={<FolderRegular />}>
-              Case overview
-            </LinkButton>
-            <LinkButton
-              href={caseHref(caseId, 'counterfactual')}
-              appearance="outline"
-              icon={<BeakerRegular />}
-            >
-              Counterfactual Lab
-            </LinkButton>
-          </>
+          <ButtonLink href={caseHref(caseId, 'review')} variant="ghost" icon={<ArrowLeftIcon />}>
+            Back to review
+          </ButtonLink>
         }
       />
-      {detail ? (
-        <p className={styles.context}>
-          <strong>{detail.reference}</strong> · {detail.title}
-        </p>
-      ) : null}
       <PermissionGate
         permission="quality:read"
-        subject="the case quality review"
+        subject="the case score"
         grantedTo="Engineers, reviewers, managers and administrators"
-        skeleton={<LoadingSkeleton variant="card" count={2} label="Loading the review" />}
+        skeleton={<ScoreSkeleton label="Loading the score" />}
       >
-        <ReviewBody caseId={caseId} />
+        <ScoreBody caseId={caseId} />
       </PermissionGate>
     </>
   );

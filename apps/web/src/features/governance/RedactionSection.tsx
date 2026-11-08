@@ -5,10 +5,10 @@ import {
   type GovernanceSettings,
   type RedactionCategory,
 } from '@caseguard/schemas';
-import { Notice, cg } from '@caseguard/ui';
-import { Button, Switch, makeStyles, tokens } from '@fluentui/react-components';
-import { AddRegular, DeleteRegular } from '@fluentui/react-icons';
-import { FieldGrid, FieldGroup, SwitchField, TextField, useEditor } from './fields';
+import { Accordion, Button, HelpButton, IconButton, cg } from '@caseguard/ui';
+import { makeStyles, tokens } from '@fluentui/react-components';
+import { PlusIcon, Trash2Icon } from 'lucide-react';
+import { FieldGroup, SwitchField, SwitchRow, TextField, useEditor } from './fields';
 import { getIn } from './messages';
 import { SectionEditor } from './SectionEditor';
 
@@ -19,23 +19,23 @@ const useStyles = makeStyles({
     gap: cg.space[3],
     margin: 0,
     padding: 0,
-    listStyle: 'none',
+    listStyleType: 'none',
   },
   row: {
     display: 'grid',
-    gap: cg.space[2],
-    alignItems: 'start',
+    gap: cg.space[3],
+    alignItems: 'end',
     gridTemplateColumns: 'minmax(0, 1fr)',
     '@media (min-width: 640px)': { gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 2fr) auto' },
   },
-  muted: { margin: 0, fontSize: tokens.fontSizeBase300, color: cg.textSecondary },
-  list2: {
-    margin: `${cg.space[1]} 0 0`,
-    paddingLeft: cg.space[4],
-    display: 'flex',
-    flexDirection: 'column',
-    gap: cg.space[1],
+  head: { display: 'flex', alignItems: 'flex-start', gap: cg.space[1] },
+  muted: {
+    margin: 0,
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase300,
+    color: cg.textSecondary,
   },
+  add: { paddingTop: cg.space[3] },
 });
 
 /**
@@ -74,7 +74,7 @@ const CATEGORY_LABELS: Partial<Record<RedactionCategory, string>> = {
 
 const CATEGORY_ORDER: readonly RedactionCategory[] = [...SECRET_CATEGORIES, ...PERSONAL_CATEGORIES];
 
-function Categories() {
+function PersonalData() {
   const { draft, set, disabled } = useEditor();
   const raw = getIn(draft, 'enabledCategories');
   const enabled = new Set<RedactionCategory>(
@@ -92,60 +92,16 @@ function Categories() {
   };
   return (
     <>
-      <FieldGroup
-        title="Credentials (always redacted)"
-        description="Secrets such as tokens, keys and connection strings are always removed before text is stored. They cannot be turned off."
-      >
-        <FieldGrid>
-          {SECRET_CATEGORIES.map((category) => (
-            <div key={category}>
-              <SwitchFixed label={CATEGORY_LABELS[category] ?? category} />
-            </div>
-          ))}
-        </FieldGrid>
-      </FieldGroup>
-      <FieldGroup
-        title="Personal data (your choice)"
-        description="Replaced by numbered placeholders so analysis can still tell two values apart."
-      >
-        <FieldGrid>
-          {PERSONAL_CATEGORIES.map((category) => (
-            <PersonalSwitch
-              key={category}
-              label={CATEGORY_LABELS[category] ?? category}
-              checked={enabled.has(category)}
-              disabled={disabled}
-              onChange={(on) => toggle(category, on)}
-            />
-          ))}
-        </FieldGrid>
-      </FieldGroup>
+      {PERSONAL_CATEGORIES.map((category) => (
+        <SwitchRow
+          key={category}
+          label={CATEGORY_LABELS[category] ?? category}
+          checked={enabled.has(category)}
+          disabled={disabled}
+          onChange={(on) => toggle(category, on)}
+        />
+      ))}
     </>
-  );
-}
-
-function SwitchFixed({ label }: { label: string }) {
-  return <Switch label={label} checked disabled aria-label={`${label}: always on`} />;
-}
-
-function PersonalSwitch({
-  label,
-  checked,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  disabled: boolean;
-  onChange: (on: boolean) => void;
-}) {
-  return (
-    <Switch
-      label={label}
-      checked={checked}
-      disabled={disabled}
-      onChange={(_event, data) => onChange(data.checked)}
-    />
   );
 }
 
@@ -157,33 +113,45 @@ function CustomPatterns() {
   const raw = getIn(draft, 'customPatterns');
   const patterns = Array.isArray(raw) ? (raw as readonly unknown[]) : [];
   return (
-    <FieldGroup
-      title="Custom patterns"
-      description="Extra tenant patterns (regular expressions) replaced with [REDACTED:custom] in text you ingest."
-    >
-      <Notice variant="warning" title="Custom patterns can be refused">
-        A pattern runs on text you do not control, in an engine that can backtrack for a very long
-        time. Each pattern is checked when you save it (length, syntax, matching empty text, nested
-        repetition, back-references and a timed probe on hostile input) and again, with a hard time
-        limit, at ingestion. A pattern that is unsafe or too slow is refused with the reason. At
-        ingestion a pattern that fails, or runs out of time, means redaction would be incomplete, so
-        the whole payload is refused instead of being stored partly redacted.
-      </Notice>
+    <>
+      <div className={styles.head}>
+        <p className={styles.muted}>
+          Custom patterns can be refused. Each pattern is checked when you save it and again, with a
+          time limit, at ingestion: one that is unsafe, can backtrack for a very long time, or is
+          too slow is refused with the reason. If a pattern fails or runs out of time at ingestion,
+          redaction would be incomplete, so the whole payload is refused instead of being stored
+          partly redacted.
+        </p>
+        <HelpButton label="About custom patterns" title="Custom patterns">
+          A pattern runs on text you do not control, in an engine that can backtrack for a very long
+          time. Each pattern is checked for length, syntax, matching empty text, nested repetition,
+          back-references and with a timed probe on hostile input.
+        </HelpButton>
+      </div>
       <p className={styles.muted}>
         {patterns.length} of {MAX_PATTERNS} patterns used. Names up to 60 characters, patterns up to
-        200.
+        200. Matches are replaced with [REDACTED:custom].
       </p>
       {patterns.length > 0 ? (
         <ul className={styles.list} aria-label="Custom redaction patterns">
           {patterns.map((_pattern, index) => (
             <li key={index} className={styles.row}>
-              <TextField path={`customPatterns.${index}.name`} label="Name" maxLength={60} />
-              <TextField path={`customPatterns.${index}.pattern`} label="Pattern" maxLength={200} />
-              <Button
-                appearance="subtle"
-                icon={<DeleteRegular />}
+              <TextField
+                stacked
+                path={`customPatterns.${index}.name`}
+                label="Name"
+                maxLength={60}
+              />
+              <TextField
+                stacked
+                path={`customPatterns.${index}.pattern`}
+                label="Pattern"
+                maxLength={200}
+              />
+              <IconButton
+                icon={<Trash2Icon />}
+                label={`Remove custom pattern ${index + 1}`}
                 disabled={disabled}
-                aria-label={`Remove custom pattern ${index + 1}`}
                 onClick={() =>
                   set(
                     'customPatterns',
@@ -199,17 +167,17 @@ function CustomPatterns() {
           No custom patterns. The built-in categories above still apply.
         </p>
       )}
-      <div>
+      <div className={styles.add}>
         <Button
-          appearance="outline"
-          icon={<AddRegular />}
+          variant="secondary"
+          icon={<PlusIcon />}
           disabled={disabled || patterns.length >= MAX_PATTERNS}
           onClick={() => set('customPatterns', [...patterns, { name: '', pattern: '' }])}
         >
           Add a pattern
         </Button>
       </div>
-    </FieldGroup>
+    </>
   );
 }
 
@@ -227,25 +195,46 @@ export function RedactionSection({ envelope }: { envelope: GovernanceSettings['r
       effect="enforced"
       effectNote="Applied to cases ingested after the change; text already stored is not redacted again. An incomplete redaction (a pattern that fails or times out) refuses the payload."
     >
-      <Categories />
-      <CustomPatterns />
-      <FieldGroup title="Other">
-        <FieldGrid columns={2}>
-          <div>
-            <SwitchField
-              path="redactBeforeModelCalls"
-              label="Redact before model calls"
-              hint="Recorded only: nothing reads this switch, so turning it off does not change when text is redacted."
+      <Accordion>
+        <FieldGroup
+          title="Personal data (your choice)"
+          description="Replaced by numbered placeholders so analysis can still tell two values apart."
+          paths={['enabledCategories']}
+          defaultOpen
+        >
+          <PersonalData />
+        </FieldGroup>
+        <FieldGroup title="Custom patterns" paths={['customPatterns']}>
+          <CustomPatterns />
+        </FieldGroup>
+        <FieldGroup
+          title="Credentials (always redacted)"
+          description="Secrets such as tokens, keys and connection strings are always removed before text is stored. They cannot be turned off."
+        >
+          {SECRET_CATEGORIES.map((category) => (
+            <SwitchRow
+              key={category}
+              label={CATEGORY_LABELS[category] ?? category}
+              hint="Always on"
+              checked
+              disabled
             />
-          </div>
+          ))}
+        </FieldGroup>
+        <FieldGroup title="Other" paths={['redactBeforeModelCalls', 'version']}>
+          <SwitchField
+            path="redactBeforeModelCalls"
+            label="Redact before model calls"
+            hint="Recorded only: nothing reads this switch, so turning it off does not change when text is redacted."
+          />
           <TextField path="version" label="Version label" maxLength={40} hint="Free text." />
-        </FieldGrid>
-        <ul className={styles.list2} aria-label="Placeholders">
-          <li className={styles.muted}>
-            Credentials become [REDACTED:category]; personal data becomes [REDACTED:category#n].
-          </li>
-        </ul>
-      </FieldGroup>
+          <ul className={styles.list} aria-label="Placeholders">
+            <li className={styles.muted}>
+              Credentials become [REDACTED:category]; personal data becomes [REDACTED:category#n].
+            </li>
+          </ul>
+        </FieldGroup>
+      </Accordion>
     </SectionEditor>
   );
 }

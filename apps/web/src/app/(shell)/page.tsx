@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import { CommandCenterPage } from '../../features/command-center/CommandCenterPage';
+import { HomePage } from '../../features/home/HomePage';
 
-export const metadata: Metadata = { title: 'Command Center' };
+export const metadata: Metadata = { title: 'Home' };
 
 export default function Page() {
-  return <CommandCenterPage />;
+  return <HomePage />;
 }

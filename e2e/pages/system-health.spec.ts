@@ -1,3 +1,4 @@
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from '../support/fixtures';
 import { mainRegion, openPage, settle } from '../support/ui';
 
@@ -25,7 +26,26 @@ const humanize = (name: string): string => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
 
-test.describe('[FR-SYS-01] System Health: what the environment is made of, and which parts are stand-ins', () => {
+/**
+ * Opens a collapsed section of the page from its heading button and returns its content region. A closed section keeps
+ * its content mounted but clipped, so Playwright would call it visible: what proves it is open is `aria-expanded`.
+ */
+async function openSection(page: Page, name: RegExp): Promise<Locator> {
+  // The button inside the section's heading: a table in the section may have a sort button of the same name.
+  const trigger = page.getByRole('heading', { name }).getByRole('button');
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  return page.getByRole('region', { name });
+}
+
+/** The moment of the health check: the page says "just now" and carries the exact UTC moment in the element. */
+const checkedAt = (page: Page): Locator =>
+  page
+    .getByRole('group', { name: 'Overall status' })
+    .locator('dl[aria-label="Service details"]')
+    .locator('time');
+
+test.describe('[FR-SYS-01] System status: what the environment is made of, and which parts are stand-ins', () => {
   test.use({ persona: 'admin' });
 
   test('the overall status, the service and its environment are the ones the API reports', async ({
@@ -34,7 +54,7 @@ test.describe('[FR-SYS-01] System Health: what the environment is made of, and w
   }) => {
     const health = await api('admin').getOk<Health>('/system/health');
     await openPage(page, '/system');
-    await expect(page.getByRole('heading', { level: 1, name: 'System Health' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'System status' })).toBeVisible();
     const overall = page.getByRole('group', { name: 'Overall status' });
     await expect(overall).toContainText(
       health.status === 'healthy' ? 'Healthy' : /Degraded|Down|Unknown/,
@@ -44,7 +64,10 @@ test.describe('[FR-SYS-01] System Health: what the environment is made of, and w
     await expect(details).toContainText(health.environment);
     await expect(details).toContainText(/Uptime/);
     await expect(details).toContainText(/Checked \d{1,2} \w{3} 2026|Checked/);
-    await expect(page.getByText(/^Checked \d\d:\d\d:\d\d UTC$/)).toBeVisible();
+    // The check time is relative text ("just now") with the exact UTC moment, to the second, in the element itself.
+    await expect(checkedAt(page)).toBeVisible();
+    await expect(checkedAt(page)).toHaveAttribute('datetime', /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d/);
+    await expect(checkedAt(page)).toHaveAttribute('title', /^\d{1,2} \w{3} \d{4}, \d\d:\d\d UTC$/);
   });
 
   test('every dependency is a row, and each says whether it is a configured service or a simulated stand-in', async ({
@@ -53,16 +76,13 @@ test.describe('[FR-SYS-01] System Health: what the environment is made of, and w
   }) => {
     const health = await api('admin').getOk<Health>('/system/health');
     await openPage(page, '/system');
+    // The dependencies are the section that is open when the page loads.
+    await expect(
+      page.getByRole('heading', { name: /^Dependencies/ }).getByRole('button'),
+    ).toHaveAttribute('aria-expanded', 'true');
     const table = page.getByRole('table', { name: 'Dependencies and their health' });
     await expect(table).toBeVisible();
-    for (const column of [
-      'Dependency',
-      'Status',
-      'Real or simulated',
-      'Latency',
-      'Detail',
-      'Checked',
-    ]) {
+    for (const column of ['Dependency', 'Status', 'Source', 'Latency', 'Detail', 'Checked']) {
       await expect(table.getByRole('columnheader', { name: column }), column).toBeVisible();
     }
     for (const dependency of health.dependencies) {
@@ -88,7 +108,7 @@ test.describe('[FR-SYS-01] System Health: what the environment is made of, and w
   }) => {
     const health = await api('admin').getOk<Health>('/system/health');
     await openPage(page, '/system');
-    const real = page.getByRole('group', { name: 'What is real here' });
+    const real = await openSection(page, /^What is real here/);
     await expect(real).toBeVisible();
     await expect(
       real.getByText(
@@ -111,7 +131,7 @@ test.describe('[FR-SYS-01] System Health: what the environment is made of, and w
     const health = await api('admin').getOk<Health>('/system/health');
     expect(health.provider.kind).toBe('deterministic');
     await openPage(page, '/system');
-    const provider = page.getByRole('group', { name: 'AI provider' });
+    const provider = await openSection(page, /^AI provider/);
     await expect(provider).toContainText(health.provider.validationNote);
     const details = provider.locator('dl[aria-label="AI provider details"]');
     await expect(details).toContainText(health.provider.model);
@@ -119,7 +139,7 @@ test.describe('[FR-SYS-01] System Health: what the environment is made of, and w
     await expect(details).toContainText('Max retries');
     await expect(provider.getByText('Simulated').first()).toBeVisible();
 
-    const migrations = page.getByRole('group', { name: 'Migrations' });
+    const migrations = await openSection(page, /^Migrations/);
     await expect(migrations).toContainText(
       health.migrations.pending === 0 ? 'Up to date' : `${health.migrations.pending} pending`,
     );
@@ -132,30 +152,31 @@ test.describe('[FR-SYS-01] System Health: what the environment is made of, and w
     page,
   }) => {
     await openPage(page, '/system');
-    const requests = page.getByRole('group', { name: 'Requests' });
+    const requests = await openSection(page, /^Requests/);
     await expect(requests).toContainText(
       "The counters live in this API instance's memory and reset when it restarts.",
     );
     await expect(requests.locator('dl[aria-label="Request totals and latency"]')).toContainText(
       'Median latency',
     );
-    await expect(page.getByRole('group', { name: 'Security events' })).toContainText(
+    await expect(await openSection(page, /^Security events/)).toContainText(
       'Authentication failures',
     );
-    const checked = page.getByText(/^Checked \d\d:\d\d:\d\d UTC$/);
-    const before = await checked.innerText();
+    const checked = checkedAt(page);
+    const before = (await checked.getAttribute('datetime')) ?? '';
+    expect(before, 'the page says when it checked').not.toBe('');
     // The check time has a resolution of one second: press Refresh until it has moved on, rather than sleeping first.
     const refresh = page.getByRole('button', { name: 'Refresh' });
     await expect(async () => {
       await refresh.click();
-      await expect(checked).not.toHaveText(before, { timeout: 2_000 });
+      await expect(checked).not.toHaveAttribute('datetime', before, { timeout: 2_000 });
     }, 'the check time moves on after Refresh').toPass({ timeout: 30_000 });
     await settle(page);
     await expect(mainRegion(page).getByRole('alert')).toHaveCount(0);
   });
 });
 
-test.describe('[FR-SYS-01] System Health needs the telemetry permission', () => {
+test.describe('[FR-SYS-01] System status needs the telemetry permission', () => {
   test.describe('as a skill curator', () => {
     test.use({ persona: 'curator' });
     test('the page says which permission is missing and who has it, and requests nothing', async ({
@@ -168,7 +189,7 @@ test.describe('[FR-SYS-01] System Health needs the telemetry permission', () => 
       });
       await openPage(page, '/system');
       await expect(
-        page.getByRole('heading', { level: 2, name: 'You do not have access to System Health' }),
+        page.getByRole('heading', { level: 2, name: 'You do not have access to System status' }),
       ).toBeVisible();
       await expect(
         page.getByText(/does not include the "telemetry:read" permission/),

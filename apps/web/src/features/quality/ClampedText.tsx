@@ -1,7 +1,7 @@
 'use client';
 
-import { cg } from '@caseguard/ui';
-import { Button, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { Button, cg } from '@caseguard/ui';
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
 import { useId, useState } from 'react';
 
 const useStyles = makeStyles({
@@ -15,7 +15,7 @@ const useStyles = makeStyles({
     whiteSpace: 'pre-wrap',
   },
   clamped: { display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' },
-  toggle: { alignSelf: 'flex-start', minHeight: '24px', paddingInline: cg.space[1] },
+  toggle: { alignSelf: 'flex-start', marginInlineStart: `calc(${cg.space[3]} * -1)` },
 });
 
 /** Characters per line below which a text certainly fits; longer text gets the expand control. */
@@ -51,8 +51,8 @@ export function ClampedText({ text, lines = 3, label = 'text', className }: Clam
       </p>
       {long ? (
         <Button
-          appearance="transparent"
-          size="small"
+          variant="ghost"
+          size="sm"
           className={styles.toggle}
           aria-expanded={open}
           aria-controls={id}
