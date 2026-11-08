@@ -329,4 +329,28 @@ got the same 9 in pass 2 because each one met the same bar after the fixes; the 
   whole-repository checks above were then run on the final tree.
 - The machine was shared with other jobs during every run, so durations are noisy.
 
-**Next**: push `ui/caseguard-redesign` and open the pull request into `build/intelligence-wave-2`.
+**Next**: push `ui/caseguard-redesign` and open the pull request into `build/intelligence-wave-2` (done: pull request #14, all
+its CI jobs green except dependency review, which fails on every run because the repository's Dependency graph setting is off).
+
+## 2026-11-08 - Delivery to main and the repository About box
+
+**Done**
+
+- At the owner's request `main` was created from `4459031` (the tip of `ui/caseguard-redesign`, which contains `build/wave-1`,
+  `build/intelligence-wave-2` and the interface redesign) with a plain push, and made the default branch. No existing branch
+  was changed: `feat/caseguard-ai-platform` is still at `2ecb454` and `build/intelligence-wave-2` at `46a13ac`. Pull request #14
+  (into `build/intelligence-wave-2`) is still open and is now redundant.
+- The repository's About box, which was empty, has a description (the README's own tagline), 19 topics and no website, because
+  nothing is deployed.
+- The documentation that said there is no `main`, or that CI is green only on unmerged branches, was updated (`README.md`,
+  `CI_CD.md`, `ROADMAP.md`, `KNOWN_LIMITATIONS.md`, `PRODUCTION_READINESS.md`, `ASSUMPTIONS.md`, `DEMO_SCRIPT.md`).
+- CodeQL ran on the push to `main` (run 42496271360) and succeeded. `ci.yml` does not run on pushes to `main`, so it was started
+  by hand there (run 42496327427; its result is in the Actions tab).
+
+**Decisions**
+
+- Creating `main` and making it the default branch is how HA-5 (agree the default branch) was closed; the workflows already
+  assumed that name. The brief for the redesign said never to push to `main` directly; this is the owner's later, explicit
+  instruction to do so.
+- Left alone on purpose: branch protection on `main` (CI_CD.md lists the rules), the Dependency graph setting (dependency review
+  keeps failing until it is on) and the old default branch.
