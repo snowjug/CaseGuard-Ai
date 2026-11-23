@@ -132,7 +132,7 @@ services:
   # Explorer with the well-known Azurite development account from the Azurite documentation).
   azurite:
     profiles: ['azurite']
-    image: mcr.microsoft.com/azure-storage/azurite:3.37.0
+    image: mcr.microsoft.com/azure-storage/azurite:3.38.0
     command: azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --location /data --skipApiVersionCheck
     volumes:
       - azurite-data:/data
